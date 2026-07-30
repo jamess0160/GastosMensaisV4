@@ -1,6 +1,6 @@
 import { server } from "./Utils/server"
 import { Logs } from "./Utils/Logs"
-import { baseSocket } from "./modules/_Base/socket"
+import { socket } from "./Utils/socket"
 import { Utils } from "./Utils/Utils"
 import { criptManager } from "./Utils/criptManager"
 
@@ -18,5 +18,5 @@ server.app.listen(port, async () => {
 
     await Utils.sleep(3000)
 
-    baseSocket.emmitReload()
+    socket.emmitReload()
 })

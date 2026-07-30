@@ -1,4 +1,4 @@
-import { BaseDatabase } from "root/modules/_Base/moduleDatabase"
+import { Database } from "root/Utils/database"
 import { appKnex } from "./AppKnex"
 import { TransactionEvents } from "./section/transactionEvents"
 import { criptManager } from "root/Utils/criptManager"
@@ -27,13 +27,13 @@ export async function KnexTransaction(fn: (tx: KnexConnectionType, events: Trans
 export type KnexConnectionType = typeof KnexConnection
 
 export interface DBTypes {
-    Users: BaseDatabase.Users
-    UserGroupTypes: BaseDatabase.UserGroupTypes
-    UserGroupNames: BaseDatabase.UserGroupNames
-    UserInGroups: BaseDatabase.UserInGroups
-    Companys: BaseDatabase.Companys
-    SystemParams: BaseDatabase.SystemParams
-    Plants: BaseDatabase.Plants
-    PasswordRecoverys: BaseDatabase.PasswordRecoverys
-    Permissions: BaseDatabase.Permissions
+    Users: Database.Users
+    UserGroupTypes: Database.UserGroupTypes
+    UserGroupNames: Database.UserGroupNames
+    UserInGroups: Database.UserInGroups
+    Companys: Database.Companys
+    SystemParams: Database.SystemParams
+    Plants: Database.Plants
+    PasswordRecoverys: Database.PasswordRecoverys
+    Permissions: Database.Permissions
 }

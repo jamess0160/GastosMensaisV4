@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express"
 import { Utils } from "./Utils"
 import { APIError, Logs } from "./Logs"
-import { Base_Users_controller } from "root/modules/_Base/routes/Users/Users.controller"
+import { Base_Users_controller } from "root/routes/Users/Users.controller"
 
 type ExpressPromise = (req: Request, res: Response, next: NextFunction) => unknown
 

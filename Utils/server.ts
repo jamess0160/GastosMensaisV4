@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import { modules } from 'root/modules/modules'
+import { Routes } from 'root/routes'
 
 class Server {
 
@@ -10,7 +10,7 @@ class Server {
 
     constructor() {
         this.middlewares()
-        this.app.use(modules)
+        this.app.use(Routes)
 
         this.appLoaded = true
     }
