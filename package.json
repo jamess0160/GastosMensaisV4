@@ -6,7 +6,9 @@
 	"scripts": {
 		"start": "npx nodemon start",
 		"test": "jest -i",
-		"build": "webpack"
+		"build": "npm run build:app && npm run build:migrations",
+		"build:app": "webpack",
+		"build:migrations": "tsc -p tsconfig.migrations.json"
 	},
 	"author": "",
 	"license": "ISC",
