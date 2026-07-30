@@ -1,7 +1,7 @@
 import { BaseModel, MaybeArray } from "root/Utils/Base"
 import { Database } from "root/Utils/database"
 
-export class class_Base_User_model extends BaseModel {
+export class class_Users_model extends BaseModel {
 
     private readonly baseQuery = this.KnexConnection.select("*").from<Database.Users>("Users").where("Active", 1).orderBy("IdUser")
 
@@ -34,4 +34,4 @@ export class class_Base_User_model extends BaseModel {
     }
 }
 
-export const Base_User_model = new class_Base_User_model()
+export const Users_model = new class_Users_model()

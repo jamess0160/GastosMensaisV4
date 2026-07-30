@@ -28,12 +28,4 @@ export type KnexConnectionType = typeof KnexConnection
 
 export interface DBTypes {
     Users: Database.Users
-    UserGroupTypes: Database.UserGroupTypes
-    UserGroupNames: Database.UserGroupNames
-    UserInGroups: Database.UserInGroups
-    Companys: Database.Companys
-    SystemParams: Database.SystemParams
-    Plants: Database.Plants
-    PasswordRecoverys: Database.PasswordRecoverys
-    Permissions: Database.Permissions
 }

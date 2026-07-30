@@ -1,34 +1,8 @@
-import { KnexConnection } from "root/Utils/Connections/Knex/KnexConnection"
-import { class_Base_User_model } from "../../Users.model"
-import { class_Base_UserInGroups_model } from "root/routes/UserInGroups/UserInGroups.model"
+import { Users_model } from "../../Users.model"
 import { Database } from "root/Utils/database"
 
 export class Create {
-    public async run(body: CreateUser) {
-        return KnexConnection.transaction(async (tx) => {
-            const Base_User_model_tx = new class_Base_User_model(tx)
-            const Base_UserInGroups_model_tx = new class_Base_UserInGroups_model(tx)
-
-            let UserGroups = body.UserGroups
-
-            delete body.UserGroups
-
-            let [{ IdUser }] = await Base_User_model_tx.create(body).returning("IdUser")
-
-            if (UserGroups) {
-                await Base_UserInGroups_model_tx.create(UserGroups.map((item) => {
-                    return {
-                        IdUser: IdUser,
-                        IdUserGroupName: parseInt(item),
-                    }
-                }))
-            }
-
-            return { msg: "Sucesso!" }
-        })
+    public async run(body: Database.Users) {
+        return await Users_model.create(body)
     }
-}
-
-export interface CreateUser extends Database.Users {
-    UserGroups?: string[]
 }

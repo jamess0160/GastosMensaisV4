@@ -10,22 +10,26 @@ class Schema {
         })),
     ]
 
-    public readonly getToRegister = []
-
-    public readonly getSelf = []
-
-    public readonly checkLogin = [
-        joiController.validateParams(Joi.object({
-            login: Joi.string().trim().lowercase().required(),
+    public readonly getSelf = [
+        joiController.validateResponse(Joi.object({
+            IdUser: Joi.number().required(),
+            Name: Joi.string().trim().required(),
+            Email: Joi.string().trim().required(),
+            Password: Joi.string().trim().required(),
+            Phone: Joi.string().trim().required(),
+            LastLogin: Joi.string().trim().required(),
+            IdUserChange: Joi.number().required(),
+            CreatedAt: Joi.string().trim().required(),
+            UpdateAt: Joi.string().trim().required(),
         })),
     ]
 
     public readonly create = [
         joiController.validateBody(Joi.object({
             Name: Joi.string().trim().required(),
-            Login: Joi.string().trim().lowercase().required(),
-            Cellphone: Joi.string().trim().required(),
-            UserGroups: Joi.array().items(Joi.string().trim()).required(),
+            Email: Joi.string().trim().required(),
+            Password: Joi.string().trim().required(),
+            Phone: Joi.number().required(),
         })),
     ]
 
@@ -41,12 +45,6 @@ class Schema {
             newPassword: Joi.string().trim().required(),
         })),
     ]
-
-    public readonly delete = [
-        joiController.validateParams(Joi.object({
-            IdUser: Joi.number().required(),
-        })),
-    ]
 }
 
-export const Base_Users_schema = new Schema()
+export const Users_schema = new Schema()

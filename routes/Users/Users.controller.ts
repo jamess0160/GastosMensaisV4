@@ -1,10 +1,8 @@
 import { Base_AcessControl } from './sections/AcessControl.section'
 import { Request, Response } from "express"
-import { Base_User_model } from './Users.model'
+import { Users_model } from './Users.model'
 import { Database } from "root/Utils/database"
 import { ValidateLogin } from './sections/GET/validateLogin'
-import { GetToRegister } from './sections/GET/getToRegister'
-import { CheckLogin } from './sections/GET/checkLogin'
 import { Create } from './sections/POST/create'
 import { Update } from './sections/PUT/update'
 import { GetSelf } from './sections/GET/getSelf'
@@ -37,18 +35,8 @@ class Controller {
         return true
     }
 
-    getToRegister = async (req: Request, res: Response) => {
-        res.json(await new GetToRegister().run())
-    }
-
     getSelf = async (req: Request, res: Response) => {
         res.json(await new GetSelf().run(res.locals.IdUser))
-    }
-
-    checkLogin = async (req: Request, res: Response) => {
-        let { Login, IdCompany } = req.params
-
-        res.json(await new CheckLogin().run(Login, Number(IdCompany)))
     }
 
     create = async (req: Request, res: Response) => {
@@ -60,15 +48,11 @@ class Controller {
     }
 
     updatePassword = async (req: Request, res: Response) => {
-        res.json(await Base_User_model.update(res.locals.IdUser, { Pass: req.params.newPassword }))
-    }
-
-    delete = async (req: Request, res: Response) => {
-        res.json(await Base_User_model.delete(parseInt(req.params.IdUser)))
+        res.json(await Users_model.update(res.locals.IdUser, { Password: req.params.newPassword }))
     }
 }
 
-export const Base_Users_controller = new Controller()
+export const Users_controller = new Controller()
 
 export interface UserRegister extends Database.Users {
     UserGroups?: number[]

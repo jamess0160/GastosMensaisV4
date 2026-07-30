@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express"
 import { Utils } from "./Utils"
 import { APIError, Logs } from "./Logs"
-import { Base_Users_controller } from "root/routes/Users/Users.controller"
+import { Users_controller } from "root/routes/Users/Users.controller"
 
 type ExpressPromise = (req: Request, res: Response, next: NextFunction) => unknown
 
@@ -13,7 +13,7 @@ export function AsyncHandler(routeFunction: ExpressPromise, requireToken = true)
 
         try {
 
-            if (requireToken && Base_Users_controller.acessMiddleware(req, res) === false) {
+            if (requireToken && Users_controller.acessMiddleware(req, res) === false) {
                 return
             }
 

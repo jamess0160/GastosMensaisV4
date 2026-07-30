@@ -4,6 +4,7 @@ import { Schema } from "joi"
 import { AsyncHandler } from "./AsyncHandler"
 
 class JoiController {
+
     public validateBody(schema: Schema) {
         return AsyncHandler((req: Request, res: Response, next: NextFunction) => {
             let { error, value } = schema.validate(req.body, { abortEarly: false })
@@ -57,6 +58,31 @@ class JoiController {
             }
 
             req.query = value
+            next()
+        }, false)
+    }
+
+    public validateResponse(schema: Schema) {
+        return AsyncHandler((req: Request, res: Response, next: NextFunction) => {
+
+            let sendJson = res.json
+
+            res.json = (data: any) => {
+                let { error, value } = schema.validate(data, { abortEarly: false })
+
+                if (error) {
+                    throw new APIError({
+                        msg: "Dados de saída inválidos.",
+                        status: 406,
+                        data: {
+                            details: error.details
+                        }
+                    })
+                }
+
+                return sendJson(value)
+            }
+
             next()
         }, false)
     }
