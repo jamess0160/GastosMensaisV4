@@ -5,7 +5,7 @@ export namespace Database {
         Name: string
         Email: string
         Password: string
-        Phone: string
+        Phone: number
         LastLogin: string
         IdUserChange: number
         CreatedAt: string

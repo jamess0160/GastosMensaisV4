@@ -1,12 +1,8 @@
 import { Users_model } from "../../Users.model"
-import { Database } from "root/Utils/database"
+import { UsersNamespace } from "../types"
 
 export class Update {
-    public async run(IdUser: number, body: UpdateUser) {
+    public async run(IdUser: number, body: UsersNamespace.UserPayload) {
         await Users_model.update(IdUser, body)
     }
-}
-
-interface UpdateUser extends Database.Users {
-    UserGroups?: string[]
 }

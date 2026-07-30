@@ -1,8 +1,8 @@
 import { Users_model } from "../../Users.model"
-import { Database } from "root/Utils/database"
+import { UsersNamespace } from "../types"
 
 export class Create {
-    public async run(body: Database.Users) {
-        return await Users_model.create(body)
+    public async run(body: UsersNamespace.UserPayload) {
+        await Users_model.create(body)
     }
 }
