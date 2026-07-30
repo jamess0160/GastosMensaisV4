@@ -1,0 +1,31 @@
+meta {
+  name: create
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{URL}}/Base/Users
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "IdCompany": "number",
+    "IdAddress": "number",
+    "Name": "string",
+    "Login": "string",
+    "TagNumber": "string",
+    "Mail": "string",
+    "Pass": "string",
+    "Token": "string",
+    "JobDescription": "string",
+    "Phone": "string",
+    "ProjectEnrolment": "string",
+    "DecisionAccount": "boolean",
+    "UserGroups": [
+      "1"
+    ]
+  }
+}

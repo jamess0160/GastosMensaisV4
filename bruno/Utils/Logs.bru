@@ -1,0 +1,30 @@
+meta {
+  name: Logs
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{URL}}/Base/Utils/Logs
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "Type": "error",
+    "Log": {
+      "msg": "Log recebido por http",
+      "data": [
+        1,
+        2,
+        3
+      ]
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

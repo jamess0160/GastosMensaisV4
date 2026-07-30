@@ -1,0 +1,20 @@
+meta {
+  name: Reset
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{URL}}/Base/Cache/Reset/Name={{Cache}}
+  body: none
+  auth: inherit
+}
+
+vars:pre-request {
+  Cache: PendingStopsCache
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

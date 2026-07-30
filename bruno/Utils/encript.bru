@@ -1,0 +1,15 @@
+meta {
+  name: encript
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{URL}}/Base/Utils/Encript/Text={{Text}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  Text: 123456
+}

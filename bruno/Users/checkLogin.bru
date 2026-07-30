@@ -1,0 +1,16 @@
+meta {
+  name: checkLogin
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{URL}}/Base/Users/checkLogin/Login={{login}}/IdCompany={{IdCompany}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  login: admin
+  IdCompany: 1
+}

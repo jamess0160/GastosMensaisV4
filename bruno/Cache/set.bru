@@ -1,0 +1,19 @@
+meta {
+  name: set
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{URL}}/Base/Cache
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "cacheType": "",
+    "cacheKey": "",
+    "payload": {}
+  }
+}

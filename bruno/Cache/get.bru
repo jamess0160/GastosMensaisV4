@@ -1,0 +1,15 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{URL}}/Base/Cache/Name={{Cache}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  Cache: MonitoringResources
+}

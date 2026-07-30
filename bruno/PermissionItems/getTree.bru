@@ -1,0 +1,19 @@
+meta {
+  name: getTree
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{URL}}/Base/PermissionItems/Tree/IdUserGroup={{IdUserGroup}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  IdUserGroup: 1
+}
+
+vars:post-response {
+  tree: res()
+}

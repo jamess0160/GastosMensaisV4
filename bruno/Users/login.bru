@@ -1,0 +1,20 @@
+meta {
+  name: login
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{URL}}/Base/Users/login={{login}}/password={{senha}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  login: admin
+  senha: 202cb962ac59075b964b07152d234b70
+}
+
+vars:post-response {
+  token: res('token')
+}
