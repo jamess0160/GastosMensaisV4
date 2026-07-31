@@ -7,7 +7,6 @@ export namespace Database {
         Password: string
         Phone: number
         LastLogin: string
-        IdUserChange: number
         CreatedAt: string
         UpdateAt: string
     }

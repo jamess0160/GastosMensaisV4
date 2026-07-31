@@ -1,10 +1,11 @@
+import { Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { criptManager } from 'root/Utils/criptManager'
 import { Utils } from 'root/Utils/Utils'
 
 Utils.configEnv()
 
-export class class_Base_AcessControl {
+class Controller {
 
     generateToken(userId: number): string {
         return jwt.sign({ id: userId }, criptManager.getEnv("JWT_SECRET", true), { expiresIn: "24h" })
@@ -17,6 +18,25 @@ export class class_Base_AcessControl {
             return null
         }
     }
+
+    setTokenCookie(res: Response, userId: number): void {
+        const token = this.generateToken(userId)
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000
+        })
+    }
+
+    clearTokenCookie(res: Response): void {
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+        })
+    }
+
 }
 
-export const Base_AcessControl = new class_Base_AcessControl()
+export const AcessControl = new Controller()

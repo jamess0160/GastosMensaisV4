@@ -1,4 +1,4 @@
-import { Base_AcessControl } from './sections/AcessControl.section'
+import { AcessControl } from './sections/AcessControl.section'
 import { Request, Response } from "express"
 import { Users_model } from './Users.model'
 import { Database } from "root/Utils/database"
@@ -12,7 +12,7 @@ class Controller {
     validateLogin = async (req: Request, res: Response) => {
         let { login, password } = req.params
 
-        res.json(await new ValidateLogin().run(login, password))
+        res.json(await new ValidateLogin().run(res, login, password))
     }
 
     acessMiddleware = (req: Request, res: Response) => {
@@ -23,7 +23,7 @@ class Controller {
             return false
         }
 
-        let result = Base_AcessControl.verifyJwtToken(token)
+        let result = AcessControl.verifyJwtToken(token)
 
         if (!result) {
             res.status(401).send()

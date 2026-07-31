@@ -26,7 +26,7 @@ export class class_Users_model extends BaseModel {
     }
 
     update(IdUser: number, record: Partial<Database.Users>) {
-        return this.KnexConnection.update(record).from("Users").where("IdUser", IdUser)
+        return this.KnexConnection.update({ ...record, UpdateAt: this.KnexConnection.fn.now() }).from("Users").where("IdUser", IdUser)
     }
 
     delete(IdUser: number) {
