@@ -21,7 +21,7 @@ class CriptManager {
             throw new Error(`A variável de ambiente '${environmentKey}' não foi encontrada`)
         }
 
-        if (!isCrypt) {
+        if (!isCrypt || process.env.IS_CRIPTED === "false") {
             return environment
         }
 
