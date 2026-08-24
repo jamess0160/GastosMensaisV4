@@ -9,11 +9,13 @@ export async function up(knex: Knex): Promise<void> {
         table.string("Password", 255).notNullable()
         table.integer("Phone").notNullable()
         table.datetime("LastLogin").notNullable().defaultTo(knex.fn.now())
+        table.datetime("TrialStartAt").notNullable().defaultTo(knex.fn.now())
+        table.datetime("TrialEndAt").nullable()
+        table.boolean("Active").notNullable().defaultTo(true)
         table.datetime("CreatedAt").notNullable().defaultTo(knex.fn.now())
-        table.datetime("UpdateAt").notNullable().defaultTo(knex.fn.now())
+        table.datetime("UpdatedAt").notNullable().defaultTo(knex.fn.now())
 
-        // table.foreign("IdCashInflow").references("IdCashInflow").inTable("cashinflows").onDelete("CASCADE")
-        // table.foreign("IdDestiny").references("IdDestiny").inTable("destinys").onDelete("CASCADE")
+        table.unique(["Email"])
     })
 }
 
