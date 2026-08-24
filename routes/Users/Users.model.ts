@@ -3,7 +3,7 @@ import { Database } from "root/Utils/database"
 
 export class class_Users_model extends BaseModel {
 
-    private readonly baseQuery = this.KnexConnection.select("*").from<Database.Users>("Users").where("Active", 1).orderBy("IdUser")
+    private readonly baseQuery = this.KnexConnection.select("*").from<Database.Users>("Users").where("Active", true).orderBy("IdUser")
 
     getByLoginAndPassword(login: string, password: string) {
         return this.baseQuery.clone().where("Login", login).where("Pass", password).first()
@@ -26,11 +26,11 @@ export class class_Users_model extends BaseModel {
     }
 
     update(IdUser: number, record: Partial<Database.Users>) {
-        return this.KnexConnection.update({ ...record, UpdateAt: this.KnexConnection.fn.now() }).from("Users").where("IdUser", IdUser)
+        return this.KnexConnection.update({ ...record, UpdatedAt: this.KnexConnection.fn.now() }).from("Users").where("IdUser", IdUser)
     }
 
     delete(IdUser: number) {
-        return this.KnexConnection.update({ Active: 0 }).from("Users").where("IdUser", IdUser)
+        return this.KnexConnection.update({ Active: false, UpdatedAt: this.KnexConnection.fn.now() }).from("Users").where("IdUser", IdUser)
     }
 }
 

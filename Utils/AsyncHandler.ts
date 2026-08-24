@@ -38,7 +38,9 @@ export function AsyncHandler(routeFunction: ExpressPromise, requireToken = true)
             }
 
             if (error instanceof APIError) {
-                res.status(error.status).json(error)
+                res.status(error.status).json({
+                    msg: error.msg
+                })
                 return
             }
 

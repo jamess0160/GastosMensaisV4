@@ -20,7 +20,7 @@ class Schema {
             LastLogin: Joi.string().trim().required(),
             IdUserChange: Joi.number().required(),
             CreatedAt: Joi.string().trim().required(),
-            UpdateAt: Joi.string().trim().required(),
+            UpdatedAt: Joi.string().trim().required(),
         })),
     ]
 

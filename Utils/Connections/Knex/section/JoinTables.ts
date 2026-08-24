@@ -3,7 +3,7 @@ import knex from "knex";
 import { DBTypes } from "../KnexConnection";
 import { Utils } from "root/Utils/Utils";
 
-export class JoinActives {
+export class JoinTables {
 
     private readonly knexClient: knex.Knex.Client
 
@@ -11,7 +11,7 @@ export class JoinActives {
         this.knexClient = knexConnection
     }
 
-    public async run<T extends keyof DBTypes>(data: any, params: Partial<Record<T, JoinActivesParams<T, string>>>) {
+    public async run<T extends keyof DBTypes>(data: any, params: Partial<Record<T, JoinTablesParams<T, string>>>) {
 
         if (!data) {
             return data
@@ -83,25 +83,21 @@ export class JoinActives {
 
     private async getBindRecords<T extends keyof DBTypes>(idsTable: number[], bindTable: T, destinyColumn: string, append?: appendFn<T>): Promise<any[]> {
 
-        let knexQuery = this.knexClient.queryBuilder().from(bindTable).whereIn(destinyColumn, idsTable).where("Active", 1) as knex.Knex.QueryBuilder<any, any>
+        let knexQuery = this.knexClient.queryBuilder().from(bindTable).whereIn(destinyColumn, idsTable) as knex.Knex.QueryBuilder<any, any>
 
-        if (append) {
-            return append(knexQuery) as any[]
-        }
-
-        return this.knexClient.queryBuilder().from(bindTable).whereIn(destinyColumn, idsTable).where("Active", 1)
+        return append ? append(knexQuery) as any[] : knexQuery
     }
 }
 
-//#region Interfaces / Types 
+//#region Interfaces / Types
 
 declare module 'knex' {
     namespace Knex {
         interface QueryBuilder<TRecord extends {}, TResult = any> {
-            joinActives<
+            joinTables<
                 R extends
-                { [K in keyof DBTypes]?: JoinActivesParams<K, keyof TRecord> }
-                & { [K in string]: JoinActivesParams<K, keyof TRecord> }
+                { [K in keyof DBTypes]?: JoinTablesParams<K, keyof TRecord> }
+                & { [K in string]: JoinTablesParams<K, keyof TRecord> }
             >(params: R): KnexJoinReturn<TRecord, TResult, R>
         }
 
@@ -109,7 +105,7 @@ declare module 'knex' {
             TRecord extends {},
             TResult extends any,
             L extends {
-                [K in keyof DBTypes]?: JoinActivesParams<K, string | keyof TRecord>
+                [K in keyof DBTypes]?: JoinTablesParams<K, string | keyof TRecord>
             }
         > = Promise<TResult extends any[] ? BindTableReturn<TRecord, L>[] : BindTableReturn<TRecord, L> | undefined>
     }
@@ -118,7 +114,7 @@ declare module 'knex' {
 type BindTableReturn<
     R extends MaybeArray<Record<string, any>>,
     L extends {
-        [K in keyof DBTypes]?: JoinActivesParams<K, string | keyof R>
+        [K in keyof DBTypes]?: JoinTablesParams<K, string | keyof R>
     }
 > = R & {
     [K in keyof L]: K extends keyof DBTypes ?
@@ -154,7 +150,7 @@ type BindTableReturn<
 type ValidateTableName<
     R extends MaybeArray<Record<string, any>>,
     L extends {
-        [K in keyof DBTypes]?: JoinActivesParams<K, string | keyof R>
+        [K in keyof DBTypes]?: JoinTablesParams<K, string | keyof R>
     },
     K extends keyof L,
     type extends "multi" | "single"
@@ -177,7 +173,7 @@ type ValidateTableName<
         : never
     )
 
-interface JoinActivesParams<T extends keyof DBTypes | string | number | symbol, R> {
+interface JoinTablesParams<T extends keyof DBTypes | string | number | symbol, R> {
     selfPath: R,
     type?: "multi" | "single"
     destinyColumn?: T extends keyof DBTypes ? keyof DBTypes[T] : string

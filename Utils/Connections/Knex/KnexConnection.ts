@@ -27,5 +27,37 @@ export async function KnexTransaction(fn: (tx: KnexConnectionType, events: Trans
 export type KnexConnectionType = typeof KnexConnection
 
 export interface DBTypes {
+    // Identidade e acesso
     Users: Database.Users
+    Workspaces: Database.Workspaces
+    WorkspaceMembers: Database.WorkspaceMembers
+    UsersAuth: Database.UsersAuth
+    TrustedDevices: Database.TrustedDevices
+
+    // Contas e formas de pagamento
+    Accounts: Database.Accounts
+    PaymentMethods: Database.PaymentMethods
+
+    // Categorias e orcamento
+    Categories: Database.Categories
+    Budgets: Database.Budgets
+    BudgetPeriods: Database.BudgetPeriods
+    Persons: Database.Persons
+
+    // Entradas
+    Inflows: Database.Inflows
+    InflowPersons: Database.InflowPersons
+
+    // Gastos
+    Expenses: Database.Expenses
+    ExpensePayments: Database.ExpensePayments
+    ExpensePersons: Database.ExpensePersons
+    Tags: Database.Tags
+    ExpenseTags: Database.ExpenseTags
+
+    // Plataforma
+    UserDevices: Database.UserDevices
+    Notifications: Database.Notifications
+    Plans: Database.Plans
+    Subscriptions: Database.Subscriptions
 }
