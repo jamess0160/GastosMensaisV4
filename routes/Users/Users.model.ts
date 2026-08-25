@@ -18,7 +18,7 @@ export class class_Users_model extends BaseModel {
     }
 
     getByLogin(login: string) {
-        return this.baseQuery.clone().where("Login", login).first()
+        return this.baseQuery.clone().where("Email", login).first()
     }
 
     create(records: MaybeArray<Partial<Database.Users>>) {

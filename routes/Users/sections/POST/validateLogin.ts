@@ -1,8 +1,8 @@
 import { APIError, Logs } from 'root/Utils/Logs'
 import { Users_model } from '../../Users.model'
 import { AcessControl } from '../AcessControl.section'
+import { PasswordHasher } from '../PasswordHasher.section'
 import { Response } from 'express'
-import bcrypt from 'bcrypt'
 
 export class ValidateLogin {
     public async run(res: Response, login: string, password: string) {
@@ -16,7 +16,7 @@ export class ValidateLogin {
             })
         }
 
-        const isValid = await bcrypt.compare(password, user.Password)
+        const isValid = await PasswordHasher.compare(password, user.Password)
 
         if (!isValid) {
             throw new APIError({

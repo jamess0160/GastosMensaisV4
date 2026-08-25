@@ -4,17 +4,20 @@ meta {
   seq: 1
 }
 
-get {
-  url: {{URL}}/Base/Users/login={{login}}/password={{senha}}
-  body: none
+post {
+  url: {{URL}}/Base/Users/login
+  body: json
   auth: none
+}
+
+body:json {
+  {
+    "login": "{{login}}",
+    "password": "{{senha}}"
+  }
 }
 
 vars:pre-request {
   login: admin
   senha: 202cb962ac59075b964b07152d234b70
-}
-
-vars:post-response {
-  token: res('token')
 }

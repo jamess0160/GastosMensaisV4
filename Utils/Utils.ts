@@ -67,6 +67,28 @@ export namespace Utils {
         return obj
     }
 
+    const sensitiveKeys = ["password", "newpassword", "senha", "token", "authorization"]
+
+    //  Troca o valor das chaves sensíveis por um marcador antes de o dado ir para o log.
+    //  Sem isso o body do cadastro e da troca de senha vai em texto puro para Logs/error.
+    export function redactSensitive<T>(data: T): T {
+        if (Array.isArray(data)) {
+            return data.map((item) => redactSensitive(item)) as T
+        }
+
+        if (!data || typeof data !== "object" || data instanceof Date || Buffer.isBuffer(data)) {
+            return data
+        }
+
+        let redacted: Record<string, any> = {}
+
+        for (let [key, value] of Object.entries(data)) {
+            redacted[key] = sensitiveKeys.includes(key.toLowerCase()) ? "[oculto]" : redactSensitive(value)
+        }
+
+        return redacted as T
+    }
+
     export function removeNestedValue(path: string, obj: Record<string, any>) {
         let [root, nestedPath] = path.split(/\.(.*)/)
 
@@ -108,7 +130,13 @@ export namespace Utils {
     //#region Frame functions
 
     export function configEnv() {
-        config({ path: process.env.NODE_ENV === "test" ? "./.env.test" : "./.env" })
+        config({ path: "./.env" })
+
+        //  Em teste o .env.test entra por cima, declarando só o que muda (banco, portas).
+        //  O override é obrigatório: variável já exportada no terminal vence o dotenv.
+        if (process.env.NODE_ENV === "test") {
+            config({ path: "./.env.test", override: true })
+        }
     }
 
     export async function getConstants(): Promise<Constants> {

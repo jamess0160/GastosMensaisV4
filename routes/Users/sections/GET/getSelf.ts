@@ -7,7 +7,10 @@ export class GetSelf {
 
         if (!user) throw new APIError({ msg: "Usuário não encontrado!", status: 406 })
 
-        return user
+        //  O hash da senha não vai para o cliente
+        let { Password, ...self } = user
+
+        return self
     }
 
     private getUser(IdUser: number) {

@@ -3,3 +3,4 @@ Logs/
 build/
 *.zip
 .env
+.env.test

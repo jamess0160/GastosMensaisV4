@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 - `npm start` — run the API in dev mode via nodemon (`tsx index.ts`, restarts on `.ts`/`.js` changes, ignores `Logs/*`).
-- `npm test` — run Jest in-band (`jest -i`). No test files exist in the repo yet; there is no separate `jest.config.*`, so config would need to be added to `package.json` or a new config file before writing the first test.
+- `npm test` — run the integration suite (Jest in-band, config in `jest.config.ts`); `npm test -- Users` filters by file. `npm run test:watch` re-runs on change. See "Integration tests" below.
+- `npm run start:test` + `npm run test:e2e` — the end to end pair: the first boots the API with `NODE_ENV=test` (test database, port 4100), the second points the same suites at it via `TEST_BASE_URL`. Both go through `cross-env`, since `VAR=value cmd` doesn't work in the Windows shell npm uses.
 - `npm run build` — full build: `build:app` (webpack bundles `index.ts` → `build/bundle.js`, `node_modules` excluded via `webpack-node-externals`) + `build:migrations` (`tsc -p tsconfig.migrations.json` compiles `migrations/*.ts` → `build/migrations`, compiled independently of the app bundle since migrations run through the Knex CLI).
 - Migrations (Knex CLI, `development` environment only, config in `knexfile.ts`): `npx knex migrate:latest`, `npx knex migrate:rollback`, `npx knex migrate:make <name>`.
 - No lint script is configured.
@@ -13,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Environment
 
 - Env vars load through `Utils.configEnv()` (`Utils/Utils.ts`), which reads `.env`, or `.env.test` when `NODE_ENV=test`. `exemple.env` documents the full var list (`PORT`, `SOCKETPORT`, `DB_CLIENT`, `DB_HOST`, `DB_LOGIN`, `DB_PASSWORD`, `DB_SCHEMA`, `DB_PORT`, `JWT_SECRET`, `CONSTANTS_PATH`).
-- All env access goes through `criptManager.getEnv(key, isCrypt?, optional?)` (`Utils/criptManager.ts`), never `process.env` directly. Several vars (`DB_HOST`, `DB_LOGIN`, `DB_PASSWORD`, `DB_SCHEMA`, `DB_PORT`, `JWT_SECRET`) are stored AES-256-CBC encrypted (fixed key/iv in `criptManager.ts`) and decrypted on read via `isCrypt: true`. Produce new encrypted values with `criptManager.encript(value)`, also reachable at runtime via `GET /Base/Utils/Encript/Text=:Text`.
+- All env access goes through `criptManager.getEnv(key, isCrypt?, optional?)` (`Utils/criptManager.ts`), never `process.env` directly. Several vars (`DB_HOST`, `DB_LOGIN`, `DB_PASSWORD`, `DB_SCHEMA`, `DB_PORT`, `JWT_SECRET`) are stored AES-256-CBC encrypted (fixed key/iv in `criptManager.ts`) and decrypted on read via `isCrypt: true`. Produce new encrypted values with `criptManager.encript(value)`, also reachable at runtime via `GET /Base/Utils/Encript/Text=:Text`. `IS_CRIPTED="false"` short-circuits the decryption and returns the raw value — only set it when the `.env` holds plaintext, otherwise the app connects with the ciphertext as hostname.
 - `Utils.getConstants()` reads a JSON file for runtime-tunable flags, path from `CONSTANTS_PATH` (default `Utils/constants.json`). The `Constants` interface in `Utils/Utils.ts` only types a subset of the fields actually present in `constants.json` — extra keys are unused leftovers from a template and can be ignored.
 
 ## Architecture
@@ -37,6 +38,8 @@ Follow this same file split (route/controller/schema/model/sections) when adding
 `AsyncHandler` (`Utils/AsyncHandler.ts`) wraps every route handler and is the single place that: loads constants, enforces auth (calls `Users_controller.acessMiddleware` unless `requireToken` is explicitly `false`), awaits the handler, and catches errors — logging via `Logs.handleError` (gated by `constants.logs.routeErros`), replying with `{ msg }` + `error.status` for a thrown `APIError` (`Utils/Logs.ts`), or a bare 500 otherwise.
 
 Auth is JWT-based (`routes/Users/sections/AcessControl.section.ts`): `acessMiddleware` reads the raw token from the `authorization` header (not a `Bearer ` prefix) and verifies it with `JWT_SECRET`, setting `res.locals.IdUser` on success (typed via the `Express.Locals` augmentation in `Utils/Globals.d.ts`). `AcessControl` also has `setTokenCookie`/`clearTokenCookie` helpers, but nothing currently reads the cookie back — the header is what's actually enforced.
+
+Passwords are hashed server-side and only there: `PasswordHasher` (`routes/Users/sections/PasswordHasher.section.ts`, bcrypt cost 12) is the single place that hashes and compares, used by `create`, `update`, `updatePassword` and `validateLogin`. The client sends the plaintext password in the **body** — never in the URL, since the path reaches the proxy access log, the browser history, the `Referer` header and `Logs.handleError` via `req.originalUrl`; that's why `POST /Base/Users/login` and `PUT /Base/Users/updatePassword` take a body instead of route params. `AsyncHandler` runs `Utils.redactSensitive` over `req.body` before logging, and `getSelf` strips `Password` from the response. Don't pre-hash or encrypt the password on the client: whatever the API receives becomes the effective credential, so a leaked hash could be replayed as-is.
 
 ### Database (Knex)
 
@@ -100,6 +103,27 @@ Runs on its own port (`SOCKETPORT`, separate from the HTTP `PORT`). `Utils/Conne
 ### Logging
 
 Winston + daily-rotate-file, writing under `Logs/`. `Logs.insertLog(log, type)` logs to `Logs/<type>/<date>.<type>.log` (`type` ∈ `info`/`error`/`userError`/`untracked`/`telemetry`); `insertRotineLog`/`insertCacheLog` log to `Logs/rotines/<name>/` and `Logs/cache/<name>/` respectively. `Logs.handleError` auto-classifies a thrown `APIError` with `status === 406` as `userError`, everything else as `error`.
+
+## Integration tests
+
+There are no unit tests: every suite is an integration test that goes through the real pipeline (`AsyncHandler` → Joi schema → section → Knex → Postgres). Nothing is mocked.
+
+- **One file per feature/table**, next to the feature: `routes/<Feature>/<Feature>.tests.ts` (`testMatch: **/*.tests.ts`). `routes/Users/Users.tests.ts` is the reference. Inside it, **one `describe` per route**, in the same order as `<Feature>.route.ts`, plus a final `describe("Fluxo end to end")` that walks the feature's happy path over HTTP only.
+- **Helpers live in `Utils/Tests/`** (barrel at `Utils/Tests/index.ts`): `TestClient`, `TestDatabase`, `TestEnv` and the factories in `section/factories/`.
+- **`TestClient`** is the HTTP client. By default supertest boots the app in-process; with `TEST_BASE_URL` set the exact same tests hit a running server (end to end mode) — that's why tests must never call sections/models directly. It attaches the token to the `authorization` header (no `Bearer`), and `client.login(email, password)` authenticates through the real route and picks the token out of the `token` cookie.
+- **`TestDatabase`** wraps the test connection: `truncate([...])` (per suite, CASCADE + restart identity), `connection()` for asserting the persisted row, `reset()`/`migrate()`. Every destructive helper goes through `TestEnv.assertTestDatabase()`, which refuses to run unless the database name contains `test` (override with `TEST_DB_UNSAFE=true`).
+- **Factories** seed direct to the DB (`UsersFactory.create()` returns the row, the plaintext password and a valid JWT). Use them for arranging state; use HTTP for what is under test.
+- **Config**: `Utils/Tests/globalSetup.ts` rolls back and re-runs the migrations once per execution (so the migration seeds are always there); `setupFiles` loads `Utils/Tests/section/TestEnv.ts` before any app module, since `criptManager`/`AppKnex` read the env at import time; `setupFilesAfterEnv` destroys the Knex pool at the end of each file. `maxWorkers: 1` because all suites share one database, and `forceExit: true` because importing the app leaves the socket.io server and the cache `memoryLog` interval running.
+- **`.env.test`** (gitignored, template in `exemple.env.test`) is layered *on top of* `.env` with `override: true` — it only declares what changes in tests (`DB_SCHEMA` pointing at `gastos_mensais_v4_test`, `SOCKETPORT=0` for an ephemeral port, optional `TEST_BASE_URL`). Values follow the same encryption rules as `.env`.
+
+```
+npm test                # app em memória (supertest)
+
+npm run start:test      # terminal 1: servidor apontando para o banco de teste
+npm run test:e2e        # terminal 2: mesmas suítes, servidor real
+```
+
+`Utils.configEnv()` applies the same `.env` + `.env.test` layering, so the server started with `NODE_ENV=test` and the test process read the identical config — without that the factories would seed one database while the server reads another.
 
 ## Manual API testing
 

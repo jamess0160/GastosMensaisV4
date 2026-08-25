@@ -29,7 +29,8 @@ export function AsyncHandler(routeFunction: ExpressPromise, requireToken = true)
                     rota: req.originalUrl,
                     methodo: req.method,
                     IdUser: res.locals.IdUser,
-                    data: req.body,
+                    //  O body de cadastro/login carrega senha: nada de gravar isso no log
+                    data: Utils.redactSensitive(req.body),
                 })
             }
 

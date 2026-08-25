@@ -7,7 +7,8 @@ export async function up(knex: Knex): Promise<void> {
         table.string("Name", 255).notNullable()
         table.string("Email", 255).notNullable()
         table.string("Password", 255).notNullable()
-        table.integer("Phone").notNullable()
+        //  Até 12 dígitos (DDI + DDD + número): não cabe em integer
+        table.bigInteger("Phone").notNullable()
         table.datetime("LastLogin").notNullable().defaultTo(knex.fn.now())
         table.datetime("TrialStartAt").notNullable().defaultTo(knex.fn.now())
         table.datetime("TrialEndAt").nullable()

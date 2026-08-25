@@ -1,16 +1,16 @@
 import { AcessControl } from './sections/AcessControl.section'
 import { Request, Response } from "express"
-import { Users_model } from './Users.model'
 import { Database } from "root/Utils/database"
-import { ValidateLogin } from './sections/GET/validateLogin'
+import { ValidateLogin } from './sections/POST/validateLogin'
 import { Create } from './sections/POST/create'
 import { Update } from './sections/PUT/update'
+import { UpdatePassword } from './sections/PUT/updatePassword'
 import { GetSelf } from './sections/GET/getSelf'
 
 class Controller {
 
     validateLogin = async (req: Request, res: Response) => {
-        let { login, password } = req.params
+        let { login, password } = req.body
 
         res.json(await new ValidateLogin().run(res, login, password))
     }
@@ -48,7 +48,7 @@ class Controller {
     }
 
     updatePassword = async (req: Request, res: Response) => {
-        res.json(await Users_model.update(res.locals.IdUser, { Password: req.params.newPassword }))
+        res.json(await new UpdatePassword().run(res.locals.IdUser, req.body.oldPassword, req.body.newPassword))
     }
 }
 

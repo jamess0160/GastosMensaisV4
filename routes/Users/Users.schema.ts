@@ -4,23 +4,26 @@ import { joiController } from "root/Utils/joiController"
 class Schema {
 
     public readonly validateLogin = [
-        joiController.validateParams(Joi.object({
+        joiController.validateBody(Joi.object({
             login: Joi.string().trim().lowercase().required(),
             password: Joi.string().trim().required(),
         })),
     ]
 
+    //  Espelha a linha de Users, menos o Password: o hash nunca sai da API.
+    //  As datas chegam aqui como Date (o res.json só serializa depois da validação).
     public readonly getSelf = [
         joiController.validateResponse(Joi.object({
             IdUser: Joi.number().required(),
             Name: Joi.string().trim().required(),
             Email: Joi.string().trim().required(),
-            Password: Joi.string().trim().required(),
-            Phone: Joi.string().trim().required(),
-            LastLogin: Joi.string().trim().required(),
-            IdUserChange: Joi.number().required(),
-            CreatedAt: Joi.string().trim().required(),
-            UpdatedAt: Joi.string().trim().required(),
+            Phone: Joi.number().required(),
+            LastLogin: Joi.date().required(),
+            TrialStartAt: Joi.date().required(),
+            TrialEndAt: Joi.date().allow(null).required(),
+            Active: Joi.boolean().required(),
+            CreatedAt: Joi.date().required(),
+            UpdatedAt: Joi.date().required(),
         })),
     ]
 
@@ -37,11 +40,16 @@ class Schema {
         joiController.validateParams(Joi.object({
             IdUser: Joi.number().required(),
         })),
-        ...this.create
+        joiController.validateBody(Joi.object({
+            Name: Joi.string().trim().required(),
+            Email: Joi.string().trim().required(),
+            Phone: Joi.number().required(),
+        })),
     ]
 
     public readonly updatePassword = [
-        joiController.validateParams(Joi.object({
+        joiController.validateBody(Joi.object({
+            oldPassword: Joi.string().trim().required(),
             newPassword: Joi.string().trim().required(),
         })),
     ]

@@ -65,9 +65,16 @@ class JoiController {
     public validateResponse(schema: Schema) {
         return AsyncHandler((req: Request, res: Response, next: NextFunction) => {
 
-            let sendJson = res.json
+            //  bind: o res.json do express usa o this internamente (res.app), guardar a
+            //  referência solta faz a resposta válida quebrar com TypeError
+            let sendJson = res.json.bind(res)
 
             res.json = (data: any) => {
+
+                res.json = sendJson
+
+                if (res.statusCode >= 400) return res.json(data)
+
                 let { error, value } = schema.validate(data, { abortEarly: false })
 
                 if (error) {
@@ -80,7 +87,7 @@ class JoiController {
                     })
                 }
 
-                return sendJson(value)
+                return res.json(value)
             }
 
             next()
