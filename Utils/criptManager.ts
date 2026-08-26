@@ -1,5 +1,6 @@
 import crypto from "crypto"
 import { Utils } from "./Utils"
+import { APIError } from "./Logs"
 
 Utils.configEnv()
 
@@ -9,23 +10,30 @@ class CriptManager {
     private readonly iv = Buffer.from("3PQcO/de5I5pH/hQ2ZXv4w==", "base64")
 
     public getEnv(environmentKey: string, isCrypt: boolean = false, optional: boolean = false) {
+        try {
+            let environment = process.env[environmentKey]
 
-        let environment = process.env[environmentKey]
+            if (!environment) {
 
-        if (!environment) {
+                if (optional === true) {
+                    return ""
+                }
 
-            if (optional === true) {
-                return ""
+                throw new Error(`A variável de ambiente '${environmentKey}' não foi encontrada`)
             }
 
-            throw new Error(`A variável de ambiente '${environmentKey}' não foi encontrada`)
-        }
+            if (!isCrypt || process.env.IS_CRIPTED === "false") {
+                return environment
+            }
 
-        if (!isCrypt || process.env.IS_CRIPTED === "false") {
-            return environment
+            return this.decryptValue(environment)
+        } catch (error) {
+            throw new APIError({
+                msg: `Ocorreu um erro ao buscar a variável ${environmentKey}`,
+                status: 500,
+                data: { error, value: process.env[environmentKey] }
+            })
         }
-
-        return this.decryptValue(environment)
     }
 
     public encript(value: string) {
