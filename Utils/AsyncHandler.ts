@@ -24,7 +24,7 @@ export function AsyncHandler(routeFunction: ExpressPromise, requireToken = true)
             }
 
         } catch (error: any) {
-            if (constants.logs.routeErros) {
+            if (constants.logs.routeErros && (error instanceof APIError && error.status !== 401)) {
                 Logs.handleError(`Ocorreu um erro na rota ${req.originalUrl}`, error, {
                     rota: req.originalUrl,
                     methodo: req.method,

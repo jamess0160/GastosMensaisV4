@@ -129,6 +129,102 @@ describe("Users", () => {
 
             expect(created?.Password).not.toBe(payload.Password)
         })
+
+        let IdWorkspace: number
+
+        //  Todo dado de domínio é escopado por IdWorkspace: usuário sem workspace não
+        //  consegue lançar nada, então os dois nascem na mesma transaction
+        it("cria o workspace do usuário junto e devolve os dois ids", async () => {
+            let payload = buildPayload({ Name: "Usuário com workspace" })
+
+            let response = await client.anonymous().post("/Base/Users", payload)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                IdUser: expect.any(Number),
+                IdWorkspace: expect.any(Number),
+            })
+
+            IdWorkspace = response.body.IdWorkspace
+
+            let workspace = await findWorkspace(response.body.IdWorkspace)
+
+            expect(workspace?.IdOwnerUser).toBe(response.body.IdUser)
+            expect(workspace?.Name).toBe(payload.Name)
+        })
+
+        //  Se um usuário for criado já com um namespace, ele não deve criar um novo
+        it("cria o usuário e adicionar ele a um workspace já existente", async () => {
+
+            let payload = buildPayload({ IdWorkspace, Name: "Usuário com workspace" })
+
+            let response = await client.anonymous().post("/Base/Users", payload)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                IdUser: expect.any(Number),
+                IdWorkspace: expect.any(Number),
+            })
+            
+            expect(response.body.IdWorkspace).toEqual(IdWorkspace)
+        })
+
+        //  Sem a matrícula o workspace é órfão: as leituras saem de WorkspaceMembers
+        it("matricula o dono no workspace criado", async () => {
+            let response = await client.anonymous().post("/Base/Users", buildPayload())
+
+            let membership = await TestDatabase.connection()
+                .select("*")
+                .from("WorkspaceMembers")
+                .where("IdWorkspace", response.body.IdWorkspace)
+                .first()
+
+            expect(membership?.IdUser).toBe(response.body.IdUser)
+            expect(membership?.Role).toBe("owner")
+        })
+
+        //  O índice único de Email já barraria, mas com 500: a resposta tem que dizer o motivo
+        it("recusa um e-mail que já existe", async () => {
+            let payload = buildPayload()
+
+            expect((await client.anonymous().post("/Base/Users", payload)).status).toBe(200)
+
+            let response = await client.anonymous().post("/Base/Users", { ...payload, Name: "Outro nome" })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  O validateLogin normaliza o login para minúsculo: gravar o e-mail como veio
+        //  deixaria quem se cadastrou com maiúscula sem conseguir entrar
+        it("normaliza o e-mail para minúsculo", async () => {
+            let payload = buildPayload()
+            let Email = payload.Email.toUpperCase()
+
+            expect((await client.anonymous().post("/Base/Users", { ...payload, Email })).status).toBe(200)
+
+            expect(await findByEmail(payload.Email)).toBeDefined()
+
+            //  E o login com a caixa original continua funcionando
+            expect((await client.anonymous().login(Email, payload.Password)).status).toBe(200)
+        })
+
+        it("recusa um e-mail malformado", async () => {
+            let response = await client.anonymous().post("/Base/Users", buildPayload({ Email: "nao-e-um-email" }))
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Se o workspace falhasse, um usuário pela metade ficaria gravado
+        it("não deixa usuário órfão quando o cadastro é recusado", async () => {
+            let payload = buildPayload()
+
+            await client.anonymous().post("/Base/Users", payload)
+            await client.anonymous().post("/Base/Users", payload)
+
+            let users = await TestDatabase.connection().select("*").from("Users").where("Email", payload.Email)
+
+            expect(users).toHaveLength(1)
+        })
     })
 
     describe("PUT /Base/Users/IdUser=:IdUser", () => {
@@ -267,4 +363,8 @@ function buildUpdatePayload(overrides: Partial<UsersNamespace.UpdateUserPayload>
 
 function findByEmail(Email: string) {
     return TestDatabase.connection().select("*").from("Users").where("Email", Email).first()
+}
+
+function findWorkspace(IdWorkspace: number) {
+    return TestDatabase.connection().select("*").from("Workspaces").where("IdWorkspace", IdWorkspace).first()
 }

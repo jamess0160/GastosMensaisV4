@@ -1,3 +1,4 @@
+import { Knex } from "knex"
 import { Database } from "root/Utils/database"
 import { appKnex } from "./AppKnex"
 import { TransactionEvents } from "./section/transactionEvents"
@@ -14,7 +15,9 @@ export const KnexConnection = appKnex({
     },
 })
 
-export async function KnexTransaction(fn: (tx: KnexConnectionType, events: TransactionEvents) => Promise<unknown>) {
+//  O tx é Knex.Transaction (e não o Knex solto) porque é esse o tipo que o .transacting()
+//  dos models aceita: sem isso cada query dentro da transaction precisaria de um cast.
+export async function KnexTransaction<T>(fn: (tx: Knex.Transaction, events: TransactionEvents) => Promise<T>): Promise<T> {
     let events = new TransactionEvents()
 
     let result = await KnexConnection.transaction((tx) => fn(tx, events))

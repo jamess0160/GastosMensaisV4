@@ -145,13 +145,11 @@ export namespace Utils {
 
         let constantsPath = envPath ? path.resolve(process.cwd(), ...envPath.split("\\")) : path.resolve(process.cwd(), "Utils", "constants.json")
 
-        let jsonConstants = await fs.readFile(constantsPath)
+        //  Lendo com encoding o retorno já é string: sem ele o readFile devolve Buffer e o
+        //  ramo que tentava dar JSON.parse direto no valor era código morto.
+        let jsonConstants = await fs.readFile(constantsPath, "utf8")
 
         if (!jsonConstants) throw new Error(`JSON de constantes não foi encontrado no diretório ${constantsPath}`)
-
-        if (jsonConstants instanceof Buffer) {
-            return JSON.parse(jsonConstants.toString())
-        }
 
         return JSON.parse(jsonConstants)
     }

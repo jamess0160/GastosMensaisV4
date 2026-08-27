@@ -21,6 +21,12 @@ export class class_Users_model extends BaseModel {
         return this.baseQuery.clone().where("Email", login).first()
     }
 
+    //  Fora do baseQuery de propósito: o índice único de Email não conhece o Active, então a
+    //  checagem de e-mail livre no cadastro precisa enxergar também os usuários desativados.
+    getByEmailIncludingInactive(Email: string) {
+        return this.KnexConnection.select("*").from<Database.Users>("Users").where("Email", Email).first()
+    }
+
     create(records: MaybeArray<Partial<Database.Users>>) {
         return this.KnexConnection.insert(records).into("Users")
     }
