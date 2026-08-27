@@ -74,6 +74,8 @@ Tables are PascalCase plural, PK is `Id<Singular>` via `table.increments(...)`. 
 
 Domain tables are scoped by `IdWorkspace` (tenant) with `IdUser` as author. One workspace per user today; `WorkspaceMembers` is already in place for sharing later.
 
+**An account has no stored balance.** `Accounts.InitialBalance`/`InitialBalanceDate` are the opening balance — origin data, since no entry in the system derives it — and everything after that is computed from the ledger: `InitialBalance` + received `Inflows` into the account − received `Inflows` out of it − paid `ExpensePayments` whose `PaymentMethod` belongs to it. A `CurrentBalance` cache column existed and was dropped (migration `20260827022816`): keeping it in sync would mean every route that touches money remembering to recalculate, and missing one doesn't break anything — it just drifts, and a plausible wrong balance is the worst failure this app has. The indexes for the computed read are already in place. Note transfers count **both** directions here, unlike the "how much came in" totals that exclude them.
+
 `PaymentMethods` is the child of `Accounts` and is the single place where `pix`, `debit` and `credit_card` live — there is no separate cards table and no account of type `credit_card`. Creating an account auto-generates its `pix` and `debit` rows; credit cards are added by the user. `ClosingDay`/`DueDay` are only meaningful on `Kind='credit_card'`.
 
 `Categories` covers **expenses only** for now, and `IdWorkspace IS NULL` marks a system-wide predefined category — every read is `where(IdWorkspace = X or IdWorkspace is null)`.
@@ -92,7 +94,9 @@ A recurring ("fixed") expense is a **chain of real occurrences**, not template +
 
 `Inflows` carries **both** money coming in and transfers between accounts, discriminated by `Kind`: `'inflow'` has a null `IdFromAccount` (the money came from outside) and `'transfer'` requires both accounts, different from each other — two `CHECK` constraints enforce this. Because a transfer is net-zero for net worth, **every "how much came in" total must filter `Kind <> 'transfer'`**, or the same money is counted again each time it moves between accounts. `InflowPersons` splits an inflow across `Persons`; it only applies to `Kind='inflow'`, never to transfers. Inflows have no category and no recurrence by design.
 
-**Current scope.** The schema is being built in stages. What exists: identity/access (`Users`, `Workspaces`, `WorkspaceMembers`, `UsersAuth`, `TrustedDevices`), registration (`Accounts`, `PaymentMethods`, `Categories`, `Budgets`) and platform (`UserDevices`, `Notifications`, `Plans`, `Subscriptions`). Movement is deliberately **not modelled yet** — no expenses, inflows, destinies, transfers, card invoices, recurrence or reconciliation. Don't add those without being asked.
+**Current scope.** The schema is complete — all 22 tables above exist in `migrations/`. What is **not** built is the code on top of them: only `Users`, `Workspaces`/`WorkspaceMembers` and `UsersAuth`/`TrustedDevices` have routes today. Everything else (accounts, categories, persons, tags, inflows, expenses, budgets, platform) is schema without an API.
+
+`ROADMAP.md` maps that remaining work in stages, ordered by the foreign keys, and records the cross-cutting decisions that have to be settled before the movement tables get routes — account balance is already settled (computed, never cached), still open are who writes the derived `Expenses.Status` and the shared period-filter format. Read it before starting a new feature — building out of order means writing against a table whose parent has no API yet.
 
 #### PostgreSQL specifics
 

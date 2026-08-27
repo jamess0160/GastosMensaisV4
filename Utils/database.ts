@@ -67,10 +67,11 @@ export namespace Database {
         IconPath: string | null
         /** RGB em hexadecimal (#RRGGBB). */
         Color: string | null
+        /** Saldo de abertura: dado de origem, nao derivavel de nenhum lancamento. */
         InitialBalance: number
         InitialBalanceDate: Datetime | null
-        /** Cache: recalculavel do zero a partir de InitialBalance + movimentos. */
-        CurrentBalance: number
+        //  Nao existe coluna de saldo atual: o saldo e sempre calculado dos lancamentos.
+        //  Ver a migration 20260827022816 e a decisao 1 do ROADMAP.md.
         Position: number | null
         Active: boolean
         CreatedAt: Datetime

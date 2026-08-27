@@ -36,6 +36,10 @@ class Schema {
     //  "Tiago@X.com" aqui deixaria o usuário sem conseguir entrar pela própria conta.
     public readonly create = [
         joiController.validateBody(Joi.object({
+            //  PENDÊNCIA CONHECIDA (etapa 9 do ROADMAP.md): esta rota é pública e este campo
+            //  entra direto como matrícula 'owner', sem convite nem conferência de dono. Um
+            //  IdWorkspace chutado (são sequenciais) dá acesso ao workspace alheio. Vai ser
+            //  substituído por um InviteToken assinado; até lá, não subir para produção.
             IdWorkspace: Joi.number().optional(),
             Name: Joi.string().trim().required(),
             Email: Joi.string().trim().lowercase().email(emailOptions).required(),
