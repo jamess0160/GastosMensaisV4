@@ -7,12 +7,6 @@ class Schema {
 
     public readonly health = []
 
-    public readonly encript = [
-        joiController.validateParams(Joi.object({
-            Text: Joi.string().trim().required(),
-        }))
-    ]
-
     public readonly reload = []
 
     public readonly logs = [

@@ -1,18 +1,18 @@
 import type { Knex } from "knex";
 import dotenv from "dotenv";
-import { criptManager } from "./Utils/criptManager";
+import { enviromentManager } from "./Utils/enviromentManager";
 
 dotenv.config();
 
 const config: { [key: string]: Knex.Config } = {
 	development: {
-		client: criptManager.getEnv("DB_CLIENT"),
+		client: enviromentManager.getEnv("DB_CLIENT"),
 		connection: {
-			host: criptManager.getEnv("DB_HOST", true),
-			user: criptManager.getEnv("DB_LOGIN", true),
-			password: criptManager.getEnv("DB_PASSWORD", true, true),
-			database: criptManager.getEnv("DB_SCHEMA", true),
-			port: criptManager.getEnv("DB_PORT", true, true) ? parseInt(criptManager.getEnv("DB_PORT", true, true)) : undefined
+			host: enviromentManager.getEnv("DB_HOST"),
+			user: enviromentManager.getEnv("DB_LOGIN"),
+			password: enviromentManager.getEnv("DB_PASSWORD", true),
+			database: enviromentManager.getEnv("DB_SCHEMA"),
+			port: enviromentManager.getEnv("DB_PORT", true) ? parseInt(enviromentManager.getEnv("DB_PORT", true)) : undefined
 		},
 		pool: {
 			min: 2,

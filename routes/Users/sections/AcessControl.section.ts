@@ -1,6 +1,6 @@
 import { Response } from 'express'
 import jwt from 'jsonwebtoken'
-import { criptManager } from 'root/Utils/criptManager'
+import { enviromentManager } from 'root/Utils/enviromentManager'
 import { Utils } from 'root/Utils/Utils'
 
 Utils.configEnv()
@@ -8,12 +8,12 @@ Utils.configEnv()
 class Controller {
 
     generateToken(userId: number): string {
-        return jwt.sign({ id: userId }, criptManager.getEnv("JWT_SECRET", true), { expiresIn: "24h" })
+        return jwt.sign({ id: userId }, enviromentManager.getEnv("JWT_SECRET"), { expiresIn: "24h" })
     }
 
     verifyJwtToken(token: string): null | { id: number } {
         try {
-            return jwt.verify(token, criptManager.getEnv("JWT_SECRET", true)) as { id: number }
+            return jwt.verify(token, enviromentManager.getEnv("JWT_SECRET")) as { id: number }
         } catch (error: any) {
             return null
         }

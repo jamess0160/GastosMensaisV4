@@ -1,6 +1,6 @@
 import { Server, Socket as SocketType } from "socket.io"
 import { Utils } from "../Utils"
-import { criptManager } from "../criptManager"
+import { enviromentManager } from "../enviromentManager"
 
 Utils.configEnv()
 
@@ -21,7 +21,7 @@ export abstract class SocketEngine {
     }
 
     private configServer() {
-        let port = criptManager.getEnv("SOCKETPORT")
+        let port = enviromentManager.getEnv("SOCKETPORT")
 
         return new Server({
             cors: {

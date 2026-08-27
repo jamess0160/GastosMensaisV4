@@ -3,11 +3,11 @@ import { Utils } from 'root/Utils/Utils'
 import { JoinTables } from './section/JoinTables'
 import { ReturnId } from './section/returnId'
 import { registerPgTypeParsers } from './section/pgTypeParsers'
-import { criptManager } from 'root/Utils/criptManager'
+import { enviromentManager } from 'root/Utils/enviromentManager'
 
 Utils.configEnv()
 
-registerPgTypeParsers(criptManager.getEnv("DB_CLIENT"))
+registerPgTypeParsers(enviromentManager.getEnv("DB_CLIENT"))
 
 knex.QueryBuilder.extend("joinTables", async function (params: any) {
     let data = await this as any

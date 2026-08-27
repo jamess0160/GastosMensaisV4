@@ -1,7 +1,6 @@
 import { Request, Response } from "express"
 import { Logs } from "root/Utils/Logs"
 import { BaseUtilsNamespace } from "./sections/types"
-import { criptManager } from "root/Utils/criptManager"
 import { socket } from "root/Utils/socket"
 
 class Controller {
@@ -15,14 +14,6 @@ class Controller {
             msg: "API Funcionando",
             timeStamp: Date.now(),
             serverTime: new Date().toLocaleString("pt-br"),
-        })
-    }
-
-    encript = async (req: Request, res: Response) => {
-        let text = req.params.Text as string
-
-        res.json({
-            result: criptManager.encript(text)
         })
     }
 

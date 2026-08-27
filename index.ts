@@ -2,12 +2,12 @@ import { server } from "./Utils/server"
 import { Logs } from "./Utils/Logs"
 import { socket } from "./Utils/socket"
 import { Utils } from "./Utils/Utils"
-import { criptManager } from "./Utils/criptManager"
+import { enviromentManager } from "./Utils/enviromentManager"
 
 Utils.configEnv()
 
-const port = criptManager.getEnv("PORT")
-const socketPort = criptManager.getEnv("SOCKETPORT")
+const port = enviromentManager.getEnv("PORT")
+const socketPort = enviromentManager.getEnv("SOCKETPORT")
 
 server.app.listen(port, async () => {
     Logs.insertLog({ msg: "Api iniciada" })

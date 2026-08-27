@@ -1,7 +1,7 @@
 import { Utils } from "root/Utils/Utils"
 
 //  Este arquivo roda no setupFiles do jest, antes de qualquer import da aplicação.
-//  Os módulos do app (criptManager, AppKnex, AcessControl) chamam Utils.configEnv() no
+//  Os módulos do app (enviromentManager, AppKnex, AcessControl) chamam Utils.configEnv() no
 //  momento do import, então o ambiente precisa estar pronto antes disso.
 process.env.NODE_ENV = "test"
 
@@ -22,10 +22,10 @@ export namespace TestEnv {
     }
 
     export function getDatabaseName() {
-        //  import tardio: o criptManager lê o process.env no import, precisa vir depois do dotenv
-        const { criptManager } = require("root/Utils/criptManager") as typeof import("root/Utils/criptManager")
+        //  import tardio: o enviromentManager lê o process.env no import, precisa vir depois do dotenv
+        const { enviromentManager } = require("root/Utils/enviromentManager") as typeof import("root/Utils/enviromentManager")
 
-        return criptManager.getEnv("DB_SCHEMA", true)
+        return enviromentManager.getEnv("DB_SCHEMA")
     }
 
     //  Trava de segurança: migrate e truncate apagam dados, então só rodam em um banco cujo
