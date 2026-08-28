@@ -20,15 +20,9 @@ Das 22 tabelas do banco, 7 têm código:
 | `UsersAuth` / `TrustedDevices` | biometria (WebAuthn) completa |
 | `Accounts` / `PaymentMethods` | **etapa 1 pronta**: CRUD das duas, `pix` e `debit` nascendo com a conta, saldo de abertura travado depois do primeiro lançamento |
 
-**O `IdWorkspace` saiu da URL.** Ele viaja assinado dentro do próprio token, ao lado do
-`IdUser`, emitido pelo login e reemitido pelo `POST /Base/Workspaces/switch`, e chega às rotas
-pelo `res.locals`. As rotas das próximas etapas nascem sem ele no caminho:
-`GET /Base/Inflows`, `PUT /Base/Expenses/IdExpense=:IdExpense` e assim por diante.
-
-**Estar no token não dispensa o `assertMember`.** A assinatura prova que o cliente não forjou
-o número; não prova que a matrícula ainda existe. O token vale 24h, e a etapa 9 vai permitir
-remover membro e rebaixar papel — quem confere isso é o banco, em toda section, exatamente
-como antes.
+**O `IdWorkspace` saiu da URL e passou a viajar dentro do token.** Isso mudou a forma de toda
+rota escopada por tenant, inclusive as que ainda não existem — ver a decisão 0 abaixo antes de
+escrever a primeira rota da etapa 2.
 
 As outras 15 não têm nada. Quatro delas (`UserDevices`, `Notifications`, `Plans`,
 `Subscriptions`) são plataforma e ficam **fora desta leva**.
@@ -63,7 +57,67 @@ conta cadastrada não existe gasto nem entrada que o banco aceite.
 
 ## Decisões transversais — tomar ANTES da etapa 4
 
-Três coisas atravessam várias etapas. Se ficarem para depois, viram retrabalho em todas elas.
+Quatro coisas atravessam várias etapas. Se ficarem para depois, viram retrabalho em todas elas.
+Duas já estão fechadas (0 e 1); as outras duas continuam abertas.
+
+### 0. Como o workspace chega na rota — DECIDIDO: assinado dentro do token
+
+Começou na URL (`/Base/Accounts/IdWorkspace=:IdWorkspace`), passou por um cookie próprio e
+terminou **dentro do próprio token**, ao lado do `IdUser`. As tabelas de rota deste documento
+já estão na forma final: **nenhuma rota das etapas 2 a 7 leva `IdWorkspace` no caminho.**
+
+```
+login  → AcessControl.startSession → SelectDefault escolhe o workspace
+       → token assinado { id, IdWorkspace } → cookie httpOnly 'token'
+requisição → acessMiddleware lê o cookie → res.locals.IdUser + res.locals.IdWorkspace
+       → controller passa adiante → section confere no banco
+```
+
+**Por que saiu da URL.** Um id no caminho é dado do cliente num lugar que convida a confiar
+nele, e ele se repetia em toda rota de toda feature sem nunca variar dentro de uma sessão —
+sete rotas na etapa 1, mais de vinte até o fim da leva.
+
+**Por que dentro do token e não num cookie só dele.** Um segundo cookie continuaria sendo dado
+do cliente: os ids são sequenciais, e reescrever `IdWorkspace=2` é trivial. Dentro do token
+assinado essa porta fecha, e a sessão inteira passa a viver e morrer como uma coisa só.
+Cuidado: o payload de um JWT é base64, **assinado não é criptografado** — qualquer um que
+tenha o token lê os dois ids. Nunca colocar segredo ali.
+
+**Assinado não é o mesmo que ainda verdadeiro — o `assertMember` fica.** O token é uma
+fotografia da autorização no instante do login e vale 24h. A etapa 9 vai permitir remover
+membro e rebaixar papel, então entre a emissão e o uso a matrícula pode ter mudado.
+Autenticação (quem é) o token resolve; autorização (ainda pode?) só o banco responde. Isso
+não custa consulta extra: a maioria das chamadas é `assertRole`, que precisa do papel
+**atual** e teria que ir ao banco de qualquer jeito.
+
+**A convenção que vale para toda section nova:** o parâmetro que chega se chama
+`SelectedIdWorkspace`, e o `IdWorkspace` usado nas queries é o que **volta da matrícula**.
+
+```ts
+public async run(SelectedIdWorkspace: number, IdUser: number, body: ...) {
+    let { IdWorkspace } = await WorkspacesAcessControl.assertRole(SelectedIdWorkspace, IdUser, ["owner", "editor"])
+    //  daqui para baixo, só o IdWorkspace conferido existe
+}
+```
+
+O nome diferente é de propósito: com os dois se chamando `IdWorkspace`, o valor não conferido
+chegaria numa query por descuido e ninguém veria na revisão.
+
+**Trocar de workspace reemite o token** (`POST /Base/Workspaces/switch`) — é a única rota que
+recebe um `IdWorkspace` escrito pelo cliente, e por isso confere a matrícula antes de assinar
+qualquer coisa. O token anterior segue válido até expirar, apontando para o workspace antigo:
+correto, porque prova a mesma identidade e uma seleção que na época era legítima. **Quando a
+etapa 9 permitir remover membro, é o `assertMember` que fecha a porta — não o token**, que
+continua circulando até as 24h acabarem.
+
+Token sem workspace (usuário sem nenhuma matrícula) responde 406 "Nenhum workspace
+selecionado", com mensagem própria porque o conserto é chamar o `switch`, não pedir acesso.
+
+**Junto veio o fim do header `authorization`:** a sessão é lida do cookie httpOnly e só dele.
+Front e API saem do mesmo domínio (`www.gastosmensais.com.br` e `.../api` pelo nginx), então
+são a mesma origem — sem CORS, sem preflight. Dois caminhos de autenticação significariam que
+o mais fraco decide, e um header aceito de qualquer lugar escapa do `sameSite: strict`, que é
+toda a defesa contra CSRF hoje. Detalhes de deploy no `CLAUDE.md`.
 
 ### 1. Saldo da conta — DECIDIDO: calcular na fonte, sem cache
 
@@ -131,13 +185,13 @@ update do gasto **não pode aceitar `Status` no body**.
 
 | Rota | O que faz |
 | --- | --- |
-| `GET /Base/Accounts/IdWorkspace=:IdWorkspace` | lista contas ativas com as formas de pagamento embutidas (`joinTables`) |
-| `POST /Base/Accounts/IdWorkspace=:IdWorkspace` | cria conta **e gera `pix` + `debit` na mesma transaction** |
-| `PUT /Base/Accounts/IdWorkspace=:IdWorkspace/IdAccount=:IdAccount` | edita nome, cor, ícone, posição |
-| `DELETE /Base/Accounts/IdWorkspace=:IdWorkspace/IdAccount=:IdAccount` | `Active = false` |
-| `POST /Base/PaymentMethods/IdWorkspace=:IdWorkspace` | cadastra cartão de crédito |
-| `PUT /Base/PaymentMethods/IdWorkspace=:IdWorkspace/IdPaymentMethod=:IdPaymentMethod` | edita |
-| `DELETE /Base/PaymentMethods/IdWorkspace=:IdWorkspace/IdPaymentMethod=:IdPaymentMethod` | `Active = false` |
+| `GET /Base/Accounts` | lista contas ativas com as formas de pagamento embutidas (`joinTables`) |
+| `POST /Base/Accounts` | cria conta **e gera `pix` + `debit` na mesma transaction** |
+| `PUT /Base/Accounts/IdAccount=:IdAccount` | edita nome, cor, ícone, posição |
+| `DELETE /Base/Accounts/IdAccount=:IdAccount` | `Active = false` |
+| `POST /Base/PaymentMethods` | cadastra cartão de crédito |
+| `PUT /Base/PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | edita |
+| `DELETE /Base/PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | `Active = false` |
 
 **Pontos de atenção**
 
@@ -167,10 +221,10 @@ update do gasto **não pode aceitar `Status` no body**.
 
 | Rota | O que faz |
 | --- | --- |
-| `GET /Base/Categories/IdWorkspace=:IdWorkspace` | `where(IdWorkspace = X or IdWorkspace is null)`, em árvore |
-| `POST /Base/Categories/IdWorkspace=:IdWorkspace` | cria categoria do workspace |
-| `PUT /Base/Categories/IdWorkspace=:IdWorkspace/IdCategory=:IdCategory` | edita |
-| `DELETE /Base/Categories/IdWorkspace=:IdWorkspace/IdCategory=:IdCategory` | `Active = false` |
+| `GET /Base/Categories` | `where(IdWorkspace = X or IdWorkspace is null)`, em árvore |
+| `POST /Base/Categories` | cria categoria do workspace |
+| `PUT /Base/Categories/IdCategory=:IdCategory` | edita |
+| `DELETE /Base/Categories/IdCategory=:IdCategory` | `Active = false` |
 
 **Pontos de atenção**
 
@@ -189,8 +243,8 @@ update do gasto **não pode aceitar `Status` no body**.
 **Tabelas:** `Persons`, `Tags` · **Pastas:** `routes/Persons/`, `routes/Tags/`
 
 CRUD simples nas duas, escopado por workspace:
-`GET`/`POST /Base/<Feature>/IdWorkspace=:IdWorkspace` e
-`PUT`/`DELETE /Base/<Feature>/IdWorkspace=:IdWorkspace/Id<Singular>=:Id<Singular>`.
+`GET`/`POST /Base/<Feature>` e
+`PUT`/`DELETE /Base/<Feature>/Id<Singular>=:Id<Singular>`.
 
 **Pontos de atenção**
 
@@ -211,12 +265,12 @@ CRUD simples nas duas, escopado por workspace:
 
 | Rota | O que faz |
 | --- | --- |
-| `GET /Base/Inflows/IdWorkspace=:IdWorkspace` | lista por período e status |
-| `GET /Base/Inflows/IdWorkspace=:IdWorkspace/IdInflow=:IdInflow` | uma entrada com o rateio |
-| `POST /Base/Inflows/IdWorkspace=:IdWorkspace` | cria entrada **ou** transferência |
-| `PUT /Base/Inflows/IdWorkspace=:IdWorkspace/IdInflow=:IdInflow` | edita |
-| `POST /Base/Inflows/IdWorkspace=:IdWorkspace/IdInflow=:IdInflow/receive` | `pending` → `received`, grava `ReceivedAt`, recalcula saldo |
-| `DELETE /Base/Inflows/IdWorkspace=:IdWorkspace/IdInflow=:IdInflow` | `Status = 'canceled'` |
+| `GET /Base/Inflows` | lista por período e status |
+| `GET /Base/Inflows/IdInflow=:IdInflow` | uma entrada com o rateio |
+| `POST /Base/Inflows` | cria entrada **ou** transferência |
+| `PUT /Base/Inflows/IdInflow=:IdInflow` | edita |
+| `POST /Base/Inflows/IdInflow=:IdInflow/receive` | `pending` → `received`, grava `ReceivedAt`, recalcula saldo |
+| `DELETE /Base/Inflows/IdInflow=:IdInflow` | `Status = 'canceled'` |
 
 **Pontos de atenção**
 
@@ -240,12 +294,12 @@ CRUD simples nas duas, escopado por workspace:
 
 | Rota | O que faz |
 | --- | --- |
-| `GET /Base/Expenses/IdWorkspace=:IdWorkspace` | lista por período, status, categoria |
-| `GET /Base/Expenses/IdWorkspace=:IdWorkspace/IdExpense=:IdExpense` | gasto com pernas, rateio e tags |
-| `POST /Base/Expenses/IdWorkspace=:IdWorkspace` | cria `Kind='single'` com pernas, rateio e tags numa transaction |
-| `PUT /Base/Expenses/IdWorkspace=:IdWorkspace/IdExpense=:IdExpense` | edita |
+| `GET /Base/Expenses` | lista por período, status, categoria |
+| `GET /Base/Expenses/IdExpense=:IdExpense` | gasto com pernas, rateio e tags |
+| `POST /Base/Expenses` | cria `Kind='single'` com pernas, rateio e tags numa transaction |
+| `PUT /Base/Expenses/IdExpense=:IdExpense` | edita |
 | `POST /Base/Expenses/.../IdExpensePayment=:IdExpensePayment/pay` | quita uma perna, recalcula `Status` e saldo |
-| `DELETE /Base/Expenses/IdWorkspace=:IdWorkspace/IdExpense=:IdExpense` | `Status = 'canceled'` |
+| `DELETE /Base/Expenses/IdExpense=:IdExpense` | `Status = 'canceled'` |
 
 **Pontos de atenção**
 
@@ -290,7 +344,7 @@ aponta para ela e é um gasto de verdade.
 
 | Rota | O que faz |
 | --- | --- |
-| `POST /Base/Expenses/IdWorkspace=:IdWorkspace` | `Kind='fixed'` cria a raiz e as ocorrências |
+| `POST /Base/Expenses` | `Kind='fixed'` cria a raiz e as ocorrências |
 | `PUT /Base/Expenses/.../IdExpense=:IdExpense/series` | edita a série — **só daqui para a frente** |
 | `DELETE /Base/Expenses/.../IdExpense=:IdExpense/series` | encerra a série |
 
@@ -339,10 +393,10 @@ ficar, que ela é interna e é justamente o que esta etapa vai reusar.
 
 | Rota | O que faz |
 | --- | --- |
-| `POST /Base/Workspaces/IdWorkspace=:IdWorkspace/invite` | dono gera um convite assinado; devolve o token |
-| `GET /Base/Workspaces/IdWorkspace=:IdWorkspace/members` | lista membros e papéis |
-| `PUT /Base/Workspaces/IdWorkspace=:IdWorkspace/members/IdWorkspaceMember=:IdWorkspaceMember` | muda o papel |
-| `DELETE /Base/Workspaces/IdWorkspace=:IdWorkspace/members/IdWorkspaceMember=:IdWorkspaceMember` | remove membro / sair |
+| `POST /Base/Workspaces/invite` | dono gera um convite assinado; devolve o token |
+| `GET /Base/Workspaces/members` | lista membros e papéis |
+| `PUT /Base/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember` | muda o papel |
+| `DELETE /Base/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember` | remove membro / sair |
 | `POST /Base/Workspaces/join` | usuário **já cadastrado** aceita um convite |
 | `POST /Base/Users` | passa a aceitar `InviteToken` **no lugar de** `IdWorkspace` |
 
@@ -359,6 +413,14 @@ ficar, que ela é interna e é justamente o que esta etapa vai reusar.
   muda o desenho.
 - **Um workspace tem um dono.** Transferir propriedade é operação própria, e o último `owner`
   não pode sair sem passar o bastão.
+- **Remover membro não invalida o token dele** — consequência direta da decisão 0. O
+  `IdWorkspace` vai assinado dentro do token e ele vale 24h, então quem foi removido continua
+  com um token que aponta para o workspace. Quem fecha a porta é o `assertMember`, que consulta
+  a matrícula a cada requisição: apagada a linha, a próxima chamada já responde 406. **A
+  remoção vale na hora; o token é que fica órfão até expirar.** Isso só vira problema se alguém
+  um dia decidir confiar no `IdWorkspace` do token sem conferir — e é por isso que a
+  convenção do `SelectedIdWorkspace` existe. Mesmo raciocínio para rebaixar papel: o token
+  não carrega `Role`, justamente para não haver papel velho circulando.
 - **`Persons` tem `unique(["IdUser"])` global, não composto com `IdWorkspace`.** Ou seja, um
   usuário só consegue ser `Person` em **um** workspace no schema atual. Assim que alguém for
   membro de dois workspaces e precisar entrar no rateio dos dois, essa constraint barra. É
@@ -383,7 +445,8 @@ ficar, que ela é interna e é justamente o que esta etapa vai reusar.
 Uma suíte `.tests.ts` por feature, seguindo o padrão já estabelecido (um `describe` por rota,
 mais um `describe("Fluxo end to end")`), e um fluxo que percorre tudo **só por HTTP**:
 
-1. cadastra usuário → recebe `IdUser` + `IdWorkspace`
+1. cadastra usuário → recebe `IdUser` + `IdWorkspace`, e o login já devolve a sessão com o
+   workspace selecionado (nenhum `switch` no meio — ver a decisão 0)
 2. cria conta corrente → `pix` e `debit` vêm juntos
 3. cadastra um cartão com fechamento e vencimento
 4. cria uma categoria própria e lista junto com as globais

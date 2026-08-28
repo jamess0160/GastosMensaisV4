@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-Express + TypeScript API using Knex over MySQL (client is configurable via `DB_CLIENT`). Path alias `root/*` maps to the repo root — used everywhere instead of relative imports across features (wired via `tsconfig-paths/register` for `ts-node`/`tsx`, and `TsconfigPathsPlugin` for webpack).
+Express + TypeScript API using Knex over PostgreSQL (client is configurable via `DB_CLIENT`). Path alias `root/*` maps to the repo root — used everywhere instead of relative imports across features (wired via `tsconfig-paths/register` for `ts-node`/`tsx`, and `TsconfigPathsPlugin` for webpack).
 
 ### Feature module layout
 
