@@ -11,15 +11,26 @@ gastos nos três formatos — simples, parcelado e fixo. É o fluxo de um mês d
 
 ## Onde estamos
 
-Das 22 tabelas do banco, 5 têm código:
+Das 22 tabelas do banco, 7 têm código:
 
 | Tabela | Estado |
 | --- | --- |
 | `Users` | rotas de cadastro, login, getSelf, update, troca de senha |
-| `Workspaces` / `WorkspaceMembers` | getSelf, update; nasce junto com o usuário. **Entrar em workspace existente pelo cadastro está aberto sem convite — ver etapa 9** |
+| `Workspaces` / `WorkspaceMembers` | getSelf, update, **switch** (escolhe o workspace da sessão); nasce junto com o usuário. **Entrar em workspace existente pelo cadastro está aberto sem convite — ver etapa 9** |
 | `UsersAuth` / `TrustedDevices` | biometria (WebAuthn) completa |
+| `Accounts` / `PaymentMethods` | **etapa 1 pronta**: CRUD das duas, `pix` e `debit` nascendo com a conta, saldo de abertura travado depois do primeiro lançamento |
 
-As outras 17 não têm nada. Quatro delas (`UserDevices`, `Notifications`, `Plans`,
+**O `IdWorkspace` saiu da URL.** Ele viaja assinado dentro do próprio token, ao lado do
+`IdUser`, emitido pelo login e reemitido pelo `POST /Base/Workspaces/switch`, e chega às rotas
+pelo `res.locals`. As rotas das próximas etapas nascem sem ele no caminho:
+`GET /Base/Inflows`, `PUT /Base/Expenses/IdExpense=:IdExpense` e assim por diante.
+
+**Estar no token não dispensa o `assertMember`.** A assinatura prova que o cliente não forjou
+o número; não prova que a matrícula ainda existe. O token vale 24h, e a etapa 9 vai permitir
+remover membro e rebaixar papel — quem confere isso é o banco, em toda section, exatamente
+como antes.
+
+As outras 15 não têm nada. Quatro delas (`UserDevices`, `Notifications`, `Plans`,
 `Subscriptions`) são plataforma e ficam **fora desta leva**.
 
 ---
@@ -104,8 +115,19 @@ update do gasto **não pode aceitar `Status` no body**.
 ## Etapa 1 — Contas e formas de pagamento
 
 **Tabelas:** `Accounts`, `PaymentMethods`
-**Pasta:** `routes/Accounts/` (com `PaymentMethods.model.ts` e `PaymentMethods.route.ts` ao
-lado — a forma de pagamento é filha da conta, não feature própria)
+**Pastas:** `routes/Accounts/`, `routes/PaymentMethods/`
+
+> **Correção do que este documento previa.** A ideia era manter `PaymentMethods` dentro da
+> pasta de `Accounts`, por ser filha dela. Não é a convenção do projeto: **tabela com rota
+> própria tem pasta própria em `routes/`**, mesmo sendo filha de outra. A ligação continua
+> forte nos dois sentidos — a conta nasce com pix e débito, e o GET dela embute as formas de
+> pagamento — só que agora atravessa a fronteira por import explícito.
+>
+> Vale reler as etapas 4 e 5 com isso em mente: `ExpensePayments` tem rota própria (o `pay`),
+> então é pasta. `InflowPersons`, `ExpensePersons` e `ExpenseTags` são montadas junto com o
+> pai e não têm rota nenhuma — pelo critério acima ficam como segundo model dentro da pasta
+> do pai, do mesmo jeito que `WorkspaceMembers` e `TrustedDevices` estão hoje. **Confirmar
+> antes de começar a etapa 4.**
 
 | Rota | O que faz |
 | --- | --- |
@@ -125,9 +147,17 @@ lado — a forma de pagamento é filha da conta, não feature própria)
   o banco não tem CHECK para isso.
 - Não existe conta do tipo `credit_card`: cartão é forma de pagamento, não conta.
 - `InitialBalance` só pode mudar enquanto a conta não tem movimento, senão o saldo histórico
-  muda debaixo de lançamento já feito. Decidir se trava ou se recalcula.
+  muda debaixo de lançamento já feito. **DECIDIDO: trava.** Não há o que recalcular — o saldo
+  nunca é guardado, é sempre lido dos lançamentos, então "recalcular" seria só deixar o
+  extrato do mês passado mudar sozinho. A pergunta mora em `AccountMovement.section.ts`, num
+  lugar só, porque são duas tabelas e três pontas de FK: esquecer a transferência que *saiu*
+  liberaria a troca numa conta que tem movimento.
 - Apagar forma de pagamento com gasto lançado esbarra no `RESTRICT` da FK: capturar e
-  responder 406, não deixar virar 500.
+  responder 406, não deixar virar 500. **Como ficou:** o `DELETE` é `Active = false`, então o
+  `RESTRICT` nunca chega a disparar — arquivar tira o cartão das listas de escolha sem tocar
+  no histórico, que é o que a FK está ali para proteger. Arquivar a conta arquiva as formas
+  de pagamento dela na mesma transaction: um `pix` que sobrevive à conta continuaria sendo
+  oferecido como pagamento de uma conta que sumiu.
 
 ---
 
