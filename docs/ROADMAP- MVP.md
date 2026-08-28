@@ -11,7 +11,7 @@ gastos nos três formatos — simples, parcelado e fixo. É o fluxo de um mês d
 
 ## Onde estamos
 
-Das 22 tabelas do banco, 7 têm código:
+Das 22 tabelas do banco, 8 têm código:
 
 | Tabela | Estado |
 | --- | --- |
@@ -19,6 +19,7 @@ Das 22 tabelas do banco, 7 têm código:
 | `Workspaces` / `WorkspaceMembers` | getSelf, update, **switch** (escolhe o workspace da sessão); nasce junto com o usuário. **Entrar em workspace existente pelo cadastro está aberto sem convite — ver etapa 9** |
 | `UsersAuth` / `TrustedDevices` | biometria (WebAuthn) completa |
 | `Accounts` / `PaymentMethods` | **etapa 1 pronta**: CRUD das duas, `pix` e `debit` nascendo com a conta, saldo de abertura travado depois do primeiro lançamento |
+| `Categories` | **etapa 2 pronta**: CRUD escopado, globais somente leitura, árvore com pai conferido e sem ciclo, arquivamento levando a subárvore |
 
 **O `IdWorkspace` saiu da URL e passou a viajar dentro do token.** Isso mudou a forma de toda
 rota escopada por tenant, inclusive as que ainda não existem — ver a decisão 0 abaixo antes de
@@ -235,6 +236,30 @@ update do gasto **não pode aceitar `Status` no body**.
 - `IdParentCategory`: validar que o pai é do mesmo workspace (ou global) e que não fecha ciclo.
 - `Utils.buildTree` já existe e monta a árvore.
 - `Categories` cobre **gasto apenas**. Entrada não tem categoria.
+
+**Como ficou** — o que a implementação decidiu além do que estava previsto aqui:
+
+- **Somente leitura da global mora numa section própria** (`sections/CategoryOwnership.section.ts`),
+  chamada pelo `PUT` e pelo `DELETE`. O `getUnique` **acha** a global de propósito, em vez de
+  filtrá-la fora: assim a resposta é "é pré-definida do sistema" e não "não encontrada" — a
+  categoria existe e o cliente a está vendo na lista, então o conserto é criar uma própria.
+- **Arquivar leva a subárvore junto**, na mesma `UPDATE`. Sem isso a filha fica ativa com o pai
+  arquivado: o `buildTree` só pendura o nó no pai que está na lista, então ela sumiria da tela
+  continuando lançável por id. Mesmo raciocínio de arquivar a conta junto com as formas de
+  pagamento dela.
+- **A árvore é uma vista da lista plana e nada pode sumir na montagem.** O `GET` promove a raiz
+  o nó cujo pai não está visível, em vez de deixar o `buildTree` descartá-lo. É rede: com o
+  arquivamento em subárvore o caso não deveria acontecer.
+- **Ciclo é conferido subindo do pai proposto até a raiz**, e só no `PUT` — na criação a
+  categoria ainda não tem filhos, então não há ciclo possível. Inclui o caso de virar pai de si
+  mesma. **A profundidade não é limitada.**
+- **`IdParentCategory` no `PUT` é lido com `in body`**: `undefined` mantém o pai, `null` promove
+  a raiz. É o único campo da feature em que omitir e mandar nulo são pedidos diferentes.
+- **A suíte semeia a própria categoria global.** O `truncate(["Users"])` das outras suítes
+  cascateia por `Workspaces` até `Categories` e leva as 13 globais do seed junto — o
+  `globalSetup` só remigra uma vez por execução, então depender do seed deixaria o teste
+  dependente da ordem de execução. Vale para toda suíte futura que precisar de categoria global
+  (etapa 5 em diante).
 
 ---
 

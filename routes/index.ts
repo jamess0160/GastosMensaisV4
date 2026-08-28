@@ -1,4 +1,5 @@
 import { Accounts_route } from "./Accounts/Accounts.route";
+import { Categories_route } from "./Categories/Categories.route";
 import { PaymentMethods_route } from "./PaymentMethods/PaymentMethods.route";
 import { Base_Cache_route } from "./Cache/Cache.route";
 import { Users_route } from "./Users/Users.route";
@@ -13,5 +14,6 @@ export const Routes = [
     Workspaces_route,
     Accounts_route,
     PaymentMethods_route,
+    Categories_route,
     Base_Utils_route,
 ]
