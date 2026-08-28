@@ -16,7 +16,16 @@ class Controller {
     }
 
     acessMiddleware = (req: Request, res: Response) => {
-        let token = req.headers['authorization']
+        //  A sessão vem do cookie httpOnly, e só dele. O front e a API são servidos pelo mesmo
+        //  domínio (www.gastosmensais.com.br e .../api pelo proxy do nginx), então são a mesma
+        //  origem: o navegador anexa o cookie sozinho, sem CORS e sem preflight.
+        //
+        //  httpOnly significa que o JavaScript da página não alcança o token — um XSS não
+        //  consegue copiá-lo para fora. Em troca, o cookie viaja sozinho em toda requisição
+        //  para o domínio, inclusive nas que partem de outro site: quem fecha esse buraco é o
+        //  sameSite:'strict' do setTokenCookie, não o CORS (CORS decide quem lê a resposta,
+        //  não quem envia a requisição).
+        let token = req.cookies?.token
 
         if (!token) {
             res.status(401).send()
@@ -30,7 +39,14 @@ class Controller {
             return false
         }
 
+        //  Os dois dados da sessão saem do mesmo token assinado: quem está pedindo, e de onde.
+        //
+        //  O IdWorkspace não pode ter sido forjado pelo cliente — a assinatura garante isso —
+        //  mas pode estar VELHO: ele foi gravado quando o token foi emitido, e a matrícula pode
+        //  ter sido revogada ou o papel rebaixado desde então. Por isso cada rota de tenant
+        //  continua passando pelo assertMember/assertRole antes de ler ou escrever.
         res.locals.IdUser = result.id
+        res.locals.IdWorkspace = result.IdWorkspace
 
         return true
     }

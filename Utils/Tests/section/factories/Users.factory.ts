@@ -46,11 +46,22 @@ export namespace UsersFactory {
             user,
             workspace,
             password,
-            token: AcessControl.generateToken(user.IdUser),
+            //  Token igual ao que o login emite: com o workspace dentro. Um token só com o
+            //  IdUser é um estado que o app não produz para quem tem matrícula.
+            token: buildToken(user.IdUser, workspace.IdWorkspace),
         }
     }
 
-    //  Usuário criado + cliente já autenticado com o token dele
+    //  Monta a sessão à mão, para os casos que o login não produz: sem workspace selecionado,
+    //  ou apontando para o workspace de outro. É o que permite provar que o assertMember ainda
+    //  barra um token legítimo cuja matrícula não existe — o token é assinado de verdade, o
+    //  que não passa é a matrícula.
+    export function buildToken(IdUser: number, IdWorkspace?: number) {
+        return AcessControl.generateToken(IdUser, IdWorkspace)
+    }
+
+    //  Usuário criado + cliente já autenticado. O token dele carrega a sessão inteira, igual
+    //  ao que o AcessControl.startSession emite no login real.
     export async function createClient(overrides: Partial<Database.Users> = {}, password = defaultPassword) {
         let created = await create(overrides, password)
 

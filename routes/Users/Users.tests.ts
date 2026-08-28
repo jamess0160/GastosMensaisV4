@@ -51,9 +51,39 @@ describe("Users", () => {
 
             expect(response.status).toBe(406)
         })
+
+        //  Os três atributos do cookie são a segurança da sessão inteira, agora que ele é o
+        //  único lugar de onde o token é lido — por isso viram asserção e não comentário:
+        //
+        //  HttpOnly  → o JavaScript da página não alcança o token, então um XSS não o copia
+        //  SameSite=Strict → o navegador não anexa o cookie em requisição vinda de outro site.
+        //                    É ISTO que barra CSRF, e não o CORS: CORS decide quem lê a
+        //                    resposta, não quem envia a requisição.
+        //  Max-Age   → a sessão morre com o token (24h), sem cookie órfão sobrando no navegador
+        it("entrega o token num cookie httpOnly e sameSite strict", async () => {
+            let response = await client.anonymous().post("/Base/Users/login", { login: root.user.Email, password: root.password })
+
+            let cookies: string[] = response.headers["set-cookie"] ?? []
+            let raw = cookies.find((cookie) => cookie.startsWith("token="))
+
+            expect(raw).toContain("HttpOnly")
+            expect(raw).toContain("SameSite=Strict")
+            expect(raw).toContain("Max-Age=86400")
+        })
     })
 
     describe("GET /Base/Users/getSelf", () => {
+
+        //  A sessão vem do cookie e SÓ do cookie. O header 'authorization' foi tirado de
+        //  propósito: com dois caminhos de autenticação, o mais fraco é o que vale, e um header
+        //  aceito escapa do sameSite:strict que é justamente o que barra CSRF hoje.
+        //
+        //  Este teste é a trava dessa decisão: um token perfeitamente válido, no header, é 401.
+        it("recusa token válido mandado no header authorization", async () => {
+            let response = await client.anonymous().get("/Base/Users/getSelf").set("authorization", root.token)
+
+            expect(response.status).toBe(401)
+        })
 
         it("recusa sem token", async () => {
             let response = await client.anonymous().get("/Base/Users/getSelf")

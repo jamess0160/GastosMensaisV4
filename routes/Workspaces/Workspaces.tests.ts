@@ -47,32 +47,120 @@ describe("Workspaces", () => {
         })
     })
 
-    describe("PUT /Base/Workspaces/IdWorkspace=:IdWorkspace", () => {
+    describe("POST /Base/Workspaces/switch", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/Base/Workspaces/IdWorkspace=${root.workspace.IdWorkspace}`, { Name: "Novo nome" })
+            let response = await client.anonymous().post("/Base/Workspaces/switch", { IdWorkspace: root.workspace.IdWorkspace })
 
             expect(response.status).toBe(401)
         })
 
-        it("recusa IdWorkspace não numérico", async () => {
-            let response = await client.put("/Base/Workspaces/IdWorkspace=abc", { Name: "Novo nome" })
+        it("recusa corpo sem o IdWorkspace", async () => {
+            let response = await client.post("/Base/Workspaces/switch", {})
+
+            expect(response.status).toBe(406)
+        })
+
+        it("recusa workspace inexistente", async () => {
+            let response = await client.post("/Base/Workspaces/switch", { IdWorkspace: 999999 })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  É a única rota que recebe um IdWorkspace escrito pelo cliente, e o que sai daqui
+        //  vira token assinado: se ela não conferisse a matrícula, todas as rotas seguintes
+        //  aceitariam esse token como legítimo — porque, para elas, ele é
+        it("recusa o workspace de um usuário que não é membro", async () => {
+            let other = await UsersFactory.create()
+
+            let response = await new TestClient(other.token).post("/Base/Workspaces/switch", {
+                IdWorkspace: root.workspace.IdWorkspace,
+            })
+
+            expect(response.status).toBe(406)
+            //  E não emitiu token nenhum
+            expect(TestClient.extractCookieToken(response)).toBeNull()
+        })
+
+        it("seleciona o workspace do membro e reemite o token com ele dentro", async () => {
+            let owner = await UsersFactory.create()
+
+            let response = await new TestClient(owner.token).post("/Base/Workspaces/switch", {
+                IdWorkspace: owner.workspace.IdWorkspace,
+            })
+
+            expect(response.status).toBe(200)
+            expect(response.body).toMatchObject({
+                IdWorkspace: owner.workspace.IdWorkspace,
+                IdOwnerUser: owner.user.IdUser,
+            })
+
+            let token = TestClient.extractCookieToken(response)
+
+            expect(token).toBeTruthy()
+            expect(TestClient.decodeToken(token!)).toMatchObject({
+                id: owner.user.IdUser,
+                IdWorkspace: owner.workspace.IdWorkspace,
+            })
+        })
+
+        //  O token é credencial: não pode ficar ao alcance de script na tela
+        it("reemite o token como httpOnly", async () => {
+            let owner = await UsersFactory.create()
+
+            let response = await new TestClient(owner.token).post("/Base/Workspaces/switch", {
+                IdWorkspace: owner.workspace.IdWorkspace,
+            })
+
+            let raw: string[] = response.headers["set-cookie"] ?? []
+
+            expect(raw.find((cookie) => cookie.startsWith("token="))).toContain("HttpOnly")
+        })
+
+        //  Fecha o ciclo: a sessão que não tinha workspace passa a ter, e uma rota de tenant
+        //  que respondia 406 passa a responder — com o token novo que o switch devolveu
+        it("destrava as rotas de tenant para a sessão que não tinha workspace", async () => {
+            let owner = await UsersFactory.create()
+            let ownerClient = new TestClient(UsersFactory.buildToken(owner.user.IdUser))
+
+            expect((await ownerClient.get("/Base/Accounts")).status).toBe(406)
+
+            let switched = await ownerClient.post("/Base/Workspaces/switch", { IdWorkspace: owner.workspace.IdWorkspace })
+
+            expect(switched.status).toBe(200)
+
+            ownerClient.setToken(TestClient.extractCookieToken(switched))
+
+            expect((await ownerClient.get("/Base/Accounts")).status).toBe(200)
+        })
+    })
+
+    describe("PUT /Base/Workspaces", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().put(`/Base/Workspaces`, { Name: "Novo nome" })
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).put(`/Base/Workspaces`, { Name: "Novo nome" })
 
             expect(response.status).toBe(406)
         })
 
         it("recusa corpo sem o Name", async () => {
-            let response = await client.put(`/Base/Workspaces/IdWorkspace=${root.workspace.IdWorkspace}`, {})
+            let response = await client.put(`/Base/Workspaces`, {})
 
             expect(response.status).toBe(406)
         })
 
-        //  O IdWorkspace vem da URL, ou seja, do cliente: sem a checagem de matrícula
-        //  qualquer usuário logado renomearia o tenant de qualquer outro
-        it("recusa o workspace de outro usuário", async () => {
+        //  Token assinado pela própria API, mas apontando para um workspace de que o usuário
+        //  não é membro. A assinatura sozinha não pega isso — quem pega é o assertRole
+        it("recusa token válido apontando para o workspace de outro usuário", async () => {
             let other = await UsersFactory.create()
 
-            let response = await new TestClient(other.token).put(`/Base/Workspaces/IdWorkspace=${root.workspace.IdWorkspace}`, { Name: "Invadido" })
+            let response = await new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace)).put(`/Base/Workspaces`, { Name: "Invadido" })
 
             expect(response.status).toBe(406)
 
@@ -84,7 +172,7 @@ describe("Workspaces", () => {
         it("renomeia o workspace do dono e atualiza o UpdatedAt", async () => {
             let owner = await UsersFactory.create()
 
-            let response = await new TestClient(owner.token).put(`/Base/Workspaces/IdWorkspace=${owner.workspace.IdWorkspace}`, { Name: "Finanças da casa" })
+            let response = await new TestClient(owner.token).put(`/Base/Workspaces`, { Name: "Finanças da casa" })
 
             expect(response.status).toBe(200)
 
@@ -113,7 +201,20 @@ describe("Workspaces", () => {
 
             let client = new TestClient()
 
-            expect((await client.login(payload.Email, payload.Password)).status).toBe(200)
+            let logged = await client.login(payload.Email, payload.Password)
+
+            expect(logged.status).toBe(200)
+
+            //  O login já sai com um workspace selecionado (AcessControl.startSession →
+            //  SelectDefault): sem isso toda rota de tenant responderia 406 até o cliente
+            //  chamar o switch — um passo obrigatório depois de todo login.
+            //
+            //  A seleção viaja dentro do próprio token, e não num cookie à parte: assim o
+            //  cliente não consegue reescrevê-la, e a sessão inteira cabe num cookie só.
+            expect(TestClient.decodeToken(client.getToken()!)).toMatchObject({
+                id: created.body.IdUser,
+                IdWorkspace: created.body.IdWorkspace,
+            })
 
             let self = await client.get("/Base/Workspaces/getSelf")
 
@@ -123,7 +224,7 @@ describe("Workspaces", () => {
             //  O workspace herda o nome do dono no cadastro
             expect(self.body[0].Name).toBe(payload.Name)
 
-            expect((await client.put(`/Base/Workspaces/IdWorkspace=${created.body.IdWorkspace}`, { Name: "Meu orçamento" })).status).toBe(200)
+            expect((await client.put(`/Base/Workspaces`, { Name: "Meu orçamento" })).status).toBe(200)
 
             let renamed = await client.get("/Base/Workspaces/getSelf")
 
