@@ -103,11 +103,15 @@ export namespace Database {
 
     //#region Categorias e orcamento
 
-    /** Categoria de gasto. IdWorkspace nulo = pre-definida global do sistema. */
+    /**
+     * Categoria de gasto. IdWorkspace nulo = pre-definida global do sistema.
+     *
+     * Lista plana: nao ha categoria filha de outra (ver a migration
+     * 20260829010000_drop_categories_parent).
+     */
     export interface Categories {
         IdCategory: number
         IdWorkspace: number | null
-        IdParentCategory: number | null
         Description: string
         /** Chave do catalogo de icones do app cliente. */
         IconKey: string | null

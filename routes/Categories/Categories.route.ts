@@ -13,12 +13,12 @@ export const Categories_route = express()
 //  nulo é a pré-definida do sistema, visível a todos os workspaces e editável por nenhum —
 //  ver sections/CategoryOwnership.section.ts.
 
-//  As do workspace mais as globais, em árvore.
+//  As do workspace mais as globais, numa lista plana — não há categoria filha de outra.
 Categories_route.get("/Base/Categories", Categories_schema.getByWorkspace, AsyncHandler(Categories_controller.getByWorkspace))
 
 Categories_route.post("/Base/Categories", Categories_schema.create, AsyncHandler(Categories_controller.create))
 
 Categories_route.put("/Base/Categories/IdCategory=:IdCategory", Categories_schema.update, AsyncHandler(Categories_controller.update))
 
-//  Arquiva (Active = false), junto com a subárvore. Ver sections/DELETE/remove.ts.
+//  Arquiva (Active = false). Ver sections/DELETE/remove.ts.
 Categories_route.delete("/Base/Categories/IdCategory=:IdCategory", Categories_schema.remove, AsyncHandler(Categories_controller.remove))

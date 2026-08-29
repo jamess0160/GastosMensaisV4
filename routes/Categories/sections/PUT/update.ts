@@ -2,7 +2,6 @@ import { WorkspacesAcessControl } from "root/routes/Workspaces/sections/AcessCon
 import { APIError } from "root/Utils/Logs"
 import { Categories_model } from "../../Categories.model"
 import { CategoryOwnership } from "../CategoryOwnership.section"
-import { CategoryTree } from "../CategoryTree.section"
 import { CategoriesNamespace } from "../types"
 
 export class Update {
@@ -24,13 +23,6 @@ export class Update {
         //  A linha global entra no getUnique porque é visível a todo mundo; o que ela não
         //  aceita é escrita. Editá-la renomearia a categoria de todos os workspaces da base.
         CategoryOwnership.assertEditable(category)
-
-        //  `in body` e não truthy: aqui `undefined` (não mexe no pai) e `null` (promove a
-        //  raiz) são pedidos diferentes, e o null tem que passar direto sem conferência.
-        if ("IdParentCategory" in body && body.IdParentCategory) {
-            //  Passa o IdCategory junto: mudar o pai é a única escrita que pode fechar ciclo.
-            await CategoryTree.assertParent(IdWorkspace, body.IdParentCategory, IdCategory)
-        }
 
         await Categories_model.update(IdCategory, body)
 

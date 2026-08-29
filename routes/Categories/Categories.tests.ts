@@ -7,6 +7,8 @@ import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tes
 //  de ninguém. A categoria global (IdWorkspace nulo) é a mesma linha para todos os workspaces,
 //  então todo describe de escrita tem o caso dela — editar ou arquivar uma global mexeria no
 //  cadastro de toda a base, e é a falha que o caminho feliz nunca encontra.
+//
+//  A lista é plana: não há categoria filha de outra.
 
 describe("Categories", () => {
 
@@ -64,32 +66,23 @@ describe("Categories", () => {
             let response = await new TestClient(user.token).get(`/Base/Categories`)
 
             expect(response.status).toBe(200)
-            expect(response.body.map((item: { Description: string }) => item.Description)).toEqual(["Transporte"])
+            expect(response.body.map(description)).toEqual(["Transporte"])
             //  IdWorkspace nulo é como o cliente sabe que aquela linha não abre para edição
             expect(response.body[0].IdWorkspace).toBeNull()
         })
 
-        it("devolve as próprias junto com as globais, em árvore", async () => {
+        //  Juntas numa lista só: separá-las obrigaria o cliente a concatenar duas chamadas
+        //  para montar um seletor
+        it("devolve as próprias junto com as globais", async () => {
             let user = await UsersFactory.create()
             let workspaceClient = new TestClient(user.token)
 
-            //  Subcategoria própria pendurada numa global: é o caso comum — "Uber" dentro de
-            //  "Transporte", que o usuário não cadastrou.
-            await workspaceClient.post(`/Base/Categories`, { Description: "Uber", IdParentCategory: globalCategory.IdCategory })
-
-            let own = await workspaceClient.post(`/Base/Categories`, { Description: "Faculdade" })
-            await workspaceClient.post(`/Base/Categories`, { Description: "Mensalidade", IdParentCategory: own.body.IdCategory })
+            await workspaceClient.post(`/Base/Categories`, { Description: "Faculdade" })
 
             let response = await workspaceClient.get(`/Base/Categories`)
 
             expect(response.status).toBe(200)
-
-            let tree = byDescription(response.body)
-
-            //  Só as raízes no topo: a subcategoria aparece dentro do pai, não solta
-            expect(Object.keys(tree).sort()).toEqual(["Faculdade", "Transporte"])
-            expect(tree["Transporte"].TreeItems.map((item: { Description: string }) => item.Description)).toEqual(["Uber"])
-            expect(tree["Faculdade"].TreeItems.map((item: { Description: string }) => item.Description)).toEqual(["Mensalidade"])
+            expect(response.body.map(description).sort()).toEqual(["Faculdade", "Transporte"])
         })
 
         it("não devolve a categoria de outro workspace", async () => {
@@ -98,7 +91,7 @@ describe("Categories", () => {
 
             let response = await new TestClient((await UsersFactory.create()).token).get(`/Base/Categories`)
 
-            expect(response.body.map((item: { Description: string }) => item.Description)).not.toContain("Segredo do vizinho")
+            expect(response.body.map(description)).not.toContain("Segredo do vizinho")
         })
 
         it("não devolve categoria arquivada", async () => {
@@ -111,29 +104,7 @@ describe("Categories", () => {
 
             let response = await workspaceClient.get(`/Base/Categories`)
 
-            expect(response.body.map((item: { Description: string }) => item.Description)).toEqual(["Transporte"])
-        })
-
-        //  A árvore é uma vista da lista plana: nada pode sumir na montagem. Com o pai fora da
-        //  lista, o buildTree descartaria a filha — ela sumiria da tela continuando ativa no
-        //  banco e aceita como categoria de um gasto novo. O DELETE arquiva a subárvore junto,
-        //  então aqui o estado é arranjado direto no banco.
-        it("sobe para a raiz a categoria cujo pai saiu da lista", async () => {
-            let user = await UsersFactory.create()
-            let workspaceClient = new TestClient(user.token)
-
-            let parent = await workspaceClient.post(`/Base/Categories`, { Description: "Pai sumido" })
-            await workspaceClient.post(`/Base/Categories`, { Description: "Filha órfã", IdParentCategory: parent.body.IdCategory })
-
-            await archiveDirectly(parent.body.IdCategory)
-
-            let response = await workspaceClient.get(`/Base/Categories`)
-
-            let tree = byDescription(response.body)
-
-            expect(Object.keys(tree).sort()).toEqual(["Filha órfã", "Transporte"])
-            //  A ligação continua gravada: o que mudou foi só onde ela é mostrada
-            expect(tree["Filha órfã"].IdParentCategory).toBe(parent.body.IdCategory)
+            expect(response.body.map(description)).toEqual(["Transporte"])
         })
     })
 
@@ -153,23 +124,6 @@ describe("Categories", () => {
 
         it("recusa cor fora do formato #RRGGBB", async () => {
             let response = await client.post(`/Base/Categories`, { Description: "Categoria", Color: "roxo" })
-
-            expect(response.status).toBe(406)
-        })
-
-        it("recusa pai inexistente", async () => {
-            let response = await client.post(`/Base/Categories`, { Description: "Órfã", IdParentCategory: 999999 })
-
-            expect(response.status).toBe(406)
-        })
-
-        //  O IdParentCategory é sequencial e chega do cliente: sem a conferência dava para
-        //  pendurar uma categoria própria dentro da árvore do vizinho.
-        it("recusa pai de outro workspace", async () => {
-            let owner = await UsersFactory.create()
-            let parent = await new TestClient(owner.token).post(`/Base/Categories`, { Description: "Pai do dono" })
-
-            let response = await otherClient.post(`/Base/Categories`, { Description: "Invasora", IdParentCategory: parent.body.IdCategory })
 
             expect(response.status).toBe(406)
         })
@@ -206,27 +160,7 @@ describe("Categories", () => {
                 Position: 4,
                 //  Do workspace, nunca global: a rota não tem como criar uma linha sem dono
                 IdWorkspace: user.workspace.IdWorkspace,
-                IdParentCategory: null,
                 Active: true,
-            })
-        })
-
-        it("cria subcategoria dentro de uma global", async () => {
-            let user = await UsersFactory.create()
-
-            let response = await new TestClient(user.token).post(`/Base/Categories`, {
-                Description: "Uber",
-                IdParentCategory: globalCategory.IdCategory,
-            })
-
-            expect(response.status).toBe(200)
-
-            let [category] = await findCategories(user.workspace.IdWorkspace)
-
-            //  A filha é do workspace; o pai continua sendo de todo mundo
-            expect(category).toMatchObject({
-                IdWorkspace: user.workspace.IdWorkspace,
-                IdParentCategory: globalCategory.IdCategory,
             })
         })
     })
@@ -302,74 +236,6 @@ describe("Categories", () => {
                 IconKey: "home",
             })
         })
-
-        it("move a categoria para outro pai", async () => {
-            let user = await UsersFactory.create()
-            let workspaceClient = new TestClient(user.token)
-
-            let parent = await workspaceClient.post(`/Base/Categories`, { Description: "Transporte próprio" })
-            let child = await workspaceClient.post(`/Base/Categories`, { Description: "Uber" })
-
-            let response = await workspaceClient.put(`/Base/Categories/IdCategory=${child.body.IdCategory}`, {
-                Description: "Uber",
-                IdParentCategory: parent.body.IdCategory,
-            })
-
-            expect(response.status).toBe(200)
-            expect((await findCategoryById(child.body.IdCategory)).IdParentCategory).toBe(parent.body.IdCategory)
-        })
-
-        //  null é pedido; undefined é omissão. São coisas diferentes, e é por isso que a
-        //  section olha `in body` em vez de truthy.
-        it("promove a subcategoria a raiz com IdParentCategory null", async () => {
-            let user = await UsersFactory.create()
-            let workspaceClient = new TestClient(user.token)
-
-            let parent = await workspaceClient.post(`/Base/Categories`, { Description: "Pai" })
-            let child = await workspaceClient.post(`/Base/Categories`, { Description: "Filha", IdParentCategory: parent.body.IdCategory })
-
-            let response = await workspaceClient.put(`/Base/Categories/IdCategory=${child.body.IdCategory}`, {
-                Description: "Filha",
-                IdParentCategory: null,
-            })
-
-            expect(response.status).toBe(200)
-            expect((await findCategoryById(child.body.IdCategory)).IdParentCategory).toBeNull()
-        })
-
-        it("recusa a categoria como pai de si mesma", async () => {
-            let user = await UsersFactory.create()
-            let workspaceClient = new TestClient(user.token)
-
-            let created = await workspaceClient.post(`/Base/Categories`, { Description: "Sozinha" })
-
-            let response = await workspaceClient.put(`/Base/Categories/IdCategory=${created.body.IdCategory}`, {
-                Description: "Sozinha",
-                IdParentCategory: created.body.IdCategory,
-            })
-
-            expect(response.status).toBe(406)
-            expect((await findCategoryById(created.body.IdCategory)).IdParentCategory).toBeNull()
-        })
-
-        //  Ciclo indireto: pôr a avó dentro da neta deixaria os três nós sem raiz, e o ramo
-        //  inteiro sumiria da árvore continuando lançável por id.
-        it("recusa fechar ciclo com um descendente", async () => {
-            let user = await UsersFactory.create()
-            let workspaceClient = new TestClient(user.token)
-
-            let grandparent = await workspaceClient.post(`/Base/Categories`, { Description: "Avó" })
-            let parent = await workspaceClient.post(`/Base/Categories`, { Description: "Mãe", IdParentCategory: grandparent.body.IdCategory })
-            let child = await workspaceClient.post(`/Base/Categories`, { Description: "Neta", IdParentCategory: parent.body.IdCategory })
-
-            let response = await workspaceClient.put(`/Base/Categories/IdCategory=${grandparent.body.IdCategory}`, {
-                Description: "Avó",
-                IdParentCategory: child.body.IdCategory,
-            })
-
-            expect(response.status).toBe(406)
-            expect((await findCategoryById(grandparent.body.IdCategory)).IdParentCategory).toBeNull()
-        })
     })
 
     describe("DELETE /Base/Categories/IdCategory=:IdCategory", () => {
@@ -396,7 +262,7 @@ describe("Categories", () => {
             expect((await findCategoryById(created.body.IdCategory)).Active).toBe(true)
         })
 
-        //  Arquivar a global a tiraria da lista de todos os workspaces da base
+        //  Arquivar a global a tiraria da lista de todos os workspaces de uma vez
         it("recusa arquivar categoria global", async () => {
             let response = await client.delete(`/Base/Categories/IdCategory=${globalCategory.IdCategory}`)
 
@@ -406,26 +272,20 @@ describe("Categories", () => {
 
         //  Soft delete e não delete físico: Expenses aponta para cá, e o gasto de março tem
         //  que continuar apontando para a categoria em que foi lançado.
-        it("arquiva a categoria e a subárvore dela", async () => {
+        it("arquiva sem apagar a linha, e só ela", async () => {
             let user = await UsersFactory.create()
             let workspaceClient = new TestClient(user.token)
 
-            let grandparent = await workspaceClient.post(`/Base/Categories`, { Description: "Avó" })
-            let parent = await workspaceClient.post(`/Base/Categories`, { Description: "Mãe", IdParentCategory: grandparent.body.IdCategory })
-            let child = await workspaceClient.post(`/Base/Categories`, { Description: "Neta", IdParentCategory: parent.body.IdCategory })
-            let sibling = await workspaceClient.post(`/Base/Categories`, { Description: "Tia sem parentesco" })
+            let created = await workspaceClient.post(`/Base/Categories`, { Description: "Categoria antiga" })
+            let untouched = await workspaceClient.post(`/Base/Categories`, { Description: "Categoria viva" })
 
-            let response = await workspaceClient.delete(`/Base/Categories/IdCategory=${grandparent.body.IdCategory}`)
+            let response = await workspaceClient.delete(`/Base/Categories/IdCategory=${created.body.IdCategory}`)
 
             expect(response.status).toBe(200)
 
-            //  As três linhas continuam no banco: só saíram das listas
-            for (let created of [grandparent, parent, child]) {
-                expect((await findCategoryById(created.body.IdCategory)).Active).toBe(false)
-            }
-
-            //  E só a subárvore: o que não descende dela não é tocado
-            expect((await findCategoryById(sibling.body.IdCategory)).Active).toBe(true)
+            //  A linha continua no banco: só saiu das listas
+            expect((await findCategoryById(created.body.IdCategory)).Active).toBe(false)
+            expect((await findCategoryById(untouched.body.IdCategory)).Active).toBe(true)
             expect((await findCategoryById(globalCategory.IdCategory)).Active).toBe(true)
         })
     })
@@ -433,7 +293,7 @@ describe("Categories", () => {
     describe("Fluxo end to end", () => {
 
         //  Passo 4 do "como saber que a leva acabou" do ROADMAP, só por HTTP: cria a categoria
-        //  própria e a lê junto com as globais.
+        //  própria e a lê junto com as globais
         it("cadastra o usuário, cria a categoria própria e lista junto com as globais", async () => {
             let payload = {
                 Name: "Usuário do fluxo de categorias",
@@ -452,39 +312,32 @@ describe("Categories", () => {
             let predefined = await flowClient.get(`/Base/Categories`)
 
             expect(predefined.status).toBe(200)
-            expect(predefined.body.map((item: { Description: string }) => item.Description)).toEqual(["Transporte"])
+            expect(predefined.body.map(description)).toEqual(["Transporte"])
 
             let own = await flowClient.post(`/Base/Categories`, { Description: "Faculdade", Color: "#283593" })
 
             expect(own.status).toBe(200)
 
-            let sub = await flowClient.post(`/Base/Categories`, { Description: "Mensalidade", IdParentCategory: own.body.IdCategory })
-
-            expect(sub.status).toBe(200)
-
             let list = await flowClient.get(`/Base/Categories`)
-            let tree = byDescription(list.body)
 
-            expect(Object.keys(tree).sort()).toEqual(["Faculdade", "Transporte"])
-            expect(tree["Faculdade"]).toMatchObject({ Color: "#283593" })
-            expect(tree["Faculdade"].TreeItems.map((item: { Description: string }) => item.Description)).toEqual(["Mensalidade"])
+            expect(list.body.map(description).sort()).toEqual(["Faculdade", "Transporte"])
+            expect(list.body.find((item: { Description: string }) => item.Description === "Faculdade")).toMatchObject({ Color: "#283593" })
 
             //  A global não é dele para editar, mesmo aparecendo na mesma lista
             expect((await flowClient.put(`/Base/Categories/IdCategory=${globalCategory.IdCategory}`, { Description: "Minha" })).status).toBe(406)
 
-            //  Arquivar a própria leva a subcategoria junto, e não encosta na global
+            //  Arquivar a própria não encosta na global
             expect((await flowClient.delete(`/Base/Categories/IdCategory=${own.body.IdCategory}`)).status).toBe(200)
 
             let final = await flowClient.get(`/Base/Categories`)
 
-            expect(final.body.map((item: { Description: string }) => item.Description)).toEqual(["Transporte"])
-            expect((await findCategoryById(sub.body.IdCategory)).Active).toBe(false)
+            expect(final.body.map(description)).toEqual(["Transporte"])
         })
     })
 })
 
-function byDescription(tree: Array<{ Description: string }>) {
-    return Object.fromEntries(tree.map((item) => [item.Description, item])) as Record<string, any>
+function description(item: { Description: string }) {
+    return item.Description
 }
 
 function findCategories(IdWorkspace: number) {
@@ -504,10 +357,4 @@ async function seedGlobalCategory(overrides: { Description: string, Position?: n
         .returning("*") as Array<{ IdCategory: number, Description: string }>
 
     return category
-}
-
-//  Arquiva sem passar pela rota, que arquivaria a subárvore junto: é a única forma de arranjar
-//  uma filha ativa com o pai fora da lista.
-function archiveDirectly(IdCategory: number) {
-    return TestDatabase.connection().update({ Active: false }).from("Categories").where("IdCategory", IdCategory)
 }

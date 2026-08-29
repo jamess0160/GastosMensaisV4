@@ -6,6 +6,9 @@ import { Database } from "root/Utils/database"
 //
 //  A tabela tem dois donos possíveis: o workspace, ou ninguém — IdWorkspace nulo marca a
 //  categoria pré-definida do sistema, que todo workspace enxerga e nenhum edita.
+//
+//  **Lista plana:** não há categoria filha de outra. A coluna IdParentCategory existiu e foi
+//  derrubada (migration 20260829010000).
 export class class_Categories_model extends BaseModel {
 
     private readonly baseQuery = this.KnexConnection.select("*").from<Database.Categories>("Categories").where("Active", true).orderBy("Position").orderBy("IdCategory")
@@ -38,15 +41,14 @@ export class class_Categories_model extends BaseModel {
     //  Soft delete, como toda tabela de cadastro: Expenses aponta para cá, e o gasto do mês
     //  passado tem que continuar apontando para a categoria em que ele foi de fato lançado.
     //
-    //  Recebe a lista porque arquivar uma categoria arquiva a subárvore dela na mesma
-    //  transaction. O IdWorkspace na cláusula não é redundância: é ele que garante que um id
-    //  que escapou para a lista não alcance a linha de outro tenant — nem uma global.
-    deleteMany(IdWorkspace: number, ids: number[]) {
+    //  O IdWorkspace na cláusula não é redundância: é a segunda barreira que impede um
+    //  UPDATE de alcançar a linha de outro tenant — ou uma global, que não é de ninguém.
+    delete(IdWorkspace: number, IdCategory: number) {
         return this.KnexConnection
             .update({ Active: false, UpdatedAt: this.KnexConnection.fn.now() })
             .from("Categories")
             .where("IdWorkspace", IdWorkspace)
-            .whereIn("IdCategory", ids)
+            .where("IdCategory", IdCategory)
     }
 }
 
