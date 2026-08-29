@@ -69,7 +69,7 @@ export namespace Database {
         Color: string | null
         /** Saldo de abertura: dado de origem, nao derivavel de nenhum lancamento. */
         InitialBalance: number
-        InitialBalanceDate: Datetime | null
+        InitialBalanceDate: CalendarDate | null
         //  Nao existe coluna de saldo atual: o saldo e sempre calculado dos lancamentos.
         //  Ver a migration 20260827022816 e a decisao 1 do ROADMAP.md.
         Position: number | null
@@ -141,7 +141,7 @@ export namespace Database {
         IdWorkspace: number
         IdBudget: number
         /** Sempre o dia 1 do mes. Vem do Postgres como "YYYY-MM-DD". */
-        ReferenceMonth: Datetime
+        ReferenceMonth: CalendarDate
         LimitValue: number
         AlertPercent: number
         Status: "open" | "closed"
@@ -189,8 +189,8 @@ export namespace Database {
         Kind: "inflow" | "transfer"
         IdFromAccount: number | null
         IdToAccount: number | null
-        CompetenceDate: Datetime
-        ExpectedDate: Datetime | null
+        CompetenceDate: CalendarDate
+        ExpectedDate: CalendarDate | null
         ReceivedAt: Datetime | null
         Notes: string | null
         CreatedAt: Datetime
@@ -233,13 +233,13 @@ export namespace Database {
         TotalValue: number
         Status: "pending" | "paid" | "canceled"
         IdCategory: number | null
-        ExpenseDate: Datetime
+        ExpenseDate: CalendarDate
         Kind: "single" | "installment" | "fixed"
         IdParentExpense: number | null
         /** Dia do mes da recorrencia. So na raiz de uma serie 'fixed'. */
         RecurrenceDay: number | null
         /** Nulo = serie sem fim. So na raiz. */
-        RecurrenceEndDate: Datetime | null
+        RecurrenceEndDate: CalendarDate | null
         Notes: string | null
         CreatedAt: Datetime
         UpdatedAt: Datetime
@@ -255,8 +255,8 @@ export namespace Database {
         InstallmentNumber: number | null
         InstallmentTotal: number | null
         /** Fechamento da fatura em que esta perna caiu. Nulo fora de cartao. */
-        ClosingDate: Datetime | null
-        DueDate: Datetime | null
+        ClosingDate: CalendarDate | null
+        DueDate: CalendarDate | null
         Paid: boolean
         PaidAt: Datetime | null
         CreatedAt: Datetime
@@ -358,3 +358,13 @@ export namespace Database {
 }
 
 type Datetime = string | Date
+
+/**
+ * Coluna `date` do Postgres: **dia do calendário**, não instante.
+ *
+ * É string e não Date de propósito. Os pgTypeParsers devolvem essas colunas como "YYYY-MM-DD"
+ * justamente para o dia não passar por fuso — em UTC-3 um Date de meia-noite vira o dia
+ * anterior. Tipar como string faz o `new Date(...)` acidental virar erro de compilação, e é o
+ * que permite comparar e somar datas como texto (Utils.addMonthsToDate).
+ */
+type CalendarDate = string
