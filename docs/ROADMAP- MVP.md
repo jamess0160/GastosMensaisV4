@@ -11,7 +11,7 @@ gastos nos três formatos — simples, parcelado e fixo. É o fluxo de um mês d
 
 ## Onde estamos
 
-Das 22 tabelas do banco, 8 têm código:
+Das 22 tabelas do banco, 16 têm código — **a leva MVP está fechada**: cadastro, entradas, gastos nos três formatos e orçamento.
 
 | Tabela | Estado |
 | --- | --- |
@@ -19,14 +19,18 @@ Das 22 tabelas do banco, 8 têm código:
 | `Workspaces` / `WorkspaceMembers` | getSelf, update, **switch** (escolhe o workspace da sessão); nasce junto com o usuário. **Entrar em workspace existente pelo cadastro está aberto sem convite — ver etapa 9** |
 | `UsersAuth` / `TrustedDevices` | biometria (WebAuthn) completa |
 | `Accounts` / `PaymentMethods` | **etapa 1 pronta**: CRUD das duas, `pix` e `debit` nascendo com a conta, saldo de abertura travado depois do primeiro lançamento |
-| `Categories` | **etapa 2 pronta**: CRUD escopado, globais somente leitura, árvore com pai conferido e sem ciclo, arquivamento levando a subárvore |
+| `Categories` | **etapa 2 pronta**: CRUD escopado, globais somente leitura, lista plana (a hierarquia foi derrubada) |
+| `Persons` / `Tags` | **etapa 3 pronta**: CRUD de pessoas com nome único por workspace e a `Person` do dono nascendo com o usuário; **a tag não tem cadastro** — nasce com o gasto, e a feature tem só busca e delete |
+| `Inflows` / `InflowPersons` | **etapa 4 pronta**: entradas e transferências, recebimento, rateio, e o saldo calculado estreando |
+| `Expenses` / `ExpensePayments` / `ExpensePersons` / `ExpenseTags` | **etapas 5, 6 e 7 prontas**: gasto simples, parcelado e fixo; dois eixos de rateio; `Status` derivado; quitar por perna |
+| `Budgets` / `BudgetPeriods` | **etapa 8 parcial**: teto por categoria e mês com o comprometido calculado. **O cadastro do mês é manual** — a rotina que materializa o mês é a etapa 8b |
 
-**O `IdWorkspace` saiu da URL e passou a viajar dentro do token.** Isso mudou a forma de toda
-rota escopada por tenant, inclusive as que ainda não existem — ver a decisão 0 abaixo antes de
-escrever a primeira rota da etapa 2.
+**O `IdWorkspace` saiu da URL e passou a viajar dentro do token.** Isso vale para toda rota
+escopada por tenant — ver a decisão 0 abaixo.
 
-As outras 15 não têm nada. Quatro delas (`UserDevices`, `Notifications`, `Plans`,
-`Subscriptions`) são plataforma e ficam **fora desta leva**.
+Ficam sem código, e de propósito, as quatro de plataforma (`UserDevices`, `Notifications`,
+`Plans`, `Subscriptions`). E a etapa 9 (compartilhamento de workspace) continua aberta, **com a
+pendência de segurança do cadastro descrita no fim deste documento**.
 
 ---
 
@@ -47,7 +51,7 @@ graph TD
     P --> E
     E --> PA["6. Parcelamento"]
     E --> F["7. Fixos"]
-    C --> B["8. Budgets (fora desta leva)"]
+    C --> B["8. Budgets (reduzido: cadastro manual do mês)"]
 ```
 
 `ExpensePayments` aponta para `PaymentMethods` com `ON DELETE RESTRICT`, e `Inflows` aponta
@@ -56,10 +60,11 @@ conta cadastrada não existe gasto nem entrada que o banco aceite.
 
 ---
 
-## Decisões transversais — tomar ANTES da etapa 4
+## Decisões transversais — as quatro fechadas
 
-Quatro coisas atravessam várias etapas. Se ficarem para depois, viram retrabalho em todas elas.
-Duas já estão fechadas (0 e 1); as outras duas continuam abertas.
+Quatro coisas atravessam várias etapas. **As quatro estão decididas e implementadas**; o
+registro fica aqui porque a razão de cada uma é o que impede a próxima pessoa de desfazê-la
+sem querer.
 
 ### 0. Como o workspace chega na rota — DECIDIDO: assinado dentro do token
 
@@ -152,18 +157,36 @@ Três consequências:
 De brinde, realizado vs. previsto é o mesmo `SUM` trocando o filtro (`Status='received'` /
 `Paid=true`), sem dobrar pontos de escrita como um cache exigiria.
 
-### 2. Quem escreve `Expenses.Status`
+### 2. Quem escreve `Expenses.Status` — DECIDIDO: só o `ExpenseStatus.section.ts`
 
 O `Status` é derivado das pernas de `ExpensePayments`: `'paid'` só quando **todas** estão
-pagas. Nunca pode ser editado direto por rota. Precisa de uma section única
-(`ExpenseStatus.section.ts`) chamada depois de qualquer escrita em pernas, e o schema de
-update do gasto **não pode aceitar `Status` no body**.
+pagas. Nunca pode ser editado direto por rota. Ficou numa section única
+(`Expenses/sections/ExpenseStatus.section.ts`), chamada **dentro da mesma transaction** de
+qualquer escrita em pernas — criar, editar, quitar, desquitar —, e o schema do PUT não aceita
+`Status` no body (o Joi recusa campo desconhecido, então mandar `Status` é 406).
 
-### 3. Padrão de filtro por período
+Dois detalhes que o teste crava: gasto **sem perna nenhuma** não pode nascer pago (`every` sobre
+lista vazia é `true`, então a guarda é explícita), e gasto **cancelado** não é recalculado — sem
+isso, quitar/desquitar ressuscitaria como `'pending'` o que acabou de ser cancelado.
 
-`GET` de entradas e de gastos vai precisar de recorte por mês. Definir uma vez o formato
-(`?From=YYYY-MM-DD&To=YYYY-MM-DD` ou `?ReferenceMonth=YYYY-MM`) e usar igual nas duas features
-— as datas chegam do Postgres como string `"YYYY-MM-DD"`, não como `Date`.
+### 3. Padrão de filtro por período — DECIDIDO: `?From=YYYY-MM-DD&To=YYYY-MM-DD`
+
+Intervalo, inclusivo nas duas pontas, sobre a `CompetenceDate` da entrada e a `ExpenseDate` do
+gasto. Mora em `periodQuery` (`Utils/joiSchemas.ts`) e as duas features importam de lá.
+
+**Por que intervalo e não `ReferenceMonth=YYYY-MM`:** o mês se escreve como intervalo
+(`From=2026-08-01&To=2026-08-31`), mas o contrário não — o período de uma fatura vai de
+fechamento a fechamento e nunca coincide com o mês civil. As duas pontas são opcionais.
+
+Junto veio o tipo `CalendarDate` (`Utils/database.ts`): as colunas `date` passaram a ser tipadas
+como **string**, não `Datetime`. Agora um `new Date()` acidental sobre uma data de calendário é
+erro de compilação, e não um dia a menos em UTC-3 descoberto em produção.
+
+A aritmética dessas datas é feita com **moment**, para não haver duas formas de somar mês no
+projeto: `Utils.addMonthsToDate`/`setDayOfMonth` fazem parse estrito de "YYYY-MM-DD" e devolvem
+string formatada, então nenhum instante escapa. O `add` do moment já grampeia no fim do mês
+(31/01 + 1 mês = 28/02); o `date()` **não** grampeia, e por isso o `setDayOfMonth` faz o clamp
+na mão — é o que a recorrência do dia 31 e o vencimento da parcela precisam.
 
 ---
 
@@ -222,7 +245,7 @@ update do gasto **não pode aceitar `Status` no body**.
 
 | Rota | O que faz |
 | --- | --- |
-| `GET /Base/Categories` | `where(IdWorkspace = X or IdWorkspace is null)`, em árvore |
+| `GET /Base/Categories` | `where(IdWorkspace = X or IdWorkspace is null)`, numa lista só |
 | `POST /Base/Categories` | cria categoria do workspace |
 | `PUT /Base/Categories/IdCategory=:IdCategory` | edita |
 | `DELETE /Base/Categories/IdCategory=:IdCategory` | `Active = false` |
@@ -233,8 +256,8 @@ update do gasto **não pode aceitar `Status` no body**.
   responder 406. Sem essa trava, um usuário apaga a categoria de todos os outros — é a falha
   mais séria possível nesta etapa, e ela não aparece em teste feliz.
 - As 13 globais já vêm da migration `20260731003200_seed_categories`.
-- `IdParentCategory`: validar que o pai é do mesmo workspace (ou global) e que não fecha ciclo.
-- `Utils.buildTree` já existe e monta a árvore.
+- ~~`IdParentCategory`: validar que o pai é do mesmo workspace (ou global) e que não fecha
+  ciclo.~~ **A hierarquia foi derrubada — ver abaixo.**
 - `Categories` cobre **gasto apenas**. Entrada não tem categoria.
 
 **Como ficou** — o que a implementação decidiu além do que estava previsto aqui:
@@ -243,18 +266,16 @@ update do gasto **não pode aceitar `Status` no body**.
   chamada pelo `PUT` e pelo `DELETE`. O `getUnique` **acha** a global de propósito, em vez de
   filtrá-la fora: assim a resposta é "é pré-definida do sistema" e não "não encontrada" — a
   categoria existe e o cliente a está vendo na lista, então o conserto é criar uma própria.
-- **Arquivar leva a subárvore junto**, na mesma `UPDATE`. Sem isso a filha fica ativa com o pai
-  arquivado: o `buildTree` só pendura o nó no pai que está na lista, então ela sumiria da tela
-  continuando lançável por id. Mesmo raciocínio de arquivar a conta junto com as formas de
-  pagamento dela.
-- **A árvore é uma vista da lista plana e nada pode sumir na montagem.** O `GET` promove a raiz
-  o nó cujo pai não está visível, em vez de deixar o `buildTree` descartá-lo. É rede: com o
-  arquivamento em subárvore o caso não deveria acontecer.
-- **Ciclo é conferido subindo do pai proposto até a raiz**, e só no `PUT` — na criação a
-  categoria ainda não tem filhos, então não há ciclo possível. Inclui o caso de virar pai de si
-  mesma. **A profundidade não é limitada.**
-- **`IdParentCategory` no `PUT` é lido com `in body`**: `undefined` mantém o pai, `null` promove
-  a raiz. É o único campo da feature em que omitir e mandar nulo são pedidos diferentes.
+- **A hierarquia foi derrubada** (migration `20260829010000_drop_categories_parent`): **não
+  existe categoria filha de outra.** A árvore chegou a ser implementada e cobrava três coisas —
+  conferir que o pai enviado pelo cliente era visível ao workspace, recusar ciclo (que deixa o
+  ramo sem raiz, some da montagem e continua lançável por id) e arrastar a subárvore no
+  arquivamento. Nenhuma delas se paga com uma dúzia de categorias por workspace, e a lista plana
+  não tem essas falhas para ter.
+
+  A coluna foi derrubada em migration nova, e não editando a original, do mesmo jeito que o
+  `CurrentBalance` de `Accounts`: quem já rodou a migration anterior não pode ficar com um
+  schema diferente de quem rodar agora.
 - **A suíte semeia a própria categoria global.** O `truncate(["Users"])` das outras suítes
   cascateia por `Workspaces` até `Categories` e leva as 13 globais do seed junto — o
   `globalSetup` só remigra uma vez por execução, então depender do seed deixaria o teste
@@ -281,6 +302,50 @@ CRUD simples nas duas, escopado por workspace:
 - Pessoa não precisa de login — é esse o motivo da tabela existir em vez de usar `Users`.
 - `Tags` tem `unique(IdWorkspace, Name)`.
 - `ExpenseTags` (o vínculo) **não** ganha rota própria: é montado junto com o gasto, na etapa 5.
+
+> **Correção do que este documento previa.** A ideia era CRUD simples nas duas features. **Não
+> é o caso de `Tags`: a tag não tem cadastro próprio.** Ela nasce junto com o gasto, a partir
+> do texto que o usuário digitou no input, e a feature tem **duas rotas só** — a busca (a
+> sugestão do input) e o delete.
+>
+> Não há `POST` porque cadastrar a etiqueta antes de usá-la seriam dois passos para uma palavra.
+> Não há `PUT` porque renomear mudaria a etiqueta de **todos** os gastos já marcados — quem quer
+> outro nome digita outro nome no próximo gasto.
+
+**Como ficou** — o que a implementação decidiu além do que estava previsto aqui:
+
+- **A `Person` do dono nasce no cadastro, e é o único lugar que escreve o `IdUser` dela**
+  (`Persons/sections/POST/createSelf.ts`, dentro da transaction do signup). O `IdUser` **não é
+  aceito em rota nenhuma**: ele é `unique` no banco inteiro e sequencial, então aceitá-lo do
+  cliente deixaria chutar um id e consumir para sempre a vaga de Person daquele usuário. Quem
+  vai escrevê-lo de novo é a etapa 9, ao aceitar um convite.
+- **Cadastro que entra em workspace já existente com nome repetido não cria a pessoa** — pula.
+  O `unique(IdWorkspace, Name)` derrubaria a transaction inteira, ou seja, um xará impediria o
+  cadastro. Inventar "Fulano (2)" viraria nome esquisito na tela e recusar o cadastro seria
+  pior. É outro item para a etapa 9 resolver junto com o convite.
+- **A pessoa vinculada a um login não é arquivável** (406). Seria irreversível: não há rota que
+  reconstrua o vínculo, então o usuário sairia de qualquer rateio futuro para sempre. Quem
+  desfaz o vínculo é a saída do membro, na etapa 9.
+- **O nome é conferido antes de escrever nas duas features**, e as duas conferências são mais
+  estritas que o índice: enxergam o arquivado (o índice ignora o `Active`) e comparam sem
+  diferenciar maiúscula de minúscula, porque "Maria" e "maria" no mesmo rateio são erro de
+  digitação. **O que elas fazem com o arquivado é que difere, e isso vem de quem dá o nome:**
+  pessoa é cadastro, então o nome continua ocupado e o 406 diz isso (se incomodar, o conserto é
+  uma rota de restore); tag é texto digitado, então digitar de novo traz a linha de volta — e
+  esse é o único caminho de reativação que existe nas duas tabelas.
+- **A tag é resolvida por texto** (`Tags/sections/POST/resolveByName.ts`), dentro da transaction
+  do gasto: nome existente é reaproveitado, arquivado volta ao ar, novo é inserido. Tag criada
+  não pode sobreviver a um gasto que falhou.
+- **A busca é o input de sugestão**, com `ILIKE` e os curingas (`%`, `_`) escapados — sem isso,
+  digitar `%` listaria tudo — e teto de resultados, porque ela responde a cada tecla.
+- **`Tags.DELETE` é `Active = false` por um motivo diferente do resto da leva.** Nas outras
+  tabelas o `RESTRICT` recusaria o delete físico; aqui `ExpenseTags` é `ON DELETE CASCADE`, ou
+  seja, o delete **passaria** e levaria em silêncio a marcação de todos os gastos da viagem.
+- **Atenção ao `IdUser` das duas tabelas: são coisas opostas.** Em `Tags` é autoria (quem
+  cadastrou), como em `Accounts`; em `Persons` é vínculo de identidade. Mesmo nome de coluna,
+  sentidos diferentes — é o ponto mais fácil de conflatar da etapa.
+- **A `UsersFactory` passou a semear a `Person` do dono**, porque o cadastro real a cria: uma
+  fábrica que produzisse usuário sem pessoa arranjaria um estado que o app não alcança.
 
 ---
 
@@ -310,6 +375,30 @@ CRUD simples nas duas, escopado por workspace:
 - Recebimento é tudo ou nada: não há `'partial'` nem coluna `ReceivedValue`.
 - É aqui que a decisão sobre `CurrentBalance` estreia.
 
+**Como ficou** — o que a implementação decidiu além do que estava previsto aqui:
+
+- **A entrada nasce sempre `'pending'`.** Lançar e receber são coisas diferentes, e é o
+  recebimento que entra no saldo. Deixar o cliente lançar já recebido misturaria as duas.
+- **Editar entrada já recebida é permitido**, e é exatamente o que a decisão de não guardar
+  saldo compra: não há cache para consertar, o extrato é recalculado na próxima leitura. É o
+  oposto do `InitialBalance` da conta, que trava — aquele é dado de origem, este é o próprio
+  lançamento. **Cancelada, não**: é estado terminal, e editar seria ressuscitar sem conferência.
+- **`Kind` e as contas não entram no `PUT`.** Trocar qualquer um dos três reescreveria o que o
+  lançamento significa e mexeria no saldo de duas contas de uma vez.
+- **O rateio é conferido contra o total novo mesmo quando não vem no corpo.** Quando só o
+  `TotalValue` muda, é o rateio antigo que deixa de fechar — sem essa conferência o `PUT` seria
+  a porta dos fundos do invariante.
+- **Cancelar entrada recebida é o estorno**, e não precisa desfazer escrita nenhuma: a linha sai
+  da soma sozinha. O mesmo vale do lado do gasto, mas lá foi preciso uma cláusula a mais — ver
+  a etapa 5.
+- **O saldo saiu no `GET /Base/Accounts`, como `Balance`.** Uma section só
+  (`Accounts/sections/AccountBalance.section.ts`), três consultas agrupadas para a lista inteira
+  em vez de três por conta.
+- **Não existe `getTotalReceived` ainda.** O ROADMAP sugeria já nascer com ele; como nenhum
+  relatório existe nesta leva, ele seria código morto. A regra (`Kind <> 'transfer'` em todo
+  total de "quanto entrou") está gravada no cabeçalho do model, que é onde a próxima pessoa a
+  escrever um total vai passar.
+
 ---
 
 ## Etapa 5 — Gasto simples
@@ -338,6 +427,34 @@ CRUD simples nas duas, escopado por workspace:
   vai reusar — um dia de diferença na compra vira um mês de diferença no caixa.
 - `Status` nunca no body do `PUT`.
 
+**Como ficou** — o que a implementação decidiu além do que estava previsto aqui:
+
+- **`ExpensePayments` virou pasta própria** (`routes/ExpensePayments/`), porque tem rota — o
+  quitar. `ExpensePersons` e `ExpenseTags` não têm rota nenhuma e ficaram como model dentro de
+  `routes/Expenses/`, como o documento previa.
+- **A categoria é obrigatória; as tags são opcionais e chegam como texto.** A categoria é o que
+  responde "com o que eu gasto", que é a pergunta do app — gasto sem ela vira linha que nenhum
+  relatório soma e que ninguém volta para arrumar. A coluna continua nullable no banco por causa
+  do `ON DELETE SET NULL`, mas nenhuma rota aceita gasto sem categoria.
+- **O POST é três sections, não uma.** `create.ts` orquestra (confere e abre a transaction),
+  `createOne.ts` escreve um gasto completo e `createSeries.ts` monta a corrente do fixo. Antes
+  era tudo privado dentro do `Create`, e privado chamando privado é sinal de section faltando —
+  a montagem das pernas é assunto de quem escreve a linha, não de quem orquestra.
+- **A perna aceita `Paid` no cadastro.** O gasto no débito costuma já sair pago no ato; o do
+  cartão nasce em aberto. O `Status` derivado acompanha sozinho.
+- **Existe `unpay`.** Sem ele, um clique errado no quitar tiraria dinheiro da conta sem volta —
+  mesmo raciocínio que barrou o arquivamento da pessoa vinculada a um login.
+- **Cancelar gasto quitado precisou de uma cláusula no saldo.** O `Paid` da perna é fato
+  histórico e continua gravado; quem tira o dinheiro de volta é o `join` com `Expenses` no
+  cálculo do saldo, filtrando `Status <> 'canceled'`. **Sem ele o estorno não existiria** — o
+  dinheiro ficaria fora da conta para sempre. É o espelho do `Status='received'` das entradas.
+- **Quitar parcela de gasto cancelado é 406.** A perna não sabe do `Status` do gasto; quem sabe
+  é o gasto.
+- **O `PUT` recusa mexer nas pernas de uma compra parcelada**: seria reparcelar sem dizer, e
+  faturas já lançadas mudariam de mês. Cancelar e lançar de novo é a operação honesta.
+- **Os dois eixos são conferidos contra o total novo mesmo quando não vêm no corpo**, como nas
+  entradas.
+
 ---
 
 ## Etapa 6 — Parcelamento
@@ -356,6 +473,21 @@ CRUD simples nas duas, escopado por workspace:
 - O CHECK do banco garante `1 <= InstallmentNumber <= InstallmentTotal`.
 - Cancelar uma compra parcelada cancela a série inteira; quitar uma parcela não torna o gasto
   pago (o `Status` derivado já resolve isso sozinho, se ninguém escrever nele à mão).
+
+**Como ficou**
+
+- **A sobra de centavos vai na primeira parcela** (100 em 3x = 33,34 + 33,33 + 33,33), que é o
+  que a operadora faz e é a parcela que fecha primeiro — pôr na última seria mexer no valor que
+  só vence daqui a meses. Cravado em teste, com a soma batendo exatamente com o total.
+- **Parcelamento exige uma forma de pagamento só — mas ela não precisa ser cartão.** Com duas,
+  não haveria como dizer qual parcela saiu de onde sem inventar um segundo eixo dentro do eixo
+  financeiro. Já **carnê, crediário e o racha com um amigo** caem em pix ou débito e continuam
+  sendo parcela mensal: fora do cartão não há fatura, então a parcela fica sem `ClosingDate`,
+  mas **ganha `DueDate`** no mesmo dia dos meses seguintes — sem ele não haveria como responder
+  quanto vence em novembro.
+- **`InstallmentTotal` mínimo é 2**: "parcelado em 1x" é compra à vista.
+- **Cancelar a compra cancela tudo naturalmente** — as 6 parcelas são pernas de **uma** linha de
+  `Expenses`, então não existe meia compra cancelada.
 
 ---
 
@@ -385,6 +517,90 @@ aponta para ela e é um gasto de verdade.
 
 Para MVP a primeira entrega valor mais rápido. Seja qual for, editar a série muda **só o
 futuro**: ocorrência passada guarda o valor que realmente valeu.
+
+**Como ficou** — DECIDIDO: gerar a janela na criação, sem agendador.
+
+- **`Occurrences` (padrão 12, teto 60) diz quantas ocorrências nascem de uma vez**, contando a
+  raiz, e `RecurrenceEndDate` corta antes se for o caso. O teto existe para um erro de digitação
+  não criar dez anos de gasto. Estender a série é uma edição, não uma rotina — quando a rotina
+  mensal aparecer (etapa 8), ela materializa a partir da mesma raiz.
+- **A raiz é a primeira ocorrência**, não um molde: ela é um gasto de verdade e carrega
+  `RecurrenceDay`/`RecurrenceEndDate`. As geradas apontam para ela.
+- **"Daqui para a frente" é a data da ocorrência escolhida, nunca o relógio.** As duas rotas de
+  série agem sobre a ocorrência em que foram chamadas e todas as posteriores — é como um
+  calendário trata "este e os seguintes". Sem relógio no meio, não há fuso para errar nem teste
+  que dependa do dia em que roda, e "quanto eu pagava em agosto" continua tendo resposta.
+- **O dia da recorrência é grampeado no fim do mês** (`Utils.setDayOfMonth`): a série do dia 31
+  cai no dia 28 em fevereiro em vez de sumir ou pular para março.
+- **A ocorrência futura nasce em aberto** mesmo quando a raiz é lançada já paga.
+- **Gasto fixo usa uma forma de pagamento só**, pelo mesmo motivo do parcelamento. Se alguém
+  editar uma ocorrência à parte e deixá-la com duas, a edição de série recusa dizendo qual
+  ocorrência — ela não adivinha como distribuir.
+- **Encerrar a série grava o fim na raiz** (`RecurrenceEndDate` = a última ocorrência que
+  sobrou), e cancela da escolhida para a frente. O passado fica: cancelar a assinatura em
+  outubro não apaga o que se pagou de agosto a setembro.
+
+---
+
+## Etapa 8 — Orçamento (entregue em versão reduzida)
+
+**Tabelas:** `Budgets`, `BudgetPeriods` · **Pastas:** `routes/Budgets/`, `routes/BudgetPeriods/`
+
+O orçamento entrou na leva porque sem ele o MVP não responde "quanto ainda posso gastar", que é
+metade da razão de o app existir. **O que ficou de fora é só a automação:** hoje o usuário
+cadastra o teto mês a mês; a rotina que materializa o mês corrente a partir da definição é a
+etapa 8b.
+
+| Rota | O que faz |
+| --- | --- |
+| `GET /Base/Budgets?ReferenceMonth=YYYY-MM` | o mês inteiro: cada teto com a categoria e **quanto já foi comprometido** |
+| `POST /Base/Budgets` | orça uma categoria num mês — resolve a definição e cria o mês, numa transaction |
+| `PUT /Base/BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod` | muda o teto **daquele mês só** |
+| `DELETE /Base/BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod` | tira o teto daquele mês |
+
+**Pontos de atenção**
+
+- **`BudgetPeriods.IdBudget` é `NOT NULL`**, então não dá para entregar só a tabela do mês: o
+  período não existe sem a definição. É por isso que o POST escreve as duas.
+- **A definição é única por categoria** (`unique(IdWorkspace, IdCategory)`), então o cadastro do
+  segundo mês reencontra a linha e a atualiza para o teto novo — ela é *a definição vigente*.
+  Os meses já cadastrados não se mexem: é exatamente para isso que existem duas tabelas.
+- **O segundo passo do POST mora em `BudgetPeriods/sections/POST/createForMonth.ts`** de
+  propósito: é a section que a rotina vai chamar sem alterar nada, trocando o mês informado pelo
+  mês corrente.
+- **O comprometido é calculado a cada leitura** (`Budgets/sections/BudgetSpent.section.ts`), como
+  o saldo da conta, e três decisões dele mudam o número:
+  - **soma perna, não gasto**: 600 em 6x custa 100 ao teto de agosto, não 600 — o resto é
+    problema dos meses seguintes, e somar o total na data da compra estouraria agosto por uma
+    dívida de meio ano;
+  - **a data que vale é a da saída** (`coalesce(DueDate, ExpenseDate)`), então a compra no cartão
+    pesa no mês em que a fatura vence;
+  - **conta pendente junto com pago**, ao contrário do saldo: orçamento é comprometido, saldo é
+    realizado.
+- **O alerta fica com o cliente.** A resposta devolve `LimitValue`, `Spent` e `AlertPercent`;
+  comparar os três é trabalho de quem desenha a barra.
+- **`ReferenceMonth` é `YYYY-MM`, e não `From`/`To`.** Aqui o mês *é* a unidade — um teto vale
+  para o mês civil inteiro, ao contrário das listagens de movimento, em que a fatura nunca
+  coincide com o mês. `Utils.monthStart` normaliza para o dia 1, que é o que faz o
+  `unique(IdBudget, ReferenceMonth)` funcionar.
+- **O `DELETE` do período é físico** — o único do projeto. O período é *plano*, não lançamento:
+  nada aponta para ele, nenhum dinheiro passou por ele, e guardá-lo deixaria na tela um teto que
+  o usuário disse não querer. A definição sobrevive, porque é dela que a rotina vai materializar
+  os próximos meses.
+- **`Status`/`ClosedAt` nascem `'open'` e nada os move.** Fechar o mês é trabalho da rotina; sem
+  rota que aceite `'closed'`, o valor não tem como divergir.
+- **`Budgets.Active` é a única coluna que ninguém lê ainda.** Ela é o "parar de orçar esta
+  categoria", e só passa a significar alguma coisa quando a rotina existir.
+
+### Etapa 8b — a rotina mensal (o que falta)
+
+Materializar `BudgetPeriods` do mês corrente a partir de `Budgets` ativos, no primeiro dia do
+mês. Precisa de agendador, e a suíte passa a depender de disparar a rotina na mão. Junto vem o
+fechamento do mês anterior (`Status='closed'`, `ClosedAt`) e o sentido do `Budgets.Active`.
+
+**Cuidado com o que já está pronto:** a rotina não pode recriar o mês que o usuário cadastrou à
+mão nem sobrescrever o teto que ele ajustou — o `unique(IdBudget, ReferenceMonth)` barra o
+primeiro caso com 23505, então a rotina tem que pular o que já existe, e não tentar inserir.
 
 ---
 
@@ -458,14 +674,23 @@ ficar, que ela é interna e é justamente o que esta etapa vai reusar.
 
 | Tabela | Por quê |
 | --- | --- |
-| `Budgets`, `BudgetPeriods` | orçamento depende de gasto lançado para significar alguma coisa; e `BudgetPeriods` precisa da rotina mensal |
+| `Budgets`, `BudgetPeriods` | ~~orçamento depende de gasto lançado para significar alguma coisa; e `BudgetPeriods` precisa da rotina mensal~~ **Entrou na leva, em versão reduzida — ver a etapa 8 abaixo.** Só a rotina ficou de fora |
 | `UserDevices`, `Notifications` | push e avisos não fazem parte do fluxo de um mês |
 | `Plans`, `Subscriptions` | cobrança |
 | Faturas de cartão, conciliação, relatórios | leitura derivada — só faz sentido com dado lançado |
 
 ---
 
-## Como saber que a leva acabou
+## Como saber que a leva acabou — **acabou**
+
+Os nove passos abaixo estão cobertos por HTTP, distribuídos entre os `Fluxo end to end` das
+suítes de cada feature; o passo 9 (ler o mês e os saldos fecharem) fecha em
+`Expenses.tests.ts`. **338 testes, 10 suítes.**
+
+O que ficou **fora** e é o próximo passo natural: a **etapa 8b** (a rotina mensal que
+materializa o orçamento do mês, hoje cadastrado à mão), a etapa 9 (compartilhamento — **com a
+pendência de segurança do cadastro ainda aberta**) e as tabelas de plataforma.
+
 
 Uma suíte `.tests.ts` por feature, seguindo o padrão já estabelecido (um `describe` por rota,
 mais um `describe("Fluxo end to end")`), e um fluxo que percorre tudo **só por HTTP**:
