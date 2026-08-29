@@ -10,6 +10,8 @@ export interface TestUser {
     user: Database.Users
     /** O workspace que nasce junto com o usuário, como no cadastro real */
     workspace: Database.Workspaces
+    /** A Person do próprio dono, que o cadastro também cria — é ela que entra nos rateios */
+    person: Database.Persons
     /** Senha em texto puro, para conseguir logar depois */
     password: string
     /** Token JWT válido, para pular o login quando ele não é o objeto do teste */
@@ -41,10 +43,12 @@ export namespace UsersFactory {
             .returning("*") as Database.Users[]
 
         let workspace = await createWorkspace(user)
+        let person = await createSelfPerson(user, workspace)
 
         return {
             user,
             workspace,
+            person,
             password,
             //  Token igual ao que o login emite: com o workspace dentro. Um token só com o
             //  IdUser é um estado que o app não produz para quem tem matrícula.
@@ -72,6 +76,18 @@ export namespace UsersFactory {
         sequence++
 
         return `teste.${Date.now()}.${sequence}@gastos.local`
+    }
+
+    //  O cadastro real cria a Person do dono na mesma transaction do usuário: todo rateio é
+    //  entre Persons, então um usuário que não é pessoa nenhuma não consegue entrar no próprio.
+    //  A fábrica segue o cadastro — semear o estado que o app não produz esconderia o bug.
+    async function createSelfPerson(user: Database.Users, workspace: Database.Workspaces) {
+        let [person] = await KnexConnection
+            .insert({ IdWorkspace: workspace.IdWorkspace, IdUser: user.IdUser, Name: user.Name })
+            .into("Persons")
+            .returning("*") as Database.Persons[]
+
+        return person
     }
 
     async function createWorkspace(user: Database.Users) {
