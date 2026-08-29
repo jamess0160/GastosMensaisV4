@@ -8,8 +8,8 @@ class Schema {
     //  Sem validateParams em nenhuma rota daqui: o IdWorkspace saiu do caminho e vem do
     //  token da sessão, e o único parâmetro que sobrou é o id da própria linha.
     public readonly getByWorkspace = [
-        //  Espelha a linha de Accounts. Não há coluna de saldo atual: o saldo é calculado dos
-        //  lançamentos, e essa leitura entra na etapa 4, junto com as entradas.
+        //  Espelha a linha de Accounts, mais o Balance, que **não é coluna**: é calculado dos
+        //  lançamentos a cada leitura (sections/AccountBalance.section.ts).
         joiController.validateResponse(Joi.array().items(Joi.object({
             IdAccount: Joi.number().required(),
             IdWorkspace: Joi.number().required(),
@@ -20,6 +20,9 @@ class Schema {
             Color: Joi.string().allow(null).required(),
             InitialBalance: Joi.number().required(),
             InitialBalanceDate: isoDate.allow(null).required(),
+            //  Saldo realizado: abertura + entradas recebidas − transferências que saíram −
+            //  pernas de gasto pagas. O pendente é previsão e não entra.
+            Balance: Joi.number().required(),
             Position: Joi.number().allow(null).required(),
             Active: Joi.boolean().required(),
             CreatedAt: Joi.date().required(),

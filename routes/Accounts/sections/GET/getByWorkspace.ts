@@ -1,5 +1,6 @@
 import { WorkspacesAcessControl } from "root/routes/Workspaces/sections/AcessControl.section"
 import { Accounts_model } from "../../Accounts.model"
+import { AccountBalance } from "../AccountBalance.section"
 
 //  As contas do workspace, cada uma com as suas formas de pagamento embutidas. Vem junto
 //  porque é sempre junto que o cliente usa: a tela de lançar gasto precisa da conta para
@@ -12,7 +13,7 @@ export class GetByWorkspace {
         //  trivial. Sem esta conferência, isso viraria a lista de contas do vizinho.
         let { IdWorkspace } = await WorkspacesAcessControl.assertMember(SelectedIdWorkspace, IdUser)
 
-        return await Accounts_model.getByWorkspace(IdWorkspace).joinTables({
+        let accounts = await Accounts_model.getByWorkspace(IdWorkspace).joinTables({
             PaymentMethods: {
                 selfPath: "IdAccount",
                 //  O joinTables não aplica filtro nenhum por conta própria: sem este append a
@@ -20,5 +21,11 @@ export class GetByWorkspace {
                 append: (query) => query.where("Active", true).orderBy("Position").orderBy("IdPaymentMethod"),
             },
         })
+
+        //  O saldo não é coluna: é sempre calculado dos lançamentos, num lugar só. Vai junto
+        //  com a conta porque não existe tela que mostre uma sem o outro.
+        let balances = await AccountBalance.getByAccounts(accounts)
+
+        return accounts.map((account) => ({ ...account, Balance: balances.get(account.IdAccount) ?? account.InitialBalance }))
     }
 }
