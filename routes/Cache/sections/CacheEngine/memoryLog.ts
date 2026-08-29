@@ -5,8 +5,11 @@ import moment from "moment";
 import sizeof from "object-sizeof"
 
 export class MemoryLog extends BaseSection<CacheEngine> {
+
+    private timer?: NodeJS.Timeout
+
     public run() {
-        setInterval(() => {
+        this.timer = setInterval(() => {
             Logs.insertCacheLog({
                 msg: "Consumo de memoria do cache",
                 data: [
@@ -17,5 +20,16 @@ export class MemoryLog extends BaseSection<CacheEngine> {
                 ]
             }, "Memory")
         }, moment.duration(1, "minute").asMilliseconds());
+
+        //  unref: este intervalo é telemetria, não trabalho. Sem ele o node fica de pé só por
+        //  causa do timer — é uma das razões de a suíte precisar de forceExit.
+        this.timer.unref()
+    }
+
+    //  Existe para os testes: o intervalo dispara sozinho e, se cair depois que o jest
+    //  desmontou o ambiente do arquivo, o winston já foi descarregado e o log estoura dentro
+    //  de um teste qualquer que estivesse rodando — uma falha aleatória que não é do teste.
+    public stop() {
+        clearInterval(this.timer)
     }
 }

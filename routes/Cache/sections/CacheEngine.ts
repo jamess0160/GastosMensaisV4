@@ -27,6 +27,12 @@ export class CacheEngine {
         this.MemoryLog.run()
     }
 
+    //  Para a telemetria de memória. Usado pelo encerramento das suítes — ver
+    //  Utils/Tests/setupSuite.ts.
+    public stopMemoryLog() {
+        this.MemoryLog.stop()
+    }
+
     public getProp(type: string, key?: string) {
         return this.GetProp.run(type, key)
     }
