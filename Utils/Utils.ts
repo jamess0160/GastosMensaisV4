@@ -1,6 +1,7 @@
 import { config } from 'dotenv'
 import path from "path";
 import fs from 'fs/promises'
+import moment from "moment";
 
 //  Funções de utilidades do projeto
 export namespace Utils {
@@ -152,6 +153,61 @@ export namespace Utils {
         if (!jsonConstants) throw new Error(`JSON de constantes não foi encontrado no diretório ${constantsPath}`)
 
         return JSON.parse(jsonConstants)
+    }
+
+    /**
+     * Dinheiro em centavos, para comparar sem o erro do ponto flutuante.
+     *
+     * As colunas são `decimal(15,2)` e chegam como number: somar 0.1 + 0.2 em JS dá
+     * 0.30000000000000004, então `soma das partes === total` só fecha em inteiro. Todo
+     * invariante de rateio (entradas e as duas de gastos) compara por aqui.
+     */
+    export function toCents(value: number) {
+        return Math.round(value * 100)
+    }
+
+    /**
+     * Aritmética de calendário sobre "YYYY-MM-DD", com moment e **sem instante nenhum**.
+     *
+     * As colunas `date` do Postgres chegam e voltam como string (ver pgTypeParsers): elas são
+     * dias do calendário, não instantes. O moment é construído com o formato explícito e no
+     * modo estrito, e a saída volta formatada — assim o valor nunca vira um Date solto, que é
+     * o que reintroduziria o fuso que os parsers existem para tirar (em UTC-3, meia-noite do
+     * dia 01 é o dia 31 do mês anterior).
+     *
+     * O `add` do moment já **grampeia no fim do mês**: 31/01 + 1 mês é 28/02, não 03/03. É a
+     * regra que a fatura do cartão e a recorrência mensal precisam.
+     */
+    export const calendarFormat = "YYYY-MM-DD"
+
+    export function addMonthsToDate(date: string, months: number) {
+        return toCalendar(date).add(months, "months").format(calendarFormat)
+    }
+
+    /** Move a data para um dia do mês, grampeando no último dia quando ele não existe. */
+    export function setDayOfMonth(date: string, day: number) {
+        let target = toCalendar(date)
+
+        //  O `date()` do moment estoura para o mês seguinte quando o dia não existe (31 de
+        //  fevereiro vira 03/03): o clamp é nosso, e é o que a recorrência do dia 31 precisa.
+        return target.date(Math.min(day, target.daysInMonth())).format(calendarFormat)
+    }
+
+    //  Estrito de propósito: uma data fora do formato vira "Invalid date" na saída em vez de
+    //  ser adivinhada pelo moment, e o erro aparece onde nasceu.
+    function toCalendar(date: string) {
+        return moment(date, calendarFormat, true)
+    }
+
+    /**
+     * O primeiro dia do mês de referência: "2026-08" vira "2026-08-01".
+     *
+     * A coluna `ReferenceMonth` é `date` e guarda sempre o dia 1 — é o que faz duas linhas do
+     * mesmo mês colidirem no `unique(IdBudget, ReferenceMonth)` em vez de conviverem por causa
+     * de um dia diferente.
+     */
+    export function monthStart(reference: string) {
+        return moment(reference, "YYYY-MM", true).format(calendarFormat)
     }
 
     export function buildTree<T>(items: T[], getId: (item: T) => number, getParentId: (item: T) => number | null): TreeNode<T>[] {
