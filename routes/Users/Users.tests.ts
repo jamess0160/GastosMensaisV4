@@ -213,6 +213,40 @@ describe("Users", () => {
             expect(membership?.Role).toBe("owner")
         })
 
+        //  Todo rateio é entre Persons, nunca entre Users: sem esta linha o primeiro gasto
+        //  compartilhado exigiria que o usuário se cadastrasse como pessoa antes de conseguir
+        //  aparecer no próprio rateio. Vai na mesma transaction, como o workspace.
+        it("cria a Person do próprio dono junto", async () => {
+            let payload = buildPayload({ Name: "Dono que também é pessoa" })
+
+            let response = await client.anonymous().post("/Base/Users", payload)
+
+            let person = await findPerson(response.body.IdWorkspace)
+
+            //  O IdUser da pessoa é o vínculo com o login, e este é o único lugar que o escreve
+            expect(person).toMatchObject({ Name: payload.Name, IdUser: response.body.IdUser })
+        })
+
+        //  Homônimo no workspace já existente: o unique(IdWorkspace, Name) derrubaria a
+        //  transaction inteira, ou seja, um xará impediria o cadastro. A pessoa é pulada, não
+        //  inventada — ver Persons/sections/POST/createSelf.ts.
+        it("cadastra sem a Person quando o nome já existe no workspace", async () => {
+            let owner = buildPayload({ Name: "Nome repetido" })
+            let created = await client.anonymous().post("/Base/Users", owner)
+
+            let response = await client.anonymous().post("/Base/Users", buildPayload({
+                Name: "Nome repetido",
+                IdWorkspace: created.body.IdWorkspace,
+            }))
+
+            expect(response.status).toBe(200)
+
+            let persons = await findPersons(created.body.IdWorkspace)
+
+            expect(persons).toHaveLength(1)
+            expect(persons[0].IdUser).toBe(created.body.IdUser)
+        })
+
         //  O índice único de Email já barraria, mas com 500: a resposta tem que dizer o motivo
         it("recusa um e-mail que já existe", async () => {
             let payload = buildPayload()
@@ -397,4 +431,12 @@ function findByEmail(Email: string) {
 
 function findWorkspace(IdWorkspace: number) {
     return TestDatabase.connection().select("*").from("Workspaces").where("IdWorkspace", IdWorkspace).first()
+}
+
+function findPerson(IdWorkspace: number) {
+    return TestDatabase.connection().select("*").from("Persons").where("IdWorkspace", IdWorkspace).first()
+}
+
+function findPersons(IdWorkspace: number) {
+    return TestDatabase.connection().select("*").from("Persons").where("IdWorkspace", IdWorkspace).orderBy("IdPerson")
 }
