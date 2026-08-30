@@ -10,7 +10,7 @@ Documento gerado a partir dos `*.route.ts` e `*.schema.ts` do repositório. Ele 
 
 Em produção o front é servido em `https://www.gastosmensais.com.br` e a API em `https://www.gastosmensais.com.br/api`. **Mesma origem** — sem CORS, sem preflight.
 
-Todos os caminhos deste documento começam em `/Base/...`, então a URL final é `/api/Base/...`.
+Os caminhos deste documento são relativos a essa base: `/Accounts` aqui é `https://www.gastosmensais.com.br/api/Accounts` no navegador.
 
 > **Desenvolvimento:** front e API em portas diferentes são origens diferentes, e o cookie de sessão é `SameSite=Strict` — ele **não** será enviado. Faça proxy de `/api` pelo dev server (`server.proxy` do Vite). Não contorne isso afrouxando o cookie.
 
@@ -27,7 +27,7 @@ A sessão é um JWT no cookie `token`:
 
 **Não existe header `Authorization`.** Um token válido enviado no header responde **401**. Basta usar `fetch(..., { credentials: 'same-origin' })` e o cookie viaja sozinho.
 
-O token carrega **duas** informações: `IdUser` e `IdWorkspace`. Por isso **nenhuma rota recebe `IdWorkspace`** — a única exceção é `POST /Base/Workspaces/switch`, que é justamente quem troca o workspace da sessão e reemite o cookie.
+O token carrega **duas** informações: `IdUser` e `IdWorkspace`. Por isso **nenhuma rota recebe `IdWorkspace`** — a única exceção é `POST /Workspaces/switch`, que é justamente quem troca o workspace da sessão e reemite o cookie.
 
 ### 1.3 Formato de erro
 
@@ -52,8 +52,8 @@ Não há `404` para linha inexistente em rota de tenant: responde `406` com `msg
 Parâmetros de rota usam o padrão `Nome=:Valor`, não `/:Valor`:
 
 ```
-PUT    /Base/Accounts/IdAccount=12
-DELETE /Base/Expenses/IdExpense=45/series
+PUT    /Accounts/IdAccount=12
+DELETE /Expenses/IdExpense=45/series
 ```
 
 ### 1.5 Tipos
@@ -76,9 +76,9 @@ Nos PUTs, campos marcados `obrigatório` têm que ir sempre — mesmo que não t
 
 ---
 
-## 2. Users — `/Base/Users`
+## 2. Users — `/Users`
 
-### `POST /Base/Users` — cadastro *(público)*
+### `POST /Users` — cadastro *(público)*
 
 Cria, numa única transaction: o **usuário**, o **workspace** dele, a **matrícula** e a **Person** dele mesmo.
 
@@ -104,11 +104,11 @@ Cria, numa única transaction: o **usuário**, o **workspace** dele, a **matríc
 
 E-mail já em uso: `406`.
 
-> O cadastro **não** loga o usuário. Chame `POST /Base/Users/login` em seguida.
+> O cadastro **não** loga o usuário. Chame `POST /Users/login` em seguida.
 
 ---
 
-### `POST /Base/Users/login` *(público)*
+### `POST /Users/login` *(público)*
 
 **Body**
 
@@ -129,7 +129,7 @@ O login já seleciona o primeiro workspace do usuário, então a sessão nunca c
 
 ---
 
-### `GET /Base/Users/getSelf` 🔒
+### `GET /Users/getSelf` 🔒
 
 **Resposta `200`** (`Password` nunca sai):
 
@@ -150,7 +150,7 @@ O login já seleciona o primeiro workspace do usuário, então a sessão nunca c
 
 ---
 
-### `PUT /Base/Users/IdUser=:IdUser` 🔒
+### `PUT /Users/IdUser=:IdUser` 🔒
 
 **Body:** `Name` (obrigatório), `Email` (obrigatório), `Phone` (obrigatório).
 
@@ -158,7 +158,7 @@ O login já seleciona o primeiro workspace do usuário, então a sessão nunca c
 
 ---
 
-### `PUT /Base/Users/updatePassword` 🔒
+### `PUT /Users/updatePassword` 🔒
 
 **Body:** `oldPassword` (obrigatório), `newPassword` (obrigatório) — **no body, nunca na URL**: o path cai no log de acesso do proxy, no histórico do navegador e no header `Referer`.
 
@@ -166,13 +166,13 @@ O login já seleciona o primeiro workspace do usuário, então a sessão nunca c
 
 ---
 
-## 3. UsersAuth (biometria / WebAuthn) — `/Base/UsersAuth`
+## 3. UsersAuth (biometria / WebAuthn) — `/UsersAuth`
 
 Dois fluxos de dois passos, costurados por um **`ChallengeToken`** (JWT curto, 5 min) que a API assina no passo 1 e o cliente devolve no passo 2. A API não guarda estado entre os passos.
 
 **`DeviceKey`**: id base64url de 32 bytes que a **API gera** e o **aparelho guarda** (localStorage). Não é credencial — só responde "quais passkeys oferecer aqui" e "já perguntei sobre biometria neste aparelho".
 
-### `GET /Base/UsersAuth/checkDevice/DeviceKey=:DeviceKey` *(público)*
+### `GET /UsersAuth/checkDevice/DeviceKey=:DeviceKey` *(público)*
 
 Tri-estado, para decidir o que mostrar na tela de login:
 
@@ -188,7 +188,7 @@ Tri-estado, para decidir o que mostrar na tela de login:
 
 ---
 
-### `GET /Base/UsersAuth/options/login/DeviceKey=:DeviceKey` *(público)*
+### `GET /UsersAuth/options/login/DeviceKey=:DeviceKey` *(público)*
 
 **Resposta `200`**
 
@@ -213,7 +213,7 @@ O desafio **não fixa usuário**: duas pessoas podem ter passkey no mesmo aparel
 
 ---
 
-### `POST /Base/UsersAuth/authenticate` *(público)*
+### `POST /UsersAuth/authenticate` *(público)*
 
 **Body**
 
@@ -234,7 +234,7 @@ O usuário é resolvido **pela credencial assinada**, não pelo `DeviceKey`.
 
 ---
 
-### `GET /Base/UsersAuth/getSelf` 🔒
+### `GET /UsersAuth/getSelf` 🔒
 
 Lista as passkeys da conta.
 
@@ -252,13 +252,13 @@ Lista as passkeys da conta.
 
 ---
 
-### `GET /Base/UsersAuth/options/register` 🔒
+### `GET /UsersAuth/options/register` 🔒
 
 **Resposta `200`:** `{ "options": { ... }, "ChallengeToken": "eyJ..." }` — `options` é o `PublicKeyCredentialCreationOptionsJSON`, para `startRegistration()`.
 
 ---
 
-### `POST /Base/UsersAuth/register` 🔒
+### `POST /UsersAuth/register` 🔒
 
 **Body:** `ChallengeToken` (obrigatório), `Response` (obrigatório, retorno do `startRegistration()`), `DeviceKey` (opcional — mande o que já existe no aparelho; sem ele a API gera um).
 
@@ -272,7 +272,7 @@ Guarde o `DeviceKey` no aparelho. Registrar limpa uma recusa anterior.
 
 ---
 
-### `POST /Base/UsersAuth/skipDevice` 🔒
+### `POST /UsersAuth/skipDevice` 🔒
 
 "Não quero biometria neste aparelho" — é o que faz `checkDevice` passar a responder `false`.
 
@@ -280,7 +280,7 @@ Guarde o `DeviceKey` no aparelho. Registrar limpa uma recusa anterior.
 
 ---
 
-### `DELETE /Base/UsersAuth/IdUserAuth=:IdUserAuth` 🔒
+### `DELETE /UsersAuth/IdUserAuth=:IdUserAuth` 🔒
 
 Soft delete (a linha fica, para o `CredentialId` seguir ocupando o índice único — senão o mesmo autenticador poderia registrar a passkey de novo como se fosse nova).
 
@@ -288,11 +288,11 @@ Soft delete (a linha fica, para o `CredentialId` seguir ocupando o índice únic
 
 ---
 
-## 4. Workspaces — `/Base/Workspaces` 🔒
+## 4. Workspaces — `/Workspaces` 🔒
 
 Não há `POST`: hoje é um workspace por usuário e ele nasce no cadastro.
 
-### `GET /Base/Workspaces/getSelf`
+### `GET /Workspaces/getSelf`
 
 Os workspaces em que o usuário é membro.
 
@@ -300,7 +300,7 @@ Os workspaces em que o usuário é membro.
 [{ "IdWorkspace": 1, "Name": "Casa", "IdOwnerUser": 1, "CreatedAt": "...", "UpdatedAt": "..." }]
 ```
 
-### `POST /Base/Workspaces/switch`
+### `POST /Workspaces/switch`
 
 **A única rota que recebe `IdWorkspace` do cliente.** Confere a matrícula e **reemite o cookie** — o workspace vive dentro do token.
 
@@ -308,7 +308,7 @@ Os workspaces em que o usuário é membro.
 
 **Resposta:** o workspace escolhido, mesma forma do `getSelf` (objeto único).
 
-### `PUT /Base/Workspaces`
+### `PUT /Workspaces`
 
 Edita o workspace **selecionado na sessão** — sem id no caminho.
 
@@ -318,11 +318,11 @@ Edita o workspace **selecionado na sessão** — sem id no caminho.
 
 ---
 
-## 5. Accounts — `/Base/Accounts` 🔒
+## 5. Accounts — `/Accounts` 🔒
 
 Uma conta **não tem saldo guardado**. `Balance` é calculado a cada leitura.
 
-### `GET /Base/Accounts`
+### `GET /Accounts`
 
 Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 
@@ -350,7 +350,7 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 
 `Type` ∈ `checking` | `cash`. **Não existe conta de tipo cartão** — cartão é forma de pagamento.
 
-### `POST /Base/Accounts`
+### `POST /Accounts`
 
 | Campo | Tipo | Regra |
 |---|---|---|
@@ -364,7 +364,7 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 
 **Resposta:** `{ "IdAccount": 1 }`. A conta já nasce com uma forma **pix** e uma **débito** — busque-as no `GET`.
 
-### `PUT /Base/Accounts/IdAccount=:IdAccount`
+### `PUT /Accounts/IdAccount=:IdAccount`
 
 `Name` obrigatório; `Type`, `IconPath`, `Color`, `InitialBalance`, `InitialBalanceDate`, `Position` opcionais (omitido = mantém).
 
@@ -372,7 +372,7 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 
 **Resposta:** `{ "msg": "Conta atualizada com sucesso" }`.
 
-### `DELETE /Base/Accounts/IdAccount=:IdAccount`
+### `DELETE /Accounts/IdAccount=:IdAccount`
 
 **Arquiva** (`Active = false`) e arquiva as formas de pagamento junto. O histórico continua apontando para a linha.
 
@@ -380,9 +380,9 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 
 ---
 
-## 6. PaymentMethods — `/Base/PaymentMethods` 🔒
+## 6. PaymentMethods — `/PaymentMethods` 🔒
 
-**Não há `GET`**: a forma de pagamento sai embutida em `GET /Base/Accounts`.
+**Não há `GET`**: a forma de pagamento sai embutida em `GET /Accounts`.
 
 **Forma da linha** (a mesma dentro de `Accounts.PaymentMethods`):
 
@@ -408,7 +408,7 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 
 `Kind` ∈ `pix` | `debit` | `credit_card`. `ClosingDay`/`DueDay` só fazem sentido em `credit_card` — nas outras são `null`.
 
-### `POST /Base/PaymentMethods`
+### `POST /PaymentMethods`
 
 **Só cartão de crédito.** Pix e débito nascem com a conta e não se criam pela mão.
 
@@ -427,7 +427,7 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 
 **Resposta:** `{ "IdPaymentMethod": 3 }`.
 
-### `PUT /Base/PaymentMethods/IdPaymentMethod=:IdPaymentMethod`
+### `PUT /PaymentMethods/IdPaymentMethod=:IdPaymentMethod`
 
 `Name` obrigatório; `ClosingDay`, `DueDay`, `Brand`, `LastDigits`, `IconPath`, `Color`, `Position` opcionais.
 
@@ -435,17 +435,17 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 
 **Resposta:** `{ "msg": "Forma de pagamento atualizada com sucesso" }`.
 
-### `DELETE /Base/PaymentMethods/IdPaymentMethod=:IdPaymentMethod`
+### `DELETE /PaymentMethods/IdPaymentMethod=:IdPaymentMethod`
 
 Arquiva. **Resposta:** `{ "msg": "Forma de pagamento arquivada com sucesso" }`.
 
 ---
 
-## 7. Categories — `/Base/Categories` 🔒
+## 7. Categories — `/Categories` 🔒
 
 Categoria é **só de gasto** — entrada não tem categoria. **Lista plana: categoria não é filha de outra.**
 
-### `GET /Base/Categories`
+### `GET /Categories`
 
 Devolve as do workspace **e as globais juntas**, numa lista só.
 
@@ -465,7 +465,7 @@ Devolve as do workspace **e as globais juntas**, numa lista só.
 
 > **`IdWorkspace: null` = categoria pré-definida do sistema.** Ela aparece em todo workspace e **não pode ser editada nem arquivada** — tentar responde `406`. Use esse campo para desabilitar os botões de editar/excluir na tela.
 
-### `POST /Base/Categories`
+### `POST /Categories`
 
 | Campo | Tipo | Regra |
 |---|---|---|
@@ -476,23 +476,23 @@ Devolve as do workspace **e as globais juntas**, numa lista só.
 
 **Resposta:** `{ "IdCategory": 14 }`.
 
-### `PUT /Base/Categories/IdCategory=:IdCategory`
+### `PUT /Categories/IdCategory=:IdCategory`
 
 `Description` obrigatório; `IconKey`, `Color`, `Position` opcionais.
 
 **Resposta:** `{ "msg": "Categoria atualizada com sucesso" }`.
 
-### `DELETE /Base/Categories/IdCategory=:IdCategory`
+### `DELETE /Categories/IdCategory=:IdCategory`
 
 Arquiva. **Resposta:** `{ "msg": "Categoria arquivada com sucesso" }`.
 
 ---
 
-## 8. Persons — `/Base/Persons` 🔒
+## 8. Persons — `/Persons` 🔒
 
 Quem recebeu ou quem gastou. Os dois rateios (entrada e gasto) apontam para **Persons**, nunca para Users — pessoa não precisa ter login.
 
-### `GET /Base/Persons`
+### `GET /Persons`
 
 ```json
 [{
@@ -508,7 +508,7 @@ Quem recebeu ou quem gastou. Os dois rateios (entrada e gasto) apontam para **Pe
 
 `IdUser` aqui é **vínculo de identidade** (essa pessoa é um usuário do sistema), não autoria. Nulo é o caso comum.
 
-### `POST /Base/Persons`
+### `POST /Persons`
 
 **Body:** `Name` (obrigatório, ≤255) — **e só**. `IdUser` não é aceito de propósito: é único no banco inteiro, e aceitá-lo do cliente consumiria a vaga de outro usuário.
 
@@ -516,11 +516,11 @@ Nome já usado no workspace (mesmo arquivado, e a comparação ignora maiúscula
 
 **Resposta:** `{ "IdPerson": 2 }`.
 
-### `PUT /Base/Persons/IdPerson=:IdPerson`
+### `PUT /Persons/IdPerson=:IdPerson`
 
 **Body:** `Name` (obrigatório). **Resposta:** `{ "msg": "Pessoa atualizada com sucesso" }`.
 
-### `DELETE /Base/Persons/IdPerson=:IdPerson`
+### `DELETE /Persons/IdPerson=:IdPerson`
 
 Arquiva. **Recusa (`406`) a pessoa vinculada a um login** (`IdUser` preenchido): o vínculo não pode ser reconstruído por rota nenhuma, e arquivar tiraria esse usuário de todo rateio futuro para sempre.
 
@@ -528,11 +528,11 @@ Arquiva. **Recusa (`406`) a pessoa vinculada a um login** (`IdUser` preenchido):
 
 ---
 
-## 9. Tags — `/Base/Tags` 🔒
+## 9. Tags — `/Tags` 🔒
 
 **Duas rotas só, e é de propósito.** A tag **não tem cadastro**: ela nasce do texto digitado no lançamento do gasto. Não há `POST` (cadastrar antes de usar seriam dois passos para uma etiqueta) e não há `PUT` (renomear mudaria a etiqueta de todos os gastos já marcados).
 
-### `GET /Base/Tags/search?Search=via`
+### `GET /Tags/search?Search=via`
 
 O input de sugestão enquanto se digita. `Search` opcional, ≤100 caracteres. Busca `ILIKE`, com os curingas escapados, e o resultado vem limitado.
 
@@ -551,7 +551,7 @@ O input de sugestão enquanto se digita. `Search` opcional, ≤100 caracteres. B
 
 `IdUser` aqui é **autoria** (quem usou a tag primeiro) — sentido oposto ao de `Persons`.
 
-### `DELETE /Base/Tags/IdTag=:IdTag`
+### `DELETE /Tags/IdTag=:IdTag`
 
 Arquiva. **Resposta:** `{ "msg": "Tag arquivada com sucesso" }`.
 
@@ -559,7 +559,7 @@ Arquiva. **Resposta:** `{ "msg": "Tag arquivada com sucesso" }`.
 
 ---
 
-## 10. Inflows — `/Base/Inflows` 🔒
+## 10. Inflows — `/Inflows` 🔒
 
 Carrega **entrada de dinheiro e transferência entre contas**, discriminadas por `Kind`.
 
@@ -572,7 +572,7 @@ Carrega **entrada de dinheiro e transferência entre contas**, discriminadas por
 
 `Status` ∈ `pending` | `received` | `canceled`. Nasce sempre `pending`. **Não há estado parcial nem `ReceivedValue`.**
 
-### `GET /Base/Inflows`
+### `GET /Inflows`
 
 **Query** (todos opcionais)
 
@@ -607,7 +607,7 @@ Filtra por `CompetenceDate`. **Sem `Status`, as canceladas ficam de fora**; peç
 }]
 ```
 
-### `GET /Base/Inflows/IdInflow=:IdInflow`
+### `GET /Inflows/IdInflow=:IdInflow`
 
 Mesma linha **mais** `Persons`:
 
@@ -626,7 +626,7 @@ Mesma linha **mais** `Persons`:
 }
 ```
 
-### `POST /Base/Inflows`
+### `POST /Inflows`
 
 | Campo | Tipo | Regra |
 |---|---|---|
@@ -644,7 +644,7 @@ Mesma linha **mais** `Persons`:
 
 **Resposta:** `{ "IdInflow": 1 }`.
 
-### `PUT /Base/Inflows/IdInflow=:IdInflow`
+### `PUT /Inflows/IdInflow=:IdInflow`
 
 | Campo | Regra |
 |---|---|
@@ -661,13 +661,13 @@ Mesma linha **mais** `Persons`:
 
 **Resposta:** `{ "msg": "Entrada atualizada com sucesso" }`.
 
-### `POST /Base/Inflows/IdInflow=:IdInflow/receive`
+### `POST /Inflows/IdInflow=:IdInflow/receive`
 
 Sem body. É **isto** que põe o dinheiro no saldo. Tudo ou nada.
 
 **Resposta:** `{ "msg": "Entrada recebida com sucesso" }`.
 
-### `DELETE /Base/Inflows/IdInflow=:IdInflow`
+### `DELETE /Inflows/IdInflow=:IdInflow`
 
 **Cancela** (`Status = 'canceled'`). Não há delete físico nem `Active` nesta tabela.
 
@@ -675,7 +675,7 @@ Sem body. É **isto** que põe o dinheiro no saldo. Tudo ou nada.
 
 ---
 
-## 11. Expenses — `/Base/Expenses` 🔒
+## 11. Expenses — `/Expenses` 🔒
 
 ### 11.1 Os dois eixos — leia antes de montar a tela
 
@@ -704,7 +704,7 @@ Um gasto tem **dois rateios independentes que nunca se cruzam**:
 
 `Status` ∈ `pending` | `paid` | `canceled`, calculado num único lugar e recalculado a cada quitação. **Só chega a `paid` quando TODAS as pernas estão pagas** — quitar 1 de 6 parcelas deixa a compra `pending`.
 
-### `GET /Base/Expenses`
+### `GET /Expenses`
 
 **Query** (todos opcionais): `From`, `To` (`YYYY-MM-DD`, inclusivos, sobre `ExpenseDate`), `Status`, `Kind`, `IdCategory`.
 
@@ -732,7 +732,7 @@ Sem `Status`, os cancelados ficam de fora.
 }]
 ```
 
-### `GET /Base/Expenses/IdExpense=:IdExpense`
+### `GET /Expenses/IdExpense=:IdExpense`
 
 A mesma linha **mais os três filhos**:
 
@@ -773,7 +773,7 @@ A mesma linha **mais os três filhos**:
 
 > Em cartão, um dia de diferença na compra vira **um mês** de diferença no caixa: comprou até o dia do fechamento, cai na fatura deste mês; depois dele, na do mês seguinte.
 
-### `POST /Base/Expenses`
+### `POST /Expenses`
 
 | Campo | Tipo | Regra |
 |---|---|---|
@@ -805,7 +805,7 @@ A mesma linha **mais os três filhos**:
 
 `Occurrences` = quantas linhas de gasto nasceram: `1`, ou a série inteira em `fixed`.
 
-### `PUT /Base/Expenses/IdExpense=:IdExpense`
+### `PUT /Expenses/IdExpense=:IdExpense`
 
 | Campo | Regra |
 |---|---|
@@ -825,7 +825,7 @@ A mesma linha **mais os três filhos**:
 
 **Resposta:** `{ "msg": "Gasto atualizado com sucesso" }`.
 
-### `PUT /Base/Expenses/IdExpense=:IdExpense/series`
+### `PUT /Expenses/IdExpense=:IdExpense/series`
 
 "Esta e as seguintes", como num calendário: age na ocorrência chamada **e em todas as posteriores**. O corte é a **data dela**, não o relógio — ocorrência passada guarda o valor que realmente valeu.
 
@@ -839,13 +839,13 @@ A mesma linha **mais os três filhos**:
 { "msg": "Série atualizada com sucesso", "Occurrences": 8 }
 ```
 
-### `DELETE /Base/Expenses/IdExpense=:IdExpense`
+### `DELETE /Expenses/IdExpense=:IdExpense`
 
 **Cancela** (`Status = 'canceled'`). Cancelar um gasto já pago é o estorno: o dinheiro volta ao saldo.
 
 Já cancelado: `406`. **Resposta:** `{ "msg": "Gasto cancelado com sucesso" }`.
 
-### `DELETE /Base/Expenses/IdExpense=:IdExpense/series`
+### `DELETE /Expenses/IdExpense=:IdExpense/series`
 
 Cancela desta ocorrência para a frente.
 
@@ -853,11 +853,11 @@ Cancela desta ocorrência para a frente.
 
 ---
 
-## 12. ExpensePayments — `/Base/ExpensePayments` 🔒
+## 12. ExpensePayments — `/ExpensePayments` 🔒
 
 A perna não tem `GET` nem `POST` de cadastro: ela nasce com o gasto e sai embutida nele. O que existe aqui é **o verbo que move saldo**.
 
-### `POST /Base/ExpensePayments/IdExpensePayment=:IdExpensePayment/pay`
+### `POST /ExpensePayments/IdExpensePayment=:IdExpensePayment/pay`
 
 **Sem body** — o instante do pagamento quem grava é o servidor. Recalcula o `Status` do gasto na mesma transaction.
 
@@ -865,7 +865,7 @@ A perna não tem `GET` nem `POST` de cadastro: ela nasce com o gasto e sai embut
 
 `406` se: a perna não existe, o gasto está cancelado, ou a parcela **já está quitada**.
 
-### `POST /Base/ExpensePayments/IdExpensePayment=:IdExpensePayment/unpay`
+### `POST /ExpensePayments/IdExpensePayment=:IdExpensePayment/unpay`
 
 Desquita. Existe porque um clique errado, sem ele, tiraria dinheiro da conta sem volta.
 
@@ -873,7 +873,7 @@ Desquita. Existe porque um clique errado, sem ele, tiraria dinheiro da conta sem
 
 ---
 
-## 13. Budgets — `/Base/Budgets` 🔒
+## 13. Budgets — `/Budgets` 🔒
 
 > **Entrega reduzida de propósito: o cadastro do mês é manual.** A rotina que materializaria o mês a partir da definição ainda não existe, então hoje é o usuário que informa o mês.
 
@@ -881,7 +881,7 @@ Desquita. Existe porque um clique errado, sem ele, tiraria dinheiro da conta sem
 
 Orçamento é **só de gasto** — entrada não tem categoria, então não tem teto.
 
-### `GET /Base/Budgets?ReferenceMonth=YYYY-MM`
+### `GET /Budgets?ReferenceMonth=YYYY-MM`
 
 `ReferenceMonth` **obrigatório**, no formato `YYYY-MM`. Aqui o mês **é** a unidade (ao contrário das listagens de movimento, que usam `From`/`To`): um teto vale para o mês civil inteiro.
 
@@ -913,7 +913,7 @@ Note que `ReferenceMonth` **volta como `YYYY-MM-01`** (a coluna guarda o dia 1),
 
 **O alerta é do cliente:** a resposta traz `LimitValue`, `Spent` e `AlertPercent`; comparar os três números é trabalho da tela.
 
-### `POST /Base/Budgets`
+### `POST /Budgets`
 
 Numa transaction: resolve a definição vigente (cria, ou **atualiza** para o novo limite — só existe uma por categoria) e materializa o mês.
 
@@ -930,11 +930,11 @@ Numa transaction: resolve a definição vigente (cria, ou **atualiza** para o no
 
 ---
 
-## 14. BudgetPeriods — `/Base/BudgetPeriods` 🔒
+## 14. BudgetPeriods — `/BudgetPeriods` 🔒
 
-**Sem `GET`** (o mês sai em `GET /Base/Budgets`, que é onde ele significa algo) e **sem `POST`** (o mês nasce no `POST /Base/Budgets`). As duas rotas mexem em **um mês só** — é isso que a separação em duas tabelas compra.
+**Sem `GET`** (o mês sai em `GET /Budgets`, que é onde ele significa algo) e **sem `POST`** (o mês nasce no `POST /Budgets`). As duas rotas mexem em **um mês só** — é isso que a separação em duas tabelas compra.
 
-### `PUT /Base/BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod`
+### `PUT /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod`
 
 **Body:** `LimitValue` (obrigatório, > 0), `AlertPercent` (opcional, 1–100).
 
@@ -942,7 +942,7 @@ Numa transaction: resolve a definição vigente (cria, ou **atualiza** para o no
 
 **Resposta:** `{ "msg": "Orçamento do mês atualizado com sucesso" }`.
 
-### `DELETE /Base/BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod`
+### `DELETE /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod`
 
 **Delete físico — o único do projeto.** Um período é plano, não lançamento: nada aponta para ele e nenhum dinheiro passou por ali. **A definição sobrevive.**
 
@@ -950,16 +950,16 @@ Numa transaction: resolve a definição vigente (cria, ou **atualiza** para o no
 
 ---
 
-## 15. Utils — `/Base/Utils`
+## 15. Utils — `/Utils`
 
 | Rota | Auth | Resposta |
 |---|---|---|
-| `GET /Base/Utils/ServerTime` | público | `1756512000000` (número, epoch ms) |
-| `GET /Base/Utils/Health` | público | `{ "msg": "API Funcionando", "timeStamp": 1756512000000, "serverTime": "30/08/2026 12:00:00" }` |
-| `GET /Base/Utils/Reload` | 🔒 | texto `"Mensagem socket enviada com sucesso!"` — dispara reload via socket |
-| `POST /Base/Utils/Logs` | 🔒 | texto `"Sucesso"` |
+| `GET /Utils/ServerTime` | público | `1756512000000` (número, epoch ms) |
+| `GET /Utils/Health` | público | `{ "msg": "API Funcionando", "timeStamp": 1756512000000, "serverTime": "30/08/2026 12:00:00" }` |
+| `GET /Utils/Reload` | 🔒 | texto `"Mensagem socket enviada com sucesso!"` — dispara reload via socket |
+| `POST /Utils/Logs` | 🔒 | texto `"Sucesso"` |
 
-**`POST /Base/Utils/Logs`** — body:
+**`POST /Utils/Logs`** — body:
 
 ```json
 {
@@ -984,9 +984,9 @@ Numa transaction: resolve a definição vigente (cria, ou **atualiza** para o no
 
 Existe no banco, mas **sem rota**: `UserDevices`, `Notifications`, `Plans`, `Subscriptions`.
 
-Também não existem: `POST /Base/Workspaces` (workspace nasce no cadastro), `GET` de `PaymentMethods` (vem embutido na conta), CRUD de `Tags` além de busca e arquivar, `GET`/`POST` de `BudgetPeriods`, e a **rotina mensal** que materializaria os orçamentos.
+Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de `PaymentMethods` (vem embutido na conta), CRUD de `Tags` além de busca e arquivar, `GET`/`POST` de `BudgetPeriods`, e a **rotina mensal** que materializaria os orçamentos.
 
-**Fora deste contrato:** `/Base/Cache` (`GET /Base/Cache/CacheName=:CacheName`, `POST /Base/Cache`, `POST /Base/Cache/Reset/CacheName=:CacheName`) é o subsistema interno de cache em memória sincronizado por socket. Não tem schema Joi, não é escopado por workspace e não faz parte do domínio do app — não consuma a partir das telas.
+**Fora deste contrato:** `/Cache` (`GET /Cache/CacheName=:CacheName`, `POST /Cache`, `POST /Cache/Reset/CacheName=:CacheName`) é o subsistema interno de cache em memória sincronizado por socket. Não tem schema Joi, não é escopado por workspace e não faz parte do domínio do app — não consuma a partir das telas.
 
 ---
 
@@ -994,59 +994,59 @@ Também não existem: `POST /Base/Workspaces` (workspace nasce no cadastro), `GE
 
 | Método | Rota | Auth |
 |---|---|---|
-| POST | `/Base/Users` | público |
-| POST | `/Base/Users/login` | público |
-| GET | `/Base/Users/getSelf` | 🔒 |
-| PUT | `/Base/Users/IdUser=:IdUser` | 🔒 |
-| PUT | `/Base/Users/updatePassword` | 🔒 |
-| GET | `/Base/UsersAuth/checkDevice/DeviceKey=:DeviceKey` | público |
-| GET | `/Base/UsersAuth/options/login/DeviceKey=:DeviceKey` | público |
-| POST | `/Base/UsersAuth/authenticate` | público |
-| GET | `/Base/UsersAuth/getSelf` | 🔒 |
-| GET | `/Base/UsersAuth/options/register` | 🔒 |
-| POST | `/Base/UsersAuth/register` | 🔒 |
-| POST | `/Base/UsersAuth/skipDevice` | 🔒 |
-| DELETE | `/Base/UsersAuth/IdUserAuth=:IdUserAuth` | 🔒 |
-| GET | `/Base/Workspaces/getSelf` | 🔒 |
-| POST | `/Base/Workspaces/switch` | 🔒 |
-| PUT | `/Base/Workspaces` | 🔒 |
-| GET | `/Base/Accounts` | 🔒 |
-| POST | `/Base/Accounts` | 🔒 |
-| PUT | `/Base/Accounts/IdAccount=:IdAccount` | 🔒 |
-| DELETE | `/Base/Accounts/IdAccount=:IdAccount` | 🔒 |
-| POST | `/Base/PaymentMethods` | 🔒 |
-| PUT | `/Base/PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | 🔒 |
-| DELETE | `/Base/PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | 🔒 |
-| GET | `/Base/Categories` | 🔒 |
-| POST | `/Base/Categories` | 🔒 |
-| PUT | `/Base/Categories/IdCategory=:IdCategory` | 🔒 |
-| DELETE | `/Base/Categories/IdCategory=:IdCategory` | 🔒 |
-| GET | `/Base/Persons` | 🔒 |
-| POST | `/Base/Persons` | 🔒 |
-| PUT | `/Base/Persons/IdPerson=:IdPerson` | 🔒 |
-| DELETE | `/Base/Persons/IdPerson=:IdPerson` | 🔒 |
-| GET | `/Base/Tags/search` | 🔒 |
-| DELETE | `/Base/Tags/IdTag=:IdTag` | 🔒 |
-| GET | `/Base/Inflows` | 🔒 |
-| GET | `/Base/Inflows/IdInflow=:IdInflow` | 🔒 |
-| POST | `/Base/Inflows` | 🔒 |
-| PUT | `/Base/Inflows/IdInflow=:IdInflow` | 🔒 |
-| POST | `/Base/Inflows/IdInflow=:IdInflow/receive` | 🔒 |
-| DELETE | `/Base/Inflows/IdInflow=:IdInflow` | 🔒 |
-| GET | `/Base/Expenses` | 🔒 |
-| GET | `/Base/Expenses/IdExpense=:IdExpense` | 🔒 |
-| POST | `/Base/Expenses` | 🔒 |
-| PUT | `/Base/Expenses/IdExpense=:IdExpense` | 🔒 |
-| PUT | `/Base/Expenses/IdExpense=:IdExpense/series` | 🔒 |
-| DELETE | `/Base/Expenses/IdExpense=:IdExpense` | 🔒 |
-| DELETE | `/Base/Expenses/IdExpense=:IdExpense/series` | 🔒 |
-| POST | `/Base/ExpensePayments/IdExpensePayment=:Id/pay` | 🔒 |
-| POST | `/Base/ExpensePayments/IdExpensePayment=:Id/unpay` | 🔒 |
-| GET | `/Base/Budgets` | 🔒 |
-| POST | `/Base/Budgets` | 🔒 |
-| PUT | `/Base/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
-| DELETE | `/Base/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
-| GET | `/Base/Utils/ServerTime` | público |
-| GET | `/Base/Utils/Health` | público |
-| GET | `/Base/Utils/Reload` | 🔒 |
-| POST | `/Base/Utils/Logs` | 🔒 |
+| POST | `/Users` | público |
+| POST | `/Users/login` | público |
+| GET | `/Users/getSelf` | 🔒 |
+| PUT | `/Users/IdUser=:IdUser` | 🔒 |
+| PUT | `/Users/updatePassword` | 🔒 |
+| GET | `/UsersAuth/checkDevice/DeviceKey=:DeviceKey` | público |
+| GET | `/UsersAuth/options/login/DeviceKey=:DeviceKey` | público |
+| POST | `/UsersAuth/authenticate` | público |
+| GET | `/UsersAuth/getSelf` | 🔒 |
+| GET | `/UsersAuth/options/register` | 🔒 |
+| POST | `/UsersAuth/register` | 🔒 |
+| POST | `/UsersAuth/skipDevice` | 🔒 |
+| DELETE | `/UsersAuth/IdUserAuth=:IdUserAuth` | 🔒 |
+| GET | `/Workspaces/getSelf` | 🔒 |
+| POST | `/Workspaces/switch` | 🔒 |
+| PUT | `/Workspaces` | 🔒 |
+| GET | `/Accounts` | 🔒 |
+| POST | `/Accounts` | 🔒 |
+| PUT | `/Accounts/IdAccount=:IdAccount` | 🔒 |
+| DELETE | `/Accounts/IdAccount=:IdAccount` | 🔒 |
+| POST | `/PaymentMethods` | 🔒 |
+| PUT | `/PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | 🔒 |
+| DELETE | `/PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | 🔒 |
+| GET | `/Categories` | 🔒 |
+| POST | `/Categories` | 🔒 |
+| PUT | `/Categories/IdCategory=:IdCategory` | 🔒 |
+| DELETE | `/Categories/IdCategory=:IdCategory` | 🔒 |
+| GET | `/Persons` | 🔒 |
+| POST | `/Persons` | 🔒 |
+| PUT | `/Persons/IdPerson=:IdPerson` | 🔒 |
+| DELETE | `/Persons/IdPerson=:IdPerson` | 🔒 |
+| GET | `/Tags/search` | 🔒 |
+| DELETE | `/Tags/IdTag=:IdTag` | 🔒 |
+| GET | `/Inflows` | 🔒 |
+| GET | `/Inflows/IdInflow=:IdInflow` | 🔒 |
+| POST | `/Inflows` | 🔒 |
+| PUT | `/Inflows/IdInflow=:IdInflow` | 🔒 |
+| POST | `/Inflows/IdInflow=:IdInflow/receive` | 🔒 |
+| DELETE | `/Inflows/IdInflow=:IdInflow` | 🔒 |
+| GET | `/Expenses` | 🔒 |
+| GET | `/Expenses/IdExpense=:IdExpense` | 🔒 |
+| POST | `/Expenses` | 🔒 |
+| PUT | `/Expenses/IdExpense=:IdExpense` | 🔒 |
+| PUT | `/Expenses/IdExpense=:IdExpense/series` | 🔒 |
+| DELETE | `/Expenses/IdExpense=:IdExpense` | 🔒 |
+| DELETE | `/Expenses/IdExpense=:IdExpense/series` | 🔒 |
+| POST | `/ExpensePayments/IdExpensePayment=:Id/pay` | 🔒 |
+| POST | `/ExpensePayments/IdExpensePayment=:Id/unpay` | 🔒 |
+| GET | `/Budgets` | 🔒 |
+| POST | `/Budgets` | 🔒 |
+| PUT | `/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
+| DELETE | `/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
+| GET | `/Utils/ServerTime` | público |
+| GET | `/Utils/Health` | público |
+| GET | `/Utils/Reload` | 🔒 |
+| POST | `/Utils/Logs` | 🔒 |
