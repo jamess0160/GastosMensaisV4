@@ -1,7 +1,7 @@
 import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
 
 //  Testes integrados de Accounts. Um describe por rota de Accounts.route.ts, mais o fluxo
-//  end to end no fim. O cartão de crédito tem suíte própria, em PaymentMethods.tests.ts.
+//  end to end no fim. O cartão de crédito tem suíte própria, em PaymentMethods.test.ts.
 //
 //  Esta é a primeira feature escopada por tenant, então metade dos casos aqui é sobre isso: o
 //  IdWorkspace chega pela URL e é sequencial, ou seja, chutável. Todo describe tem o caso do
@@ -409,7 +409,7 @@ describe("Accounts", () => {
 
         //  Passos 1 e 2 do "como saber que a leva acabou" do ROADMAP, só por HTTP: do cadastro
         //  do usuário até a conta pronta para receber lançamento. O cartão é o passo 3 e está
-        //  no fluxo de PaymentMethods.tests.ts.
+        //  no fluxo de PaymentMethods.test.ts.
         it("cadastra o usuário, cria a conta e lê a lista com pix e débito", async () => {
             let payload = {
                 Name: "Usuário do fluxo de contas",

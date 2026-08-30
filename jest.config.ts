@@ -5,8 +5,8 @@ const config: Config = {
     testEnvironment: "node",
     rootDir: ".",
 
-    //  Um arquivo de teste por tabela/feature: routes/<Feature>/<Feature>.tests.ts
-    testMatch: ["**/*.tests.ts"],
+    //  Um arquivo de teste por tabela/feature: routes/<Feature>/<Feature>.test.ts
+    testMatch: ["**/*.test.ts"],
 
     //  Mesmo alias do tsconfig (root/*), que o jest não lê sozinho
     moduleNameMapper: {

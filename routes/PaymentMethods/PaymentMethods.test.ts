@@ -4,7 +4,7 @@ import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tes
 //
 //  A conta é arranjo, não objeto de teste: ela vem pelo POST /Accounts porque é de lá
 //  que saem o pix e o débito automáticos, e várias asserções daqui dependem deles existirem
-//  do jeito que a rota real cria. Quem testa a conta em si é Accounts.tests.ts.
+//  do jeito que a rota real cria. Quem testa a conta em si é Accounts.test.ts.
 
 describe("PaymentMethods", () => {
 

@@ -12,8 +12,6 @@ Em produção o front é servido em `https://www.gastosmensais.com.br` e a API e
 
 Os caminhos deste documento são relativos a essa base: `/Accounts` aqui é `https://www.gastosmensais.com.br/api/Accounts` no navegador.
 
-> **Mudança de contrato:** o prefixo `/Base` foi removido de todas as rotas. Onde antes era `/api/Base/Accounts`, agora é `/api/Accounts`. Não há rota mantida no caminho antigo — o `/Base` simplesmente não existe mais e responde 404.
-
 > **Desenvolvimento:** front e API em portas diferentes são origens diferentes, e o cookie de sessão é `SameSite=Strict` — ele **não** será enviado. Faça proxy de `/api` pelo dev server (`server.proxy` do Vite). Não contorne isso afrouxando o cookie.
 
 ### 1.2 Autenticação — cookie, e só cookie
