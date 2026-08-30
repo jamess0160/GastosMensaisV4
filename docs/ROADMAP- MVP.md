@@ -685,14 +685,14 @@ ficar, que ela é interna e é justamente o que esta etapa vai reusar.
 
 Os nove passos abaixo estão cobertos por HTTP, distribuídos entre os `Fluxo end to end` das
 suítes de cada feature; o passo 9 (ler o mês e os saldos fecharem) fecha em
-`Expenses.tests.ts`. **338 testes, 10 suítes.**
+`Expenses.test.ts`. **338 testes, 10 suítes.**
 
 O que ficou **fora** e é o próximo passo natural: a **etapa 8b** (a rotina mensal que
 materializa o orçamento do mês, hoje cadastrado à mão), a etapa 9 (compartilhamento — **com a
 pendência de segurança do cadastro ainda aberta**) e as tabelas de plataforma.
 
 
-Uma suíte `.tests.ts` por feature, seguindo o padrão já estabelecido (um `describe` por rota,
+Uma suíte `.test.ts` por feature, seguindo o padrão já estabelecido (um `describe` por rota,
 mais um `describe("Fluxo end to end")`), e um fluxo que percorre tudo **só por HTTP**:
 
 1. cadastra usuário → recebe `IdUser` + `IdWorkspace`, e o login já devolve a sessão com o
