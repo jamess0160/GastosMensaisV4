@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gastos mensais — Dashboard (Hi-fi)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand:#FF6A00; --brand-soft:#FFF8EA;
+    --neg:#FF001A; --neg-soft:#FFE9EB; --pos:#00DC8C; --pos-soft:#DDF8EE; --pos-ink:#009C63;
+    --cat-azul:#0084FF; --cat-roxo:#7238D7; --cat-magenta:#F40092; --cat-ciano:#00B4D8; --cat-grafite:#6E6A66;
+    --page:#EEEDEA; --screen:#F6F5F2; --surface:#FFFFFF; --surface-alt:#FAFAF8;
+    --border:#E7E5DF; --border-strong:#CFCDC6;
+    --ink:#1B1B1B; --ink-2:#6B6864; --ink-3:#9B9893;
+    --fill:#2A2826; --fill-soft:#EAE8E2;
+    --font:"Inter",-apple-system,system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: radial-gradient(1200px 700px at 50% -10%, #F4F2EE, transparent 70%), var(--page);
+    min-height:100vh; font-family:var(--font); color:var(--ink); -webkit-font-smoothing:antialiased;
+    display:flex; flex-direction:column; align-items:center; padding:56px 24px 72px;
+  }
+  .num{ font-variant-numeric:tabular-nums; }
+
+  .deck-head{ text-align:center; margin-bottom:38px; }
+  .deck-head .kick{ font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:1.6px; text-transform:uppercase; color:var(--brand); }
+  .deck-head h1{ font-size:22px; font-weight:700; letter-spacing:-0.4px; margin:8px 0 0; }
+  .deck-head p{ font-size:13px; color:var(--ink-2); margin:6px 0 0; }
+
+  .stage{ display:flex; gap:64px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+  .frame-wrap{ display:flex; flex-direction:column; align-items:center; gap:16px; }
+  .frame-cap{ font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:0.8px; text-transform:uppercase; color:var(--ink-3); }
+
+  /* device */
+  .device{ width:414px; padding:12px; background:#121110; border-radius:56px;
+    box-shadow:0 2px 4px rgba(0,0,0,0.4), 0 40px 80px -20px rgba(40,30,20,0.45), inset 0 0 0 2px #2b2926; position:relative; }
+  .screen{ width:390px; height:844px; border-radius:44px; overflow:hidden; background:var(--screen); position:relative; display:flex; flex-direction:column; }
+  .island{ position:absolute; top:11px; left:50%; transform:translateX(-50%); width:118px; height:34px; background:#000; border-radius:18px; z-index:30; }
+  .statusbar{ height:54px; flex-shrink:0; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 9px; position:relative; z-index:20; }
+  .statusbar .time{ font-size:15px; font-weight:600; letter-spacing:0.3px; }
+  .statusbar .ic{ display:flex; align-items:center; gap:7px; }
+
+  .app-view{ flex:1; min-height:0; overflow-y:auto; padding:4px 20px 116px; display:block; }
+  .app-view::-webkit-scrollbar{ display:none; }
+
+  /* month header */
+  .month-head{ display:flex; align-items:center; justify-content:space-between; padding:6px 0 12px; }
+  .month-sel{ display:inline-flex; align-items:center; gap:9px; background:none; border:none; padding:6px 4px; cursor:pointer; font-family:var(--font); }
+  .month-sel .m{ font-size:17px; font-weight:700; letter-spacing:-0.2px; }
+  .caret{ color:var(--ink-3); display:flex; }
+  .hicons{ display:flex; gap:8px; }
+  .ibtn{ width:38px; height:38px; border-radius:11px; background:var(--surface); border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; color:var(--ink); cursor:pointer; }
+  .ibtn.round{ border-radius:50%; }
+
+  /* card */
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:18px; }
+  .card.flush{ padding:0; overflow:hidden; }
+
+  /* labels */
+  .ov{ font-size:11.5px; font-weight:600; letter-spacing:0.6px; text-transform:uppercase; color:var(--ink-2); }
+  .seclabel{ display:flex; align-items:baseline; justify-content:space-between; padding:24px 2px 11px; }
+  .seclabel .t{ font-size:11.5px; font-weight:600; letter-spacing:0.7px; text-transform:uppercase; color:var(--ink-2); }
+  .seclabel .a{ font-size:12.5px; font-weight:500; color:var(--ink-2); }
+
+  /* hero */
+  .hero-val{ display:flex; align-items:baseline; gap:8px; margin-top:7px; }
+  .hero-val .cur{ font-size:19px; font-weight:500; color:var(--ink-2); }
+  .hero-val .big{ font-size:43px; font-weight:700; letter-spacing:-1.2px; line-height:1; }
+  .bar{ height:8px; border-radius:99px; background:var(--fill-soft); overflow:hidden; }
+  .bar > i{ display:block; height:100%; border-radius:99px; background:var(--fill); }
+  .meta-row{ display:flex; justify-content:space-between; font-size:12px; color:var(--ink-2); }
+
+  .summary{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; padding-top:16px; border-top:1px solid var(--border); }
+  .stat .lab{ display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+  .stat .lab .arw{ width:19px; height:19px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; }
+  .stat .lab .arw.up{ background:var(--pos-soft); color:var(--pos-ink); }
+  .stat .lab .arw.dn{ background:var(--neg-soft); color:var(--neg); }
+  .stat .lab .n{ font-size:12px; color:var(--ink-2); font-weight:500; }
+  .stat .v{ font-size:17px; font-weight:700; }
+  .v.pos{ color:var(--pos-ink); } .v.neg{ color:var(--neg); }
+
+  /* person row (A) */
+  .prow{ display:flex; align-items:center; gap:14px; }
+  .avatar{ width:40px; height:40px; border-radius:50%; background:var(--fill); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:15px; flex-shrink:0; }
+  .avatar.sm{ width:28px; height:28px; font-size:12px; }
+  .avatar.out{ background:var(--surface); border:1px solid var(--border-strong); color:var(--ink); font-size:12px; }
+  .prow .top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .prow .nm{ font-size:15px; font-weight:600; } .prow .am{ font-size:15px; font-weight:600; }
+  .barmeta{ margin-top:6px; display:flex; justify-content:space-between; font-size:11px; color:var(--ink-2); }
+
+  /* payment row */
+  .pay{ display:flex; align-items:center; gap:12px; }
+  .pay .ic2{ width:38px; height:38px; border-radius:11px; background:var(--surface-alt); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:var(--ink-2); flex-shrink:0; }
+  .pay .nm{ font-size:14px; font-weight:600; } .pay .sl{ font-size:11.5px; color:var(--ink-2); margin-top:2px; }
+
+  /* expense card + chips */
+  .exp .top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .exp .desc{ font-size:15px; font-weight:600; margin-bottom:7px; }
+  .chips{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .chip{ display:inline-flex; align-items:center; gap:6px; height:25px; padding:0 9px; border-radius:99px; font-size:12px; font-weight:500; color:var(--ink); background:var(--surface); border:1px solid var(--border); }
+  .chip .dot{ width:7px; height:7px; border-radius:50%; }
+  .chip.plain{ color:var(--ink-2); }
+  .when{ font-size:11.5px; color:var(--ink-2); }
+
+  /* tab bar */
+  .tabbar{ position:absolute; left:0; right:0; bottom:0; height:88px; border-top:1px solid var(--border);
+    background:rgba(246,245,242,0.9); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    display:flex; align-items:flex-start; padding-top:11px; z-index:15; }
+  .tab{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--ink-3); font-size:10.5px; font-weight:500; }
+  .tab.active{ color:var(--brand); }
+  .fab{ width:54px; height:54px; border-radius:27px; margin-top:-15px; background:var(--brand); color:#fff;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 10px 22px -4px rgba(255,106,0,0.5); }
+  .home-ind{ position:absolute; left:50%; bottom:9px; transform:translateX(-50%); width:134px; height:5px; border-radius:3px; background:#1B1B1B; opacity:0.55; z-index:20; }
+
+  /* ── Variation B specifics ── */
+  .delta{ display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:99px; font-size:11.5px; font-weight:600; }
+  .delta.neg{ background:var(--neg-soft); color:var(--neg); }
+  .stack{ display:flex; align-items:center; height:30px; gap:3px; }
+  .stack .seg{ height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:10.5px; font-weight:600; color:#fff; min-width:0; overflow:hidden; }
+  .stack .seg.t{ background:var(--fill); } .stack .seg.l{ background:#6f6a64; }
+  .stack .seg.free{ background:transparent; border:1.5px dashed var(--border-strong); color:var(--ink-2); }
+  .switch{ display:flex; gap:8px; overflow-x:auto; padding:2px 0 2px; }
+  .sw-chip{ height:34px; padding:0 15px; border-radius:99px; display:inline-flex; align-items:center; font-size:13px; font-weight:500; white-space:nowrap; background:var(--surface); border:1px solid var(--border); color:var(--ink-2); }
+  .sw-chip.on{ background:var(--brand); border-color:var(--brand); color:#fff; font-weight:600; }
+  .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .tile .hd{ display:flex; align-items:center; gap:9px; margin-bottom:12px; }
+  .tile .hd .nm{ font-size:14px; font-weight:600; }
+  .tile .av{ display:flex; align-items:baseline; gap:4px; margin-bottom:9px; }
+  .tile .av .cur{ font-size:12px; color:var(--ink-2); font-weight:500; }
+  .tile .av .big{ font-size:22px; font-weight:700; letter-spacing:-0.3px; }
+  .tile .sl{ font-size:11px; color:var(--ink-2); margin-top:6px; }
+
+  .crow{ padding:14px 16px; border-top:1px solid var(--border); }
+  .crow.first{ border-top:none; }
+  .crow .top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px; }
+  .crow .nm{ display:flex; align-items:center; gap:9px; font-size:14px; font-weight:600; }
+  .crow .nm .dot{ width:9px; height:9px; border-radius:50%; }
+  .crow .rt{ display:flex; align-items:baseline; gap:9px; }
+  .crow .pct{ font-size:11px; color:var(--ink-2); } .crow .am{ font-size:14px; font-weight:600; }
+  .bar.thin{ height:5px; }
+
+  .budget .top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px; }
+  .budget .nm{ font-size:14px; font-weight:600; }
+  .budget .ut{ font-size:12px; color:var(--ink-2); } .budget .ut .tot{ color:var(--ink-3); }
+  .budget .st{ margin-top:7px; font-size:11px; color:var(--ink-2); }
+  .budget .st.over{ color:var(--neg); font-weight:600; }
+  .bar > i.over{ background:var(--neg); }
+
+  .arow{ padding:14px 16px; display:flex; align-items:center; gap:12px; border-top:1px solid var(--border); }
+  .arow.first{ border-top:none; }
+  .arow .desc{ font-size:14px; font-weight:600; margin-bottom:2px; }
+  .arow .when{ font-size:11px; color:var(--ink-2); }
+
+  @media (max-width:920px){ .stage{ gap:40px; } }
+</style>
+</head>
+<body>
+
+  <div class="deck-head">
+    <div class="kick">Gastos mensais · Hi-fi · sessão 2</div>
+    <h1>Menu inicial / Dashboard</h1>
+    <p>Saldo restante em destaque. Cor pontual: setas de renda/gasto, tons de categoria nos lançamentos e marca no FAB/seleção.</p>
+  </div>
+
+  <div class="stage">
+
+    <!-- ════════════ VARIAÇÃO A ════════════ -->
+    <div class="frame-wrap">
+      <div class="frame-cap">Saldo em destaque</div>
+      <div class="device">
+        <div class="screen">
+          <div class="island"></div>
+          <div class="statusbar">
+            <span class="time num">9:41</span>
+            <span class="ic">
+              <svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="7.5" width="3" height="4.5" rx="0.6" fill="#1B1B1B"/><rect x="4.8" y="5" width="3" height="7" rx="0.6" fill="#1B1B1B"/><rect x="9.6" y="2.5" width="3" height="9.5" rx="0.6" fill="#1B1B1B"/><rect x="14.4" y="0" width="3" height="12" rx="0.6" fill="#1B1B1B"/></svg>
+              <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 3.2c2.1 0 4.1.8 5.5 2.2l1.1-1.1C13 2.6 10.6 1.6 8 1.6S3 2.6 1.4 4.3l1.1 1.1C3.9 4 5.9 3.2 8 3.2z" fill="#1B1B1B"/><path d="M8 6.3c1.3 0 2.5.5 3.4 1.4l1.1-1.1C11.3 5.4 9.7 4.7 8 4.7s-3.3.7-4.5 1.9l1.1 1.1C5.5 6.8 6.7 6.3 8 6.3z" fill="#1B1B1B"/><circle cx="8" cy="9.6" r="1.5" fill="#1B1B1B"/></svg>
+              <svg width="26" height="13" viewBox="0 0 26 13"><rect x="0.6" y="0.6" width="22" height="11.8" rx="3.2" fill="none" stroke="#1B1B1B" stroke-opacity="0.45"/><rect x="2.2" y="2.2" width="18.5" height="8.6" rx="2" fill="#1B1B1B"/><rect x="23.6" y="4.2" width="1.6" height="4.6" rx="0.8" fill="#1B1B1B" fill-opacity="0.5"/></svg>
+            </span>
+          </div>
+
+          <div class="app-view">
+            <div class="month-head">
+              <button class="month-sel">
+                <span class="caret"><svg width="9" height="14" viewBox="0 0 9 14"><path d="M6.5 2L2 7l4.5 5" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="m num">Maio · 2026</span>
+                <span class="caret"><svg width="9" height="14" viewBox="0 0 9 14"><path d="M2.5 2L7 7l-4.5 5" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              </button>
+              <div class="hicons">
+                <button class="ibtn round"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4.5 8a4.5 4.5 0 0 1 9 0v3l1.8 2.6H2.7L4.5 11z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 15a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.5"/></svg></button>
+              </div>
+            </div>
+
+            <!-- HERO -->
+            <div class="card" style="padding:22px">
+              <div class="ov">Restante neste mês</div>
+              <div class="hero-val"><span class="cur">R$</span><span class="big num">2.030,44</span></div>
+              <div style="margin:18px 0 9px"><div class="bar"><i style="width:76%"></i></div></div>
+              <div class="meta-row num"><span>76% do orçamento usado</span></div>
+              <div class="summary">
+                <div class="stat">
+                  <div class="lab"><span class="arw up"><svg width="11" height="11" viewBox="0 0 12 12"><path d="M6 10V2M2 6l4-4 4 4" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="n">Renda</span></div>
+                  <div class="v pos num">R$ 8.623,10</div>
+                </div>
+                <div class="stat">
+                  <div class="lab"><span class="arw dn"><svg width="11" height="11" viewBox="0 0 12 12"><path d="M6 2v8M2 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="n">Gastos</span></div>
+                  <div class="v neg num">R$ 6.592,66</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- POR PESSOA -->
+            <div class="seclabel"><span class="t">Por pessoa</span></div>
+            <div style="display:flex; flex-direction:column; gap:10px">
+              <div class="card" style="padding:14px"><div class="prow">
+                <div class="avatar">T</div>
+                <div style="flex:1; min-width:0">
+                  <div class="top"><span class="nm">Tiago</span><span class="am num">R$ 1.641,64</span></div>
+                  <div class="bar" style="height:6px"><i style="width:68%"></i></div>
+                  <div class="barmeta num"><span>68% do orçamento</span><span>de R$ 2.400,00</span></div>
+                </div>
+              </div></div>
+              <div class="card" style="padding:14px"><div class="prow">
+                <div class="avatar">L</div>
+                <div style="flex:1; min-width:0">
+                  <div class="top"><span class="nm">Luana</span><span class="am num">R$ 388,80</span></div>
+                  <div class="bar" style="height:6px"><i style="width:16%"></i></div>
+                  <div class="barmeta num"><span>16% do orçamento</span><span>de R$ 2.400,00</span></div>
+                </div>
+              </div></div>
+            </div>
+
+            <!-- FORMAS DE PAGAMENTO -->
+            <div class="seclabel"><span class="t">Formas de pagamento</span></div>
+            <div style="display:flex; flex-direction:column; gap:8px">
+              <div class="card" style="padding:13px"><div class="pay">
+                <div class="ic2"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2.5" y="4" width="13" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M2.5 7.5h13" stroke="currentColor" stroke-width="1.4"/></svg></div>
+                <div style="flex:1; min-width:0"><div class="nm">Nubank Tiago - Pix / Débito</div><div class="sl">Geral · Aliment. · Transp.</div></div>
+                <div style="display:flex; align-items:center; gap:7px"><span class="num" style="font-size:14px; font-weight:600">R$ 2.493,42</span><span class="caret"><svg width="8" height="13" viewBox="0 0 8 13"><path d="M2 2l4 4.5L2 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+              </div></div>
+              <div class="card" style="padding:13px"><div class="pay">
+                <div class="ic2"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2.5" y="4" width="13" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M2.5 7.5h13" stroke="currentColor" stroke-width="1.4"/></svg></div>
+                <div style="flex:1; min-width:0"><div class="nm">Nubank Luana - Pix / Débito</div><div class="sl">Geral</div></div>
+                <div style="display:flex; align-items:center; gap:7px"><span class="num" style="font-size:14px; font-weight:600">R$ 1.945,00</span><span class="caret"><svg width="8" height="13" viewBox="0 0 8 13"><path d="M2 2l4 4.5L2 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+              </div></div>
+              <div class="card" style="padding:13px"><div class="pay">
+                <div class="ic2"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2.5" y="4" width="13" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M2.5 7.5h13" stroke="currentColor" stroke-width="1.4"/></svg></div>
+                <div style="flex:1; min-width:0"><div class="nm">Nubank Tiago - Crédito #1</div><div class="sl">Geral · Aliment.</div></div>
+                <div style="display:flex; align-items:center; gap:7px"><span class="num" style="font-size:14px; font-weight:600">R$ 1.456,20</span><span class="caret"><svg width="8" height="13" viewBox="0 0 8 13"><path d="M2 2l4 4.5L2 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+              </div></div>
+            </div>
+
+          </div>
+
+          <div class="tabbar">
+            <div class="tab active"><svg width="23" height="23" viewBox="0 0 22 22" fill="none"><path d="M3 10l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6h-6v6H4a1 1 0 0 1-1-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span>Início</span></div>
+            <div class="tab"><svg width="23" height="23" viewBox="0 0 22 22" fill="none"><path d="M5 6h12M5 11h12M5 16h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Gastos</span></div>
+            <div class="tab"><div class="fab"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M11 4v14M4 11h14" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></div></div>
+            <div class="tab"><svg width="23" height="23" viewBox="0 0 22 22" fill="none"><path d="M11 5v12M6 12l5 5 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Renda</span></div>
+            <div class="tab"><svg width="23" height="23" viewBox="0 0 22 22" fill="none"><circle cx="5" cy="11" r="1.3" fill="currentColor"/><circle cx="11" cy="11" r="1.3" fill="currentColor"/><circle cx="17" cy="11" r="1.3" fill="currentColor"/></svg><span>Mais</span></div>
+          </div>
+          <div class="home-ind"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
