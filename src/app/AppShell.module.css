@@ -1,0 +1,23 @@
+/* O layout desenha as telas dentro de um frame fixo de 1440x900. Aqui o
+   frame vira a janela: mesma composição (sidebar + conteúdo rolável),
+   sem a moldura de apresentação. */
+
+.shell {
+    display: flex;
+    height: 100%;
+    background: var(--screen);
+}
+
+.main {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+}
+
+.center {
+    height: 100%;
+    display: grid;
+    place-items: center;
+    color: var(--ink-2);
+    font-size: 13.5px;
+}

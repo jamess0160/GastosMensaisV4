@@ -1,0 +1,86 @@
+/* ════════════════════════════════════════════════════════════
+   Gastos mensais · Design tokens
+   Fonte da verdade: Layout/Hi-fi Desktop/*.html (bloco :root, identico
+   byte-a-byte nos 8 arquivos). Nao edite valores aqui sem atualizar o
+   layout de origem — este arquivo e a transcricao dele.
+   ════════════════════════════════════════════════════════════ */
+:root {
+    /* ── Marca ─────────────────────────────────────────────── */
+    --brand: #ff6a00;
+    --brand-press: #e85f00;
+    --brand-soft: #fff8ea;
+    --brand-tint: #ffe9d6;
+
+    /* ── Semanticas ────────────────────────────────────────── */
+    --neg: #ff001a;
+    --neg-soft: #ffe9eb;
+    --pos: #00dc8c;
+    --pos-soft: #ddf8ee;
+    --pos-ink: #009c63;
+
+    /* ── Categorias ────────────────────────────────────────── */
+    --cat-azul: #0084ff;
+    --cat-roxo: #7238d7;
+    --cat-amarelo: #f4d800;
+    --cat-magenta: #f40092;
+    --cat-verde: #36da0d;
+    --cat-ciano: #00b4d8;
+    --cat-coral: #ff5247;
+    --cat-grafite: #6e6a66;
+
+    /* ── Neutros quentes ───────────────────────────────────── */
+    --page: #eeedea;
+    --screen: #f6f5f2;
+    --surface: #ffffff;
+    --surface-alt: #fafaf8;
+    --border: #e2e0da;
+    --border-strong: #cfcdc6;
+    --border-dashed: #bfbdb6;
+    --ink: #1b1b1b;
+    --ink-2: #6b6864;
+    --ink-3: #9b9893;
+    --fill: #2a2826;
+    --fill-soft: #eae8e2;
+
+    /* ── Tipografia ────────────────────────────────────────── */
+    --font: "Inter", -apple-system, system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+
+    /* ════════════════════════════════════════════════════════
+     Derivados — nao vem do :root do layout, foram extraidos dos
+     valores que mais se repetem nele. Servem para manter as telas
+     coerentes; qualquer medida pontual continua literal no CSS.
+     ════════════════════════════════════════════════════════ */
+
+    /* Raios */
+    --r-xs: 6px;
+    --r-sm: 9px;
+    --r-md: 12px;
+    --r-lg: 14px;
+    --r-pill: 999px;
+
+    /* Sombras */
+    --sh-hairline: 0 1px 2px rgba(0, 0, 0, 0.06);
+    --sh-raised: 0 1px 3px rgba(0, 0, 0, 0.25);
+    --sh-brand: 0 5px 13px -3px rgba(255, 106, 0, 0.5);
+    --sh-slideover: -16px 0 40px -8px rgba(20, 18, 15, 0.22);
+    --sh-modal: 0 30px 80px rgba(20, 18, 15, 0.34);
+    --ring-brand: 0 0 0 4px var(--brand-soft);
+
+    /* Chassi do app (fora do frame 1440x900 do layout) */
+    --sidebar-w: 240px;
+    --topbar-h: 64px;
+}
+
+/* Paleta de categorias na ordem em que o layout a usa — para atribuir cor
+   a categoria vinda da API quando ela nao traz Color propria. */
+:root {
+    --cat-palette-0: var(--cat-azul);
+    --cat-palette-1: var(--cat-roxo);
+    --cat-palette-2: var(--cat-magenta);
+    --cat-palette-3: var(--cat-ciano);
+    --cat-palette-4: var(--cat-verde);
+    --cat-palette-5: var(--cat-amarelo);
+    --cat-palette-6: var(--cat-coral);
+    --cat-palette-7: var(--cat-grafite);
+}
