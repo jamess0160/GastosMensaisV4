@@ -34,16 +34,16 @@ describe("Categories", () => {
         otherClient = new TestClient(other.token)
     })
 
-    describe("GET /Base/Categories", () => {
+    describe("GET /Categories", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get(`/Base/Categories`)
+            let response = await client.anonymous().get(`/Categories`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa sessão sem workspace selecionado", async () => {
-            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Base/Categories`)
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Categories`)
 
             expect(response.status).toBe(406)
         })
@@ -53,7 +53,7 @@ describe("Categories", () => {
         it("recusa token válido apontando para o workspace de outro usuário", async () => {
             let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace))
 
-            let response = await forged.get(`/Base/Categories`)
+            let response = await forged.get(`/Categories`)
 
             expect(response.status).toBe(406)
         })
@@ -63,7 +63,7 @@ describe("Categories", () => {
         it("devolve as globais mesmo com o workspace vazio", async () => {
             let user = await UsersFactory.create()
 
-            let response = await new TestClient(user.token).get(`/Base/Categories`)
+            let response = await new TestClient(user.token).get(`/Categories`)
 
             expect(response.status).toBe(200)
             expect(response.body.map(description)).toEqual(["Transporte"])
@@ -77,9 +77,9 @@ describe("Categories", () => {
             let user = await UsersFactory.create()
             let workspaceClient = new TestClient(user.token)
 
-            await workspaceClient.post(`/Base/Categories`, { Description: "Faculdade" })
+            await workspaceClient.post(`/Categories`, { Description: "Faculdade" })
 
-            let response = await workspaceClient.get(`/Base/Categories`)
+            let response = await workspaceClient.get(`/Categories`)
 
             expect(response.status).toBe(200)
             expect(response.body.map(description).sort()).toEqual(["Faculdade", "Transporte"])
@@ -87,9 +87,9 @@ describe("Categories", () => {
 
         it("não devolve a categoria de outro workspace", async () => {
             let owner = await UsersFactory.create()
-            await new TestClient(owner.token).post(`/Base/Categories`, { Description: "Segredo do vizinho" })
+            await new TestClient(owner.token).post(`/Categories`, { Description: "Segredo do vizinho" })
 
-            let response = await new TestClient((await UsersFactory.create()).token).get(`/Base/Categories`)
+            let response = await new TestClient((await UsersFactory.create()).token).get(`/Categories`)
 
             expect(response.body.map(description)).not.toContain("Segredo do vizinho")
         })
@@ -98,32 +98,32 @@ describe("Categories", () => {
             let user = await UsersFactory.create()
             let workspaceClient = new TestClient(user.token)
 
-            let archived = await workspaceClient.post(`/Base/Categories`, { Description: "Categoria arquivada" })
+            let archived = await workspaceClient.post(`/Categories`, { Description: "Categoria arquivada" })
 
-            await workspaceClient.delete(`/Base/Categories/IdCategory=${archived.body.IdCategory}`)
+            await workspaceClient.delete(`/Categories/IdCategory=${archived.body.IdCategory}`)
 
-            let response = await workspaceClient.get(`/Base/Categories`)
+            let response = await workspaceClient.get(`/Categories`)
 
             expect(response.body.map(description)).toEqual(["Transporte"])
         })
     })
 
-    describe("POST /Base/Categories", () => {
+    describe("POST /Categories", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().post(`/Base/Categories`, { Description: "Categoria" })
+            let response = await client.anonymous().post(`/Categories`, { Description: "Categoria" })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa corpo sem a Description", async () => {
-            let response = await client.post(`/Base/Categories`, {})
+            let response = await client.post(`/Categories`, {})
 
             expect(response.status).toBe(406)
         })
 
         it("recusa cor fora do formato #RRGGBB", async () => {
-            let response = await client.post(`/Base/Categories`, { Description: "Categoria", Color: "roxo" })
+            let response = await client.post(`/Categories`, { Description: "Categoria", Color: "roxo" })
 
             expect(response.status).toBe(406)
         })
@@ -132,7 +132,7 @@ describe("Categories", () => {
             let owner = await UsersFactory.create()
             let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, owner.workspace.IdWorkspace))
 
-            let response = await forged.post(`/Base/Categories`, { Description: "Invasora" })
+            let response = await forged.post(`/Categories`, { Description: "Invasora" })
 
             expect(response.status).toBe(406)
             expect(await findCategories(owner.workspace.IdWorkspace)).toHaveLength(0)
@@ -141,7 +141,7 @@ describe("Categories", () => {
         it("cria a categoria do workspace", async () => {
             let user = await UsersFactory.create()
 
-            let response = await new TestClient(user.token).post(`/Base/Categories`, {
+            let response = await new TestClient(user.token).post(`/Categories`, {
                 Description: "Academia",
                 IconKey: "dumbbell",
                 Color: "#2E7D32",
@@ -165,25 +165,25 @@ describe("Categories", () => {
         })
     })
 
-    describe("PUT /Base/Categories/IdCategory=:IdCategory", () => {
+    describe("PUT /Categories/IdCategory=:IdCategory", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/Base/Categories/IdCategory=1`, { Description: "X" })
+            let response = await client.anonymous().put(`/Categories/IdCategory=1`, { Description: "X" })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa categoria inexistente", async () => {
-            let response = await client.put(`/Base/Categories/IdCategory=999999`, { Description: "X" })
+            let response = await client.put(`/Categories/IdCategory=999999`, { Description: "X" })
 
             expect(response.status).toBe(406)
         })
 
         it("recusa a categoria de outro workspace", async () => {
             let owner = await UsersFactory.create()
-            let created = await new TestClient(owner.token).post(`/Base/Categories`, { Description: "Categoria do dono" })
+            let created = await new TestClient(owner.token).post(`/Categories`, { Description: "Categoria do dono" })
 
-            let response = await otherClient.put(`/Base/Categories/IdCategory=${created.body.IdCategory}`, { Description: "Invadida" })
+            let response = await otherClient.put(`/Categories/IdCategory=${created.body.IdCategory}`, { Description: "Invadida" })
 
             expect(response.status).toBe(406)
             expect((await findCategoryById(created.body.IdCategory)).Description).toBe("Categoria do dono")
@@ -193,7 +193,7 @@ describe("Categories", () => {
         //  workspaces, então ela chega no getUnique de qualquer sessão. Sem esta trava, um PUT
         //  renomeia a categoria de toda a base de uma vez.
         it("recusa editar categoria global", async () => {
-            let response = await client.put(`/Base/Categories/IdCategory=${globalCategory.IdCategory}`, { Description: "Sequestrada" })
+            let response = await client.put(`/Categories/IdCategory=${globalCategory.IdCategory}`, { Description: "Sequestrada" })
 
             expect(response.status).toBe(406)
             expect((await findCategoryById(globalCategory.IdCategory)).Description).toBe("Transporte")
@@ -203,9 +203,9 @@ describe("Categories", () => {
             let user = await UsersFactory.create()
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Categories`, { Description: "Casa", Color: "#000000" })
+            let created = await workspaceClient.post(`/Categories`, { Description: "Casa", Color: "#000000" })
 
-            let response = await workspaceClient.put(`/Base/Categories/IdCategory=${created.body.IdCategory}`, {
+            let response = await workspaceClient.put(`/Categories/IdCategory=${created.body.IdCategory}`, {
                 Description: "Moradia",
                 Color: "#5D4037",
                 IconKey: "home",
@@ -226,9 +226,9 @@ describe("Categories", () => {
             let user = await UsersFactory.create()
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Categories`, { Description: "Casa", Color: "#123456", IconKey: "home" })
+            let created = await workspaceClient.post(`/Categories`, { Description: "Casa", Color: "#123456", IconKey: "home" })
 
-            await workspaceClient.put(`/Base/Categories/IdCategory=${created.body.IdCategory}`, { Description: "Só a descrição" })
+            await workspaceClient.put(`/Categories/IdCategory=${created.body.IdCategory}`, { Description: "Só a descrição" })
 
             expect(await findCategoryById(created.body.IdCategory)).toMatchObject({
                 Description: "Só a descrição",
@@ -238,25 +238,25 @@ describe("Categories", () => {
         })
     })
 
-    describe("DELETE /Base/Categories/IdCategory=:IdCategory", () => {
+    describe("DELETE /Categories/IdCategory=:IdCategory", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().delete(`/Base/Categories/IdCategory=1`)
+            let response = await client.anonymous().delete(`/Categories/IdCategory=1`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa categoria inexistente", async () => {
-            let response = await client.delete(`/Base/Categories/IdCategory=999999`)
+            let response = await client.delete(`/Categories/IdCategory=999999`)
 
             expect(response.status).toBe(406)
         })
 
         it("recusa a categoria de outro workspace", async () => {
             let owner = await UsersFactory.create()
-            let created = await new TestClient(owner.token).post(`/Base/Categories`, { Description: "Categoria do dono" })
+            let created = await new TestClient(owner.token).post(`/Categories`, { Description: "Categoria do dono" })
 
-            let response = await otherClient.delete(`/Base/Categories/IdCategory=${created.body.IdCategory}`)
+            let response = await otherClient.delete(`/Categories/IdCategory=${created.body.IdCategory}`)
 
             expect(response.status).toBe(406)
             expect((await findCategoryById(created.body.IdCategory)).Active).toBe(true)
@@ -264,7 +264,7 @@ describe("Categories", () => {
 
         //  Arquivar a global a tiraria da lista de todos os workspaces de uma vez
         it("recusa arquivar categoria global", async () => {
-            let response = await client.delete(`/Base/Categories/IdCategory=${globalCategory.IdCategory}`)
+            let response = await client.delete(`/Categories/IdCategory=${globalCategory.IdCategory}`)
 
             expect(response.status).toBe(406)
             expect((await findCategoryById(globalCategory.IdCategory)).Active).toBe(true)
@@ -276,10 +276,10 @@ describe("Categories", () => {
             let user = await UsersFactory.create()
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Categories`, { Description: "Categoria antiga" })
-            let untouched = await workspaceClient.post(`/Base/Categories`, { Description: "Categoria viva" })
+            let created = await workspaceClient.post(`/Categories`, { Description: "Categoria antiga" })
+            let untouched = await workspaceClient.post(`/Categories`, { Description: "Categoria viva" })
 
-            let response = await workspaceClient.delete(`/Base/Categories/IdCategory=${created.body.IdCategory}`)
+            let response = await workspaceClient.delete(`/Categories/IdCategory=${created.body.IdCategory}`)
 
             expect(response.status).toBe(200)
 
@@ -302,34 +302,34 @@ describe("Categories", () => {
                 Phone: 549987654321,
             }
 
-            expect((await new TestClient().post("/Base/Users", payload)).status).toBe(200)
+            expect((await new TestClient().post("/Users", payload)).status).toBe(200)
 
             let flowClient = new TestClient()
 
             expect((await flowClient.login(payload.Email, payload.Password)).status).toBe(200)
 
             //  Antes de cadastrar nada, o usuário já tem com o que lançar um gasto
-            let predefined = await flowClient.get(`/Base/Categories`)
+            let predefined = await flowClient.get(`/Categories`)
 
             expect(predefined.status).toBe(200)
             expect(predefined.body.map(description)).toEqual(["Transporte"])
 
-            let own = await flowClient.post(`/Base/Categories`, { Description: "Faculdade", Color: "#283593" })
+            let own = await flowClient.post(`/Categories`, { Description: "Faculdade", Color: "#283593" })
 
             expect(own.status).toBe(200)
 
-            let list = await flowClient.get(`/Base/Categories`)
+            let list = await flowClient.get(`/Categories`)
 
             expect(list.body.map(description).sort()).toEqual(["Faculdade", "Transporte"])
             expect(list.body.find((item: { Description: string }) => item.Description === "Faculdade")).toMatchObject({ Color: "#283593" })
 
             //  A global não é dele para editar, mesmo aparecendo na mesma lista
-            expect((await flowClient.put(`/Base/Categories/IdCategory=${globalCategory.IdCategory}`, { Description: "Minha" })).status).toBe(406)
+            expect((await flowClient.put(`/Categories/IdCategory=${globalCategory.IdCategory}`, { Description: "Minha" })).status).toBe(406)
 
             //  Arquivar a própria não encosta na global
-            expect((await flowClient.delete(`/Base/Categories/IdCategory=${own.body.IdCategory}`)).status).toBe(200)
+            expect((await flowClient.delete(`/Categories/IdCategory=${own.body.IdCategory}`)).status).toBe(200)
 
-            let final = await flowClient.get(`/Base/Categories`)
+            let final = await flowClient.get(`/Categories`)
 
             expect(final.body.map(description)).toEqual(["Transporte"])
         })

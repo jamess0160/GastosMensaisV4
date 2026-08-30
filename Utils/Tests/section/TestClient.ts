@@ -34,7 +34,7 @@ export class TestClient {
     //  devolve o token no corpo: ele sai como cookie httpOnly, exatamente como chega ao
     //  navegador, e é de lá que este cliente o tira.
     public async login(login: string, password: string) {
-        let response = await this.anonymous().post("/Base/Users/login", { login, password })
+        let response = await this.anonymous().post("/Users/login", { login, password })
 
         this.token = TestClient.extractCookieToken(response)
 

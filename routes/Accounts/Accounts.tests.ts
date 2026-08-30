@@ -25,10 +25,10 @@ describe("Accounts", () => {
         otherClient = new TestClient(other.token)
     })
 
-    describe("GET /Base/Accounts", () => {
+    describe("GET /Accounts", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get(`/Base/Accounts`)
+            let response = await client.anonymous().get(`/Accounts`)
 
             expect(response.status).toBe(401)
         })
@@ -36,7 +36,7 @@ describe("Accounts", () => {
         //  Sessão autenticada cujo token foi emitido sem workspace — o usuário não tem
         //  matrícula nenhuma. Não é falta de permissão: o conserto é chamar o switch.
         it("recusa sessão sem workspace selecionado", async () => {
-            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Base/Accounts`)
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Accounts`)
 
             expect(response.status).toBe(406)
         })
@@ -44,7 +44,7 @@ describe("Accounts", () => {
         //  Mexer no payload do token quebra a assinatura, e aí nem chega às rotas de tenant:
         //  o acessMiddleware recusa antes. É a diferença entre o token e o cookie de antes.
         it("recusa token com o payload adulterado", async () => {
-            let response = await new TestClient(tamperToken(root.token)).get(`/Base/Accounts`)
+            let response = await new TestClient(tamperToken(root.token)).get(`/Accounts`)
 
             expect(response.status).toBe(401)
         })
@@ -56,13 +56,13 @@ describe("Accounts", () => {
         it("recusa token válido apontando para o workspace de outro usuário", async () => {
             let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace))
 
-            let response = await forged.get(`/Base/Accounts`)
+            let response = await forged.get(`/Accounts`)
 
             expect(response.status).toBe(406)
         })
 
         it("devolve lista vazia quando o workspace não tem conta", async () => {
-            let response = await client.get(`/Base/Accounts`)
+            let response = await client.get(`/Accounts`)
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual([])
@@ -72,9 +72,9 @@ describe("Accounts", () => {
             let user = await UsersFactory.create()
             let workspaceClient = new TestClient(user.token)
 
-            await workspaceClient.post(`/Base/Accounts`, { Name: "Nubank" })
+            await workspaceClient.post(`/Accounts`, { Name: "Nubank" })
 
-            let response = await workspaceClient.get(`/Base/Accounts`)
+            let response = await workspaceClient.get(`/Accounts`)
 
             expect(response.status).toBe(200)
             expect(response.body).toHaveLength(1)
@@ -89,10 +89,10 @@ describe("Accounts", () => {
             let workspaceClient = new TestClient(user.token)
             let IdWorkspace = user.workspace.IdWorkspace
 
-            let visible = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta viva" })
-            let archived = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta arquivada" })
+            let visible = await workspaceClient.post(`/Accounts`, { Name: "Conta viva" })
+            let archived = await workspaceClient.post(`/Accounts`, { Name: "Conta arquivada" })
 
-            let card = await workspaceClient.post(`/Base/PaymentMethods`, {
+            let card = await workspaceClient.post(`/PaymentMethods`, {
                 IdAccount: visible.body.IdAccount,
                 Name: "Cartão cancelado",
                 Kind: "credit_card",
@@ -100,39 +100,39 @@ describe("Accounts", () => {
                 DueDay: 28,
             })
 
-            await workspaceClient.delete(`/Base/Accounts/IdAccount=${archived.body.IdAccount}`)
-            await workspaceClient.delete(`/Base/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`)
+            await workspaceClient.delete(`/Accounts/IdAccount=${archived.body.IdAccount}`)
+            await workspaceClient.delete(`/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`)
 
-            let response = await workspaceClient.get(`/Base/Accounts`)
+            let response = await workspaceClient.get(`/Accounts`)
 
             expect(response.body.map((item: { Name: string }) => item.Name)).toEqual(["Conta viva"])
             expect(response.body[0].PaymentMethods.map((item: { Kind: string }) => item.Kind)).toEqual(["pix", "debit"])
         })
     })
 
-    describe("POST /Base/Accounts", () => {
+    describe("POST /Accounts", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().post(`/Base/Accounts`, { Name: "Conta" })
+            let response = await client.anonymous().post(`/Accounts`, { Name: "Conta" })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa corpo sem o Name", async () => {
-            let response = await client.post(`/Base/Accounts`, {})
+            let response = await client.post(`/Accounts`, {})
 
             expect(response.status).toBe(406)
         })
 
         //  Cartão é forma de pagamento, não conta: o Type só tem checking e cash
         it("recusa conta do tipo credit_card", async () => {
-            let response = await client.post(`/Base/Accounts`, { Name: "Cartão", Type: "credit_card" })
+            let response = await client.post(`/Accounts`, { Name: "Cartão", Type: "credit_card" })
 
             expect(response.status).toBe(406)
         })
 
         it("recusa cor fora do formato #RRGGBB", async () => {
-            let response = await client.post(`/Base/Accounts`, { Name: "Conta", Color: "roxo" })
+            let response = await client.post(`/Accounts`, { Name: "Conta", Color: "roxo" })
 
             expect(response.status).toBe(406)
         })
@@ -140,7 +140,7 @@ describe("Accounts", () => {
         it("recusa token válido apontando para o workspace de outro usuário", async () => {
             let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace))
 
-            let response = await forged.post(`/Base/Accounts`, { Name: "Invadida" })
+            let response = await forged.post(`/Accounts`, { Name: "Invadida" })
 
             expect(response.status).toBe(406)
 
@@ -150,7 +150,7 @@ describe("Accounts", () => {
         })
 
         it("recusa sessão sem workspace selecionado", async () => {
-            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).post(`/Base/Accounts`, { Name: "Sem workspace" })
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).post(`/Accounts`, { Name: "Sem workspace" })
 
             expect(response.status).toBe(406)
         })
@@ -161,7 +161,7 @@ describe("Accounts", () => {
             let user = await UsersFactory.create()
             let IdWorkspace = user.workspace.IdWorkspace
 
-            let response = await new TestClient(user.token).post(`/Base/Accounts`, {
+            let response = await new TestClient(user.token).post(`/Accounts`, {
                 Name: "Conta corrente",
                 Type: "checking",
                 Color: "#8A05BE",
@@ -195,7 +195,7 @@ describe("Accounts", () => {
         it("usa checking e saldo zero como padrão", async () => {
             let user = await UsersFactory.create()
 
-            let response = await new TestClient(user.token).post(`/Base/Accounts`, { Name: "Carteira" })
+            let response = await new TestClient(user.token).post(`/Accounts`, { Name: "Carteira" })
 
             let [account] = await findAccounts(user.workspace.IdWorkspace)
 
@@ -204,16 +204,16 @@ describe("Accounts", () => {
         })
     })
 
-    describe("PUT /Base/Accounts/IdAccount=:IdAccount", () => {
+    describe("PUT /Accounts/IdAccount=:IdAccount", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/Base/Accounts/IdAccount=1`, { Name: "X" })
+            let response = await client.anonymous().put(`/Accounts/IdAccount=1`, { Name: "X" })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa conta inexistente", async () => {
-            let response = await client.put(`/Base/Accounts/IdAccount=999999`, { Name: "X" })
+            let response = await client.put(`/Accounts/IdAccount=999999`, { Name: "X" })
 
             expect(response.status).toBe(406)
         })
@@ -222,9 +222,9 @@ describe("Accounts", () => {
         //  conferida no próprio tenant liberaria a edição da conta do vizinho
         it("recusa a conta de outro workspace", async () => {
             let owner = await UsersFactory.create()
-            let created = await new TestClient(owner.token).post(`/Base/Accounts`, { Name: "Conta do dono" })
+            let created = await new TestClient(owner.token).post(`/Accounts`, { Name: "Conta do dono" })
 
-            let response = await otherClient.put(`/Base/Accounts/IdAccount=${created.body.IdAccount}`, { Name: "Invadida" })
+            let response = await otherClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, { Name: "Invadida" })
 
             expect(response.status).toBe(406)
 
@@ -238,9 +238,9 @@ describe("Accounts", () => {
             let IdWorkspace = user.workspace.IdWorkspace
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta", Color: "#000000" })
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta", Color: "#000000" })
 
-            let response = await workspaceClient.put(`/Base/Accounts/IdAccount=${created.body.IdAccount}`, {
+            let response = await workspaceClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, {
                 Name: "Conta principal",
                 Color: "#FF0000",
                 IconPath: "banco/nubank.svg",
@@ -260,9 +260,9 @@ describe("Accounts", () => {
             let IdWorkspace = user.workspace.IdWorkspace
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta", Color: "#123456" })
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta", Color: "#123456" })
 
-            await workspaceClient.put(`/Base/Accounts/IdAccount=${created.body.IdAccount}`, { Name: "Só o nome" })
+            await workspaceClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, { Name: "Só o nome" })
 
             let [account] = await findAccounts(IdWorkspace)
 
@@ -274,9 +274,9 @@ describe("Accounts", () => {
             let IdWorkspace = user.workspace.IdWorkspace
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta", InitialBalance: 100 })
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta", InitialBalance: 100 })
 
-            let response = await workspaceClient.put(`/Base/Accounts/IdAccount=${created.body.IdAccount}`, {
+            let response = await workspaceClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, {
                 Name: "Conta",
                 InitialBalance: 250.75,
                 InitialBalanceDate: "2026-01-31",
@@ -298,11 +298,11 @@ describe("Accounts", () => {
             let IdWorkspace = user.workspace.IdWorkspace
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta", InitialBalance: 100 })
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta", InitialBalance: 100 })
 
             await seedInflow(IdWorkspace, created.body.IdAccount)
 
-            let response = await workspaceClient.put(`/Base/Accounts/IdAccount=${created.body.IdAccount}`, {
+            let response = await workspaceClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, {
                 Name: "Conta",
                 InitialBalance: 999,
             })
@@ -321,11 +321,11 @@ describe("Accounts", () => {
             let IdWorkspace = user.workspace.IdWorkspace
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta", InitialBalance: 100 })
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta", InitialBalance: 100 })
 
             await seedInflow(IdWorkspace, created.body.IdAccount)
 
-            let response = await workspaceClient.put(`/Base/Accounts/IdAccount=${created.body.IdAccount}`, {
+            let response = await workspaceClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, {
                 Name: "Renomeada",
                 InitialBalance: 100,
             })
@@ -339,11 +339,11 @@ describe("Accounts", () => {
             let IdWorkspace = user.workspace.IdWorkspace
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta", InitialBalance: 100 })
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta", InitialBalance: 100 })
 
             await seedInflow(IdWorkspace, created.body.IdAccount, "canceled")
 
-            let response = await workspaceClient.put(`/Base/Accounts/IdAccount=${created.body.IdAccount}`, {
+            let response = await workspaceClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, {
                 Name: "Conta",
                 InitialBalance: 500,
             })
@@ -352,25 +352,25 @@ describe("Accounts", () => {
         })
     })
 
-    describe("DELETE /Base/Accounts/IdAccount=:IdAccount", () => {
+    describe("DELETE /Accounts/IdAccount=:IdAccount", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().delete(`/Base/Accounts/IdAccount=1`)
+            let response = await client.anonymous().delete(`/Accounts/IdAccount=1`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa conta inexistente", async () => {
-            let response = await client.delete(`/Base/Accounts/IdAccount=999999`)
+            let response = await client.delete(`/Accounts/IdAccount=999999`)
 
             expect(response.status).toBe(406)
         })
 
         it("recusa a conta de outro workspace", async () => {
             let owner = await UsersFactory.create()
-            let created = await new TestClient(owner.token).post(`/Base/Accounts`, { Name: "Conta do dono" })
+            let created = await new TestClient(owner.token).post(`/Accounts`, { Name: "Conta do dono" })
 
-            let response = await otherClient.delete(`/Base/Accounts/IdAccount=${created.body.IdAccount}`)
+            let response = await otherClient.delete(`/Accounts/IdAccount=${created.body.IdAccount}`)
 
             expect(response.status).toBe(406)
 
@@ -386,9 +386,9 @@ describe("Accounts", () => {
             let IdWorkspace = user.workspace.IdWorkspace
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta antiga" })
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta antiga" })
 
-            let response = await workspaceClient.delete(`/Base/Accounts/IdAccount=${created.body.IdAccount}`)
+            let response = await workspaceClient.delete(`/Accounts/IdAccount=${created.body.IdAccount}`)
 
             expect(response.status).toBe(200)
 
@@ -418,7 +418,7 @@ describe("Accounts", () => {
                 Phone: 549987654321,
             }
 
-            let created = await new TestClient().post("/Base/Users", payload)
+            let created = await new TestClient().post("/Users", payload)
 
             expect(created.status).toBe(200)
 
@@ -428,7 +428,7 @@ describe("Accounts", () => {
 
             let IdWorkspace = created.body.IdWorkspace
 
-            let account = await flowClient.post(`/Base/Accounts`, {
+            let account = await flowClient.post(`/Accounts`, {
                 Name: "Conta corrente",
                 InitialBalance: 2000,
                 InitialBalanceDate: "2026-08-01",
@@ -436,7 +436,7 @@ describe("Accounts", () => {
 
             expect(account.status).toBe(200)
 
-            let list = await flowClient.get(`/Base/Accounts`)
+            let list = await flowClient.get(`/Accounts`)
 
             expect(list.status).toBe(200)
             expect(list.body).toHaveLength(1)
@@ -452,7 +452,7 @@ describe("Accounts", () => {
             //  do mês passado de mudar sozinho
             await seedInflow(IdWorkspace, account.body.IdAccount)
 
-            let frozen = await flowClient.put(`/Base/Accounts/IdAccount=${account.body.IdAccount}`, {
+            let frozen = await flowClient.put(`/Accounts/IdAccount=${account.body.IdAccount}`, {
                 Name: "Conta corrente",
                 InitialBalance: 5000,
             })
@@ -460,9 +460,9 @@ describe("Accounts", () => {
             expect(frozen.status).toBe(406)
 
             //  Renomear continua liberado: o que trava é o saldo de abertura, não a conta
-            expect((await flowClient.put(`/Base/Accounts/IdAccount=${account.body.IdAccount}`, { Name: "Conta do Nubank" })).status).toBe(200)
+            expect((await flowClient.put(`/Accounts/IdAccount=${account.body.IdAccount}`, { Name: "Conta do Nubank" })).status).toBe(200)
 
-            let renamed = await flowClient.get(`/Base/Accounts`)
+            let renamed = await flowClient.get(`/Accounts`)
 
             expect(renamed.body[0]).toMatchObject({ Name: "Conta do Nubank", InitialBalance: 2000 })
         })

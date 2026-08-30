@@ -68,7 +68,7 @@ sem querer.
 
 ### 0. Como o workspace chega na rota — DECIDIDO: assinado dentro do token
 
-Começou na URL (`/Base/Accounts/IdWorkspace=:IdWorkspace`), passou por um cookie próprio e
+Começou na URL (`/Accounts/IdWorkspace=:IdWorkspace`), passou por um cookie próprio e
 terminou **dentro do próprio token**, ao lado do `IdUser`. As tabelas de rota deste documento
 já estão na forma final: **nenhuma rota das etapas 2 a 7 leva `IdWorkspace` no caminho.**
 
@@ -109,7 +109,7 @@ public async run(SelectedIdWorkspace: number, IdUser: number, body: ...) {
 O nome diferente é de propósito: com os dois se chamando `IdWorkspace`, o valor não conferido
 chegaria numa query por descuido e ninguém veria na revisão.
 
-**Trocar de workspace reemite o token** (`POST /Base/Workspaces/switch`) — é a única rota que
+**Trocar de workspace reemite o token** (`POST /Workspaces/switch`) — é a única rota que
 recebe um `IdWorkspace` escrito pelo cliente, e por isso confere a matrícula antes de assinar
 qualquer coisa. O token anterior segue válido até expirar, apontando para o workspace antigo:
 correto, porque prova a mesma identidade e uma seleção que na época era legítima. **Quando a
@@ -209,13 +209,13 @@ na mão — é o que a recorrência do dia 31 e o vencimento da parcela precisam
 
 | Rota | O que faz |
 | --- | --- |
-| `GET /Base/Accounts` | lista contas ativas com as formas de pagamento embutidas (`joinTables`) |
-| `POST /Base/Accounts` | cria conta **e gera `pix` + `debit` na mesma transaction** |
-| `PUT /Base/Accounts/IdAccount=:IdAccount` | edita nome, cor, ícone, posição |
-| `DELETE /Base/Accounts/IdAccount=:IdAccount` | `Active = false` |
-| `POST /Base/PaymentMethods` | cadastra cartão de crédito |
-| `PUT /Base/PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | edita |
-| `DELETE /Base/PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | `Active = false` |
+| `GET /Accounts` | lista contas ativas com as formas de pagamento embutidas (`joinTables`) |
+| `POST /Accounts` | cria conta **e gera `pix` + `debit` na mesma transaction** |
+| `PUT /Accounts/IdAccount=:IdAccount` | edita nome, cor, ícone, posição |
+| `DELETE /Accounts/IdAccount=:IdAccount` | `Active = false` |
+| `POST /PaymentMethods` | cadastra cartão de crédito |
+| `PUT /PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | edita |
+| `DELETE /PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | `Active = false` |
 
 **Pontos de atenção**
 
@@ -245,10 +245,10 @@ na mão — é o que a recorrência do dia 31 e o vencimento da parcela precisam
 
 | Rota | O que faz |
 | --- | --- |
-| `GET /Base/Categories` | `where(IdWorkspace = X or IdWorkspace is null)`, numa lista só |
-| `POST /Base/Categories` | cria categoria do workspace |
-| `PUT /Base/Categories/IdCategory=:IdCategory` | edita |
-| `DELETE /Base/Categories/IdCategory=:IdCategory` | `Active = false` |
+| `GET /Categories` | `where(IdWorkspace = X or IdWorkspace is null)`, numa lista só |
+| `POST /Categories` | cria categoria do workspace |
+| `PUT /Categories/IdCategory=:IdCategory` | edita |
+| `DELETE /Categories/IdCategory=:IdCategory` | `Active = false` |
 
 **Pontos de atenção**
 
@@ -289,8 +289,8 @@ na mão — é o que a recorrência do dia 31 e o vencimento da parcela precisam
 **Tabelas:** `Persons`, `Tags` · **Pastas:** `routes/Persons/`, `routes/Tags/`
 
 CRUD simples nas duas, escopado por workspace:
-`GET`/`POST /Base/<Feature>` e
-`PUT`/`DELETE /Base/<Feature>/Id<Singular>=:Id<Singular>`.
+`GET`/`POST /<Feature>` e
+`PUT`/`DELETE /<Feature>/Id<Singular>=:Id<Singular>`.
 
 **Pontos de atenção**
 
@@ -355,12 +355,12 @@ CRUD simples nas duas, escopado por workspace:
 
 | Rota | O que faz |
 | --- | --- |
-| `GET /Base/Inflows` | lista por período e status |
-| `GET /Base/Inflows/IdInflow=:IdInflow` | uma entrada com o rateio |
-| `POST /Base/Inflows` | cria entrada **ou** transferência |
-| `PUT /Base/Inflows/IdInflow=:IdInflow` | edita |
-| `POST /Base/Inflows/IdInflow=:IdInflow/receive` | `pending` → `received`, grava `ReceivedAt`, recalcula saldo |
-| `DELETE /Base/Inflows/IdInflow=:IdInflow` | `Status = 'canceled'` |
+| `GET /Inflows` | lista por período e status |
+| `GET /Inflows/IdInflow=:IdInflow` | uma entrada com o rateio |
+| `POST /Inflows` | cria entrada **ou** transferência |
+| `PUT /Inflows/IdInflow=:IdInflow` | edita |
+| `POST /Inflows/IdInflow=:IdInflow/receive` | `pending` → `received`, grava `ReceivedAt`, recalcula saldo |
+| `DELETE /Inflows/IdInflow=:IdInflow` | `Status = 'canceled'` |
 
 **Pontos de atenção**
 
@@ -391,7 +391,7 @@ CRUD simples nas duas, escopado por workspace:
 - **Cancelar entrada recebida é o estorno**, e não precisa desfazer escrita nenhuma: a linha sai
   da soma sozinha. O mesmo vale do lado do gasto, mas lá foi preciso uma cláusula a mais — ver
   a etapa 5.
-- **O saldo saiu no `GET /Base/Accounts`, como `Balance`.** Uma section só
+- **O saldo saiu no `GET /Accounts`, como `Balance`.** Uma section só
   (`Accounts/sections/AccountBalance.section.ts`), três consultas agrupadas para a lista inteira
   em vez de três por conta.
 - **Não existe `getTotalReceived` ainda.** O ROADMAP sugeria já nascer com ele; como nenhum
@@ -408,12 +408,12 @@ CRUD simples nas duas, escopado por workspace:
 
 | Rota | O que faz |
 | --- | --- |
-| `GET /Base/Expenses` | lista por período, status, categoria |
-| `GET /Base/Expenses/IdExpense=:IdExpense` | gasto com pernas, rateio e tags |
-| `POST /Base/Expenses` | cria `Kind='single'` com pernas, rateio e tags numa transaction |
-| `PUT /Base/Expenses/IdExpense=:IdExpense` | edita |
-| `POST /Base/Expenses/.../IdExpensePayment=:IdExpensePayment/pay` | quita uma perna, recalcula `Status` e saldo |
-| `DELETE /Base/Expenses/IdExpense=:IdExpense` | `Status = 'canceled'` |
+| `GET /Expenses` | lista por período, status, categoria |
+| `GET /Expenses/IdExpense=:IdExpense` | gasto com pernas, rateio e tags |
+| `POST /Expenses` | cria `Kind='single'` com pernas, rateio e tags numa transaction |
+| `PUT /Expenses/IdExpense=:IdExpense` | edita |
+| `POST /Expenses/.../IdExpensePayment=:IdExpensePayment/pay` | quita uma perna, recalcula `Status` e saldo |
+| `DELETE /Expenses/IdExpense=:IdExpense` | `Status = 'canceled'` |
 
 **Pontos de atenção**
 
@@ -501,9 +501,9 @@ aponta para ela e é um gasto de verdade.
 
 | Rota | O que faz |
 | --- | --- |
-| `POST /Base/Expenses` | `Kind='fixed'` cria a raiz e as ocorrências |
-| `PUT /Base/Expenses/.../IdExpense=:IdExpense/series` | edita a série — **só daqui para a frente** |
-| `DELETE /Base/Expenses/.../IdExpense=:IdExpense/series` | encerra a série |
+| `POST /Expenses` | `Kind='fixed'` cria a raiz e as ocorrências |
+| `PUT /Expenses/.../IdExpense=:IdExpense/series` | edita a série — **só daqui para a frente** |
+| `DELETE /Expenses/.../IdExpense=:IdExpense/series` | encerra a série |
 
 **Ponto de atenção principal — decidir antes de começar**
 
@@ -553,10 +553,10 @@ etapa 8b.
 
 | Rota | O que faz |
 | --- | --- |
-| `GET /Base/Budgets?ReferenceMonth=YYYY-MM` | o mês inteiro: cada teto com a categoria e **quanto já foi comprometido** |
-| `POST /Base/Budgets` | orça uma categoria num mês — resolve a definição e cria o mês, numa transaction |
-| `PUT /Base/BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod` | muda o teto **daquele mês só** |
-| `DELETE /Base/BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod` | tira o teto daquele mês |
+| `GET /Budgets?ReferenceMonth=YYYY-MM` | o mês inteiro: cada teto com a categoria e **quanto já foi comprometido** |
+| `POST /Budgets` | orça uma categoria num mês — resolve a definição e cria o mês, numa transaction |
+| `PUT /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod` | muda o teto **daquele mês só** |
+| `DELETE /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod` | tira o teto daquele mês |
 
 **Pontos de atenção**
 
@@ -611,12 +611,12 @@ primeiro caso com 23505, então a rotina tem que pular o que já existe, e não 
 
 ### Pendência aberta — fechar nesta etapa
 
-`POST /Base/Users` é rota pública e o schema aceita `IdWorkspace` no body. Quando ele vem
+`POST /Users` é rota pública e o schema aceita `IdWorkspace` no body. Quando ele vem
 preenchido, `Workspaces/sections/POST/create.ts` pula a criação e insere direto a matrícula
 com `Role: "owner"`:
 
 ```
-POST /Base/Users
+POST /Users
 { "Name": "...", "Email": "...", "Password": "...", "Phone": 1, "IdWorkspace": 1 }
 ```
 
@@ -634,12 +634,12 @@ ficar, que ela é interna e é justamente o que esta etapa vai reusar.
 
 | Rota | O que faz |
 | --- | --- |
-| `POST /Base/Workspaces/invite` | dono gera um convite assinado; devolve o token |
-| `GET /Base/Workspaces/members` | lista membros e papéis |
-| `PUT /Base/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember` | muda o papel |
-| `DELETE /Base/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember` | remove membro / sair |
-| `POST /Base/Workspaces/join` | usuário **já cadastrado** aceita um convite |
-| `POST /Base/Users` | passa a aceitar `InviteToken` **no lugar de** `IdWorkspace` |
+| `POST /Workspaces/invite` | dono gera um convite assinado; devolve o token |
+| `GET /Workspaces/members` | lista membros e papéis |
+| `PUT /Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember` | muda o papel |
+| `DELETE /Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember` | remove membro / sair |
+| `POST /Workspaces/join` | usuário **já cadastrado** aceita um convite |
+| `POST /Users` | passa a aceitar `InviteToken` **no lugar de** `IdWorkspace` |
 
 ### Pontos de atenção
 

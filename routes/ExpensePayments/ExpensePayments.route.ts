@@ -13,6 +13,6 @@ export const ExpensePayments_route = express()
 //  detalhe nunca vira status parcial no gasto: o Expenses.Status é recalculado a cada quitação
 //  e só chega a 'paid' quando todas as pernas estão pagas.
 
-ExpensePayments_route.post("/Base/ExpensePayments/IdExpensePayment=:IdExpensePayment/pay", ExpensePayments_schema.pay, AsyncHandler(ExpensePayments_controller.pay))
+ExpensePayments_route.post("/ExpensePayments/IdExpensePayment=:IdExpensePayment/pay", ExpensePayments_schema.pay, AsyncHandler(ExpensePayments_controller.pay))
 
-ExpensePayments_route.post("/Base/ExpensePayments/IdExpensePayment=:IdExpensePayment/unpay", ExpensePayments_schema.unpay, AsyncHandler(ExpensePayments_controller.unpay))
+ExpensePayments_route.post("/ExpensePayments/IdExpensePayment=:IdExpensePayment/unpay", ExpensePayments_schema.unpay, AsyncHandler(ExpensePayments_controller.unpay))

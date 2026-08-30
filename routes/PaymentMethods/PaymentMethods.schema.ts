@@ -4,7 +4,7 @@ import { color } from "root/Utils/joiSchemas"
 
 const day = Joi.number().integer().min(1).max(31)
 
-//  Exportado porque a forma de pagamento sai embutida na conta (GET /Base/Accounts) e é
+//  Exportado porque a forma de pagamento sai embutida na conta (GET /Accounts) e é
 //  daqui que a forma da linha tem que sair — o schema da conta importa este, e não o
 //  contrário: quem embute depende de quem é embutido.
 export const paymentMethodResponse = Joi.object({

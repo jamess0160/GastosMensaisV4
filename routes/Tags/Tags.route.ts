@@ -17,8 +17,8 @@ export const Tags_route = express()
 //  O vínculo ExpenseTags também não tem rota: é montado junto com o gasto.
 
 //  O input de sugestão, enquanto se digita: ?Search=via
-Tags_route.get("/Base/Tags/search", Tags_schema.search, AsyncHandler(Tags_controller.search))
+Tags_route.get("/Tags/search", Tags_schema.search, AsyncHandler(Tags_controller.search))
 
 //  Arquiva (Active = false). Ver sections/DELETE/remove.ts: o delete físico levaria o vínculo
 //  com os gastos junto, por causa do ON DELETE CASCADE de ExpenseTags.
-Tags_route.delete("/Base/Tags/IdTag=:IdTag", Tags_schema.remove, AsyncHandler(Tags_controller.remove))
+Tags_route.delete("/Tags/IdTag=:IdTag", Tags_schema.remove, AsyncHandler(Tags_controller.remove))

@@ -3,7 +3,7 @@ import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tes
 //  Testes integrados de Tags. Um describe por rota de Tags.route.ts — e são duas só, porque a
 //  tag não tem cadastro próprio: ela nasce do texto digitado ao lançar o gasto.
 //
-//  Por isso o arranjo daqui passa por `POST /Base/Expenses`: é o único lugar que cria tag. O
+//  Por isso o arranjo daqui passa por `POST /Expenses`: é o único lugar que cria tag. O
 //  que esta suíte cobre é a busca (o input de sugestão), o arquivamento, e as regras de
 //  resolução do texto — mesmo nome não vira tag nova, e nome de tag arquivada a traz de volta.
 
@@ -25,16 +25,16 @@ describe("Tags", () => {
         otherClient = new TestClient(other.token)
     })
 
-    describe("GET /Base/Tags/search", () => {
+    describe("GET /Tags/search", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get(`/Base/Tags/search`)
+            let response = await client.anonymous().get(`/Tags/search`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa sessão sem workspace selecionado", async () => {
-            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Base/Tags/search`)
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Tags/search`)
 
             expect(response.status).toBe(406)
         })
@@ -42,7 +42,7 @@ describe("Tags", () => {
         it("recusa token válido apontando para o workspace de outro usuário", async () => {
             let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace))
 
-            let response = await forged.get(`/Base/Tags/search`)
+            let response = await forged.get(`/Tags/search`)
 
             expect(response.status).toBe(406)
         })
@@ -50,7 +50,7 @@ describe("Tags", () => {
         it("devolve lista vazia quando o workspace não tem tag", async () => {
             let workspace = await buildWorkspace()
 
-            let response = await workspace.client.get(`/Base/Tags/search`)
+            let response = await workspace.client.get(`/Tags/search`)
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual([])
@@ -62,7 +62,7 @@ describe("Tags", () => {
 
             await createExpenseWithTags(workspace, ["Viagem Chile", "Casamento"])
 
-            let response = await workspace.client.get(`/Base/Tags/search`)
+            let response = await workspace.client.get(`/Tags/search`)
 
             expect(response.body.map(name)).toEqual(["Casamento", "Viagem Chile"])
         })
@@ -72,9 +72,9 @@ describe("Tags", () => {
 
             await createExpenseWithTags(workspace, ["Viagem Chile", "Casamento"])
 
-            expect((await workspace.client.get(`/Base/Tags/search?Search=via`)).body.map(name)).toEqual(["Viagem Chile"])
-            expect((await workspace.client.get(`/Base/Tags/search?Search=CHILE`)).body.map(name)).toEqual(["Viagem Chile"])
-            expect((await workspace.client.get(`/Base/Tags/search?Search=nada`)).body).toEqual([])
+            expect((await workspace.client.get(`/Tags/search?Search=via`)).body.map(name)).toEqual(["Viagem Chile"])
+            expect((await workspace.client.get(`/Tags/search?Search=CHILE`)).body.map(name)).toEqual(["Viagem Chile"])
+            expect((await workspace.client.get(`/Tags/search?Search=nada`)).body).toEqual([])
         })
 
         //  O % é curinga do ILIKE: sem escapar, digitá-lo listaria tudo
@@ -83,7 +83,7 @@ describe("Tags", () => {
 
             await createExpenseWithTags(workspace, ["Viagem Chile"])
 
-            expect((await workspace.client.get(`/Base/Tags/search?Search=%25`)).body).toEqual([])
+            expect((await workspace.client.get(`/Tags/search?Search=%25`)).body).toEqual([])
         })
 
         it("não devolve tag arquivada nem a de outro workspace", async () => {
@@ -93,11 +93,11 @@ describe("Tags", () => {
             await createExpenseWithTags(stranger, ["Tag do vizinho"])
             await createExpenseWithTags(workspace, ["Tag viva", "Tag arquivada"])
 
-            let archived = (await workspace.client.get(`/Base/Tags/search?Search=arquivada`)).body[0]
+            let archived = (await workspace.client.get(`/Tags/search?Search=arquivada`)).body[0]
 
-            await workspace.client.delete(`/Base/Tags/IdTag=${archived.IdTag}`)
+            await workspace.client.delete(`/Tags/IdTag=${archived.IdTag}`)
 
-            expect((await workspace.client.get(`/Base/Tags/search`)).body.map(name)).toEqual(["Tag viva"])
+            expect((await workspace.client.get(`/Tags/search`)).body.map(name)).toEqual(["Tag viva"])
         })
     })
 
@@ -119,7 +119,7 @@ describe("Tags", () => {
             })
 
             //  O gasto devolve a tag inteira, não a linha de vínculo: é o nome que a tela mostra
-            let detail = await workspace.client.get(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            let detail = await workspace.client.get(`/Expenses/IdExpense=${created.IdExpense}`)
 
             expect(detail.body.Tags).toHaveLength(1)
             expect(detail.body.Tags[0].Name).toBe("Viagem Chile")
@@ -135,8 +135,8 @@ describe("Tags", () => {
 
             expect(await findTags(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
 
-            let firstDetail = await workspace.client.get(`/Base/Expenses/IdExpense=${first.IdExpense}`)
-            let secondDetail = await workspace.client.get(`/Base/Expenses/IdExpense=${second.IdExpense}`)
+            let firstDetail = await workspace.client.get(`/Expenses/IdExpense=${first.IdExpense}`)
+            let secondDetail = await workspace.client.get(`/Expenses/IdExpense=${second.IdExpense}`)
 
             expect(secondDetail.body.Tags[0].IdTag).toBe(firstDetail.body.Tags[0].IdTag)
             //  O nome gravado é o da primeira vez: renomear mudaria a etiqueta do gasto anterior
@@ -150,7 +150,7 @@ describe("Tags", () => {
 
             let created = await createExpenseWithTags(workspace, ["Viagem", "VIAGEM", " viagem "])
 
-            let detail = await workspace.client.get(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            let detail = await workspace.client.get(`/Expenses/IdExpense=${created.IdExpense}`)
 
             expect(detail.body.Tags).toHaveLength(1)
             expect(await findTags(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
@@ -165,7 +165,7 @@ describe("Tags", () => {
 
             let [tag] = await findTags(workspace.user.workspace.IdWorkspace)
 
-            await workspace.client.delete(`/Base/Tags/IdTag=${tag.IdTag}`)
+            await workspace.client.delete(`/Tags/IdTag=${tag.IdTag}`)
 
             expect((await findTagById(tag.IdTag)).Active).toBe(false)
 
@@ -175,7 +175,7 @@ describe("Tags", () => {
             expect(await findTags(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
             expect((await findTagById(tag.IdTag)).Active).toBe(true)
 
-            let detail = await workspace.client.get(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            let detail = await workspace.client.get(`/Expenses/IdExpense=${created.IdExpense}`)
 
             expect(detail.body.Tags[0].IdTag).toBe(tag.IdTag)
         })
@@ -183,7 +183,7 @@ describe("Tags", () => {
         it("recusa tag em branco", async () => {
             let workspace = await buildWorkspace()
 
-            let response = await workspace.client.post(`/Base/Expenses`, buildExpense(workspace, { Tags: ["   "] }))
+            let response = await workspace.client.post(`/Expenses`, buildExpense(workspace, { Tags: ["   "] }))
 
             expect(response.status).toBe(406)
         })
@@ -206,7 +206,7 @@ describe("Tags", () => {
 
             //  Rateio que não fecha: a recusa acontece antes da transaction, mas o teste garante
             //  que nenhuma tag ficou para trás por qualquer caminho de erro
-            let response = await workspace.client.post(`/Base/Expenses`, buildExpense(workspace, {
+            let response = await workspace.client.post(`/Expenses`, buildExpense(workspace, {
                 Tags: ["Tag fantasma"],
                 Persons: [{ IdPerson: workspace.user.person.IdPerson, Value: 50 }],
             }))
@@ -216,16 +216,16 @@ describe("Tags", () => {
         })
     })
 
-    describe("DELETE /Base/Tags/IdTag=:IdTag", () => {
+    describe("DELETE /Tags/IdTag=:IdTag", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().delete(`/Base/Tags/IdTag=1`)
+            let response = await client.anonymous().delete(`/Tags/IdTag=1`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa tag inexistente", async () => {
-            let response = await client.delete(`/Base/Tags/IdTag=999999`)
+            let response = await client.delete(`/Tags/IdTag=999999`)
 
             expect(response.status).toBe(406)
         })
@@ -239,7 +239,7 @@ describe("Tags", () => {
 
             let [tag] = await findTags(owner.user.workspace.IdWorkspace)
 
-            let response = await otherClient.delete(`/Base/Tags/IdTag=${tag.IdTag}`)
+            let response = await otherClient.delete(`/Tags/IdTag=${tag.IdTag}`)
 
             expect(response.status).toBe(406)
             expect((await findTagById(tag.IdTag)).Active).toBe(true)
@@ -254,7 +254,7 @@ describe("Tags", () => {
 
             let [tag] = await findTags(workspace.user.workspace.IdWorkspace)
 
-            let response = await workspace.client.delete(`/Base/Tags/IdTag=${tag.IdTag}`)
+            let response = await workspace.client.delete(`/Tags/IdTag=${tag.IdTag}`)
 
             expect(response.status).toBe(200)
             expect((await findTagById(tag.IdTag)).Active).toBe(false)
@@ -270,9 +270,9 @@ describe("Tags", () => {
 
             let [tag] = await findTags(workspace.user.workspace.IdWorkspace)
 
-            await workspace.client.delete(`/Base/Tags/IdTag=${tag.IdTag}`)
+            await workspace.client.delete(`/Tags/IdTag=${tag.IdTag}`)
 
-            let response = await workspace.client.delete(`/Base/Tags/IdTag=${tag.IdTag}`)
+            let response = await workspace.client.delete(`/Tags/IdTag=${tag.IdTag}`)
 
             expect(response.status).toBe(406)
         })
@@ -288,22 +288,22 @@ describe("Tags", () => {
                 Phone: 549987654321,
             }
 
-            expect((await new TestClient().post("/Base/Users", payload)).status).toBe(200)
+            expect((await new TestClient().post("/Users", payload)).status).toBe(200)
 
             let flowClient = new TestClient()
 
             expect((await flowClient.login(payload.Email, payload.Password)).status).toBe(200)
 
-            let account = await flowClient.post(`/Base/Accounts`, { Name: "Conta corrente", InitialBalance: 1000 })
-            let methods = (await flowClient.get(`/Base/Accounts`)).body[0].PaymentMethods
+            let account = await flowClient.post(`/Accounts`, { Name: "Conta corrente", InitialBalance: 1000 })
+            let methods = (await flowClient.get(`/Accounts`)).body[0].PaymentMethods
             let debit = methods.find((item: { Kind: string }) => item.Kind === "debit").IdPaymentMethod
-            let category = await flowClient.post(`/Base/Categories`, { Description: "Lazer" })
+            let category = await flowClient.post(`/Categories`, { Description: "Lazer" })
 
             //  Nada cadastrado: o input abre vazio
-            expect((await flowClient.get(`/Base/Tags/search`)).body).toEqual([])
+            expect((await flowClient.get(`/Tags/search`)).body).toEqual([])
 
             //  A tag nasce com o gasto, a partir do texto digitado
-            let first = await flowClient.post(`/Base/Expenses`, {
+            let first = await flowClient.post(`/Expenses`, {
                 Description: "Passagem",
                 TotalValue: 800,
                 IdCategory: category.body.IdCategory,
@@ -316,13 +316,13 @@ describe("Tags", () => {
             expect(account.status).toBe(200)
 
             //  Agora o input sugere ela ao digitar
-            let suggestion = await flowClient.get(`/Base/Tags/search?Search=via`)
+            let suggestion = await flowClient.get(`/Tags/search?Search=via`)
 
             expect(suggestion.body).toHaveLength(1)
             expect(suggestion.body[0].Name).toBe("Viagem Chile")
 
             //  O segundo gasto usa a mesma etiqueta, sem criar outra
-            let second = await flowClient.post(`/Base/Expenses`, {
+            let second = await flowClient.post(`/Expenses`, {
                 Description: "Hotel",
                 TotalValue: 1200,
                 IdCategory: category.body.IdCategory,
@@ -332,15 +332,15 @@ describe("Tags", () => {
             })
 
             expect(second.status).toBe(200)
-            expect((await flowClient.get(`/Base/Tags/search`)).body.map(name)).toEqual(["Presente", "Viagem Chile"])
+            expect((await flowClient.get(`/Tags/search`)).body.map(name)).toEqual(["Presente", "Viagem Chile"])
 
             //  A viagem acabou: arquivar tira da sugestão sem tocar nos dois gastos marcados
             let trip = suggestion.body[0]
 
-            expect((await flowClient.delete(`/Base/Tags/IdTag=${trip.IdTag}`)).status).toBe(200)
-            expect((await flowClient.get(`/Base/Tags/search`)).body.map(name)).toEqual(["Presente"])
+            expect((await flowClient.delete(`/Tags/IdTag=${trip.IdTag}`)).status).toBe(200)
+            expect((await flowClient.get(`/Tags/search`)).body.map(name)).toEqual(["Presente"])
 
-            let detail = await flowClient.get(`/Base/Expenses/IdExpense=${second.body.IdExpense}`)
+            let detail = await flowClient.get(`/Expenses/IdExpense=${second.body.IdExpense}`)
 
             //  O gasto continua marcado — só a sugestão perdeu a tag
             expect(detail.body.Tags.map(name).sort()).toEqual(["Presente", "Viagem Chile"])
@@ -363,10 +363,10 @@ async function buildWorkspace(): Promise<TestWorkspace> {
     let user = await UsersFactory.create()
     let client = new TestClient(user.token)
 
-    await client.post(`/Base/Accounts`, { Name: "Conta corrente", InitialBalance: 1000 })
+    await client.post(`/Accounts`, { Name: "Conta corrente", InitialBalance: 1000 })
 
-    let methods = (await client.get(`/Base/Accounts`)).body[0].PaymentMethods
-    let category = await client.post(`/Base/Categories`, { Description: "Categoria" })
+    let methods = (await client.get(`/Accounts`)).body[0].PaymentMethods
+    let category = await client.post(`/Categories`, { Description: "Categoria" })
 
     return {
         user,
@@ -388,7 +388,7 @@ function buildExpense(workspace: TestWorkspace, overrides: Record<string, unknow
 }
 
 async function createExpenseWithTags(workspace: TestWorkspace, Tags: string[]) {
-    let response = await workspace.client.post(`/Base/Expenses`, buildExpense(workspace, { Tags }))
+    let response = await workspace.client.post(`/Expenses`, buildExpense(workspace, { Tags }))
 
     expect(response.status).toBe(200)
 

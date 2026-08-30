@@ -4,7 +4,7 @@ import { Update } from "./sections/PUT/update"
 
 class Controller {
 
-    //  Não há POST: o mês nasce junto com o cadastro do orçamento (POST /Base/Budgets), dentro
+    //  Não há POST: o mês nasce junto com o cadastro do orçamento (POST /Budgets), dentro
     //  da transaction dele — e é essa escrita que a rotina mensal vai passar a fazer.
     update = async (req: Request, res: Response) => {
         res.json(await new Update().run(res.locals.IdWorkspace, Number(req.params.IdBudgetPeriod), res.locals.IdUser, req.body))

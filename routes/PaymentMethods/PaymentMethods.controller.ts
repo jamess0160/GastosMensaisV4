@@ -5,7 +5,7 @@ import { Update } from "./sections/PUT/update"
 
 class Controller {
 
-    //  Não há GET: a forma de pagamento sai embutida na conta, no GET /Base/Accounts. Ler as
+    //  Não há GET: a forma de pagamento sai embutida na conta, no GET /Accounts. Ler as
     //  duas coisas separadas obrigaria o cliente a remontar o vínculo que o modelo já tem.
     create = async (req: Request, res: Response) => {
         res.json(await new Create().run(res.locals.IdWorkspace, res.locals.IdUser, req.body))

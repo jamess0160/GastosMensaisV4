@@ -16,7 +16,7 @@ export const Budgets_route = express()
 //  Orçamento é **só de gasto**: entrada não tem categoria, então não tem teto.
 
 //  O mês inteiro, com quanto já foi comprometido em cada teto: ?ReferenceMonth=YYYY-MM
-Budgets_route.get("/Base/Budgets", Budgets_schema.getByMonth, AsyncHandler(Budgets_controller.getByMonth))
+Budgets_route.get("/Budgets", Budgets_schema.getByMonth, AsyncHandler(Budgets_controller.getByMonth))
 
 //  Orça uma categoria em um mês: resolve a definição vigente e cria o mês.
-Budgets_route.post("/Base/Budgets", Budgets_schema.create, AsyncHandler(Budgets_controller.create))
+Budgets_route.post("/Budgets", Budgets_schema.create, AsyncHandler(Budgets_controller.create))

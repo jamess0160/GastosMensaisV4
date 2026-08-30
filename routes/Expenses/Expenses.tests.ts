@@ -28,19 +28,19 @@ describe("Expenses", () => {
         other = await UsersFactory.create({ Name: "Usuário de outro workspace" })
         otherClient = new TestClient(other.token)
 
-        rootCategory = (await client.post(`/Base/Categories`, { Description: "Categoria da raiz" })).body.IdCategory
+        rootCategory = (await client.post(`/Categories`, { Description: "Categoria da raiz" })).body.IdCategory
     })
 
-    describe("GET /Base/Expenses", () => {
+    describe("GET /Expenses", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get(`/Base/Expenses`)
+            let response = await client.anonymous().get(`/Expenses`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa sessão sem workspace selecionado", async () => {
-            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Base/Expenses`)
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Expenses`)
 
             expect(response.status).toBe(406)
         })
@@ -48,7 +48,7 @@ describe("Expenses", () => {
         it("recusa token válido apontando para o workspace de outro usuário", async () => {
             let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace))
 
-            let response = await forged.get(`/Base/Expenses`)
+            let response = await forged.get(`/Expenses`)
 
             expect(response.status).toBe(406)
         })
@@ -56,7 +56,7 @@ describe("Expenses", () => {
         it("devolve lista vazia quando o workspace não tem gasto", async () => {
             let workspace = await buildWorkspace()
 
-            let response = await workspace.client.get(`/Base/Expenses`)
+            let response = await workspace.client.get(`/Expenses`)
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual([])
@@ -71,9 +71,9 @@ describe("Expenses", () => {
             await createExpense(workspace, { Description: "No mês", ExpenseDate: "2026-08-10", IdCategory: category })
             let paid = await createExpense(workspace, { Description: "Pago", ExpenseDate: "2026-08-11", Paid: true })
 
-            expect((await workspace.client.get(`/Base/Expenses?From=2026-08-01&To=2026-08-31`)).body.map(description)).toEqual(["No mês", "Pago"])
-            expect((await workspace.client.get(`/Base/Expenses?IdCategory=${category}`)).body.map(description)).toEqual(["No mês"])
-            expect((await workspace.client.get(`/Base/Expenses?Status=paid`)).body.map(description)).toEqual(["Pago"])
+            expect((await workspace.client.get(`/Expenses?From=2026-08-01&To=2026-08-31`)).body.map(description)).toEqual(["No mês", "Pago"])
+            expect((await workspace.client.get(`/Expenses?IdCategory=${category}`)).body.map(description)).toEqual(["No mês"])
+            expect((await workspace.client.get(`/Expenses?Status=paid`)).body.map(description)).toEqual(["Pago"])
             expect(paid.IdExpense).toEqual(expect.any(Number))
         })
 
@@ -83,10 +83,10 @@ describe("Expenses", () => {
             let canceled = await createExpense(workspace, { Description: "Cancelado" })
             await createExpense(workspace, { Description: "Vivo" })
 
-            await workspace.client.delete(`/Base/Expenses/IdExpense=${canceled.IdExpense}`)
+            await workspace.client.delete(`/Expenses/IdExpense=${canceled.IdExpense}`)
 
-            expect((await workspace.client.get(`/Base/Expenses`)).body.map(description)).toEqual(["Vivo"])
-            expect((await workspace.client.get(`/Base/Expenses?Status=canceled`)).body.map(description)).toEqual(["Cancelado"])
+            expect((await workspace.client.get(`/Expenses`)).body.map(description)).toEqual(["Vivo"])
+            expect((await workspace.client.get(`/Expenses?Status=canceled`)).body.map(description)).toEqual(["Cancelado"])
         })
 
         it("não devolve o gasto de outro workspace", async () => {
@@ -94,20 +94,20 @@ describe("Expenses", () => {
 
             await createExpense(owner, { Description: "Gasto do vizinho" })
 
-            expect((await otherClient.get(`/Base/Expenses`)).body.map(description)).not.toContain("Gasto do vizinho")
+            expect((await otherClient.get(`/Expenses`)).body.map(description)).not.toContain("Gasto do vizinho")
         })
     })
 
-    describe("GET /Base/Expenses/IdExpense=:IdExpense", () => {
+    describe("GET /Expenses/IdExpense=:IdExpense", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get(`/Base/Expenses/IdExpense=1`)
+            let response = await client.anonymous().get(`/Expenses/IdExpense=1`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa gasto inexistente", async () => {
-            let response = await client.get(`/Base/Expenses/IdExpense=999999`)
+            let response = await client.get(`/Expenses/IdExpense=999999`)
 
             expect(response.status).toBe(406)
         })
@@ -116,7 +116,7 @@ describe("Expenses", () => {
             let owner = await buildWorkspace()
             let created = await createExpense(owner)
 
-            let response = await otherClient.get(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            let response = await otherClient.get(`/Expenses/IdExpense=${created.IdExpense}`)
 
             expect(response.status).toBe(406)
         })
@@ -141,7 +141,7 @@ describe("Expenses", () => {
                 Tags: ["Viagem"],
             })
 
-            let response = await workspace.client.get(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            let response = await workspace.client.get(`/Expenses/IdExpense=${created.IdExpense}`)
 
             expect(response.status).toBe(200)
             expect(response.body.Payments).toHaveLength(2)
@@ -150,10 +150,10 @@ describe("Expenses", () => {
         })
     })
 
-    describe("POST /Base/Expenses", () => {
+    describe("POST /Expenses", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().post(`/Base/Expenses`, {
+            let response = await client.anonymous().post(`/Expenses`, {
                 Description: "Gasto",
                 TotalValue: 10,
                 IdCategory: rootCategory,
@@ -167,7 +167,7 @@ describe("Expenses", () => {
         it("recusa gasto sem forma de pagamento", async () => {
             let workspace = await buildWorkspace()
 
-            let response = await workspace.client.post(`/Base/Expenses`, {
+            let response = await workspace.client.post(`/Expenses`, {
                 Description: "Sem perna",
                 TotalValue: 10,
                 IdCategory: workspace.IdCategory,
@@ -182,7 +182,7 @@ describe("Expenses", () => {
             let owner = await buildWorkspace()
             let intruder = await buildWorkspace()
 
-            let response = await intruder.client.post(`/Base/Expenses`, buildBody(intruder, {
+            let response = await intruder.client.post(`/Expenses`, buildBody(intruder, {
                 Payments: [{ IdPaymentMethod: owner.IdDebit, Value: 100 }],
             }))
 
@@ -197,8 +197,8 @@ describe("Expenses", () => {
 
             let category = await createCategory(stranger, "Categoria do vizinho")
 
-            expect((await workspace.client.post(`/Base/Expenses`, buildBody(workspace, { IdCategory: category }))).status).toBe(406)
-            expect((await workspace.client.post(`/Base/Expenses`, buildBody(workspace, {
+            expect((await workspace.client.post(`/Expenses`, buildBody(workspace, { IdCategory: category }))).status).toBe(406)
+            expect((await workspace.client.post(`/Expenses`, buildBody(workspace, {
                 Persons: [{ IdPerson: stranger.user.person.IdPerson, Value: 100 }],
             }))).status).toBe(406)
         })
@@ -209,7 +209,7 @@ describe("Expenses", () => {
 
             let { IdCategory, ...body } = buildBody(workspace)
 
-            expect((await workspace.client.post(`/Base/Expenses`, body)).status).toBe(406)
+            expect((await workspace.client.post(`/Expenses`, body)).status).toBe(406)
         })
 
         //  Cada eixo fecha com o total por conta própria. O que não fecha não quebra nada na
@@ -217,7 +217,7 @@ describe("Expenses", () => {
         it("recusa eixo financeiro que não fecha com o total", async () => {
             let workspace = await buildWorkspace()
 
-            let response = await workspace.client.post(`/Base/Expenses`, buildBody(workspace, {
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
                 TotalValue: 100,
                 Payments: [{ IdPaymentMethod: workspace.IdDebit, Value: 90 }],
             }))
@@ -228,7 +228,7 @@ describe("Expenses", () => {
         it("recusa eixo analítico que não fecha com o total", async () => {
             let workspace = await buildWorkspace()
 
-            let response = await workspace.client.post(`/Base/Expenses`, buildBody(workspace, {
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
                 TotalValue: 100,
                 Persons: [{ IdPerson: workspace.user.person.IdPerson, Value: 90 }],
             }))
@@ -239,7 +239,7 @@ describe("Expenses", () => {
         it("cria o gasto simples pendente com as duas pernas", async () => {
             let workspace = await buildWorkspace()
 
-            let response = await workspace.client.post(`/Base/Expenses`, buildBody(workspace, {
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
                 Description: "Mercado",
                 TotalValue: 250.5,
                 ExpenseDate: "2026-08-10",
@@ -313,7 +313,7 @@ describe("Expenses", () => {
         })
     })
 
-    describe("POST /Base/Expenses — parcelamento", () => {
+    describe("POST /Expenses — parcelamento", () => {
 
         //  600 em 6x são 6 pernas de 100, e o TotalValue continua sendo o total da compra
         it("cria 6 pernas de 100 numa compra de 600 em 6x", async () => {
@@ -408,7 +408,7 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let card = await createCard(workspace)
 
-            let response = await workspace.client.post(`/Base/Expenses`, buildBody(workspace, {
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
                 Kind: "installment",
                 InstallmentTotal: 3,
                 TotalValue: 100,
@@ -426,7 +426,7 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let card = await createCard(workspace)
 
-            let response = await workspace.client.post(`/Base/Expenses`, buildBody(workspace, {
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
                 Kind: "installment",
                 InstallmentTotal: 1,
                 Payments: [{ IdPaymentMethod: card, Value: 100 }],
@@ -450,7 +450,7 @@ describe("Expenses", () => {
             let payments = await findPayments(created.IdExpense)
 
             for (let index = 0; index < payments.length; index++) {
-                await workspace.client.post(`/Base/ExpensePayments/IdExpensePayment=${payments[index].IdExpensePayment}/pay`)
+                await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payments[index].IdExpensePayment}/pay`)
 
                 let expected = index === payments.length - 1 ? "paid" : "pending"
 
@@ -459,7 +459,7 @@ describe("Expenses", () => {
         })
     })
 
-    describe("POST /Base/Expenses — gasto fixo", () => {
+    describe("POST /Expenses — gasto fixo", () => {
 
         //  Corrente de ocorrências reais, não molde + instâncias: toda linha é um gasto
         it("cria a raiz e as ocorrências, todas com suas pernas", async () => {
@@ -539,7 +539,7 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let card = await createCard(workspace)
 
-            let response = await workspace.client.post(`/Base/Expenses`, buildBody(workspace, {
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
                 Kind: "fixed",
                 TotalValue: 100,
                 Payments: [
@@ -554,22 +554,22 @@ describe("Expenses", () => {
         it("recusa recorrência em gasto que não é fixo", async () => {
             let workspace = await buildWorkspace()
 
-            let response = await workspace.client.post(`/Base/Expenses`, buildBody(workspace, { RecurrenceDay: 5 }))
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, { RecurrenceDay: 5 }))
 
             expect(response.status).toBe(406)
         })
     })
 
-    describe("PUT /Base/Expenses/IdExpense=:IdExpense", () => {
+    describe("PUT /Expenses/IdExpense=:IdExpense", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/Base/Expenses/IdExpense=1`, buildUpdateBody(rootCategory))
+            let response = await client.anonymous().put(`/Expenses/IdExpense=1`, buildUpdateBody(rootCategory))
 
             expect(response.status).toBe(401)
         })
 
         it("recusa gasto inexistente", async () => {
-            let response = await client.put(`/Base/Expenses/IdExpense=999999`, buildUpdateBody(rootCategory))
+            let response = await client.put(`/Expenses/IdExpense=999999`, buildUpdateBody(rootCategory))
 
             expect(response.status).toBe(406)
         })
@@ -578,7 +578,7 @@ describe("Expenses", () => {
             let owner = await buildWorkspace()
             let created = await createExpense(owner, { Description: "Gasto do vizinho" })
 
-            let response = await otherClient.put(`/Base/Expenses/IdExpense=${created.IdExpense}`, buildUpdateBody(rootCategory))
+            let response = await otherClient.put(`/Expenses/IdExpense=${created.IdExpense}`, buildUpdateBody(rootCategory))
 
             expect(response.status).toBe(406)
             expect((await findExpense(created.IdExpense)).Description).toBe("Gasto do vizinho")
@@ -590,12 +590,12 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let created = await createExpense(workspace)
 
-            expect((await workspace.client.put(`/Base/Expenses/IdExpense=${created.IdExpense}`, {
+            expect((await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}`, {
                 ...buildUpdateBody(workspace.IdCategory),
                 Status: "paid",
             })).status).toBe(406)
 
-            expect((await workspace.client.put(`/Base/Expenses/IdExpense=${created.IdExpense}`, {
+            expect((await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}`, {
                 ...buildUpdateBody(workspace.IdCategory),
                 Kind: "fixed",
             })).status).toBe(406)
@@ -606,7 +606,7 @@ describe("Expenses", () => {
             let category = await createCategory(workspace, "Mercado")
             let created = await createExpense(workspace, { TotalValue: 100 })
 
-            let response = await workspace.client.put(`/Base/Expenses/IdExpense=${created.IdExpense}`, {
+            let response = await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}`, {
                 Description: "Mercado do mês",
                 TotalValue: 150,
                 ExpenseDate: "2026-08-15",
@@ -628,7 +628,7 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let created = await createExpense(workspace, { TotalValue: 100 })
 
-            let response = await workspace.client.put(`/Base/Expenses/IdExpense=${created.IdExpense}`, buildUpdateBody(workspace.IdCategory, { TotalValue: 180 }))
+            let response = await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}`, buildUpdateBody(workspace.IdCategory, { TotalValue: 180 }))
 
             expect(response.status).toBe(406)
             expect((await findExpense(created.IdExpense)).TotalValue).toBe(100)
@@ -642,7 +642,7 @@ describe("Expenses", () => {
                 Persons: [{ IdPerson: workspace.user.person.IdPerson, Value: 100 }],
             })
 
-            let response = await workspace.client.put(`/Base/Expenses/IdExpense=${created.IdExpense}`, buildUpdateBody(workspace.IdCategory, {
+            let response = await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}`, buildUpdateBody(workspace.IdCategory, {
                 Description: "Só o nome",
                 TotalValue: 100,
             }))
@@ -664,7 +664,7 @@ describe("Expenses", () => {
                 Payments: [{ IdPaymentMethod: card, Value: 300 }],
             })
 
-            let response = await workspace.client.put(`/Base/Expenses/IdExpense=${created.IdExpense}`, {
+            let response = await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}`, {
                 ...buildUpdateBody(workspace.IdCategory, { TotalValue: 300 }),
                 Payments: [{ IdPaymentMethod: card, Value: 300 }],
             })
@@ -677,24 +677,24 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let created = await createExpense(workspace)
 
-            await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}`)
 
-            let response = await workspace.client.put(`/Base/Expenses/IdExpense=${created.IdExpense}`, buildUpdateBody(workspace.IdCategory))
+            let response = await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}`, buildUpdateBody(workspace.IdCategory))
 
             expect(response.status).toBe(406)
         })
     })
 
-    describe("POST /Base/ExpensePayments/IdExpensePayment=:IdExpensePayment/pay", () => {
+    describe("POST /ExpensePayments/IdExpensePayment=:IdExpensePayment/pay", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().post(`/Base/ExpensePayments/IdExpensePayment=1/pay`)
+            let response = await client.anonymous().post(`/ExpensePayments/IdExpensePayment=1/pay`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa perna inexistente", async () => {
-            let response = await client.post(`/Base/ExpensePayments/IdExpensePayment=999999/pay`)
+            let response = await client.post(`/ExpensePayments/IdExpensePayment=999999/pay`)
 
             expect(response.status).toBe(406)
         })
@@ -706,7 +706,7 @@ describe("Expenses", () => {
             let created = await createExpense(owner)
             let [payment] = await findPayments(created.IdExpense)
 
-            let response = await otherClient.post(`/Base/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/pay`)
+            let response = await otherClient.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/pay`)
 
             expect(response.status).toBe(406)
             expect((await findPayments(created.IdExpense))[0].Paid).toBe(false)
@@ -720,7 +720,7 @@ describe("Expenses", () => {
 
             expect(await accountBalance(workspace)).toBe(1000)
 
-            let response = await workspace.client.post(`/Base/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/pay`)
+            let response = await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/pay`)
 
             expect(response.status).toBe(200)
 
@@ -737,7 +737,7 @@ describe("Expenses", () => {
             let created = await createExpense(workspace, { Paid: true })
             let [payment] = await findPayments(created.IdExpense)
 
-            let response = await workspace.client.post(`/Base/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/pay`)
+            let response = await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/pay`)
 
             expect(response.status).toBe(406)
         })
@@ -747,9 +747,9 @@ describe("Expenses", () => {
             let created = await createExpense(workspace)
             let [payment] = await findPayments(created.IdExpense)
 
-            await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}`)
 
-            let response = await workspace.client.post(`/Base/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/pay`)
+            let response = await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/pay`)
 
             expect(response.status).toBe(406)
         })
@@ -762,7 +762,7 @@ describe("Expenses", () => {
 
             expect(await accountBalance(workspace)).toBe(750)
 
-            let response = await workspace.client.post(`/Base/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/unpay`)
+            let response = await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/unpay`)
 
             expect(response.status).toBe(200)
             expect(await accountBalance(workspace)).toBe(1000)
@@ -771,16 +771,16 @@ describe("Expenses", () => {
         })
     })
 
-    describe("DELETE /Base/Expenses/IdExpense=:IdExpense", () => {
+    describe("DELETE /Expenses/IdExpense=:IdExpense", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().delete(`/Base/Expenses/IdExpense=1`)
+            let response = await client.anonymous().delete(`/Expenses/IdExpense=1`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa gasto inexistente", async () => {
-            let response = await client.delete(`/Base/Expenses/IdExpense=999999`)
+            let response = await client.delete(`/Expenses/IdExpense=999999`)
 
             expect(response.status).toBe(406)
         })
@@ -789,7 +789,7 @@ describe("Expenses", () => {
             let owner = await buildWorkspace()
             let created = await createExpense(owner)
 
-            let response = await otherClient.delete(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            let response = await otherClient.delete(`/Expenses/IdExpense=${created.IdExpense}`)
 
             expect(response.status).toBe(406)
             expect((await findExpense(created.IdExpense)).Status).toBe("pending")
@@ -799,7 +799,7 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let created = await createExpense(workspace)
 
-            let response = await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            let response = await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}`)
 
             expect(response.status).toBe(200)
             expect((await findExpense(created.IdExpense)).Status).toBe("canceled")
@@ -813,7 +813,7 @@ describe("Expenses", () => {
 
             expect(await accountBalance(workspace)).toBe(750)
 
-            await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}`)
 
             expect(await accountBalance(workspace)).toBe(1000)
             //  O fato histórico fica gravado
@@ -832,7 +832,7 @@ describe("Expenses", () => {
                 Payments: [{ IdPaymentMethod: card, Value: 300 }],
             })
 
-            await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}`)
 
             expect((await findExpense(created.IdExpense)).Status).toBe("canceled")
             expect(await findPayments(created.IdExpense)).toHaveLength(3)
@@ -842,18 +842,18 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let created = await createExpense(workspace)
 
-            await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}`)
 
-            let response = await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}`)
+            let response = await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}`)
 
             expect(response.status).toBe(406)
         })
     })
 
-    describe("PUT /Base/Expenses/IdExpense=:IdExpense/series", () => {
+    describe("PUT /Expenses/IdExpense=:IdExpense/series", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/Base/Expenses/IdExpense=1/series`, {
+            let response = await client.anonymous().put(`/Expenses/IdExpense=1/series`, {
                 Description: "X",
                 TotalValue: 10,
                 IdCategory: rootCategory,
@@ -866,7 +866,7 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let created = await createExpense(workspace)
 
-            let response = await workspace.client.put(`/Base/Expenses/IdExpense=${created.IdExpense}/series`, {
+            let response = await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}/series`, {
                 Description: "X",
                 TotalValue: 100,
                 IdCategory: workspace.IdCategory,
@@ -891,7 +891,7 @@ describe("Expenses", () => {
             let series = await findSeries(created.IdExpense)
             let third = series[2]
 
-            let response = await workspace.client.put(`/Base/Expenses/IdExpense=${third.IdExpense}/series`, {
+            let response = await workspace.client.put(`/Expenses/IdExpense=${third.IdExpense}/series`, {
                 Description: "Aluguel reajustado",
                 TotalValue: 1650,
                 IdCategory: workspace.IdCategory,
@@ -920,7 +920,7 @@ describe("Expenses", () => {
                 Occurrences: 3,
             })
 
-            await workspace.client.put(`/Base/Expenses/IdExpense=${created.IdExpense}/series`, {
+            await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}/series`, {
                 Description: "Novo valor",
                 TotalValue: 250,
                 IdCategory: workspace.IdCategory,
@@ -941,7 +941,7 @@ describe("Expenses", () => {
                 Occurrences: 2,
             })
 
-            let response = await workspace.client.put(`/Base/Expenses/IdExpense=${created.IdExpense}/series`, {
+            let response = await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}/series`, {
                 Description: "Com rateio torto",
                 TotalValue: 200,
                 IdCategory: workspace.IdCategory,
@@ -952,10 +952,10 @@ describe("Expenses", () => {
         })
     })
 
-    describe("DELETE /Base/Expenses/IdExpense=:IdExpense/series", () => {
+    describe("DELETE /Expenses/IdExpense=:IdExpense/series", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().delete(`/Base/Expenses/IdExpense=1/series`)
+            let response = await client.anonymous().delete(`/Expenses/IdExpense=1/series`)
 
             expect(response.status).toBe(401)
         })
@@ -964,7 +964,7 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let created = await createExpense(workspace)
 
-            let response = await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}/series`)
+            let response = await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}/series`)
 
             expect(response.status).toBe(406)
         })
@@ -982,7 +982,7 @@ describe("Expenses", () => {
 
             let series = await findSeries(created.IdExpense)
 
-            let response = await workspace.client.delete(`/Base/Expenses/IdExpense=${series[2].IdExpense}/series`)
+            let response = await workspace.client.delete(`/Expenses/IdExpense=${series[2].IdExpense}/series`)
 
             expect(response.status).toBe(200)
             expect(response.body.Canceled).toBe(2)
@@ -1003,7 +1003,7 @@ describe("Expenses", () => {
                 Occurrences: 3,
             })
 
-            let response = await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}/series`)
+            let response = await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}/series`)
 
             expect(response.status).toBe(200)
             expect((await findSeries(created.IdExpense)).every((item) => item.Status === "canceled")).toBe(true)
@@ -1018,9 +1018,9 @@ describe("Expenses", () => {
                 Occurrences: 2,
             })
 
-            await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}/series`)
+            await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}/series`)
 
-            let response = await workspace.client.delete(`/Base/Expenses/IdExpense=${created.IdExpense}/series`)
+            let response = await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}/series`)
 
             expect(response.status).toBe(406)
         })
@@ -1038,18 +1038,18 @@ describe("Expenses", () => {
                 Phone: 549987654321,
             }
 
-            expect((await new TestClient().post("/Base/Users", payload)).status).toBe(200)
+            expect((await new TestClient().post("/Users", payload)).status).toBe(200)
 
             let flowClient = new TestClient()
 
             expect((await flowClient.login(payload.Email, payload.Password)).status).toBe(200)
 
             //  Conta com pix e débito, mais um cartão
-            let account = await flowClient.post(`/Base/Accounts`, { Name: "Conta corrente", InitialBalance: 5000 })
-            let methods = (await flowClient.get(`/Base/Accounts`)).body[0].PaymentMethods
+            let account = await flowClient.post(`/Accounts`, { Name: "Conta corrente", InitialBalance: 5000 })
+            let methods = (await flowClient.get(`/Accounts`)).body[0].PaymentMethods
             let debit = methods.find((item: { Kind: string }) => item.Kind === "debit").IdPaymentMethod
 
-            let card = await flowClient.post(`/Base/PaymentMethods`, {
+            let card = await flowClient.post(`/PaymentMethods`, {
                 IdAccount: account.body.IdAccount,
                 Name: "Cartão",
                 Kind: "credit_card",
@@ -1057,11 +1057,11 @@ describe("Expenses", () => {
                 DueDay: 28,
             })
 
-            let category = await flowClient.post(`/Base/Categories`, { Description: "Casa" })
-            let persons = await flowClient.get(`/Base/Persons`)
+            let category = await flowClient.post(`/Categories`, { Description: "Casa" })
+            let persons = await flowClient.get(`/Persons`)
 
             //  6. gasto simples no débito, quitado na hora
-            let market = await flowClient.post(`/Base/Expenses`, {
+            let market = await flowClient.post(`/Expenses`, {
                 Description: "Mercado",
                 TotalValue: 400,
                 ExpenseDate: "2026-08-10",
@@ -1074,7 +1074,7 @@ describe("Expenses", () => {
             expect(await balanceOf(flowClient, account.body.IdAccount)).toBe(4600)
 
             //  7. compra parcelada em 6x no cartão
-            let notebook = await flowClient.post(`/Base/Expenses`, {
+            let notebook = await flowClient.post(`/Expenses`, {
                 Description: "Notebook",
                 TotalValue: 600,
                 Kind: "installment",
@@ -1086,7 +1086,7 @@ describe("Expenses", () => {
 
             expect(notebook.status).toBe(200)
 
-            let detail = await flowClient.get(`/Base/Expenses/IdExpense=${notebook.body.IdExpense}`)
+            let detail = await flowClient.get(`/Expenses/IdExpense=${notebook.body.IdExpense}`)
 
             expect(detail.body.Payments).toHaveLength(6)
             expect(detail.body.Payments[0]).toMatchObject({ Value: 100, InstallmentNumber: 1, DueDate: "2026-08-28" })
@@ -1094,12 +1094,12 @@ describe("Expenses", () => {
             expect(await balanceOf(flowClient, account.body.IdAccount)).toBe(4600)
 
             //  Quita a primeira parcela: só ela sai do saldo, e o gasto continua pendente
-            expect((await flowClient.post(`/Base/ExpensePayments/IdExpensePayment=${detail.body.Payments[0].IdExpensePayment}/pay`)).status).toBe(200)
+            expect((await flowClient.post(`/ExpensePayments/IdExpensePayment=${detail.body.Payments[0].IdExpensePayment}/pay`)).status).toBe(200)
             expect(await balanceOf(flowClient, account.body.IdAccount)).toBe(4500)
-            expect((await flowClient.get(`/Base/Expenses/IdExpense=${notebook.body.IdExpense}`)).body.Status).toBe("pending")
+            expect((await flowClient.get(`/Expenses/IdExpense=${notebook.body.IdExpense}`)).body.Status).toBe("pending")
 
             //  8. gasto fixo: a raiz e as ocorrências
-            let rent = await flowClient.post(`/Base/Expenses`, {
+            let rent = await flowClient.post(`/Expenses`, {
                 Description: "Aluguel",
                 TotalValue: 1500,
                 Kind: "fixed",
@@ -1113,42 +1113,42 @@ describe("Expenses", () => {
             expect(rent.body.Occurrences).toBe(3)
 
             //  9. a leitura do mês, e os números fechando
-            let month = await flowClient.get(`/Base/Expenses?From=2026-08-01&To=2026-08-31`)
+            let month = await flowClient.get(`/Expenses?From=2026-08-01&To=2026-08-31`)
 
             //  Mercado, notebook e a primeira ocorrência do aluguel
             expect(month.body).toHaveLength(3)
 
-            let salary = await flowClient.post(`/Base/Inflows`, {
+            let salary = await flowClient.post(`/Inflows`, {
                 Description: "Salário",
                 TotalValue: 3000,
                 IdToAccount: account.body.IdAccount,
                 CompetenceDate: "2026-08-05",
             })
 
-            expect((await flowClient.post(`/Base/Inflows/IdInflow=${salary.body.IdInflow}/receive`)).status).toBe(200)
+            expect((await flowClient.post(`/Inflows/IdInflow=${salary.body.IdInflow}/receive`)).status).toBe(200)
 
             //  5000 de abertura − 400 de mercado − 100 da parcela + 3000 de salário
             expect(await balanceOf(flowClient, account.body.IdAccount)).toBe(7500)
 
             //  Quita o aluguel deste mês e o saldo acompanha
-            let rentDetail = await flowClient.get(`/Base/Expenses/IdExpense=${rent.body.IdExpense}`)
+            let rentDetail = await flowClient.get(`/Expenses/IdExpense=${rent.body.IdExpense}`)
 
-            expect((await flowClient.post(`/Base/ExpensePayments/IdExpensePayment=${rentDetail.body.Payments[0].IdExpensePayment}/pay`)).status).toBe(200)
+            expect((await flowClient.post(`/ExpensePayments/IdExpensePayment=${rentDetail.body.Payments[0].IdExpensePayment}/pay`)).status).toBe(200)
             expect(await balanceOf(flowClient, account.body.IdAccount)).toBe(6000)
-            expect((await flowClient.get(`/Base/Expenses/IdExpense=${rent.body.IdExpense}`)).body.Status).toBe("paid")
+            expect((await flowClient.get(`/Expenses/IdExpense=${rent.body.IdExpense}`)).body.Status).toBe("paid")
 
             //  E o aluguel sobe a partir da ocorrência de setembro, sem reescrever agosto
-            let series = await flowClient.get(`/Base/Expenses?Kind=fixed`)
+            let series = await flowClient.get(`/Expenses?Kind=fixed`)
 
             expect(series.body).toHaveLength(3)
 
-            expect((await flowClient.put(`/Base/Expenses/IdExpense=${series.body[1].IdExpense}/series`, {
+            expect((await flowClient.put(`/Expenses/IdExpense=${series.body[1].IdExpense}/series`, {
                 Description: "Aluguel reajustado",
                 TotalValue: 1650,
                 IdCategory: category.body.IdCategory,
             })).status).toBe(200)
 
-            let after = await flowClient.get(`/Base/Expenses?Kind=fixed`)
+            let after = await flowClient.get(`/Expenses?Kind=fixed`)
 
             expect(after.body.map((item: { TotalValue: number }) => item.TotalValue)).toEqual([1500, 1650, 1650])
             //  O que já foi pago em agosto continua valendo 1500, e o saldo não mudou
@@ -1175,11 +1175,11 @@ async function buildWorkspace(): Promise<TestWorkspace> {
     let user = await UsersFactory.create()
     let client = new TestClient(user.token)
 
-    let account = await client.post(`/Base/Accounts`, { Name: "Conta corrente", InitialBalance: 1000 })
+    let account = await client.post(`/Accounts`, { Name: "Conta corrente", InitialBalance: 1000 })
 
-    let list = await client.get(`/Base/Accounts`)
+    let list = await client.get(`/Accounts`)
     let methods = list.body.find((item: { IdAccount: number }) => item.IdAccount === account.body.IdAccount).PaymentMethods
-    let category = await client.post(`/Base/Categories`, { Description: "Categoria do teste" })
+    let category = await client.post(`/Categories`, { Description: "Categoria do teste" })
 
     return {
         user,
@@ -1191,7 +1191,7 @@ async function buildWorkspace(): Promise<TestWorkspace> {
 }
 
 async function createCard(workspace: TestWorkspace, overrides: { ClosingDay?: number, DueDay?: number } = {}) {
-    let response = await workspace.client.post(`/Base/PaymentMethods`, {
+    let response = await workspace.client.post(`/PaymentMethods`, {
         IdAccount: workspace.IdAccount,
         Name: "Cartão",
         Kind: "credit_card",
@@ -1203,11 +1203,11 @@ async function createCard(workspace: TestWorkspace, overrides: { ClosingDay?: nu
 }
 
 function createCategory(workspace: TestWorkspace, Description: string) {
-    return workspace.client.post(`/Base/Categories`, { Description }).then((response) => response.body.IdCategory as number)
+    return workspace.client.post(`/Categories`, { Description }).then((response) => response.body.IdCategory as number)
 }
 
 function createPerson(workspace: TestWorkspace, Name: string) {
-    return workspace.client.post(`/Base/Persons`, { Name }).then((response) => response.body.IdPerson as number)
+    return workspace.client.post(`/Persons`, { Name }).then((response) => response.body.IdPerson as number)
 }
 
 //  O corpo mínimo de um gasto: uma perna no débito fechando com o total. O `Paid` é atalho de
@@ -1237,7 +1237,7 @@ function buildUpdateBody(IdCategory: number, overrides: Record<string, unknown> 
 }
 
 async function createExpense(workspace: TestWorkspace, overrides: Record<string, any> = {}) {
-    let response = await workspace.client.post(`/Base/Expenses`, buildBody(workspace, overrides))
+    let response = await workspace.client.post(`/Expenses`, buildBody(workspace, overrides))
 
     expect(response.status).toBe(200)
 
@@ -1258,7 +1258,7 @@ async function accountBalance(workspace: TestWorkspace) {
 
 //  O saldo sai pela rota de contas: ele não é coluna, é calculado a cada leitura
 async function balanceOf(client: TestClient, IdAccount: number) {
-    let response = await client.get(`/Base/Accounts`)
+    let response = await client.get(`/Accounts`)
 
     return response.body.find((item: { IdAccount: number }) => item.IdAccount === IdAccount).Balance as number
 }

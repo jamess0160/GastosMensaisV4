@@ -2,7 +2,7 @@ import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tes
 
 //  Testes integrados de PaymentMethods. Um describe por rota de PaymentMethods.route.ts.
 //
-//  A conta é arranjo, não objeto de teste: ela vem pelo POST /Base/Accounts porque é de lá
+//  A conta é arranjo, não objeto de teste: ela vem pelo POST /Accounts porque é de lá
 //  que saem o pix e o débito automáticos, e várias asserções daqui dependem deles existirem
 //  do jeito que a rota real cria. Quem testa a conta em si é Accounts.tests.ts.
 
@@ -24,7 +24,7 @@ describe("PaymentMethods", () => {
         otherClient = new TestClient(other.token)
     })
 
-    describe("POST /Base/PaymentMethods", () => {
+    describe("POST /PaymentMethods", () => {
 
         let user: TestUser
         let workspaceClient: TestClient
@@ -34,13 +34,13 @@ describe("PaymentMethods", () => {
             user = await UsersFactory.create()
             workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta do cartão" })
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta do cartão" })
 
             IdAccount = created.body.IdAccount
         })
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().post(`/Base/PaymentMethods`, {
+            let response = await client.anonymous().post(`/PaymentMethods`, {
                 IdAccount,
                 Name: "Cartão roxo",
                 Kind: "credit_card",
@@ -54,7 +54,7 @@ describe("PaymentMethods", () => {
         })
 
         it("cadastra o cartão de crédito com fechamento e vencimento", async () => {
-            let response = await workspaceClient.post(`/Base/PaymentMethods`, {
+            let response = await workspaceClient.post(`/PaymentMethods`, {
                 IdAccount,
                 Name: "Cartão roxo",
                 Kind: "credit_card",
@@ -83,7 +83,7 @@ describe("PaymentMethods", () => {
         //  Pix e débito nascem com a conta: um segundo "pix" da mesma conta duplicaria a
         //  forma de pagamento que o resto do modelo trata como única
         it("recusa cadastrar pix ou débito", async () => {
-            let response = await workspaceClient.post(`/Base/PaymentMethods`, {
+            let response = await workspaceClient.post(`/PaymentMethods`, {
                 IdAccount,
                 Name: "Outro pix",
                 Kind: "pix",
@@ -95,7 +95,7 @@ describe("PaymentMethods", () => {
         //  ClosingDay/DueDay decidem em qual fatura a compra cai: sem eles, a etapa 5 não
         //  tem como calcular a data de vencimento da perna do gasto
         it("recusa cartão sem fechamento e vencimento", async () => {
-            let response = await workspaceClient.post(`/Base/PaymentMethods`, {
+            let response = await workspaceClient.post(`/PaymentMethods`, {
                 IdAccount,
                 Name: "Cartão sem fatura",
                 Kind: "credit_card",
@@ -105,7 +105,7 @@ describe("PaymentMethods", () => {
         })
 
         it("recusa dia de fechamento fora de 1..31", async () => {
-            let response = await workspaceClient.post(`/Base/PaymentMethods`, {
+            let response = await workspaceClient.post(`/PaymentMethods`, {
                 IdAccount,
                 Name: "Cartão",
                 Kind: "credit_card",
@@ -119,7 +119,7 @@ describe("PaymentMethods", () => {
         //  O IdAccount chega pelo body e é sequencial: sem a leitura escopada dava para
         //  pendurar um cartão na conta de outro tenant
         it("recusa pendurar o cartão em conta de outro workspace", async () => {
-            let response = await otherClient.post(`/Base/PaymentMethods`, {
+            let response = await otherClient.post(`/PaymentMethods`, {
                 IdAccount,
                 Name: "Cartão invasor",
                 Kind: "credit_card",
@@ -135,7 +135,7 @@ describe("PaymentMethods", () => {
         })
     })
 
-    describe("PUT /Base/PaymentMethods/IdPaymentMethod=:IdPaymentMethod", () => {
+    describe("PUT /PaymentMethods/IdPaymentMethod=:IdPaymentMethod", () => {
 
         let user: TestUser
         let workspaceClient: TestClient
@@ -146,10 +146,10 @@ describe("PaymentMethods", () => {
             user = await UsersFactory.create()
             workspaceClient = new TestClient(user.token)
 
-            let account = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta" })
+            let account = await workspaceClient.post(`/Accounts`, { Name: "Conta" })
             IdAccount = account.body.IdAccount
 
-            let card = await workspaceClient.post(`/Base/PaymentMethods`, {
+            let card = await workspaceClient.post(`/PaymentMethods`, {
                 IdAccount,
                 Name: "Cartão",
                 Kind: "credit_card",
@@ -160,19 +160,19 @@ describe("PaymentMethods", () => {
         })
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/Base/PaymentMethods/IdPaymentMethod=${IdCard}`, { Name: "X" })
+            let response = await client.anonymous().put(`/PaymentMethods/IdPaymentMethod=${IdCard}`, { Name: "X" })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa forma de pagamento de outro workspace", async () => {
-            let response = await otherClient.put(`/Base/PaymentMethods/IdPaymentMethod=${IdCard}`, { Name: "Invadido" })
+            let response = await otherClient.put(`/PaymentMethods/IdPaymentMethod=${IdCard}`, { Name: "Invadido" })
 
             expect(response.status).toBe(406)
         })
 
         it("edita o cartão", async () => {
-            let response = await workspaceClient.put(`/Base/PaymentMethods/IdPaymentMethod=${IdCard}`, {
+            let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${IdCard}`, {
                 Name: "Cartão renomeado",
                 ClosingDay: 15,
                 DueDay: 25,
@@ -191,7 +191,7 @@ describe("PaymentMethods", () => {
         it("recusa fechamento e vencimento em pix", async () => {
             let [pix] = await findPaymentMethods(IdAccount)
 
-            let response = await workspaceClient.put(`/Base/PaymentMethods/IdPaymentMethod=${pix.IdPaymentMethod}`, {
+            let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${pix.IdPaymentMethod}`, {
                 Name: "Pix",
                 ClosingDay: 10,
                 DueDay: 20,
@@ -207,7 +207,7 @@ describe("PaymentMethods", () => {
         it("aceita renomear o pix sem tocar nos campos de cartão", async () => {
             let [pix] = await findPaymentMethods(IdAccount)
 
-            let response = await workspaceClient.put(`/Base/PaymentMethods/IdPaymentMethod=${pix.IdPaymentMethod}`, {
+            let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${pix.IdPaymentMethod}`, {
                 Name: "Pix da conta",
             })
 
@@ -217,7 +217,7 @@ describe("PaymentMethods", () => {
 
         //  Apagar o fechamento de um cartão não é edição parcial: é deixar a compra sem fatura
         it("recusa apagar o fechamento de um cartão", async () => {
-            let response = await workspaceClient.put(`/Base/PaymentMethods/IdPaymentMethod=${IdCard}`, {
+            let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${IdCard}`, {
                 Name: "Cartão",
                 ClosingDay: null,
             })
@@ -227,7 +227,7 @@ describe("PaymentMethods", () => {
 
         //  Trocar o Kind mudaria a regra de fatura de todas as compras já lançadas nele
         it("recusa trocar o Kind", async () => {
-            let response = await workspaceClient.put(`/Base/PaymentMethods/IdPaymentMethod=${IdCard}`, {
+            let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${IdCard}`, {
                 Name: "Cartão",
                 Kind: "pix",
             })
@@ -236,16 +236,16 @@ describe("PaymentMethods", () => {
         })
     })
 
-    describe("DELETE /Base/PaymentMethods/IdPaymentMethod=:IdPaymentMethod", () => {
+    describe("DELETE /PaymentMethods/IdPaymentMethod=:IdPaymentMethod", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().delete(`/Base/PaymentMethods/IdPaymentMethod=1`)
+            let response = await client.anonymous().delete(`/PaymentMethods/IdPaymentMethod=1`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa forma de pagamento inexistente", async () => {
-            let response = await client.delete(`/Base/PaymentMethods/IdPaymentMethod=999999`)
+            let response = await client.delete(`/PaymentMethods/IdPaymentMethod=999999`)
 
             expect(response.status).toBe(406)
         })
@@ -257,9 +257,9 @@ describe("PaymentMethods", () => {
             let IdWorkspace = user.workspace.IdWorkspace
             let workspaceClient = new TestClient(user.token)
 
-            let account = await workspaceClient.post(`/Base/Accounts`, { Name: "Conta" })
+            let account = await workspaceClient.post(`/Accounts`, { Name: "Conta" })
 
-            let card = await workspaceClient.post(`/Base/PaymentMethods`, {
+            let card = await workspaceClient.post(`/PaymentMethods`, {
                 IdAccount: account.body.IdAccount,
                 Name: "Cartão a arquivar",
                 Kind: "credit_card",
@@ -267,7 +267,7 @@ describe("PaymentMethods", () => {
                 DueDay: 10,
             })
 
-            let response = await workspaceClient.delete(`/Base/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`)
+            let response = await workspaceClient.delete(`/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`)
 
             expect(response.status).toBe(200)
 
@@ -286,14 +286,14 @@ describe("PaymentMethods", () => {
             let user = await UsersFactory.createClient()
             let IdWorkspace = user.workspace.IdWorkspace
 
-            let account = await user.client.post(`/Base/Accounts`, { Name: "Conta corrente" })
+            let account = await user.client.post(`/Accounts`, { Name: "Conta corrente" })
 
             //  A conta já nasce com as duas formas automáticas, sem nenhuma data de fatura
             let born = await readMethods(user.client, IdWorkspace)
 
             expect(born.map((item) => item.Kind)).toEqual(["pix", "debit"])
 
-            let card = await user.client.post(`/Base/PaymentMethods`, {
+            let card = await user.client.post(`/PaymentMethods`, {
                 IdAccount: account.body.IdAccount,
                 Name: "Cartão principal",
                 Kind: "credit_card",
@@ -312,7 +312,7 @@ describe("PaymentMethods", () => {
             expect(withCard.filter((item) => item.ClosingDay !== null)).toHaveLength(1)
             expect(withCard.find((item) => item.Kind === "credit_card")).toMatchObject({ Name: "Cartão principal", ClosingDay: 20, DueDay: 28 })
 
-            expect((await user.client.put(`/Base/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`, {
+            expect((await user.client.put(`/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`, {
                 Name: "Cartão do dia a dia",
                 ClosingDay: 5,
                 DueDay: 12,
@@ -322,7 +322,7 @@ describe("PaymentMethods", () => {
 
             expect(edited.find((item) => item.Kind === "credit_card")).toMatchObject({ Name: "Cartão do dia a dia", ClosingDay: 5, DueDay: 12 })
 
-            expect((await user.client.delete(`/Base/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`)).status).toBe(200)
+            expect((await user.client.delete(`/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`)).status).toBe(200)
 
             //  Sumiu da escolha, mas a linha continua no banco para o histórico apontar
             expect((await readMethods(user.client, IdWorkspace)).map((item) => item.Kind)).toEqual(["pix", "debit"])
@@ -341,7 +341,7 @@ interface MethodResponse {
 
 //  Esta feature não tem GET: a forma de pagamento é sempre lida embutida na conta
 async function readMethods(client: TestClient, IdWorkspace: number): Promise<MethodResponse[]> {
-    let response = await client.get(`/Base/Accounts`)
+    let response = await client.get(`/Accounts`)
 
     return response.body[0].PaymentMethods
 }

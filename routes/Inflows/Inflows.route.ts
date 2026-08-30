@@ -13,16 +13,16 @@ export const Inflows_route = express()
 
 //  Lista do período: ?From=YYYY-MM-DD&To=YYYY-MM-DD (&Status=&Kind=). Sem Status, a cancelada
 //  fica de fora. O formato do período é o mesmo de Expenses — ver Utils/joiSchemas.ts.
-Inflows_route.get("/Base/Inflows", Inflows_schema.getByWorkspace, AsyncHandler(Inflows_controller.getByWorkspace))
+Inflows_route.get("/Inflows", Inflows_schema.getByWorkspace, AsyncHandler(Inflows_controller.getByWorkspace))
 
-Inflows_route.get("/Base/Inflows/IdInflow=:IdInflow", Inflows_schema.getUnique, AsyncHandler(Inflows_controller.getUnique))
+Inflows_route.get("/Inflows/IdInflow=:IdInflow", Inflows_schema.getUnique, AsyncHandler(Inflows_controller.getUnique))
 
-Inflows_route.post("/Base/Inflows", Inflows_schema.create, AsyncHandler(Inflows_controller.create))
+Inflows_route.post("/Inflows", Inflows_schema.create, AsyncHandler(Inflows_controller.create))
 
-Inflows_route.put("/Base/Inflows/IdInflow=:IdInflow", Inflows_schema.update, AsyncHandler(Inflows_controller.update))
+Inflows_route.put("/Inflows/IdInflow=:IdInflow", Inflows_schema.update, AsyncHandler(Inflows_controller.update))
 
 //  É o recebimento que entra no saldo, não o lançamento.
-Inflows_route.post("/Base/Inflows/IdInflow=:IdInflow/receive", Inflows_schema.receive, AsyncHandler(Inflows_controller.receive))
+Inflows_route.post("/Inflows/IdInflow=:IdInflow/receive", Inflows_schema.receive, AsyncHandler(Inflows_controller.receive))
 
 //  Cancela (Status = canceled). Não há delete físico nem Active nesta tabela.
-Inflows_route.delete("/Base/Inflows/IdInflow=:IdInflow", Inflows_schema.remove, AsyncHandler(Inflows_controller.remove))
+Inflows_route.delete("/Inflows/IdInflow=:IdInflow", Inflows_schema.remove, AsyncHandler(Inflows_controller.remove))

@@ -29,16 +29,16 @@ describe("Budgets", () => {
         otherClient = new TestClient(other.token)
     })
 
-    describe("GET /Base/Budgets", () => {
+    describe("GET /Budgets", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get(`/Base/Budgets?ReferenceMonth=2026-08`)
+            let response = await client.anonymous().get(`/Budgets?ReferenceMonth=2026-08`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa sessão sem workspace selecionado", async () => {
-            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Base/Budgets?ReferenceMonth=2026-08`)
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Budgets?ReferenceMonth=2026-08`)
 
             expect(response.status).toBe(406)
         })
@@ -46,7 +46,7 @@ describe("Budgets", () => {
         it("recusa token válido apontando para o workspace de outro usuário", async () => {
             let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace))
 
-            let response = await forged.get(`/Base/Budgets?ReferenceMonth=2026-08`)
+            let response = await forged.get(`/Budgets?ReferenceMonth=2026-08`)
 
             expect(response.status).toBe(406)
         })
@@ -55,14 +55,14 @@ describe("Budgets", () => {
         it("recusa mês fora do formato YYYY-MM", async () => {
             let workspace = await buildWorkspace()
 
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08-01`)).status).toBe(406)
-            expect((await workspace.client.get(`/Base/Budgets`)).status).toBe(406)
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08-01`)).status).toBe(406)
+            expect((await workspace.client.get(`/Budgets`)).status).toBe(406)
         })
 
         it("devolve lista vazia quando o mês não tem orçamento", async () => {
             let workspace = await buildWorkspace()
 
-            let response = await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)
+            let response = await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual([])
@@ -73,7 +73,7 @@ describe("Budgets", () => {
 
             await createBudget(workspace, { LimitValue: 800 })
 
-            let response = await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)
+            let response = await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)
 
             expect(response.status).toBe(200)
             expect(response.body).toHaveLength(1)
@@ -97,8 +97,8 @@ describe("Budgets", () => {
             await createBudget(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
             await createBudget(workspace, { ReferenceMonth: "2026-09", LimitValue: 900 })
 
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([800])
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-09`)).body.map(limit)).toEqual([900])
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([800])
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-09`)).body.map(limit)).toEqual([900])
         })
 
         it("não devolve o orçamento de outro workspace", async () => {
@@ -106,7 +106,7 @@ describe("Budgets", () => {
 
             await createBudget(owner)
 
-            expect((await otherClient.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body).toEqual([])
+            expect((await otherClient.get(`/Budgets?ReferenceMonth=2026-08`)).body).toEqual([])
         })
 
         //  **O número que dá sentido ao teto.** Gasto lançado no mês, na categoria orçada.
@@ -121,7 +121,7 @@ describe("Budgets", () => {
             await createExpense(workspace, { TotalValue: 999, ExpenseDate: "2026-09-02" })
             await createExpense(workspace, { TotalValue: 999, ExpenseDate: "2026-08-15", IdCategory: await createCategory(workspace, "Lazer") })
 
-            let response = await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)
+            let response = await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)
 
             expect(response.body[0].Spent).toBe(420.5)
         })
@@ -136,7 +136,7 @@ describe("Budgets", () => {
             await createExpense(workspace, { TotalValue: 100, ExpenseDate: "2026-08-10", Paid: true })
             await createExpense(workspace, { TotalValue: 200, ExpenseDate: "2026-08-11" })
 
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(300)
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(300)
         })
 
         it("não conta gasto cancelado", async () => {
@@ -146,9 +146,9 @@ describe("Budgets", () => {
 
             let canceled = await createExpense(workspace, { TotalValue: 300, ExpenseDate: "2026-08-10" })
 
-            await workspace.client.delete(`/Base/Expenses/IdExpense=${canceled.IdExpense}`)
+            await workspace.client.delete(`/Expenses/IdExpense=${canceled.IdExpense}`)
 
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(0)
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(0)
         })
 
         //  **A parcela pesa no mês em que vence, não no mês da compra.** Somar os 600 em agosto
@@ -166,8 +166,8 @@ describe("Budgets", () => {
                 ExpenseDate: "2026-08-10",
             })
 
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(100)
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-09`)).body[0].Spent).toBe(100)
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(100)
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-09`)).body[0].Spent).toBe(100)
         })
 
         //  No cartão, o que pesa no mês é a fatura que vence nele — a compra do dia 21 num
@@ -181,15 +181,15 @@ describe("Budgets", () => {
 
             await createExpense(workspace, { TotalValue: 150, ExpenseDate: "2026-08-21", IdPaymentMethod: card })
 
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(0)
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-09`)).body[0].Spent).toBe(150)
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(0)
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-09`)).body[0].Spent).toBe(150)
         })
     })
 
-    describe("POST /Base/Budgets", () => {
+    describe("POST /Budgets", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().post(`/Base/Budgets`, {
+            let response = await client.anonymous().post(`/Budgets`, {
                 IdCategory: 1,
                 ReferenceMonth: "2026-08",
                 LimitValue: 800,
@@ -201,15 +201,15 @@ describe("Budgets", () => {
         it("recusa corpo sem categoria, mês ou valor", async () => {
             let workspace = await buildWorkspace()
 
-            expect((await workspace.client.post(`/Base/Budgets`, {})).status).toBe(406)
-            expect((await workspace.client.post(`/Base/Budgets`, { IdCategory: workspace.IdCategory, ReferenceMonth: "2026-08" })).status).toBe(406)
+            expect((await workspace.client.post(`/Budgets`, {})).status).toBe(406)
+            expect((await workspace.client.post(`/Budgets`, { IdCategory: workspace.IdCategory, ReferenceMonth: "2026-08" })).status).toBe(406)
         })
 
         //  Teto zero é não ter teto, e isso se faz apagando o mês
         it("recusa teto zero ou negativo", async () => {
             let workspace = await buildWorkspace()
 
-            expect((await workspace.client.post(`/Base/Budgets`, buildBody(workspace, { LimitValue: 0 }))).status).toBe(406)
+            expect((await workspace.client.post(`/Budgets`, buildBody(workspace, { LimitValue: 0 }))).status).toBe(406)
         })
 
         //  O IdCategory é sequencial e chega do cliente
@@ -217,7 +217,7 @@ describe("Budgets", () => {
             let workspace = await buildWorkspace()
             let stranger = await buildWorkspace()
 
-            let response = await workspace.client.post(`/Base/Budgets`, buildBody(workspace, { IdCategory: stranger.IdCategory }))
+            let response = await workspace.client.post(`/Budgets`, buildBody(workspace, { IdCategory: stranger.IdCategory }))
 
             expect(response.status).toBe(406)
         })
@@ -226,7 +226,7 @@ describe("Budgets", () => {
             let owner = await buildWorkspace()
             let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, owner.user.workspace.IdWorkspace))
 
-            let response = await forged.post(`/Base/Budgets`, buildBody(owner))
+            let response = await forged.post(`/Budgets`, buildBody(owner))
 
             expect(response.status).toBe(406)
             expect(await findBudgets(owner.user.workspace.IdWorkspace)).toHaveLength(0)
@@ -236,7 +236,7 @@ describe("Budgets", () => {
         it("cria a definição e o mês de uma vez", async () => {
             let workspace = await buildWorkspace()
 
-            let response = await workspace.client.post(`/Base/Budgets`, buildBody(workspace, { LimitValue: 800, AlertPercent: 90 }))
+            let response = await workspace.client.post(`/Budgets`, buildBody(workspace, { LimitValue: 800, AlertPercent: 90 }))
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({ IdBudget: expect.any(Number), IdBudgetPeriod: expect.any(Number) })
@@ -266,8 +266,8 @@ describe("Budgets", () => {
         it("reaproveita a definição no cadastro do mês seguinte", async () => {
             let workspace = await buildWorkspace()
 
-            let first = await workspace.client.post(`/Base/Budgets`, buildBody(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 }))
-            let second = await workspace.client.post(`/Base/Budgets`, buildBody(workspace, { ReferenceMonth: "2026-09", LimitValue: 900 }))
+            let first = await workspace.client.post(`/Budgets`, buildBody(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 }))
+            let second = await workspace.client.post(`/Budgets`, buildBody(workspace, { ReferenceMonth: "2026-09", LimitValue: 900 }))
 
             expect(second.status).toBe(200)
             expect(second.body.IdBudget).toBe(first.body.IdBudget)
@@ -281,9 +281,9 @@ describe("Budgets", () => {
         it("atualiza a definição sem reescrever o mês já cadastrado", async () => {
             let workspace = await buildWorkspace()
 
-            let first = await workspace.client.post(`/Base/Budgets`, buildBody(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 }))
+            let first = await workspace.client.post(`/Budgets`, buildBody(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 }))
 
-            await workspace.client.post(`/Base/Budgets`, buildBody(workspace, { ReferenceMonth: "2026-09", LimitValue: 1000 }))
+            await workspace.client.post(`/Budgets`, buildBody(workspace, { ReferenceMonth: "2026-09", LimitValue: 1000 }))
 
             let [budget] = await findBudgets(workspace.user.workspace.IdWorkspace)
 
@@ -301,7 +301,7 @@ describe("Budgets", () => {
 
             await createBudget(workspace)
 
-            let response = await workspace.client.post(`/Base/Budgets`, buildBody(workspace))
+            let response = await workspace.client.post(`/Budgets`, buildBody(workspace))
 
             expect(response.status).toBe(406)
         })
@@ -313,20 +313,20 @@ describe("Budgets", () => {
             await createBudget(workspace)
             await createBudget(workspace, { IdCategory: await createCategory(workspace, "Lazer") })
 
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body).toHaveLength(2)
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body).toHaveLength(2)
         })
     })
 
-    describe("PUT /Base/BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", () => {
+    describe("PUT /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/Base/BudgetPeriods/IdBudgetPeriod=1`, { LimitValue: 100 })
+            let response = await client.anonymous().put(`/BudgetPeriods/IdBudgetPeriod=1`, { LimitValue: 100 })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa período inexistente", async () => {
-            let response = await client.put(`/Base/BudgetPeriods/IdBudgetPeriod=999999`, { LimitValue: 100 })
+            let response = await client.put(`/BudgetPeriods/IdBudgetPeriod=999999`, { LimitValue: 100 })
 
             expect(response.status).toBe(406)
         })
@@ -337,7 +337,7 @@ describe("Budgets", () => {
             let owner = await buildWorkspace()
             let created = await createBudget(owner, { LimitValue: 800 })
 
-            let response = await otherClient.put(`/Base/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, { LimitValue: 1 })
+            let response = await otherClient.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, { LimitValue: 1 })
 
             expect(response.status).toBe(406)
             expect((await findPeriodById(created.IdBudgetPeriod)).LimitValue).toBe(800)
@@ -350,7 +350,7 @@ describe("Budgets", () => {
             let august = await createBudget(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
             let december = await createBudget(workspace, { ReferenceMonth: "2026-12", LimitValue: 800 })
 
-            let response = await workspace.client.put(`/Base/BudgetPeriods/IdBudgetPeriod=${december.IdBudgetPeriod}`, {
+            let response = await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${december.IdBudgetPeriod}`, {
                 LimitValue: 1500,
                 AlertPercent: 95,
             })
@@ -367,7 +367,7 @@ describe("Budgets", () => {
             let workspace = await buildWorkspace()
             let created = await createBudget(workspace)
 
-            let response = await workspace.client.put(`/Base/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, {
+            let response = await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, {
                 LimitValue: 900,
                 ReferenceMonth: "2026-09-01",
             })
@@ -376,16 +376,16 @@ describe("Budgets", () => {
         })
     })
 
-    describe("DELETE /Base/BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", () => {
+    describe("DELETE /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().delete(`/Base/BudgetPeriods/IdBudgetPeriod=1`)
+            let response = await client.anonymous().delete(`/BudgetPeriods/IdBudgetPeriod=1`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa período inexistente", async () => {
-            let response = await client.delete(`/Base/BudgetPeriods/IdBudgetPeriod=999999`)
+            let response = await client.delete(`/BudgetPeriods/IdBudgetPeriod=999999`)
 
             expect(response.status).toBe(406)
         })
@@ -394,7 +394,7 @@ describe("Budgets", () => {
             let owner = await buildWorkspace()
             let created = await createBudget(owner)
 
-            let response = await otherClient.delete(`/Base/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
+            let response = await otherClient.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
 
             expect(response.status).toBe(406)
             expect(await findPeriodById(created.IdBudgetPeriod)).toBeDefined()
@@ -408,13 +408,13 @@ describe("Budgets", () => {
 
             let created = await createBudget(workspace)
 
-            let response = await workspace.client.delete(`/Base/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
+            let response = await workspace.client.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
 
             expect(response.status).toBe(200)
             expect(await findPeriodById(created.IdBudgetPeriod)).toBeUndefined()
             expect(await findBudgets(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
 
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body).toEqual([])
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body).toEqual([])
         })
 
         //  Apagado o mês, a categoria pode ser orçada de novo nele
@@ -423,12 +423,12 @@ describe("Budgets", () => {
 
             let created = await createBudget(workspace, { LimitValue: 800 })
 
-            await workspace.client.delete(`/Base/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
+            await workspace.client.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
 
-            let response = await workspace.client.post(`/Base/Budgets`, buildBody(workspace, { LimitValue: 500 }))
+            let response = await workspace.client.post(`/Budgets`, buildBody(workspace, { LimitValue: 500 }))
 
             expect(response.status).toBe(200)
-            expect((await workspace.client.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([500])
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([500])
         })
     })
 
@@ -444,20 +444,20 @@ describe("Budgets", () => {
                 Phone: 549987654321,
             }
 
-            expect((await new TestClient().post("/Base/Users", payload)).status).toBe(200)
+            expect((await new TestClient().post("/Users", payload)).status).toBe(200)
 
             let flowClient = new TestClient()
 
             expect((await flowClient.login(payload.Email, payload.Password)).status).toBe(200)
 
-            await flowClient.post(`/Base/Accounts`, { Name: "Conta corrente", InitialBalance: 5000 })
+            await flowClient.post(`/Accounts`, { Name: "Conta corrente", InitialBalance: 5000 })
 
-            let methods = (await flowClient.get(`/Base/Accounts`)).body[0].PaymentMethods
+            let methods = (await flowClient.get(`/Accounts`)).body[0].PaymentMethods
             let debit = methods.find((item: { Kind: string }) => item.Kind === "debit").IdPaymentMethod
-            let category = await flowClient.post(`/Base/Categories`, { Description: "Mercado" })
+            let category = await flowClient.post(`/Categories`, { Description: "Mercado" })
 
             //  Agosto: teto de 800
-            let august = await flowClient.post(`/Base/Budgets`, {
+            let august = await flowClient.post(`/Budgets`, {
                 IdCategory: category.body.IdCategory,
                 ReferenceMonth: "2026-08",
                 LimitValue: 800,
@@ -465,13 +465,13 @@ describe("Budgets", () => {
 
             expect(august.status).toBe(200)
 
-            let empty = await flowClient.get(`/Base/Budgets?ReferenceMonth=2026-08`)
+            let empty = await flowClient.get(`/Budgets?ReferenceMonth=2026-08`)
 
             expect(empty.body[0]).toMatchObject({ LimitValue: 800, Spent: 0, AlertPercent: 80 })
 
             //  Duas compras no mês, uma quitada e outra não: as duas comprometem o teto
             for (let expense of [{ Value: 300, Paid: true }, { Value: 250, Paid: false }]) {
-                expect((await flowClient.post(`/Base/Expenses`, {
+                expect((await flowClient.post(`/Expenses`, {
                     Description: "Compra do mês",
                     TotalValue: expense.Value,
                     IdCategory: category.body.IdCategory,
@@ -480,28 +480,28 @@ describe("Budgets", () => {
                 })).status).toBe(200)
             }
 
-            let used = await flowClient.get(`/Base/Budgets?ReferenceMonth=2026-08`)
+            let used = await flowClient.get(`/Budgets?ReferenceMonth=2026-08`)
 
             expect(used.body[0].Spent).toBe(550)
             //  O alerta é do cliente: a API entrega os três números que ele compara
             expect(used.body[0].Spent / used.body[0].LimitValue).toBeGreaterThan(0.68)
 
             //  O mês apertou: sobe o teto só de agosto
-            expect((await flowClient.put(`/Base/BudgetPeriods/IdBudgetPeriod=${august.body.IdBudgetPeriod}`, { LimitValue: 900 })).status).toBe(200)
-            expect((await flowClient.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body[0].LimitValue).toBe(900)
+            expect((await flowClient.put(`/BudgetPeriods/IdBudgetPeriod=${august.body.IdBudgetPeriod}`, { LimitValue: 900 })).status).toBe(200)
+            expect((await flowClient.get(`/Budgets?ReferenceMonth=2026-08`)).body[0].LimitValue).toBe(900)
 
             //  Setembro é cadastrado à mão — é isto que a rotina vai automatizar
-            expect((await flowClient.post(`/Base/Budgets`, {
+            expect((await flowClient.post(`/Budgets`, {
                 IdCategory: category.body.IdCategory,
                 ReferenceMonth: "2026-09",
                 LimitValue: 850,
             })).status).toBe(200)
 
-            let september = await flowClient.get(`/Base/Budgets?ReferenceMonth=2026-09`)
+            let september = await flowClient.get(`/Budgets?ReferenceMonth=2026-09`)
 
             //  Mês novo, gasto zerado — e agosto continua com os 900 e os 550
             expect(september.body[0]).toMatchObject({ LimitValue: 850, Spent: 0 })
-            expect((await flowClient.get(`/Base/Budgets?ReferenceMonth=2026-08`)).body[0]).toMatchObject({ LimitValue: 900, Spent: 550 })
+            expect((await flowClient.get(`/Budgets?ReferenceMonth=2026-08`)).body[0]).toMatchObject({ LimitValue: 900, Spent: 550 })
         })
     })
 })
@@ -521,10 +521,10 @@ async function buildWorkspace(): Promise<TestWorkspace> {
     let user = await UsersFactory.create()
     let client = new TestClient(user.token)
 
-    await client.post(`/Base/Accounts`, { Name: "Conta corrente", InitialBalance: 5000 })
+    await client.post(`/Accounts`, { Name: "Conta corrente", InitialBalance: 5000 })
 
-    let methods = (await client.get(`/Base/Accounts`)).body[0].PaymentMethods
-    let category = await client.post(`/Base/Categories`, { Description: "Mercado" })
+    let methods = (await client.get(`/Accounts`)).body[0].PaymentMethods
+    let category = await client.post(`/Categories`, { Description: "Mercado" })
 
     return {
         user,
@@ -535,13 +535,13 @@ async function buildWorkspace(): Promise<TestWorkspace> {
 }
 
 function createCategory(workspace: TestWorkspace, Description: string) {
-    return workspace.client.post(`/Base/Categories`, { Description }).then((response) => response.body.IdCategory as number)
+    return workspace.client.post(`/Categories`, { Description }).then((response) => response.body.IdCategory as number)
 }
 
 async function createCard(workspace: TestWorkspace) {
-    let account = (await workspace.client.get(`/Base/Accounts`)).body[0]
+    let account = (await workspace.client.get(`/Accounts`)).body[0]
 
-    let response = await workspace.client.post(`/Base/PaymentMethods`, {
+    let response = await workspace.client.post(`/PaymentMethods`, {
         IdAccount: account.IdAccount,
         Name: "Cartão",
         Kind: "credit_card",
@@ -562,7 +562,7 @@ function buildBody(workspace: TestWorkspace, overrides: Record<string, unknown> 
 }
 
 async function createBudget(workspace: TestWorkspace, overrides: Record<string, unknown> = {}) {
-    let response = await workspace.client.post(`/Base/Budgets`, buildBody(workspace, overrides))
+    let response = await workspace.client.post(`/Budgets`, buildBody(workspace, overrides))
 
     expect(response.status).toBe(200)
 
@@ -572,7 +572,7 @@ async function createBudget(workspace: TestWorkspace, overrides: Record<string, 
 async function createExpense(workspace: TestWorkspace, overrides: Record<string, any> = {}) {
     let { Paid, IdPaymentMethod, ...rest } = overrides
 
-    let response = await workspace.client.post(`/Base/Expenses`, {
+    let response = await workspace.client.post(`/Expenses`, {
         Description: "Compra do mês",
         TotalValue: 100,
         IdCategory: workspace.IdCategory,

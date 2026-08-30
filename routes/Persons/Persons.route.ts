@@ -14,11 +14,11 @@ export const Persons_route = express()
 //  Não há rota que escreva o IdUser: o vínculo com um login nasce no cadastro do usuário
 //  (sections/POST/createSelf.ts, dentro da transaction do signup). Ver POST/create.ts.
 
-Persons_route.get("/Base/Persons", Persons_schema.getByWorkspace, AsyncHandler(Persons_controller.getByWorkspace))
+Persons_route.get("/Persons", Persons_schema.getByWorkspace, AsyncHandler(Persons_controller.getByWorkspace))
 
-Persons_route.post("/Base/Persons", Persons_schema.create, AsyncHandler(Persons_controller.create))
+Persons_route.post("/Persons", Persons_schema.create, AsyncHandler(Persons_controller.create))
 
-Persons_route.put("/Base/Persons/IdPerson=:IdPerson", Persons_schema.update, AsyncHandler(Persons_controller.update))
+Persons_route.put("/Persons/IdPerson=:IdPerson", Persons_schema.update, AsyncHandler(Persons_controller.update))
 
 //  Arquiva (Active = false), e recusa a pessoa vinculada a um login. Ver sections/DELETE/remove.ts.
-Persons_route.delete("/Base/Persons/IdPerson=:IdPerson", Persons_schema.remove, AsyncHandler(Persons_controller.remove))
+Persons_route.delete("/Persons/IdPerson=:IdPerson", Persons_schema.remove, AsyncHandler(Persons_controller.remove))

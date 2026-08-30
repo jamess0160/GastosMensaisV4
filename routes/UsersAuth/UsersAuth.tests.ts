@@ -21,11 +21,11 @@ describe("UsersAuth", () => {
         client = new TestClient(root.token)
     })
 
-    describe("GET /Base/UsersAuth/checkDevice/DeviceKey=:DeviceKey", () => {
+    describe("GET /UsersAuth/checkDevice/DeviceKey=:DeviceKey", () => {
 
         //  Rota pública de propósito: é o primeiro pedido do app, antes de existir token
         it("responde null para um aparelho desconhecido", async () => {
-            let response = await client.anonymous().get(`/Base/UsersAuth/checkDevice/DeviceKey=${UsersAuthFactory.buildDeviceKey()}`)
+            let response = await client.anonymous().get(`/UsersAuth/checkDevice/DeviceKey=${UsersAuthFactory.buildDeviceKey()}`)
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({ UseAuth: null })
@@ -35,7 +35,7 @@ describe("UsersAuth", () => {
             let owner = await UsersFactory.create()
             let credential = await UsersAuthFactory.create(owner.user.IdUser)
 
-            let response = await client.anonymous().get(`/Base/UsersAuth/checkDevice/DeviceKey=${credential.DeviceKey}`)
+            let response = await client.anonymous().get(`/UsersAuth/checkDevice/DeviceKey=${credential.DeviceKey}`)
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({ UseAuth: true })
@@ -45,9 +45,9 @@ describe("UsersAuth", () => {
             let owner = await UsersFactory.create()
             let deviceKey = UsersAuthFactory.buildDeviceKey()
 
-            await new TestClient(owner.token).post("/Base/UsersAuth/skipDevice", { DeviceKey: deviceKey })
+            await new TestClient(owner.token).post("/UsersAuth/skipDevice", { DeviceKey: deviceKey })
 
-            let response = await client.anonymous().get(`/Base/UsersAuth/checkDevice/DeviceKey=${deviceKey}`)
+            let response = await client.anonymous().get(`/UsersAuth/checkDevice/DeviceKey=${deviceKey}`)
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({ UseAuth: false })
@@ -55,16 +55,16 @@ describe("UsersAuth", () => {
 
         it("recusa DeviceKey fora do formato", async () => {
             //  O '.' é caractere válido de URL mas não existe em base64url: é o schema que recusa
-            let response = await client.anonymous().get("/Base/UsersAuth/checkDevice/DeviceKey=chave.invalida")
+            let response = await client.anonymous().get("/UsersAuth/checkDevice/DeviceKey=chave.invalida")
 
             expect(response.status).toBe(406)
         })
     })
 
-    describe("GET /Base/UsersAuth/getSelf", () => {
+    describe("GET /UsersAuth/getSelf", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get("/Base/UsersAuth/getSelf")
+            let response = await client.anonymous().get("/UsersAuth/getSelf")
 
             expect(response.status).toBe(401)
         })
@@ -74,7 +74,7 @@ describe("UsersAuth", () => {
             let credential = await UsersAuthFactory.create(owner.user.IdUser)
             await UsersAuthFactory.create((await UsersFactory.create()).user.IdUser)
 
-            let response = await new TestClient(owner.token).get("/Base/UsersAuth/getSelf")
+            let response = await new TestClient(owner.token).get("/UsersAuth/getSelf")
 
             expect(response.status).toBe(200)
             expect(response.body).toHaveLength(1)
@@ -86,23 +86,23 @@ describe("UsersAuth", () => {
             let owner = await UsersFactory.create()
             await UsersAuthFactory.create(owner.user.IdUser)
 
-            let response = await new TestClient(owner.token).get("/Base/UsersAuth/getSelf")
+            let response = await new TestClient(owner.token).get("/UsersAuth/getSelf")
 
             expect(response.body[0].PublicKey).toBeUndefined()
             expect(response.body[0].Counter).toBeUndefined()
         })
     })
 
-    describe("GET /Base/UsersAuth/options/register", () => {
+    describe("GET /UsersAuth/options/register", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get("/Base/UsersAuth/options/register")
+            let response = await client.anonymous().get("/UsersAuth/options/register")
 
             expect(response.status).toBe(401)
         })
 
         it("devolve as options e o desafio assinado", async () => {
-            let response = await client.get("/Base/UsersAuth/options/register")
+            let response = await client.get("/UsersAuth/options/register")
 
             expect(response.status).toBe(200)
             expect(response.body.options.challenge).toEqual(expect.any(String))
@@ -112,7 +112,7 @@ describe("UsersAuth", () => {
 
         //  Só a digital do próprio aparelho: chave física externa não serve ao caso de uso
         it("pede um autenticador de plataforma", async () => {
-            let response = await client.get("/Base/UsersAuth/options/register")
+            let response = await client.get("/UsersAuth/options/register")
 
             expect(response.body.options.authenticatorSelection.authenticatorAttachment).toBe("platform")
         })
@@ -122,23 +122,23 @@ describe("UsersAuth", () => {
             let owner = await UsersFactory.create()
             let credential = await UsersAuthFactory.create(owner.user.IdUser)
 
-            let response = await new TestClient(owner.token).get("/Base/UsersAuth/options/register")
+            let response = await new TestClient(owner.token).get("/UsersAuth/options/register")
 
             expect(response.body.options.excludeCredentials.map((item: { id: string }) => item.id)).toEqual([credential.CredentialId])
         })
 
         it("gera um desafio diferente a cada chamada", async () => {
-            let first = await client.get("/Base/UsersAuth/options/register")
-            let second = await client.get("/Base/UsersAuth/options/register")
+            let first = await client.get("/UsersAuth/options/register")
+            let second = await client.get("/UsersAuth/options/register")
 
             expect(first.body.options.challenge).not.toBe(second.body.options.challenge)
         })
     })
 
-    describe("GET /Base/UsersAuth/options/login/DeviceKey=:DeviceKey", () => {
+    describe("GET /UsersAuth/options/login/DeviceKey=:DeviceKey", () => {
 
         it("recusa um aparelho sem credencial registrada", async () => {
-            let response = await client.anonymous().get(`/Base/UsersAuth/options/login/DeviceKey=${UsersAuthFactory.buildDeviceKey()}`)
+            let response = await client.anonymous().get(`/UsersAuth/options/login/DeviceKey=${UsersAuthFactory.buildDeviceKey()}`)
 
             expect(response.status).toBe(406)
         })
@@ -148,7 +148,7 @@ describe("UsersAuth", () => {
             let owner = await UsersFactory.create()
             let credential = await UsersAuthFactory.create(owner.user.IdUser)
 
-            let response = await client.anonymous().get(`/Base/UsersAuth/options/login/DeviceKey=${credential.DeviceKey}`)
+            let response = await client.anonymous().get(`/UsersAuth/options/login/DeviceKey=${credential.DeviceKey}`)
 
             expect(response.status).toBe(200)
             expect(response.body.options.allowCredentials.map((item: { id: string }) => item.id)).toEqual([credential.CredentialId])
@@ -165,28 +165,28 @@ describe("UsersAuth", () => {
             await UsersAuthFactory.create(first.user.IdUser, { DeviceKey: deviceKey })
             await UsersAuthFactory.create(second.user.IdUser, { DeviceKey: deviceKey })
 
-            let response = await client.anonymous().get(`/Base/UsersAuth/options/login/DeviceKey=${deviceKey}`)
+            let response = await client.anonymous().get(`/UsersAuth/options/login/DeviceKey=${deviceKey}`)
 
             expect(response.body.options.allowCredentials).toHaveLength(2)
         })
     })
 
-    describe("POST /Base/UsersAuth/register", () => {
+    describe("POST /UsersAuth/register", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().post("/Base/UsersAuth/register", buildRegisterBody("token-qualquer"))
+            let response = await client.anonymous().post("/UsersAuth/register", buildRegisterBody("token-qualquer"))
 
             expect(response.status).toBe(401)
         })
 
         it("recusa corpo sem o ChallengeToken", async () => {
-            let response = await client.post("/Base/UsersAuth/register", { Response: { id: "abc" } })
+            let response = await client.post("/UsersAuth/register", { Response: { id: "abc" } })
 
             expect(response.status).toBe(406)
         })
 
         it("recusa um ChallengeToken forjado", async () => {
-            let response = await client.post("/Base/UsersAuth/register", buildRegisterBody("nao-e-um-jwt"))
+            let response = await client.post("/UsersAuth/register", buildRegisterBody("nao-e-um-jwt"))
 
             expect(response.status).toBe(406)
         })
@@ -195,9 +195,9 @@ describe("UsersAuth", () => {
         //  outra conta serviria para pendurar uma passkey na conta errada
         it("recusa o desafio emitido para outro usuário", async () => {
             let other = await UsersFactory.create()
-            let options = await new TestClient(other.token).get("/Base/UsersAuth/options/register")
+            let options = await new TestClient(other.token).get("/UsersAuth/options/register")
 
-            let response = await client.post("/Base/UsersAuth/register", buildRegisterBody(options.body.ChallengeToken))
+            let response = await client.post("/UsersAuth/register", buildRegisterBody(options.body.ChallengeToken))
 
             expect(response.status).toBe(406)
             expect(await countCredentials(root.user.IdUser)).toBe(0)
@@ -208,9 +208,9 @@ describe("UsersAuth", () => {
         it("recusa um desafio de login", async () => {
             let owner = await UsersFactory.create()
             let credential = await UsersAuthFactory.create(owner.user.IdUser)
-            let options = await client.anonymous().get(`/Base/UsersAuth/options/login/DeviceKey=${credential.DeviceKey}`)
+            let options = await client.anonymous().get(`/UsersAuth/options/login/DeviceKey=${credential.DeviceKey}`)
 
-            let response = await new TestClient(owner.token).post("/Base/UsersAuth/register", buildRegisterBody(options.body.ChallengeToken))
+            let response = await new TestClient(owner.token).post("/UsersAuth/register", buildRegisterBody(options.body.ChallengeToken))
 
             expect(response.status).toBe(406)
         })
@@ -218,25 +218,25 @@ describe("UsersAuth", () => {
         it("recusa uma assinatura que não confere com o desafio", async () => {
             let owner = await UsersFactory.create()
             let ownerClient = new TestClient(owner.token)
-            let options = await ownerClient.get("/Base/UsersAuth/options/register")
+            let options = await ownerClient.get("/UsersAuth/options/register")
 
-            let response = await ownerClient.post("/Base/UsersAuth/register", buildRegisterBody(options.body.ChallengeToken))
+            let response = await ownerClient.post("/UsersAuth/register", buildRegisterBody(options.body.ChallengeToken))
 
             expect(response.status).toBe(406)
             expect(await countCredentials(owner.user.IdUser)).toBe(0)
         })
     })
 
-    describe("POST /Base/UsersAuth/authenticate", () => {
+    describe("POST /UsersAuth/authenticate", () => {
 
         it("recusa corpo sem a resposta do autenticador", async () => {
-            let response = await client.anonymous().post("/Base/UsersAuth/authenticate", { ChallengeToken: "abc" })
+            let response = await client.anonymous().post("/UsersAuth/authenticate", { ChallengeToken: "abc" })
 
             expect(response.status).toBe(406)
         })
 
         it("recusa um ChallengeToken forjado", async () => {
-            let response = await client.anonymous().post("/Base/UsersAuth/authenticate", {
+            let response = await client.anonymous().post("/UsersAuth/authenticate", {
                 ChallengeToken: "nao-e-um-jwt",
                 Response: { id: "qualquer" },
             })
@@ -247,9 +247,9 @@ describe("UsersAuth", () => {
         it("recusa uma credencial que não existe, sem entregar cookie", async () => {
             let owner = await UsersFactory.create()
             let credential = await UsersAuthFactory.create(owner.user.IdUser)
-            let options = await client.anonymous().get(`/Base/UsersAuth/options/login/DeviceKey=${credential.DeviceKey}`)
+            let options = await client.anonymous().get(`/UsersAuth/options/login/DeviceKey=${credential.DeviceKey}`)
 
-            let response = await client.anonymous().post("/Base/UsersAuth/authenticate", {
+            let response = await client.anonymous().post("/UsersAuth/authenticate", {
                 ChallengeToken: options.body.ChallengeToken,
                 Response: { id: "credencial-que-nao-existe" },
             })
@@ -260,9 +260,9 @@ describe("UsersAuth", () => {
 
         //  Desafio de registro não vale para entrar
         it("recusa um desafio de registro", async () => {
-            let options = await client.get("/Base/UsersAuth/options/register")
+            let options = await client.get("/UsersAuth/options/register")
 
-            let response = await client.anonymous().post("/Base/UsersAuth/authenticate", {
+            let response = await client.anonymous().post("/UsersAuth/authenticate", {
                 ChallengeToken: options.body.ChallengeToken,
                 Response: { id: "qualquer" },
             })
@@ -271,10 +271,10 @@ describe("UsersAuth", () => {
         })
     })
 
-    describe("POST /Base/UsersAuth/skipDevice", () => {
+    describe("POST /UsersAuth/skipDevice", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().post("/Base/UsersAuth/skipDevice", {})
+            let response = await client.anonymous().post("/UsersAuth/skipDevice", {})
 
             expect(response.status).toBe(401)
         })
@@ -282,7 +282,7 @@ describe("UsersAuth", () => {
         it("gera um DeviceKey quando o cliente ainda não tem um", async () => {
             let owner = await UsersFactory.create()
 
-            let response = await new TestClient(owner.token).post("/Base/UsersAuth/skipDevice", {})
+            let response = await new TestClient(owner.token).post("/UsersAuth/skipDevice", {})
 
             expect(response.status).toBe(200)
             expect(response.body.DeviceKey).toEqual(expect.any(String))
@@ -292,7 +292,7 @@ describe("UsersAuth", () => {
             let owner = await UsersFactory.create()
             let deviceKey = UsersAuthFactory.buildDeviceKey()
 
-            let response = await new TestClient(owner.token).post("/Base/UsersAuth/skipDevice", { DeviceKey: deviceKey })
+            let response = await new TestClient(owner.token).post("/UsersAuth/skipDevice", { DeviceKey: deviceKey })
 
             expect(response.body.DeviceKey).toBe(deviceKey)
         })
@@ -303,15 +303,15 @@ describe("UsersAuth", () => {
             let ownerClient = new TestClient(owner.token)
             let deviceKey = UsersAuthFactory.buildDeviceKey()
 
-            expect((await ownerClient.post("/Base/UsersAuth/skipDevice", { DeviceKey: deviceKey })).status).toBe(200)
-            expect((await ownerClient.post("/Base/UsersAuth/skipDevice", { DeviceKey: deviceKey })).status).toBe(200)
+            expect((await ownerClient.post("/UsersAuth/skipDevice", { DeviceKey: deviceKey })).status).toBe(200)
+            expect((await ownerClient.post("/UsersAuth/skipDevice", { DeviceKey: deviceKey })).status).toBe(200)
         })
     })
 
-    describe("DELETE /Base/UsersAuth/IdUserAuth=:IdUserAuth", () => {
+    describe("DELETE /UsersAuth/IdUserAuth=:IdUserAuth", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().delete("/Base/UsersAuth/IdUserAuth=1")
+            let response = await client.anonymous().delete("/UsersAuth/IdUserAuth=1")
 
             expect(response.status).toBe(401)
         })
@@ -320,7 +320,7 @@ describe("UsersAuth", () => {
             let owner = await UsersFactory.create()
             let credential = await UsersAuthFactory.create(owner.user.IdUser)
 
-            let response = await client.delete(`/Base/UsersAuth/IdUserAuth=${credential.IdUserAuth}`)
+            let response = await client.delete(`/UsersAuth/IdUserAuth=${credential.IdUserAuth}`)
 
             expect(response.status).toBe(406)
             expect(await countCredentials(owner.user.IdUser)).toBe(1)
@@ -331,7 +331,7 @@ describe("UsersAuth", () => {
             let owner = await UsersFactory.create()
             let credential = await UsersAuthFactory.create(owner.user.IdUser)
 
-            let response = await new TestClient(owner.token).delete(`/Base/UsersAuth/IdUserAuth=${credential.IdUserAuth}`)
+            let response = await new TestClient(owner.token).delete(`/UsersAuth/IdUserAuth=${credential.IdUserAuth}`)
 
             expect(response.status).toBe(200)
 
@@ -339,7 +339,7 @@ describe("UsersAuth", () => {
 
             expect(row?.Active).toBe(false)
 
-            let check = await client.anonymous().get(`/Base/UsersAuth/checkDevice/DeviceKey=${credential.DeviceKey}`)
+            let check = await client.anonymous().get(`/UsersAuth/checkDevice/DeviceKey=${credential.DeviceKey}`)
 
             expect(check.body).toEqual({ UseAuth: null })
         })
@@ -358,25 +358,25 @@ describe("UsersAuth", () => {
                 Phone: 549987654321,
             }
 
-            expect((await new TestClient().post("/Base/Users", payload)).status).toBe(200)
+            expect((await new TestClient().post("/Users", payload)).status).toBe(200)
 
             let app = new TestClient()
             let deviceKey = UsersAuthFactory.buildDeviceKey()
 
             //  Aparelho novo: o app ainda não sabe nada dele
-            expect((await app.get(`/Base/UsersAuth/checkDevice/DeviceKey=${deviceKey}`)).body).toEqual({ UseAuth: null })
+            expect((await app.get(`/UsersAuth/checkDevice/DeviceKey=${deviceKey}`)).body).toEqual({ UseAuth: null })
 
             expect((await app.login(payload.Email, payload.Password)).status).toBe(200)
 
-            let skipped = await app.post("/Base/UsersAuth/skipDevice", { DeviceKey: deviceKey })
+            let skipped = await app.post("/UsersAuth/skipDevice", { DeviceKey: deviceKey })
 
             expect(skipped.status).toBe(200)
             expect(skipped.body.DeviceKey).toBe(deviceKey)
 
             //  Agora o app sabe que já perguntou e foi recusado: não pergunta de novo
-            expect((await app.get(`/Base/UsersAuth/checkDevice/DeviceKey=${deviceKey}`)).body).toEqual({ UseAuth: false })
+            expect((await app.get(`/UsersAuth/checkDevice/DeviceKey=${deviceKey}`)).body).toEqual({ UseAuth: false })
 
-            let options = await app.get("/Base/UsersAuth/options/register")
+            let options = await app.get("/UsersAuth/options/register")
 
             expect(options.status).toBe(200)
             expect(options.body.ChallengeToken).toEqual(expect.any(String))

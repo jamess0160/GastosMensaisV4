@@ -23,10 +23,10 @@ describe("Users", () => {
         client = new TestClient(root.token)
     })
 
-    describe("POST /Base/Users/login", () => {
+    describe("POST /Users/login", () => {
 
         it("autentica com as credenciais corretas e devolve o token", async () => {
-            let response = await client.anonymous().post("/Base/Users/login", { login: root.user.Email, password: root.password })
+            let response = await client.anonymous().post("/Users/login", { login: root.user.Email, password: root.password })
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({ msg: "Login realizado com sucesso" })
@@ -34,20 +34,20 @@ describe("Users", () => {
         })
 
         it("recusa a senha errada", async () => {
-            let response = await client.anonymous().post("/Base/Users/login", { login: root.user.Email, password: "senha-errada" })
+            let response = await client.anonymous().post("/Users/login", { login: root.user.Email, password: "senha-errada" })
 
             expect(response.status).toBe(401)
             expect(TestClient.extractCookieToken(response)).toBeNull()
         })
 
         it("recusa um login que não existe", async () => {
-            let response = await client.anonymous().post("/Base/Users/login", { login: UsersFactory.buildEmail(), password: root.password })
+            let response = await client.anonymous().post("/Users/login", { login: UsersFactory.buildEmail(), password: root.password })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa senha em branco antes de chegar no banco", async () => {
-            let response = await client.anonymous().post("/Base/Users/login", { login: root.user.Email, password: " " })
+            let response = await client.anonymous().post("/Users/login", { login: root.user.Email, password: " " })
 
             expect(response.status).toBe(406)
         })
@@ -61,7 +61,7 @@ describe("Users", () => {
         //                    resposta, não quem envia a requisição.
         //  Max-Age   → a sessão morre com o token (24h), sem cookie órfão sobrando no navegador
         it("entrega o token num cookie httpOnly e sameSite strict", async () => {
-            let response = await client.anonymous().post("/Base/Users/login", { login: root.user.Email, password: root.password })
+            let response = await client.anonymous().post("/Users/login", { login: root.user.Email, password: root.password })
 
             let cookies: string[] = response.headers["set-cookie"] ?? []
             let raw = cookies.find((cookie) => cookie.startsWith("token="))
@@ -72,7 +72,7 @@ describe("Users", () => {
         })
     })
 
-    describe("GET /Base/Users/getSelf", () => {
+    describe("GET /Users/getSelf", () => {
 
         //  A sessão vem do cookie e SÓ do cookie. O header 'authorization' foi tirado de
         //  propósito: com dois caminhos de autenticação, o mais fraco é o que vale, e um header
@@ -80,25 +80,25 @@ describe("Users", () => {
         //
         //  Este teste é a trava dessa decisão: um token perfeitamente válido, no header, é 401.
         it("recusa token válido mandado no header authorization", async () => {
-            let response = await client.anonymous().get("/Base/Users/getSelf").set("authorization", root.token)
+            let response = await client.anonymous().get("/Users/getSelf").set("authorization", root.token)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get("/Base/Users/getSelf")
+            let response = await client.anonymous().get("/Users/getSelf")
 
             expect(response.status).toBe(401)
         })
 
         it("recusa token inválido", async () => {
-            let response = await new TestClient("token-invalido").get("/Base/Users/getSelf")
+            let response = await new TestClient("token-invalido").get("/Users/getSelf")
 
             expect(response.status).toBe(401)
         })
 
         it("devolve o usuário dono do token", async () => {
-            let response = await client.get("/Base/Users/getSelf")
+            let response = await client.get("/Users/getSelf")
 
             expect(response.status).toBe(200)
             expect(response.body).toMatchObject({
@@ -111,7 +111,7 @@ describe("Users", () => {
         })
 
         it("não devolve o hash da senha", async () => {
-            let response = await client.get("/Base/Users/getSelf")
+            let response = await client.get("/Users/getSelf")
 
             expect(response.status).toBe(200)
             expect(response.body.Password).toBeUndefined()
@@ -121,17 +121,17 @@ describe("Users", () => {
             let removed = await UsersFactory.create()
             await TestDatabase.connection().delete().from("Users").where("IdUser", removed.user.IdUser)
 
-            let response = await new TestClient(removed.token).get("/Base/Users/getSelf")
+            let response = await new TestClient(removed.token).get("/Users/getSelf")
 
             expect(response.status).toBe(406)
         })
     })
 
-    describe("POST /Base/Users", () => {
+    describe("POST /Users", () => {
 
         //  Rota pública: é por ela que nasce o primeiro usuário, sem token nenhum
         it("recusa corpo incompleto", async () => {
-            let response = await client.anonymous().post("/Base/Users", { Name: "Sem o resto" })
+            let response = await client.anonymous().post("/Users", { Name: "Sem o resto" })
 
             expect(response.status).toBe(406)
         })
@@ -139,7 +139,7 @@ describe("Users", () => {
         it("cria o usuário no banco sem exigir token", async () => {
             let payload = buildPayload({ Name: "Usuário criado pela rota" })
 
-            let response = await client.anonymous().post("/Base/Users", payload)
+            let response = await client.anonymous().post("/Users", payload)
 
             expect(response.status).toBe(200)
 
@@ -153,7 +153,7 @@ describe("Users", () => {
         it("grava a senha com hash, nunca em texto puro", async () => {
             let payload = buildPayload()
 
-            await client.anonymous().post("/Base/Users", payload)
+            await client.anonymous().post("/Users", payload)
 
             let created = await findByEmail(payload.Email)
 
@@ -167,7 +167,7 @@ describe("Users", () => {
         it("cria o workspace do usuário junto e devolve os dois ids", async () => {
             let payload = buildPayload({ Name: "Usuário com workspace" })
 
-            let response = await client.anonymous().post("/Base/Users", payload)
+            let response = await client.anonymous().post("/Users", payload)
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
@@ -188,7 +188,7 @@ describe("Users", () => {
 
             let payload = buildPayload({ IdWorkspace, Name: "Usuário com workspace" })
 
-            let response = await client.anonymous().post("/Base/Users", payload)
+            let response = await client.anonymous().post("/Users", payload)
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
@@ -201,7 +201,7 @@ describe("Users", () => {
 
         //  Sem a matrícula o workspace é órfão: as leituras saem de WorkspaceMembers
         it("matricula o dono no workspace criado", async () => {
-            let response = await client.anonymous().post("/Base/Users", buildPayload())
+            let response = await client.anonymous().post("/Users", buildPayload())
 
             let membership = await TestDatabase.connection()
                 .select("*")
@@ -219,7 +219,7 @@ describe("Users", () => {
         it("cria a Person do próprio dono junto", async () => {
             let payload = buildPayload({ Name: "Dono que também é pessoa" })
 
-            let response = await client.anonymous().post("/Base/Users", payload)
+            let response = await client.anonymous().post("/Users", payload)
 
             let person = await findPerson(response.body.IdWorkspace)
 
@@ -232,9 +232,9 @@ describe("Users", () => {
         //  inventada — ver Persons/sections/POST/createSelf.ts.
         it("cadastra sem a Person quando o nome já existe no workspace", async () => {
             let owner = buildPayload({ Name: "Nome repetido" })
-            let created = await client.anonymous().post("/Base/Users", owner)
+            let created = await client.anonymous().post("/Users", owner)
 
-            let response = await client.anonymous().post("/Base/Users", buildPayload({
+            let response = await client.anonymous().post("/Users", buildPayload({
                 Name: "Nome repetido",
                 IdWorkspace: created.body.IdWorkspace,
             }))
@@ -251,9 +251,9 @@ describe("Users", () => {
         it("recusa um e-mail que já existe", async () => {
             let payload = buildPayload()
 
-            expect((await client.anonymous().post("/Base/Users", payload)).status).toBe(200)
+            expect((await client.anonymous().post("/Users", payload)).status).toBe(200)
 
-            let response = await client.anonymous().post("/Base/Users", { ...payload, Name: "Outro nome" })
+            let response = await client.anonymous().post("/Users", { ...payload, Name: "Outro nome" })
 
             expect(response.status).toBe(406)
         })
@@ -264,7 +264,7 @@ describe("Users", () => {
             let payload = buildPayload()
             let Email = payload.Email.toUpperCase()
 
-            expect((await client.anonymous().post("/Base/Users", { ...payload, Email })).status).toBe(200)
+            expect((await client.anonymous().post("/Users", { ...payload, Email })).status).toBe(200)
 
             expect(await findByEmail(payload.Email)).toBeDefined()
 
@@ -273,7 +273,7 @@ describe("Users", () => {
         })
 
         it("recusa um e-mail malformado", async () => {
-            let response = await client.anonymous().post("/Base/Users", buildPayload({ Email: "nao-e-um-email" }))
+            let response = await client.anonymous().post("/Users", buildPayload({ Email: "nao-e-um-email" }))
 
             expect(response.status).toBe(406)
         })
@@ -282,8 +282,8 @@ describe("Users", () => {
         it("não deixa usuário órfão quando o cadastro é recusado", async () => {
             let payload = buildPayload()
 
-            await client.anonymous().post("/Base/Users", payload)
-            await client.anonymous().post("/Base/Users", payload)
+            await client.anonymous().post("/Users", payload)
+            await client.anonymous().post("/Users", payload)
 
             let users = await TestDatabase.connection().select("*").from("Users").where("Email", payload.Email)
 
@@ -291,23 +291,23 @@ describe("Users", () => {
         })
     })
 
-    describe("PUT /Base/Users/IdUser=:IdUser", () => {
+    describe("PUT /Users/IdUser=:IdUser", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/Base/Users/IdUser=${root.user.IdUser}`, buildUpdatePayload())
+            let response = await client.anonymous().put(`/Users/IdUser=${root.user.IdUser}`, buildUpdatePayload())
 
             expect(response.status).toBe(401)
         })
 
         it("recusa IdUser não numérico", async () => {
-            let response = await client.put("/Base/Users/IdUser=abc", buildUpdatePayload())
+            let response = await client.put("/Users/IdUser=abc", buildUpdatePayload())
 
             expect(response.status).toBe(406)
         })
 
         //  A senha não se troca por aqui: ela tem rota própria, que exige a senha atual
         it("recusa Password no corpo", async () => {
-            let response = await client.put(`/Base/Users/IdUser=${root.user.IdUser}`, buildPayload())
+            let response = await client.put(`/Users/IdUser=${root.user.IdUser}`, buildPayload())
 
             expect(response.status).toBe(406)
         })
@@ -316,7 +316,7 @@ describe("Users", () => {
             let target = await UsersFactory.create()
             let payload = buildUpdatePayload({ Name: "Nome atualizado", Email: target.user.Email })
 
-            let response = await client.put(`/Base/Users/IdUser=${target.user.IdUser}`, payload)
+            let response = await client.put(`/Users/IdUser=${target.user.IdUser}`, payload)
 
             expect(response.status).toBe(200)
 
@@ -327,16 +327,16 @@ describe("Users", () => {
         })
     })
 
-    describe("PUT /Base/Users/updatePassword", () => {
+    describe("PUT /Users/updatePassword", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put("/Base/Users/updatePassword", { oldPassword: root.password, newPassword: "NovaSenha@123" })
+            let response = await client.anonymous().put("/Users/updatePassword", { oldPassword: root.password, newPassword: "NovaSenha@123" })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa corpo sem a nova senha", async () => {
-            let response = await new TestClient(root.token).put("/Base/Users/updatePassword", { oldPassword: root.password })
+            let response = await new TestClient(root.token).put("/Users/updatePassword", { oldPassword: root.password })
 
             expect(response.status).toBe(406)
         })
@@ -344,7 +344,7 @@ describe("Users", () => {
         it("recusa quando a senha atual não confere", async () => {
             let owner = await UsersFactory.create()
 
-            let response = await new TestClient(owner.token).put("/Base/Users/updatePassword", { oldPassword: "não é essa", newPassword: "NovaSenha@123" })
+            let response = await new TestClient(owner.token).put("/Users/updatePassword", { oldPassword: "não é essa", newPassword: "NovaSenha@123" })
 
             expect(response.status).toBe(406)
 
@@ -356,7 +356,7 @@ describe("Users", () => {
             let owner = await UsersFactory.create()
             let newPassword = "NovaSenha@123"
 
-            let response = await new TestClient(owner.token).put("/Base/Users/updatePassword", { oldPassword: owner.password, newPassword })
+            let response = await new TestClient(owner.token).put("/Users/updatePassword", { oldPassword: owner.password, newPassword })
 
             expect(response.status).toBe(200)
 
@@ -369,7 +369,7 @@ describe("Users", () => {
             let owner = await UsersFactory.create()
             let newPassword = "OutraSenha@456"
 
-            await new TestClient(owner.token).put("/Base/Users/updatePassword", { oldPassword: owner.password, newPassword })
+            await new TestClient(owner.token).put("/Users/updatePassword", { oldPassword: owner.password, newPassword })
 
             let updated = await findByEmail(owner.user.Email)
 
@@ -385,7 +385,7 @@ describe("Users", () => {
         it("cadastra, autentica, consulta e troca a senha", async () => {
             let payload = buildPayload({ Name: "Usuário do fluxo" })
 
-            expect((await new TestClient().post("/Base/Users", payload)).status).toBe(200)
+            expect((await new TestClient().post("/Users", payload)).status).toBe(200)
 
             let created = new TestClient()
             let login = await created.login(payload.Email, payload.Password)
@@ -393,14 +393,14 @@ describe("Users", () => {
             expect(login.status).toBe(200)
             expect(created.getToken()).toBeTruthy()
 
-            let self = await created.get("/Base/Users/getSelf")
+            let self = await created.get("/Users/getSelf")
 
             expect(self.status).toBe(200)
             expect(self.body.Email).toBe(payload.Email)
 
             let newPassword = "SenhaDoFluxo@456"
 
-            expect((await created.put("/Base/Users/updatePassword", { oldPassword: payload.Password, newPassword })).status).toBe(200)
+            expect((await created.put("/Users/updatePassword", { oldPassword: payload.Password, newPassword })).status).toBe(200)
             expect((await new TestClient().login(payload.Email, newPassword)).status).toBe(200)
             expect((await new TestClient().login(payload.Email, payload.Password)).status).toBe(401)
         })

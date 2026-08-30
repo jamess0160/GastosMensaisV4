@@ -21,7 +21,7 @@ export interface TestUser {
 let sequence = 0
 
 //  Semeia usuários direto no banco, para arranjar estado sem depender da rota de cadastro.
-//  O workspace vem junto porque é assim que o POST /Base/Users faz: usuário sem workspace não
+//  O workspace vem junto porque é assim que o POST /Users faz: usuário sem workspace não
 //  existe no app, e um teste que partisse desse estado estaria testando algo impossível.
 export namespace UsersFactory {
 

@@ -25,16 +25,16 @@ describe("Persons", () => {
         otherClient = new TestClient(other.token)
     })
 
-    describe("GET /Base/Persons", () => {
+    describe("GET /Persons", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get(`/Base/Persons`)
+            let response = await client.anonymous().get(`/Persons`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa sessão sem workspace selecionado", async () => {
-            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Base/Persons`)
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Persons`)
 
             expect(response.status).toBe(406)
         })
@@ -42,7 +42,7 @@ describe("Persons", () => {
         it("recusa token válido apontando para o workspace de outro usuário", async () => {
             let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace))
 
-            let response = await forged.get(`/Base/Persons`)
+            let response = await forged.get(`/Persons`)
 
             expect(response.status).toBe(406)
         })
@@ -52,7 +52,7 @@ describe("Persons", () => {
         it("devolve a pessoa do próprio dono, criada no cadastro", async () => {
             let user = await UsersFactory.create({ Name: "Dono sozinho" })
 
-            let response = await new TestClient(user.token).get(`/Base/Persons`)
+            let response = await new TestClient(user.token).get(`/Persons`)
 
             expect(response.status).toBe(200)
             expect(response.body).toHaveLength(1)
@@ -63,10 +63,10 @@ describe("Persons", () => {
             let user = await UsersFactory.create({ Name: "Dono" })
             let workspaceClient = new TestClient(user.token)
 
-            await workspaceClient.post(`/Base/Persons`, { Name: "Zeca" })
-            await workspaceClient.post(`/Base/Persons`, { Name: "Ana" })
+            await workspaceClient.post(`/Persons`, { Name: "Zeca" })
+            await workspaceClient.post(`/Persons`, { Name: "Ana" })
 
-            let response = await workspaceClient.get(`/Base/Persons`)
+            let response = await workspaceClient.get(`/Persons`)
 
             expect(response.body.map((item: { Name: string }) => item.Name)).toEqual(["Ana", "Dono", "Zeca"])
             //  Pessoa sem login: é para isso que a tabela existe
@@ -77,26 +77,26 @@ describe("Persons", () => {
             let user = await UsersFactory.create({ Name: "Dono" })
             let workspaceClient = new TestClient(user.token)
 
-            let archived = await workspaceClient.post(`/Base/Persons`, { Name: "Arquivada" })
+            let archived = await workspaceClient.post(`/Persons`, { Name: "Arquivada" })
 
-            await workspaceClient.delete(`/Base/Persons/IdPerson=${archived.body.IdPerson}`)
+            await workspaceClient.delete(`/Persons/IdPerson=${archived.body.IdPerson}`)
 
-            let response = await workspaceClient.get(`/Base/Persons`)
+            let response = await workspaceClient.get(`/Persons`)
 
             expect(response.body.map((item: { Name: string }) => item.Name)).toEqual(["Dono"])
         })
     })
 
-    describe("POST /Base/Persons", () => {
+    describe("POST /Persons", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().post(`/Base/Persons`, { Name: "Pessoa" })
+            let response = await client.anonymous().post(`/Persons`, { Name: "Pessoa" })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa corpo sem o Name", async () => {
-            let response = await client.post(`/Base/Persons`, {})
+            let response = await client.post(`/Persons`, {})
 
             expect(response.status).toBe(406)
         })
@@ -105,7 +105,7 @@ describe("Persons", () => {
             let owner = await UsersFactory.create()
             let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, owner.workspace.IdWorkspace))
 
-            let response = await forged.post(`/Base/Persons`, { Name: "Invasora" })
+            let response = await forged.post(`/Persons`, { Name: "Invasora" })
 
             expect(response.status).toBe(406)
             //  Só a do dono, que veio do cadastro
@@ -115,7 +115,7 @@ describe("Persons", () => {
         it("cadastra a pessoa sem login", async () => {
             let user = await UsersFactory.create({ Name: "Dono" })
 
-            let response = await new TestClient(user.token).post(`/Base/Persons`, { Name: "Filho" })
+            let response = await new TestClient(user.token).post(`/Persons`, { Name: "Filho" })
 
             expect(response.status).toBe(200)
             expect(response.body.IdPerson).toEqual(expect.any(Number))
@@ -136,7 +136,7 @@ describe("Persons", () => {
         it("recusa o IdUser no corpo", async () => {
             let user = await UsersFactory.create({ Name: "Dono" })
 
-            let response = await new TestClient(user.token).post(`/Base/Persons`, { Name: "Sequestro", IdUser: other.user.IdUser })
+            let response = await new TestClient(user.token).post(`/Persons`, { Name: "Sequestro", IdUser: other.user.IdUser })
 
             //  O schema é fechado: campo desconhecido é corpo inválido, não campo ignorado
             expect(response.status).toBe(406)
@@ -147,9 +147,9 @@ describe("Persons", () => {
             let user = await UsersFactory.create({ Name: "Dono" })
             let workspaceClient = new TestClient(user.token)
 
-            expect((await workspaceClient.post(`/Base/Persons`, { Name: "Maria" })).status).toBe(200)
+            expect((await workspaceClient.post(`/Persons`, { Name: "Maria" })).status).toBe(200)
 
-            let response = await workspaceClient.post(`/Base/Persons`, { Name: "Maria" })
+            let response = await workspaceClient.post(`/Persons`, { Name: "Maria" })
 
             expect(response.status).toBe(406)
         })
@@ -160,9 +160,9 @@ describe("Persons", () => {
             let user = await UsersFactory.create({ Name: "Dono" })
             let workspaceClient = new TestClient(user.token)
 
-            await workspaceClient.post(`/Base/Persons`, { Name: "Maria" })
+            await workspaceClient.post(`/Persons`, { Name: "Maria" })
 
-            let response = await workspaceClient.post(`/Base/Persons`, { Name: "MARIA" })
+            let response = await workspaceClient.post(`/Persons`, { Name: "MARIA" })
 
             expect(response.status).toBe(406)
         })
@@ -172,11 +172,11 @@ describe("Persons", () => {
             let user = await UsersFactory.create({ Name: "Dono" })
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Persons`, { Name: "Maria" })
+            let created = await workspaceClient.post(`/Persons`, { Name: "Maria" })
 
-            await workspaceClient.delete(`/Base/Persons/IdPerson=${created.body.IdPerson}`)
+            await workspaceClient.delete(`/Persons/IdPerson=${created.body.IdPerson}`)
 
-            let response = await workspaceClient.post(`/Base/Persons`, { Name: "Maria" })
+            let response = await workspaceClient.post(`/Persons`, { Name: "Maria" })
 
             expect(response.status).toBe(406)
         })
@@ -186,21 +186,21 @@ describe("Persons", () => {
             let first = await UsersFactory.create({ Name: "Dono um" })
             let second = await UsersFactory.create({ Name: "Dono dois" })
 
-            expect((await new TestClient(first.token).post(`/Base/Persons`, { Name: "Maria" })).status).toBe(200)
-            expect((await new TestClient(second.token).post(`/Base/Persons`, { Name: "Maria" })).status).toBe(200)
+            expect((await new TestClient(first.token).post(`/Persons`, { Name: "Maria" })).status).toBe(200)
+            expect((await new TestClient(second.token).post(`/Persons`, { Name: "Maria" })).status).toBe(200)
         })
     })
 
-    describe("PUT /Base/Persons/IdPerson=:IdPerson", () => {
+    describe("PUT /Persons/IdPerson=:IdPerson", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/Base/Persons/IdPerson=1`, { Name: "X" })
+            let response = await client.anonymous().put(`/Persons/IdPerson=1`, { Name: "X" })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa pessoa inexistente", async () => {
-            let response = await client.put(`/Base/Persons/IdPerson=999999`, { Name: "X" })
+            let response = await client.put(`/Persons/IdPerson=999999`, { Name: "X" })
 
             expect(response.status).toBe(406)
         })
@@ -209,9 +209,9 @@ describe("Persons", () => {
         //  conferida no próprio tenant liberaria a edição da pessoa do vizinho
         it("recusa a pessoa de outro workspace", async () => {
             let owner = await UsersFactory.create({ Name: "Dono" })
-            let created = await new TestClient(owner.token).post(`/Base/Persons`, { Name: "Pessoa do dono" })
+            let created = await new TestClient(owner.token).post(`/Persons`, { Name: "Pessoa do dono" })
 
-            let response = await otherClient.put(`/Base/Persons/IdPerson=${created.body.IdPerson}`, { Name: "Invadida" })
+            let response = await otherClient.put(`/Persons/IdPerson=${created.body.IdPerson}`, { Name: "Invadida" })
 
             expect(response.status).toBe(406)
             expect((await findPersonById(created.body.IdPerson)).Name).toBe("Pessoa do dono")
@@ -221,9 +221,9 @@ describe("Persons", () => {
             let user = await UsersFactory.create({ Name: "Dono" })
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Persons`, { Name: "Fulano" })
+            let created = await workspaceClient.post(`/Persons`, { Name: "Fulano" })
 
-            let response = await workspaceClient.put(`/Base/Persons/IdPerson=${created.body.IdPerson}`, { Name: "Fulano de Tal" })
+            let response = await workspaceClient.put(`/Persons/IdPerson=${created.body.IdPerson}`, { Name: "Fulano de Tal" })
 
             expect(response.status).toBe(200)
             expect((await findPersonById(created.body.IdPerson)).Name).toBe("Fulano de Tal")
@@ -233,10 +233,10 @@ describe("Persons", () => {
             let user = await UsersFactory.create({ Name: "Dono" })
             let workspaceClient = new TestClient(user.token)
 
-            await workspaceClient.post(`/Base/Persons`, { Name: "Ana" })
-            let created = await workspaceClient.post(`/Base/Persons`, { Name: "Bia" })
+            await workspaceClient.post(`/Persons`, { Name: "Ana" })
+            let created = await workspaceClient.post(`/Persons`, { Name: "Bia" })
 
-            let response = await workspaceClient.put(`/Base/Persons/IdPerson=${created.body.IdPerson}`, { Name: "Ana" })
+            let response = await workspaceClient.put(`/Persons/IdPerson=${created.body.IdPerson}`, { Name: "Ana" })
 
             expect(response.status).toBe(406)
             expect((await findPersonById(created.body.IdPerson)).Name).toBe("Bia")
@@ -248,9 +248,9 @@ describe("Persons", () => {
             let user = await UsersFactory.create({ Name: "Dono" })
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Persons`, { Name: "Ana" })
+            let created = await workspaceClient.post(`/Persons`, { Name: "Ana" })
 
-            let response = await workspaceClient.put(`/Base/Persons/IdPerson=${created.body.IdPerson}`, { Name: "Ana" })
+            let response = await workspaceClient.put(`/Persons/IdPerson=${created.body.IdPerson}`, { Name: "Ana" })
 
             expect(response.status).toBe(200)
         })
@@ -259,7 +259,7 @@ describe("Persons", () => {
         it("renomeia a pessoa do dono sem tocar no vínculo", async () => {
             let user = await UsersFactory.create({ Name: "Dono" })
 
-            let response = await new TestClient(user.token).put(`/Base/Persons/IdPerson=${user.person.IdPerson}`, { Name: "Dono renomeado" })
+            let response = await new TestClient(user.token).put(`/Persons/IdPerson=${user.person.IdPerson}`, { Name: "Dono renomeado" })
 
             expect(response.status).toBe(200)
             expect(await findPersonById(user.person.IdPerson)).toMatchObject({
@@ -269,25 +269,25 @@ describe("Persons", () => {
         })
     })
 
-    describe("DELETE /Base/Persons/IdPerson=:IdPerson", () => {
+    describe("DELETE /Persons/IdPerson=:IdPerson", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().delete(`/Base/Persons/IdPerson=1`)
+            let response = await client.anonymous().delete(`/Persons/IdPerson=1`)
 
             expect(response.status).toBe(401)
         })
 
         it("recusa pessoa inexistente", async () => {
-            let response = await client.delete(`/Base/Persons/IdPerson=999999`)
+            let response = await client.delete(`/Persons/IdPerson=999999`)
 
             expect(response.status).toBe(406)
         })
 
         it("recusa a pessoa de outro workspace", async () => {
             let owner = await UsersFactory.create({ Name: "Dono" })
-            let created = await new TestClient(owner.token).post(`/Base/Persons`, { Name: "Pessoa do dono" })
+            let created = await new TestClient(owner.token).post(`/Persons`, { Name: "Pessoa do dono" })
 
-            let response = await otherClient.delete(`/Base/Persons/IdPerson=${created.body.IdPerson}`)
+            let response = await otherClient.delete(`/Persons/IdPerson=${created.body.IdPerson}`)
 
             expect(response.status).toBe(406)
             expect((await findPersonById(created.body.IdPerson)).Active).toBe(true)
@@ -299,9 +299,9 @@ describe("Persons", () => {
             let user = await UsersFactory.create({ Name: "Dono" })
             let workspaceClient = new TestClient(user.token)
 
-            let created = await workspaceClient.post(`/Base/Persons`, { Name: "Ex-colega" })
+            let created = await workspaceClient.post(`/Persons`, { Name: "Ex-colega" })
 
-            let response = await workspaceClient.delete(`/Base/Persons/IdPerson=${created.body.IdPerson}`)
+            let response = await workspaceClient.delete(`/Persons/IdPerson=${created.body.IdPerson}`)
 
             expect(response.status).toBe(200)
 
@@ -317,7 +317,7 @@ describe("Persons", () => {
         it("recusa arquivar a pessoa vinculada a um usuário", async () => {
             let user = await UsersFactory.create({ Name: "Dono" })
 
-            let response = await new TestClient(user.token).delete(`/Base/Persons/IdPerson=${user.person.IdPerson}`)
+            let response = await new TestClient(user.token).delete(`/Persons/IdPerson=${user.person.IdPerson}`)
 
             expect(response.status).toBe(406)
             expect((await findPersonById(user.person.IdPerson)).Active).toBe(true)
@@ -336,40 +336,40 @@ describe("Persons", () => {
                 Phone: 549987654321,
             }
 
-            expect((await new TestClient().post("/Base/Users", payload)).status).toBe(200)
+            expect((await new TestClient().post("/Users", payload)).status).toBe(200)
 
             let flowClient = new TestClient()
 
             expect((await flowClient.login(payload.Email, payload.Password)).status).toBe(200)
 
             //  O dono já é pessoa antes de cadastrar qualquer coisa
-            let initial = await flowClient.get(`/Base/Persons`)
+            let initial = await flowClient.get(`/Persons`)
 
             expect(initial.status).toBe(200)
             expect(initial.body).toHaveLength(1)
             expect(initial.body[0].Name).toBe(payload.Name)
 
-            let child = await flowClient.post(`/Base/Persons`, { Name: "Filha" })
-            let partner = await flowClient.post(`/Base/Persons`, { Name: "Cônjuge" })
+            let child = await flowClient.post(`/Persons`, { Name: "Filha" })
+            let partner = await flowClient.post(`/Persons`, { Name: "Cônjuge" })
 
             expect(child.status).toBe(200)
             expect(partner.status).toBe(200)
 
             //  Nome repetido não passa: o rateio ficaria ilegível
-            expect((await flowClient.post(`/Base/Persons`, { Name: "Filha" })).status).toBe(406)
+            expect((await flowClient.post(`/Persons`, { Name: "Filha" })).status).toBe(406)
 
-            let list = await flowClient.get(`/Base/Persons`)
+            let list = await flowClient.get(`/Persons`)
 
             expect(list.body).toHaveLength(3)
             //  Só o dono tem login; as outras duas existem só para o rateio
             expect(list.body.filter((item: { IdUser: number | null }) => item.IdUser !== null)).toHaveLength(1)
 
             //  A pessoa do próprio dono não é arquivável
-            expect((await flowClient.delete(`/Base/Persons/IdPerson=${initial.body[0].IdPerson}`)).status).toBe(406)
+            expect((await flowClient.delete(`/Persons/IdPerson=${initial.body[0].IdPerson}`)).status).toBe(406)
 
-            expect((await flowClient.delete(`/Base/Persons/IdPerson=${partner.body.IdPerson}`)).status).toBe(200)
+            expect((await flowClient.delete(`/Persons/IdPerson=${partner.body.IdPerson}`)).status).toBe(200)
 
-            let final = await flowClient.get(`/Base/Persons`)
+            let final = await flowClient.get(`/Persons`)
 
             expect(final.body.map((item: { Name: string }) => item.Name)).toEqual(["Filha", payload.Name])
         })

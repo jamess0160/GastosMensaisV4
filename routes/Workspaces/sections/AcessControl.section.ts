@@ -17,7 +17,7 @@ class Controller {
     public async assertMember(IdWorkspace: number | undefined, IdUser: number) {
         //  Sessão sem workspace selecionado: o token foi emitido para um usuário sem nenhuma
         //  matrícula. Mensagem própria porque
-        //  o conserto é outro — chamar POST /Base/Workspaces/switch, não pedir acesso.
+        //  o conserto é outro — chamar POST /Workspaces/switch, não pedir acesso.
         if (!IdWorkspace) {
             throw new APIError({
                 msg: "Nenhum workspace selecionado.",

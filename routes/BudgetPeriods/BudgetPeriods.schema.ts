@@ -3,7 +3,7 @@ import { joiController } from "root/Utils/joiController"
 
 class Schema {
 
-    //  Sem GET: o mês sai na leitura do orçamento (GET /Base/Budgets), que é onde ele significa
+    //  Sem GET: o mês sai na leitura do orçamento (GET /Budgets), que é onde ele significa
     //  alguma coisa — com a categoria e o comprometido ao lado.
     public readonly update = [
         joiController.validateParams(Joi.object({

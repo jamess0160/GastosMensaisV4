@@ -2,7 +2,7 @@ import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tes
 
 //  Testes integrados da feature Workspaces. Um describe por rota de Workspaces.route.ts.
 //
-//  O workspace não tem rota de criação: ele nasce dentro do POST /Base/Users, na mesma
+//  O workspace não tem rota de criação: ele nasce dentro do POST /Users, na mesma
 //  transaction. É o describe do fluxo end to end que cobre esse nascimento, por HTTP.
 
 describe("Workspaces", () => {
@@ -17,16 +17,16 @@ describe("Workspaces", () => {
         client = new TestClient(root.token)
     })
 
-    describe("GET /Base/Workspaces/getSelf", () => {
+    describe("GET /Workspaces/getSelf", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().get("/Base/Workspaces/getSelf")
+            let response = await client.anonymous().get("/Workspaces/getSelf")
 
             expect(response.status).toBe(401)
         })
 
         it("devolve o workspace do usuário do token", async () => {
-            let response = await client.get("/Base/Workspaces/getSelf")
+            let response = await client.get("/Workspaces/getSelf")
 
             expect(response.status).toBe(200)
             expect(response.body).toHaveLength(1)
@@ -40,29 +40,29 @@ describe("Workspaces", () => {
         it("não devolve o workspace de outro usuário", async () => {
             let other = await UsersFactory.create()
 
-            let response = await new TestClient(other.token).get("/Base/Workspaces/getSelf")
+            let response = await new TestClient(other.token).get("/Workspaces/getSelf")
 
             expect(response.status).toBe(200)
             expect(response.body.map((item: { IdWorkspace: number }) => item.IdWorkspace)).toEqual([other.workspace.IdWorkspace])
         })
     })
 
-    describe("POST /Base/Workspaces/switch", () => {
+    describe("POST /Workspaces/switch", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().post("/Base/Workspaces/switch", { IdWorkspace: root.workspace.IdWorkspace })
+            let response = await client.anonymous().post("/Workspaces/switch", { IdWorkspace: root.workspace.IdWorkspace })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa corpo sem o IdWorkspace", async () => {
-            let response = await client.post("/Base/Workspaces/switch", {})
+            let response = await client.post("/Workspaces/switch", {})
 
             expect(response.status).toBe(406)
         })
 
         it("recusa workspace inexistente", async () => {
-            let response = await client.post("/Base/Workspaces/switch", { IdWorkspace: 999999 })
+            let response = await client.post("/Workspaces/switch", { IdWorkspace: 999999 })
 
             expect(response.status).toBe(406)
         })
@@ -73,7 +73,7 @@ describe("Workspaces", () => {
         it("recusa o workspace de um usuário que não é membro", async () => {
             let other = await UsersFactory.create()
 
-            let response = await new TestClient(other.token).post("/Base/Workspaces/switch", {
+            let response = await new TestClient(other.token).post("/Workspaces/switch", {
                 IdWorkspace: root.workspace.IdWorkspace,
             })
 
@@ -85,7 +85,7 @@ describe("Workspaces", () => {
         it("seleciona o workspace do membro e reemite o token com ele dentro", async () => {
             let owner = await UsersFactory.create()
 
-            let response = await new TestClient(owner.token).post("/Base/Workspaces/switch", {
+            let response = await new TestClient(owner.token).post("/Workspaces/switch", {
                 IdWorkspace: owner.workspace.IdWorkspace,
             })
 
@@ -108,7 +108,7 @@ describe("Workspaces", () => {
         it("reemite o token como httpOnly", async () => {
             let owner = await UsersFactory.create()
 
-            let response = await new TestClient(owner.token).post("/Base/Workspaces/switch", {
+            let response = await new TestClient(owner.token).post("/Workspaces/switch", {
                 IdWorkspace: owner.workspace.IdWorkspace,
             })
 
@@ -123,34 +123,34 @@ describe("Workspaces", () => {
             let owner = await UsersFactory.create()
             let ownerClient = new TestClient(UsersFactory.buildToken(owner.user.IdUser))
 
-            expect((await ownerClient.get("/Base/Accounts")).status).toBe(406)
+            expect((await ownerClient.get("/Accounts")).status).toBe(406)
 
-            let switched = await ownerClient.post("/Base/Workspaces/switch", { IdWorkspace: owner.workspace.IdWorkspace })
+            let switched = await ownerClient.post("/Workspaces/switch", { IdWorkspace: owner.workspace.IdWorkspace })
 
             expect(switched.status).toBe(200)
 
             ownerClient.setToken(TestClient.extractCookieToken(switched))
 
-            expect((await ownerClient.get("/Base/Accounts")).status).toBe(200)
+            expect((await ownerClient.get("/Accounts")).status).toBe(200)
         })
     })
 
-    describe("PUT /Base/Workspaces", () => {
+    describe("PUT /Workspaces", () => {
 
         it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/Base/Workspaces`, { Name: "Novo nome" })
+            let response = await client.anonymous().put(`/Workspaces`, { Name: "Novo nome" })
 
             expect(response.status).toBe(401)
         })
 
         it("recusa sessão sem workspace selecionado", async () => {
-            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).put(`/Base/Workspaces`, { Name: "Novo nome" })
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).put(`/Workspaces`, { Name: "Novo nome" })
 
             expect(response.status).toBe(406)
         })
 
         it("recusa corpo sem o Name", async () => {
-            let response = await client.put(`/Base/Workspaces`, {})
+            let response = await client.put(`/Workspaces`, {})
 
             expect(response.status).toBe(406)
         })
@@ -160,7 +160,7 @@ describe("Workspaces", () => {
         it("recusa token válido apontando para o workspace de outro usuário", async () => {
             let other = await UsersFactory.create()
 
-            let response = await new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace)).put(`/Base/Workspaces`, { Name: "Invadido" })
+            let response = await new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace)).put(`/Workspaces`, { Name: "Invadido" })
 
             expect(response.status).toBe(406)
 
@@ -172,7 +172,7 @@ describe("Workspaces", () => {
         it("renomeia o workspace do dono e atualiza o UpdatedAt", async () => {
             let owner = await UsersFactory.create()
 
-            let response = await new TestClient(owner.token).put(`/Base/Workspaces`, { Name: "Finanças da casa" })
+            let response = await new TestClient(owner.token).put(`/Workspaces`, { Name: "Finanças da casa" })
 
             expect(response.status).toBe(200)
 
@@ -193,7 +193,7 @@ describe("Workspaces", () => {
                 Phone: 549987654321,
             }
 
-            let created = await new TestClient().post("/Base/Users", payload)
+            let created = await new TestClient().post("/Users", payload)
 
             expect(created.status).toBe(200)
             expect(created.body.IdUser).toEqual(expect.any(Number))
@@ -216,7 +216,7 @@ describe("Workspaces", () => {
                 IdWorkspace: created.body.IdWorkspace,
             })
 
-            let self = await client.get("/Base/Workspaces/getSelf")
+            let self = await client.get("/Workspaces/getSelf")
 
             expect(self.status).toBe(200)
             expect(self.body).toHaveLength(1)
@@ -224,9 +224,9 @@ describe("Workspaces", () => {
             //  O workspace herda o nome do dono no cadastro
             expect(self.body[0].Name).toBe(payload.Name)
 
-            expect((await client.put(`/Base/Workspaces`, { Name: "Meu orçamento" })).status).toBe(200)
+            expect((await client.put(`/Workspaces`, { Name: "Meu orçamento" })).status).toBe(200)
 
-            let renamed = await client.get("/Base/Workspaces/getSelf")
+            let renamed = await client.get("/Workspaces/getSelf")
 
             expect(renamed.body[0].Name).toBe("Meu orçamento")
         })
