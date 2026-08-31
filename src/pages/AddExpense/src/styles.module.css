@@ -1,0 +1,190 @@
+/* Transcrito de Layout/Hi-fi Desktop/03 - Adicionar Gasto.html
+   (.twocol do formulário, .splitcard, .grp-lab, .ptl). */
+
+.columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 18px;
+    align-items: start;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.aside {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    position: sticky;
+    top: 24px;
+}
+
+.block {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.blockLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.blockHint {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    line-height: 1.45;
+    margin-top: -6px;
+}
+
+/* Os dois eixos de rateio, lado a lado — é a disposição que mostra que
+   eles são independentes, e não uma matriz de formas × pessoas. */
+.axes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+
+/* ── Resumo lateral ───────────────────────────────────────── */
+.summaryValue {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.8px;
+    font-variant-numeric: tabular-nums;
+    margin-top: 6px;
+}
+
+.summaryList {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.summaryRow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12.5px;
+}
+
+.summaryRow dt {
+    color: var(--ink-2);
+    margin: 0;
+}
+
+.summaryRow dd {
+    margin: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.checks {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 4px;
+}
+
+.check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--ink-2);
+}
+
+.checkMark {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: var(--fill-soft);
+    color: var(--ink-3);
+}
+
+.checkMark svg {
+    width: 10px;
+    height: 10px;
+}
+
+.checkOn {
+    background: var(--pos-soft);
+    color: var(--pos-ink);
+}
+
+.checkOn + span {
+    color: var(--ink);
+}
+
+.submit {
+    height: 46px;
+    border-radius: 12px;
+    border: none;
+    background: var(--brand);
+    color: #fff;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 8px 18px -6px rgba(255, 106, 0, 0.5);
+}
+
+.submit:hover:not(:disabled) {
+    background: var(--brand-press);
+}
+
+.submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+@media (max-width: 1180px) {
+    .columns {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .aside {
+        position: static;
+    }
+
+    .axes {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    /* O resumo lateral vira o topo da tela: num telefone ele é o que
+       confirma que o valor e o formato estão certos antes de rolar até
+       o botão. */
+    .columns {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .aside {
+        order: -1;
+    }
+
+    .summaryValue {
+        font-size: 26px;
+    }
+}

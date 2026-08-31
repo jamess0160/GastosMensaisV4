@@ -15,6 +15,8 @@ export function fakeLoginContext(overrides: Partial<LoginContext> = {}): LoginCo
         failSubmit: vi.fn(),
         finishSignIn: vi.fn(),
         setOfferBiometrics: vi.fn(),
+        setInviteBiometrics: vi.fn(),
+        rememberDeviceKey: vi.fn(),
         ...overrides,
     };
 }

@@ -57,7 +57,7 @@ O que já está de pé e não precisa ser refeito.
 
 ---
 
-## Etapa 1 — Sessão e conta
+## Etapa 1 — Sessão e conta · concluída
 
 **Objetivo:** entrar, sair e criar conta sem depender de dado semeado no
 banco.
@@ -94,7 +94,7 @@ sai e volta pela biometria.
 
 ---
 
-## Etapa 2 — Cadastros base
+## Etapa 2 — Cadastros base · concluída
 
 **Objetivo:** ter o que escolher nos formulários de lançamento.
 
@@ -132,7 +132,7 @@ contas, um cartão, duas pessoas, categorias — sem tocar no banco.
 
 ---
 
-## Etapa 3 — Lançar gasto
+## Etapa 3 — Lançar gasto · concluída
 
 A etapa mais pesada, e a que define o kit de formulário do resto do
 sistema.
@@ -175,7 +175,7 @@ fecha antes de chamar a API, e a resposta de `fixed` reporta as
 
 ---
 
-## Etapa 4 — Ver e quitar gastos
+## Etapa 4 — Ver e quitar gastos · concluída
 
 | Item | Detalhe |
 |---|---|
@@ -213,7 +213,7 @@ na última.
 
 ---
 
-## Etapa 5 — Renda e transferências
+## Etapa 5 — Renda e transferências · concluída
 
 | Item | Detalhe |
 |---|---|
@@ -246,7 +246,7 @@ recebido do mês.
 
 ---
 
-## Etapa 6 — Orçamentos
+## Etapa 6 — Orçamentos · concluída
 
 | Item | Detalhe |
 |---|---|
@@ -279,7 +279,7 @@ uma compra parcelada no cartão, com a parcela caindo no mês da fatura.
 
 ---
 
-## Etapa 7 — Dashboard
+## Etapa 7 — Dashboard · concluída
 
 Agregação pura. Só depois das etapas 3 a 6.
 
@@ -311,7 +311,7 @@ listas de Gastos e Renda do mesmo mês.
 
 ---
 
-## Etapa 8 — Relatório
+## Etapa 8 — Relatório · concluída
 
 | Item | Detalhe |
 |---|---|
@@ -336,7 +336,7 @@ no Dashboard.
 
 ---
 
-## Etapa 9 — Mobile
+## Etapa 9 — Mobile · concluída
 
 | Item | Detalhe |
 |---|---|
@@ -361,7 +361,7 @@ mostrava.
 
 ---
 
-## Etapa 10 — Endurecimento e pré-produção
+## Etapa 10 — Endurecimento e pré-produção · concluída
 
 **Objetivo:** o que separa "funciona na minha máquina" de "pode receber
 usuário".
@@ -419,19 +419,49 @@ elas.
 
 ## Resumo
 
-| Etapa | Entrega | Depende de |
-|---|---|---|
-| 0 | Fundação | — |
-| 1 | Sessão e conta | 0 |
-| 2 | Cadastros base | 1 |
-| 3 | Lançar gasto | 2 |
-| 4 | Ver e quitar gastos | 3 |
-| 5 | Renda e transferências | 2 |
-| 6 | Orçamentos | 2 |
-| 7 | Dashboard | 3, 4, 5, 6 |
-| 8 | Relatório | 4 |
-| 9 | Mobile | 1–8 |
-| 10 | Endurecimento | 1–9 |
+| Etapa | Entrega | Depende de | Status |
+|---|---|---|---|
+| 0 | Fundação | — | concluída |
+| 1 | Sessão e conta | 0 | concluída |
+| 2 | Cadastros base | 1 | concluída |
+| 3 | Lançar gasto | 2 | concluída |
+| 4 | Ver e quitar gastos | 3 | concluída |
+| 5 | Renda e transferências | 2 | concluída |
+| 6 | Orçamentos | 2 | concluída |
+| 7 | Dashboard | 3, 4, 5, 6 | concluída |
+| 8 | Relatório | 4 | concluída |
+| 9 | Mobile | 1–8 | concluída |
+| 10 | Endurecimento | 1–9 | concluída |
 
 As etapas 5 e 6 não dependem de 3 e 4 — dá para paralelizar se houver
 mais de uma pessoa. O caminho crítico é **2 → 3 → 4 → 7**.
+
+---
+
+## O que a execução entregou, e o que ficou em aberto
+
+Onze telas, 203 testes, bundle inicial em **113 kB gzip** — as telas de
+dentro chegam sob demanda e só o Login vem no primeiro pacote, o que
+segurou o número apesar dos gráficos. `npm run build`, `npm test` e
+`npm run format:check` passam.
+
+Três decisões tomadas durante a execução, que valem revisão:
+
+1. **A janela de parcelados é de 24 meses.** A lista do mês filtra por
+   `ExpenseDate`, então uma compra de 6× feita em março não aparece na
+   lista de agosto — mas a 6ª parcela dela pesa em agosto. O cliente
+   varre 24 meses para trás para recuperá-las
+   (`INSTALLMENT_LOOKBACK_MONTHS` em `src/data/month.ts`), com um
+   `get(id)` por parcelado. O contrato permite 120 parcelas: acima da
+   janela, a parcela some do total do mês. **Uma rota que devolvesse as
+   pernas de um período resolveria isso de vez**, e é candidata a entrar
+   em [Pendencias Backend.md](Pendencias%20Backend.md) — é a única
+   lacuna do MVP em que o número na tela pode ficar errado, e não só
+   ausente.
+2. **A paleta de categorias foi reordenada.** Os valores são os do
+   layout, sem alteração; a ordem mudou porque verde e amarelo
+   adjacentes têm ΔE 4.2 para protanopia. Ver `src/lib/categoryColor.ts`.
+3. **O rascunho de gasto sobrevive à sessão que expira**, guardado em
+   `sessionStorage`. Os outros formulários (entrada, conta, cartão,
+   categoria) ainda perdem o que foi digitado num 401 — são formulários
+   curtos, e o resgate só foi aplicado onde o custo de refazer é alto.

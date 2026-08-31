@@ -33,14 +33,22 @@ como em produção. **Não afrouxe o cookie para contornar isso.**
 Docs/          Contrato da API (fonte da verdade dos tipos)
 Layout/        Export do Claude Design — Hi-fi Desktop e Mobile
 src/api/       Um [Rota].connection.ts por rota, sobre axios
-src/app/       Chassi: rotas, sidebar, sessão
-src/lib/       Dinheiro, datas de calendário, DeviceKey
+src/app/       Chassi: rotas, sidebar, tab bar, sessão, telemetria
+src/data/      Hooks de React Query: cadastros e movimento do mês
+src/lib/       Dinheiro, datas, agregações, DeviceKey, rascunho
 src/pages/     Uma pasta por tela (ver Convenções)
 src/test/      Infra de teste: setup, servidor de mentira
 src/styles/    tokens.css (transcrição do :root do layout) + global.css
 src/types/     Tipos do contrato da API
 src/ui/        Primitivas transcritas da folha compartilhada do layout
 ```
+
+**`src/data/` é a única camada que fala com o React Query.** As telas
+pedem `useMonthLegs("2026-08")`, e não montam `useQuery` com array
+literal — chave de cache espalhada pelas telas é como o cache passa a
+não invalidar. As chaves ficam em [src/data/keys.ts](src/data/keys.ts) e
+a unidade de cache é o **mês**, que é a unidade de navegação das telas:
+Início, Gastos e Relatório do mesmo mês compartilham a resposta.
 
 ## Convenções
 
@@ -215,18 +223,45 @@ antes de mexer em qualquer agregação.
   orçamento conta pendente junto com pago.
 - **Não existe header `Authorization`.** Só o cookie, e ele é HttpOnly.
 
+As agregações de dinheiro vivem em
+[src/lib/aggregate.ts](src/lib/aggregate.ts), com teste, e não
+espalhadas pelos componentes — são as contas que, erradas, fazem o
+usuário perder a confiança no sistema inteiro.
+
 ## Estado da conversão
 
 | Tela | Rota | Status |
 |---|---|---|
-| Login | `/login` | Convertida (senha + biometria) |
-| Dashboard | `/` | A converter |
-| Gastos | `/gastos` | A converter |
-| Adicionar gasto | `/gastos/novo` | A converter |
-| Renda | `/renda` | A converter |
-| Contas | `/contas` | A converter |
-| Relatório | `/relatorio` | A converter |
-| Personalização | `/personalizacao` | A converter |
+| Login | `/login` | Convertida (senha, biometria, convite de passkey) |
+| Criar conta | `/cadastro` | Convertida |
+| Dashboard | `/` | Convertida (com o bloco de orçamentos) |
+| Gastos | `/gastos` | Convertida (lista, detalhe, quitação, série) |
+| Adicionar gasto | `/gastos/novo` | Convertida |
+| Editar gasto | `/gastos/:id/editar` | Convertida |
+| Renda | `/renda` | Convertida (entrada e transferência) |
+| Contas | `/contas` | Convertida (contas e cartões) |
+| Relatório | `/relatorio` | Convertida (linha e donut, com drill) |
+| Personalização | `/personalizacao` | Convertida (categorias e pessoas) |
+| Perfil | `/perfil` | Convertida (dados, senha, passkeys, workspace) |
 
-Layout mobile (`Layout/Hi-fi Mobile`) ainda não foi aplicado — as telas
-convertidas são desktop-first.
+Todas respondem em 390px. Abaixo de 900px a sidebar sai e entra a barra
+inferior ([src/app/TabBar.tsx](src/app/TabBar.tsx)), com o botão central
+de lançar gasto — a navegação do mobile é decisão do frontend, e a barra
+ganhou de gaveta porque as cinco áreas são de visita constante.
+
+## Duas decisões que valem saber
+
+**Os gráficos são SVG à mão, sem biblioteca.** O layout já os desenha em
+SVG inline e os dois são uma linha e um anel; uma lib traria layout
+engine, escalas e temas para isso, e dobraria o bundle inicial. Ver
+[src/ui/charts.tsx](src/ui/charts.tsx).
+
+**A paleta de categorias foi reordenada, não trocada.** Os oito valores
+são os `--cat-*` do layout. Na ordem original, verde e amarelo caem lado
+a lado e têm ΔE 4.2 para quem tem protanopia — duas fatias vizinhas do
+donut ficariam indistinguíveis. Reordenados, o pior par adjacente sobe
+para ΔE 18.1. O que a reordenação não resolve (amarelo e verde abaixo de
+3:1 de contraste, grafite quase acinzentado) é tratado por rótulo direto
+e visão em tabela: nenhum gráfico identifica uma fatia só pela cor. O
+raciocínio inteiro está em
+[src/lib/categoryColor.ts](src/lib/categoryColor.ts).

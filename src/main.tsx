@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
 import { ApiUnauthorizedError } from "@/api/client";
 import { router } from "@/app/routes";
+import { ErrorBoundary } from "@/app/ErrorBoundary";
+import { installTelemetry } from "@/app/telemetry";
 import "@/styles/global.css";
 
 const queryClient = new QueryClient({
@@ -18,10 +20,15 @@ const queryClient = new QueryClient({
     },
 });
 
+// Erro solto e promessa rejeitada sem `catch` viram `POST /Utils/Logs`.
+installTelemetry();
+
 createRoot(document.getElementById("root")!).render(
     <StrictMode>
-        <QueryClientProvider client={queryClient}>
-            <RouterProvider router={router} />
-        </QueryClientProvider>
+        <ErrorBoundary>
+            <QueryClientProvider client={queryClient}>
+                <RouterProvider router={router} />
+            </QueryClientProvider>
+        </ErrorBoundary>
     </StrictMode>,
 );

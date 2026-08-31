@@ -21,3 +21,18 @@
     color: var(--ink-2);
     font-size: 13.5px;
 }
+
+/* ── Mobile ───────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    /* A sidebar sai inteira: a barra inferior a substitui. Escondê-la
+       com `display:none` (e não estreitá-la) é o que garante que ela
+       não roube largura numa tela de 390px. */
+    .shell > aside {
+        display: none;
+    }
+
+    /* Espaço para a barra inferior não cobrir o fim da lista. */
+    .main {
+        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    }
+}

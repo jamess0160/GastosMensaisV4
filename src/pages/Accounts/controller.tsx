@@ -1,8 +1,50 @@
-/** Só DECLARA os eventos da tela — o corpo de cada um vive em
- *  ./sections, um arquivo por evento.
- *
- *  Ainda sem eventos: a tela é um stub até ser convertida do layout.
- *  Ver Layout/Hi-fi Desktop/08 - Contas e Conciliação.html. */
-class Controller {}
+import { archiveAccount } from "./sections/archiveAccount";
+import { archiveCard } from "./sections/archiveCard";
+import { saveAccount } from "./sections/saveAccount";
+import { saveCard } from "./sections/saveCard";
+import type { ApiTypes } from "@/types/api";
+
+/** Rascunho de conta. `IdAccount` nulo é criação. */
+export interface AccountDraft {
+    IdAccount: number | null;
+    Name: string;
+    Type: ApiTypes.AccountType;
+    Color: ApiTypes.Color | null;
+    InitialBalance: ApiTypes.Money | null;
+    InitialBalanceDate: ApiTypes.CalendarDate | null;
+    /** `InitialBalance` congela depois do primeiro lançamento: alterá-lo
+     *  responde 406. A tela desabilita o campo em vez de deixar salvar. */
+    balanceFrozen: boolean;
+}
+
+/** Rascunho de cartão. Só cartão de crédito se cria pela mão — pix e
+ *  débito nascem com a conta. */
+export interface CardDraft {
+    IdPaymentMethod: number | null;
+    IdAccount: number;
+    Name: string;
+    ClosingDay: number;
+    DueDay: number;
+    Brand: string;
+    LastDigits: string;
+    Color: ApiTypes.Color | null;
+}
+
+export interface AccountsContext {
+    accountDraft: AccountDraft | null;
+    cardDraft: CardDraft | null;
+    beginSubmit(): void;
+    failSubmit(message: string): void;
+    finishSubmit(message: string): void;
+    closeAccountForm(): void;
+    closeCardForm(): void;
+}
+
+class Controller {
+    readonly saveAccount = saveAccount;
+    readonly archiveAccount = archiveAccount;
+    readonly saveCard = saveCard;
+    readonly archiveCard = archiveCard;
+}
 
 export const AccountsController = new Controller();

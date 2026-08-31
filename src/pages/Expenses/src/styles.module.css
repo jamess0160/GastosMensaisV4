@@ -1,0 +1,253 @@
+/* Transcrito de Layout/Hi-fi Desktop/04 - Visualização de Gasto.html
+   (a lista agrupada e o slide-over de detalhe). */
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.cell {
+    padding: 16px 20px;
+    border-left: 1px solid var(--border);
+}
+
+.cell:first-child {
+    border-left: none;
+}
+
+.cellLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    margin-bottom: 6px;
+}
+
+.cellValue {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    font-variant-numeric: tabular-nums;
+}
+
+.cellCaption {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--ink-3);
+}
+
+.notice {
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--pos-soft);
+    color: var(--pos-ink);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+/* ── Linha da lista ───────────────────────────────────────── */
+.description {
+    font-size: 13.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.meta {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Slide-over de detalhe ────────────────────────────────── */
+.detailHero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.detailValue {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.detailMeta {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    margin-top: 4px;
+}
+
+.sectionLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.sectionHint {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-3);
+}
+
+.legs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.leg {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 13px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.legPaid {
+    background: var(--pos-soft);
+    border-color: transparent;
+}
+
+.legBody {
+    flex: 1;
+    min-width: 0;
+}
+
+.legName {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.legSub {
+    font-size: 11.5px;
+    color: var(--ink-2);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.legValue {
+    font-size: 13.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.splitRows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.splitRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 13px;
+    border-radius: 9px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+}
+
+.splitValue {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tag {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 11px;
+    border-radius: var(--r-pill);
+    background: var(--brand-soft);
+    color: var(--brand);
+    border: 1px solid var(--brand-tint);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.notes {
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--ink-2);
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+.history {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11.5px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+    .strip {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .cell:nth-child(3) {
+        border-left: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .cellValue {
+        font-size: 18px;
+    }
+
+    .detailValue {
+        font-size: 26px;
+    }
+}

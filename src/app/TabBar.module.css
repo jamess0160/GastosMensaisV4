@@ -1,0 +1,94 @@
+/* Transcrito de .tabbar / .tab / .fab de Layout/Hi-fi Mobile/*.html.
+
+   A decisão de navegação do mobile é do frontend: o desktop tem sidebar
+   fixa e os frames mobile desenham uma barra inferior com um botão
+   central. Barra inferior ganhou de gaveta porque as cinco áreas do
+   app são de visita constante — uma gaveta esconderia todas atrás de
+   um toque a mais, todos os dias. */
+
+.tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid var(--border);
+    background: rgba(246, 245, 242, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    display: none;
+    align-items: flex-start;
+    padding-top: 8px;
+}
+
+.tab {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    color: var(--ink-3);
+    font-size: 10.5px;
+    font-weight: 500;
+    background: none;
+    border: none;
+    padding: 2px 0;
+}
+
+.tab svg {
+    width: 20px;
+    height: 20px;
+}
+
+.active {
+    color: var(--brand);
+    font-weight: 600;
+}
+
+.label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+/* O botão central é a ação que o app existe para receber: lançar um
+   gasto. Ele sobe da barra para não competir com os ícones. */
+.fabSlot {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.fab {
+    width: 52px;
+    height: 52px;
+    border-radius: 26px;
+    margin-top: -18px;
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 22px -4px rgba(255, 106, 0, 0.5);
+    flex-shrink: 0;
+}
+
+.fab:active {
+    background: var(--brand-press);
+}
+
+.fab svg {
+    width: 24px;
+    height: 24px;
+}
+
+@media (max-width: 900px) {
+    .tabbar {
+        display: flex;
+    }
+}

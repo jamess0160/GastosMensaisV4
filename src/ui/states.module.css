@@ -1,0 +1,137 @@
+/* Carregando, vazio e erro. O layout desenha só o caminho feliz, então
+   estes três nascem da mesma gramática dele: card, ladrilho de ícone,
+   título forte e linha de apoio em ink-2. */
+
+.state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 4px;
+    padding: 44px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+}
+
+/* Dentro de uma tabela o estado não repete a moldura da tabela. */
+.inline {
+    border: none;
+    border-radius: 0;
+    padding: 36px 24px;
+}
+
+.mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--fill-soft);
+    color: var(--ink-2);
+    margin-bottom: 8px;
+}
+
+.mark svg {
+    width: 22px;
+    height: 22px;
+}
+
+.markError {
+    background: var(--neg-soft);
+    color: var(--neg);
+}
+
+.title {
+    font-size: 14.5px;
+    font-weight: 700;
+}
+
+.text {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    line-height: 1.55;
+    max-width: 42ch;
+}
+
+.action {
+    margin-top: 12px;
+}
+
+/* ── Esqueleto ────────────────────────────────────────────── */
+.skeleton {
+    background: linear-gradient(90deg, var(--fill-soft), var(--surface-alt), var(--fill-soft));
+    background-size: 200% 100%;
+    border-radius: var(--r-xs);
+    animation: shimmer 1.1s linear infinite;
+}
+
+@keyframes shimmer {
+    to {
+        background-position: -200% 0;
+    }
+}
+
+.skeletonRows {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+}
+
+.skeletonRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--surface);
+}
+
+.skeletonRow .grow {
+    flex: 1;
+}
+
+/* ── Status ───────────────────────────────────────────────── */
+.status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: var(--r-pill);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+
+.status i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+
+.paid {
+    background: var(--pos-soft);
+    color: var(--pos-ink);
+}
+
+.pending {
+    background: var(--brand-soft);
+    color: var(--brand);
+}
+
+.canceled {
+    background: var(--surface-alt);
+    color: var(--ink-3);
+    border: 1px solid var(--border);
+}
+
+.overdue {
+    background: var(--neg-soft);
+    color: var(--neg);
+}

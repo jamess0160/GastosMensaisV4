@@ -1,12 +1,22 @@
 import { HttpResponse, http as msw } from "msw";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { server } from "@/test/server";
 import { submitLogin } from "../sections/submitLogin";
 import { fakeLoginContext } from "./context";
 
 const route = "*/api/Users/login";
+const checkDevice = "*/api/UsersAuth/checkDevice/:deviceKey";
+
+/** O login por senha sempre consulta o aparelho depois do 200, para
+ *  decidir se convida a cadastrar biometria. Nos testes que não são
+ *  sobre o convite, o aparelho responde "já recusou" — que é o caminho
+ *  em que a tela segue direto. */
+const deviceAlreadyAnswered = () =>
+    server.use(msw.get(checkDevice, () => HttpResponse.json({ UseAuth: false })));
 
 describe("submitLogin", () => {
+    beforeEach(deviceAlreadyAnswered);
+
     it("entra quando a credencial está certa", async () => {
         server.use(
             msw.post(route, () => HttpResponse.json({ msg: "Login realizado com sucesso" })),
@@ -65,5 +75,69 @@ describe("submitLogin", () => {
         await submitLogin(context);
 
         expect(context.failSubmit).toHaveBeenCalledWith("Sem conexão com o servidor.");
+    });
+});
+
+describe("submitLogin · convite de biometria", () => {
+    const loginOk = () => server.use(msw.post(route, () => HttpResponse.json({ msg: "ok" })));
+
+    it("convida quando o aparelho nunca foi perguntado", async () => {
+        loginOk();
+        server.use(msw.get(checkDevice, () => HttpResponse.json({ UseAuth: null })));
+        const context = fakeLoginContext();
+
+        await submitLogin(context);
+
+        expect(context.setInviteBiometrics).toHaveBeenCalledWith(true);
+        // A tela não sai daqui: registrar passkey é rota autenticada, e a
+        // sessão acabou de nascer nesta tela.
+        expect(context.finishSignIn).not.toHaveBeenCalled();
+    });
+
+    it("não convida quando o usuário já recusou neste aparelho", async () => {
+        loginOk();
+        server.use(msw.get(checkDevice, () => HttpResponse.json({ UseAuth: false })));
+        const context = fakeLoginContext();
+
+        await submitLogin(context);
+
+        expect(context.setInviteBiometrics).not.toHaveBeenCalled();
+        expect(context.finishSignIn).toHaveBeenCalledOnce();
+    });
+
+    it("não convida quando o aparelho já tem passkey", async () => {
+        loginOk();
+        server.use(msw.get(checkDevice, () => HttpResponse.json({ UseAuth: true })));
+        const context = fakeLoginContext();
+
+        await submitLogin(context);
+
+        expect(context.setInviteBiometrics).not.toHaveBeenCalled();
+        expect(context.finishSignIn).toHaveBeenCalledOnce();
+    });
+
+    it("convida sem consultar quando o aparelho não tem DeviceKey", async () => {
+        // Sem DeviceKey não há o que consultar: o aparelho é novo por
+        // definição. Um handler de checkDevice aqui quebraria o teste,
+        // que é exatamente a garantia que se quer.
+        loginOk();
+        const context = fakeLoginContext({ deviceKey: null });
+
+        await submitLogin(context);
+
+        expect(context.setInviteBiometrics).toHaveBeenCalledWith(true);
+    });
+
+    it("segue em frente quando a consulta do aparelho falha", async () => {
+        // Não dá para segurar quem acabou de entrar por causa de uma
+        // consulta acessória: na dúvida, não convida.
+        loginOk();
+        server.use(msw.get(checkDevice, () => new HttpResponse(null, { status: 500 })));
+        const context = fakeLoginContext();
+
+        await submitLogin(context);
+
+        expect(context.finishSignIn).toHaveBeenCalledOnce();
+        expect(context.setInviteBiometrics).not.toHaveBeenCalled();
     });
 });

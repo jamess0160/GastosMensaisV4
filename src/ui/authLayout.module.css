@@ -1,6 +1,9 @@
 /* Transcrito de Layout/Hi-fi Desktop/01 - Login.html, frame A
    ("Split — painel de marca + formulário"). O frame de 1440x900 do
-   layout vira a viewport; abaixo de 900px o painel de marca sai. */
+   layout vira a viewport; abaixo de 980px o painel de marca sai.
+
+   Vive em src/ui/ porque as duas telas públicas — entrar e criar conta —
+   são o mesmo chassi com outro formulário dentro. */
 
 .split {
     display: flex;

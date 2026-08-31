@@ -1,6 +1,7 @@
 import { Navigate, Outlet } from "react-router-dom";
 import styles from "./AppShell.module.css";
 import { Sidebar } from "./Sidebar";
+import { TabBar } from "./TabBar";
 import { SessionProvider, useSessionQuery, useUnauthorizedRedirect } from "./session";
 import { ApiUnauthorizedError } from "@/api/client";
 
@@ -28,6 +29,9 @@ export function AppShell() {
                 <main className={styles.main}>
                     <Outlet />
                 </main>
+                {/* Abaixo de 900px a sidebar sai e a barra inferior
+                    entra — as duas nunca aparecem juntas. */}
+                <TabBar />
             </div>
         </SessionProvider>
     );

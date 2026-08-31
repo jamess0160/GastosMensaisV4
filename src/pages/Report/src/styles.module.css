@@ -1,0 +1,54 @@
+/* Transcrito de Layout/Hi-fi Desktop/07 - Relatório.html — a faixa de
+   números e os dois blocos de gráfico. */
+
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.sectionHead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.sectionTitle {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+}
+
+.sectionSub {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 3px;
+}
+
+@media (max-width: 900px) {
+    .kpis {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 900px) {
+    .topbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

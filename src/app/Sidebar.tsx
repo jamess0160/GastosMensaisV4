@@ -84,11 +84,15 @@ export function Sidebar() {
             </nav>
 
             <div className={styles.user}>
-                <span className={styles.avatar}>{user.Name.charAt(0).toUpperCase()}</span>
-                <div className={styles.userInfo}>
-                    <div className={styles.userName}>{user.Name}</div>
-                    <div className={styles.userEmail}>{user.Email}</div>
-                </div>
+                {/* O bloco do usuário é o caminho para o perfil: é onde
+                    se procura por "meus dados" sem pensar. */}
+                <NavLink to="/perfil" className={styles.userLink}>
+                    <span className={styles.avatar}>{user.Name.charAt(0).toUpperCase()}</span>
+                    <div className={styles.userInfo}>
+                        <div className={styles.userName}>{user.Name}</div>
+                        <div className={styles.userEmail}>{user.Email}</div>
+                    </div>
+                </NavLink>
                 <button type="button" className={styles.iconButton} onClick={signOut} title="Sair">
                     <IconSignOut />
                 </button>

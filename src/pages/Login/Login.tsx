@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import styles from "./src/styles.module.css";
+import { AuthLayout, authStyles as styles } from "@/ui/AuthLayout";
+import { ConfirmDialog } from "@/ui/overlay";
+import { FormField, Input, PasswordInput } from "@/ui/form";
+import { IconFingerprint } from "@/ui/icons";
 import { LoginController, type LoginContext } from "./controller";
-import { readDeviceKey } from "@/lib/deviceKey";
+import { readDeviceKey, writeDeviceKey } from "@/lib/deviceKey";
 
 export function Login() {
     const navigate = useNavigate();
@@ -14,8 +17,8 @@ export function Login() {
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [offerBiometrics, setOfferBiometrics] = useState(false);
-
-    const deviceKey = readDeviceKey();
+    const [inviteBiometrics, setInviteBiometrics] = useState(false);
+    const [deviceKey, setDeviceKey] = useState(() => readDeviceKey());
 
     const context = useMemo<LoginContext>(
         () => ({
@@ -36,6 +39,14 @@ export function Login() {
                 navigate("/", { replace: true });
             },
             setOfferBiometrics,
+            setInviteBiometrics(invite) {
+                setPending(false);
+                setInviteBiometrics(invite);
+            },
+            rememberDeviceKey(next) {
+                writeDeviceKey(next);
+                setDeviceKey(next);
+            },
         }),
         [deviceKey, email, password, navigate, queryClient],
     );
@@ -52,70 +63,44 @@ export function Login() {
         void LoginController.submitLogin(context);
     };
 
-    const onBiometrics = () => {
-        void LoginController.signInWithBiometrics(context);
-    };
-
     return (
-        <div className={styles.split}>
-            <aside className={styles.brandpane}>
-                <div className={styles.grid} />
-                <div className={styles.glow} />
-
-                <div className={styles.bpBrand}>
-                    <img className={styles.bpMark} src="/logo.png" alt="" />
-                    <div className={styles.bpName}>Gastos mensais</div>
-                </div>
-
-                <div className={styles.bpTagline}>
-                    Todo dinheiro do mês, sem briga e sem planilha.
-                </div>
-                <p className={styles.bpDesc}>
-                    Cadastre gastos do casal, divida entre destinos, acompanhe parcelas e feche o
-                    mês sabendo exatamente quem pagou o quê.
-                </p>
-
-                <div className={styles.bpFoot}>Gastos mensais · seu mês fechado sem planilha.</div>
-            </aside>
-
-            <main className={styles.formpane}>
-                <div className={styles.fpTop}>
-                    Ainda não tem conta?
-                    {/* Sem rota de cadastro no app ainda; POST /Users existe. */}
-                    <strong>Criar conta</strong>
-                </div>
-
-                <div className={styles.fpMid}>
-                    <h1 className={styles.fpHeading}>Entrar na sua conta</h1>
-                    <p className={styles.fpSub}>
-                        Continue de onde parou — seus gastos e parcelas te esperam.
-                    </p>
-
-                    <form className={styles.form} onSubmit={onSubmit}>
-                        {offerBiometrics && (
-                            <>
-                                <button
-                                    type="button"
-                                    className={styles.social}
-                                    onClick={onBiometrics}
-                                    disabled={pending}
-                                >
-                                    Entrar com biometria
-                                </button>
-                                <div className={styles.divider}>
-                                    <span className={styles.line} />
-                                    <span>ou com e-mail</span>
-                                    <span className={styles.line} />
-                                </div>
-                            </>
-                        )}
-
-                        <div>
-                            <div className={styles.fieldLabel}>
-                                <span className={styles.label}>E-mail</span>
+        <>
+            <AuthLayout
+                heading="Entrar na sua conta"
+                subheading="Continue de onde parou — seus gastos e parcelas te esperam."
+                topRight={
+                    <>
+                        Ainda não tem conta?
+                        <Link to="/cadastro">
+                            <strong>Criar conta</strong>
+                        </Link>
+                    </>
+                }
+            >
+                <form className={styles.form} onSubmit={onSubmit}>
+                    {offerBiometrics && (
+                        <>
+                            <button
+                                type="button"
+                                className={styles.social}
+                                onClick={() => void LoginController.signInWithBiometrics(context)}
+                                disabled={pending}
+                            >
+                                <IconFingerprint />
+                                Entrar com biometria
+                            </button>
+                            <div className={styles.divider}>
+                                <span className={styles.line} />
+                                <span>ou com e-mail</span>
+                                <span className={styles.line} />
                             </div>
-                            <input
-                                className={styles.input}
+                        </>
+                    )}
+
+                    <FormField label="E-mail">
+                        {(field) => (
+                            <Input
+                                {...field}
                                 type="email"
                                 name="email"
                                 autoComplete="username"
@@ -124,19 +109,22 @@ export function Login() {
                                 onChange={(event) => setEmail(event.target.value)}
                                 required
                             />
-                        </div>
+                        )}
+                    </FormField>
 
-                        <div>
-                            <div className={styles.fieldLabel}>
-                                <span className={styles.label}>Senha</span>
-                                {/* Sem API de recuperação de senha no contrato. */}
-                                <button type="button" className={styles.action} disabled>
-                                    Esqueci minha senha
-                                </button>
-                            </div>
-                            <input
-                                className={styles.input}
-                                type="password"
+                    <FormField
+                        label="Senha"
+                        /* Sem rota de recuperação no contrato: o link some
+                           do produto sem sumir do layout. */
+                        hint={
+                            <span title="Ainda sem API" style={{ opacity: 0.5 }}>
+                                Esqueci minha senha
+                            </span>
+                        }
+                    >
+                        {(field) => (
+                            <PasswordInput
+                                {...field}
                                 name="password"
                                 autoComplete="current-password"
                                 placeholder="••••••••"
@@ -144,25 +132,45 @@ export function Login() {
                                 onChange={(event) => setPassword(event.target.value)}
                                 required
                             />
+                        )}
+                    </FormField>
+
+                    {error && (
+                        <div className={styles.error} role="alert">
+                            {error}
                         </div>
+                    )}
 
-                        {error && <div className={styles.error}>{error}</div>}
+                    <button className={styles.cta} type="submit" disabled={pending}>
+                        {pending ? "Entrando…" : "Entrar"}
+                    </button>
+                </form>
+            </AuthLayout>
 
-                        <button className={styles.cta} type="submit" disabled={pending}>
-                            {pending ? "Entrando…" : "Entrar"}
-                        </button>
-                    </form>
-                </div>
-
-                <div className={styles.fpBot}>
-                    <span>© {new Date().getFullYear()} Gastos mensais</span>
-                    <div className={styles.links}>
-                        <span>Termos</span>
-                        <span>Privacidade</span>
-                        <span>Suporte</span>
-                    </div>
-                </div>
-            </main>
-        </div>
+            {/* A sessão já está de pé aqui: o convite acontece depois do
+                login por senha, porque registrar passkey é rota
+                autenticada. Recusar chama `skipDevice`, que faz o
+                `checkDevice` responder `false` e o convite não voltar. */}
+            <ConfirmDialog
+                open={inviteBiometrics}
+                onClose={() => void LoginController.skipBiometrics(context)}
+                onConfirm={() => void LoginController.registerBiometrics(context)}
+                title="Usar biometria neste aparelho?"
+                description={
+                    <>
+                        Da próxima vez você entra com a digital ou o rosto, sem digitar a senha.
+                        Vale só para este aparelho e você pode desfazer no seu perfil.
+                        {error && (
+                            <div className={styles.error} style={{ marginTop: 12 }} role="alert">
+                                {error}
+                            </div>
+                        )}
+                    </>
+                }
+                confirmLabel="Ativar biometria"
+                cancelLabel="Agora não"
+                pending={pending}
+            />
+        </>
     );
 }

@@ -136,6 +136,21 @@
     font-weight: 600;
 }
 
+.userLink {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px;
+    margin: -4px;
+    border-radius: var(--r-sm);
+}
+
+.userLink:hover {
+    background: var(--surface-alt);
+}
+
 .userInfo {
     flex: 1;
     min-width: 0;
