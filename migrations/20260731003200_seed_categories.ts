@@ -7,19 +7,18 @@ import type { Knex } from "knex";
 // remover a migration.
 
 const categories = [
-    { Description: "Moradia", IconKey: "home", Color: "#5D4037", Position: 1 },
-    { Description: "Alimentacao", IconKey: "utensils", Color: "#F4511E", Position: 2 },
-    { Description: "Mercado", IconKey: "shopping-cart", Color: "#EF6C00", Position: 3 },
-    { Description: "Transporte", IconKey: "car", Color: "#1565C0", Position: 4 },
-    { Description: "Saude", IconKey: "heart-pulse", Color: "#C62828", Position: 5 },
-    { Description: "Educacao", IconKey: "graduation-cap", Color: "#283593", Position: 6 },
-    { Description: "Lazer", IconKey: "party-popper", Color: "#6A1B9A", Position: 7 },
-    { Description: "Assinaturas", IconKey: "repeat", Color: "#00838F", Position: 8 },
-    { Description: "Vestuario", IconKey: "shirt", Color: "#AD1457", Position: 9 },
-    { Description: "Pets", IconKey: "paw-print", Color: "#8D6E63", Position: 10 },
-    { Description: "Impostos e taxas", IconKey: "landmark", Color: "#455A64", Position: 11 },
-    { Description: "Investimentos", IconKey: "piggy-bank", Color: "#2E7D32", Position: 12 },
-    { Description: "Outros", IconKey: "circle-dashed", Color: "#757575", Position: 13 },
+    { Description: "Alimentacao", IconKey: "Utensils", Color: "#F4511E", Position: 2 },
+    { Description: "Mercado", IconKey: "ShoppingCart", Color: "#EF6C00", Position: 3 },
+    { Description: "Transporte", IconKey: "Car", Color: "#1565C0", Position: 4 },
+    { Description: "Saude", IconKey: "HeartPulse", Color: "#C62828", Position: 5 },
+    { Description: "Educacao", IconKey: "GraduationCap", Color: "#283593", Position: 6 },
+    { Description: "Lazer", IconKey: "PartyPopper", Color: "#6A1B9A", Position: 7 },
+    { Description: "Assinaturas", IconKey: "Repeat2", Color: "#00838F", Position: 8 },
+    { Description: "Vestuario", IconKey: "Shirt", Color: "#AD1457", Position: 9 },
+    { Description: "Pets", IconKey: "PawPrint", Color: "#8D6E63", Position: 10 },
+    { Description: "Impostos e taxas", IconKey: "Landmark", Color: "#455A64", Position: 11 },
+    { Description: "Investimentos", IconKey: "PiggyBank", Color: "#2E7D32", Position: 12 },
+    { Description: "Outros", IconKey: "CircleDashed", Color: "#757575", Position: 13 },
 ]
 
 
