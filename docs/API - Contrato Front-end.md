@@ -2,6 +2,8 @@
 
 Documento gerado a partir dos `*.route.ts` e `*.schema.ts` do repositório. Ele descreve **o que a API aceita e o que devolve hoje**. Toda validação citada aqui é a que roda de verdade (Joi, em `<Feature>.schema.ts`), não uma intenção.
 
+> **Mudou alguma coisa?** O [changelog](#18-changelog) no fim do documento lista toda alteração que afeta o front, da mais recente para a mais antiga, dizendo o que quebra e o que fazer. Comece por ele.
+
 ---
 
 ## 1. Convenções gerais
@@ -320,11 +322,15 @@ Edita o workspace **selecionado na sessão** — sem id no caminho.
 
 ## 5. Accounts — `/Accounts` 🔒
 
-Uma conta **não tem saldo guardado**. `Balance` é calculado a cada leitura.
+Uma conta **não tem saldo guardado**. `Balance` é calculado a cada leitura, e é sempre o saldo **de um mês**.
 
 ### `GET /Accounts`
 
-Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
+| Query | Tipo | Regra |
+|---|---|---|
+| `ReferenceMonth` | `YYYY-MM` | opcional, default **o mês corrente** |
+
+Devolve as contas do workspace com as formas de pagamento embutidas. **O `ReferenceMonth` recorta o `Balance`, não a lista** — as contas são as mesmas em qualquer mês. Mande o mês que a tela está exibindo.
 
 ```json
 [{
@@ -346,7 +352,14 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 }]
 ```
 
-**`Balance`** = `InitialBalance` + entradas recebidas − transferências que saíram − **pernas de gasto pagas**. Pendente é previsão e **não entra**. Não é coluna: não tente recalcular somando lançamentos no cliente.
+**`Balance`** = `InitialBalance` + entradas recebidas − transferências que saíram − **pernas de gasto pagas**, tudo **com data até o último dia do `ReferenceMonth`**. Pendente é previsão e **não entra**. Não é coluna: não tente recalcular somando lançamentos no cliente.
+
+A data que conta é a do lançamento — `CompetenceDate` na entrada, `DueDate` (ou a data do gasto, fora de cartão) na perna —, **não a data em que se clicou em receber/quitar**. Duas consequências para a tela:
+
+- uma entrada de setembro já marcada como recebida **não** aparece no saldo de agosto: peça `ReferenceMonth=2026-09` para vê-la;
+- quitar hoje a parcela que vence em novembro **não** mexe no saldo de agosto — ela sai no saldo de novembro.
+
+O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDate`: uma conta aberta em agosto vem com `Balance: 0` em março. Sem `InitialBalanceDate`, a abertura conta em qualquer mês.
 
 `Type` ∈ `checking` | `cash`. **Não existe conta de tipo cartão** — cartão é forma de pagamento.
 
@@ -1050,3 +1063,58 @@ Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de
 | GET | `/Utils/Health` | público |
 | GET | `/Utils/Reload` | 🔒 |
 | POST | `/Utils/Logs` | 🔒 |
+
+---
+
+## 18. Changelog
+
+Toda mudança da API que o front enxerga entra aqui, **da mais recente para a mais antiga**. O
+resto do documento descreve sempre o estado *atual*; esta seção é o que diz **o que mudou desde
+a última vez que você leu** e o que precisa mudar do seu lado.
+
+Uma entrada tem sempre as mesmas quatro partes: a data, a rota afetada, **se quebra ou não** o
+que já está escrito, e a ação do front. Mudança que não afeta o front (refatoração interna,
+teste, índice de banco) **não** entra aqui.
+
+| Marcador | Significado |
+|---|---|
+| 🔴 **Quebra** | Código do front que funcionava para de funcionar, ou passa a mostrar número errado. Exige ação |
+| 🟡 **Comportamento** | Nada quebra na chamada, mas a resposta mudou de significado. Confira antes de ignorar |
+| 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
+
+---
+
+### 2026-08-31 — `GET /Accounts`: o saldo agora é sempre o saldo **de um mês**
+
+🟡 **Comportamento** · 🟢 **Adição** — ver a seção 5, `/Accounts`.
+
+**O que estava errado.** O `Balance` filtrava só por *estado* (`Status='received'` na entrada,
+`Paid=true` na perna de gasto) e por **data nenhuma**. Estado não é data: uma entrada com
+`CompetenceDate` em setembro que já tivesse sido marcada como recebida entrava no saldo exibido
+em agosto, e quitar hoje uma parcela que vence em novembro tirava o dinheiro do saldo de agosto.
+O saldo ficava plausível e errado.
+
+**O que mudou.**
+
+- `GET /Accounts` passou a aceitar `?ReferenceMonth=YYYY-MM` (**opcional**, default o mês
+  corrente). Ele recorta **o `Balance`, não a lista** — as contas são as mesmas em qualquer mês.
+- O corte vai até o **último dia** do mês pedido e lê **a data do lançamento**: `CompetenceDate`
+  na entrada, `DueDate` (ou a data do gasto, fora de cartão) na perna. **Não** a data em que se
+  clicou em receber/quitar.
+- O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDate`: conta
+  aberta em agosto vem com `Balance: 0` em março. Sem `InitialBalanceDate` a abertura conta em
+  qualquer mês, como antes.
+- `ReferenceMonth` fora do formato `YYYY-MM` responde `406` (`"Parâmetros inválidos na Query."`).
+
+**Ação do front.**
+
+1. Na tela que tem seletor de mês, **mande o mês exibido**: `GET /Accounts?ReferenceMonth=2026-08`.
+   Sem o parâmetro você recebe o mês corrente, que é o comportamento certo para quem abre o app.
+2. Se você exibe saldo junto de uma lista filtrada por `From`/`To`, os dois recortes são
+   diferentes de propósito — saldo é **posição** (mês fechado), lista é **fatia** (intervalo
+   livre). Não tente derivar um do outro.
+3. Números que pareciam certos podem mudar: um saldo que incluía lançamento de mês futuro agora
+   não inclui mais. Isso é a correção, não uma regressão.
+
+**Não mudou:** a forma da linha de `Accounts`, o `POST`/`PUT`/`DELETE`, nem a regra de que
+pendente é previsão e não entra no saldo.

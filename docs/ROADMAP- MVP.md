@@ -131,10 +131,13 @@ toda a defesa contra CSRF hoje. Detalhes de deploy no `CLAUDE.md`.
 partir dos lançamentos:
 
 ```
-saldo = InitialBalance
+saldo do mês M = InitialBalance                              (se InitialBalanceDate <= fim de M)
       + Inflows recebidos com IdToAccount   = conta
       − Inflows recebidos com IdFromAccount = conta      (transferência que saiu)
       − ExpensePayments pagos cujo PaymentMethod é da conta
+
+      ... tudo com data de lançamento até o fim de M:
+          CompetenceDate na entrada, coalesce(DueDate, ExpenseDate) na perna de gasto
 ```
 
 Por que não cache: o custo de manter é toda rota que mexe em dinheiro lembrar de recalcular
@@ -144,10 +147,18 @@ pior falha possível aqui. O ganho seria performance, que não existe neste volu
 para essa query já estão no banco (`ExpensePayments["IdWorkspace","IdPaymentMethod","Paid"]`,
 `Inflows["IdToAccount"]`, `Inflows["IdFromAccount"]`).
 
-Três consequências:
+Quatro consequências:
 
+- **O saldo é sempre o saldo *de um mês*** — `GET /Accounts?ReferenceMonth=YYYY-MM`, default o
+  mês corrente. **Estado não é data:** nada impede marcar como recebida uma entrada de
+  setembro, e sem corte esse dinheiro apareceria no saldo de agosto. O corte lê a data do
+  lançamento, nunca `ReceivedAt`/`PaidAt` — aqueles são o instante do clique, e quitar hoje a
+  fatura de setembro jogaria a saída no mês errado. Mês, e não o `From`/`To` das listagens de
+  movimento, porque saldo é posição e não recorte — e é o que faz "quanto eu tinha em julho"
+  ser uma pergunta respondível.
 - **`InitialBalance` e `InitialBalanceDate` continuam** — são dado de origem, não cache.
-  Nenhum lançamento do sistema deriva o saldo de abertura.
+  Nenhum lançamento do sistema deriva o saldo de abertura. A `InitialBalanceDate`, quando
+  preenchida, obedece ao mesmo corte: uma conta aberta em agosto não tinha saldo em março.
 - **Transferência conta nos dois sentidos no saldo**, ao contrário do total de "quanto
   entrou", que exclui `Kind='transfer'`. Duas regras opostas sobre a mesma coluna: é o ponto
   mais fácil de conflatar do modelo.
@@ -393,7 +404,8 @@ CRUD simples nas duas, escopado por workspace:
   a etapa 5.
 - **O saldo saiu no `GET /Accounts`, como `Balance`.** Uma section só
   (`Accounts/sections/AccountBalance.section.ts`), três consultas agrupadas para a lista inteira
-  em vez de três por conta.
+  em vez de três por conta. Depois ganhou o corte por mês (`?ReferenceMonth`, default o
+  corrente) — ver a decisão 1.
 - **Não existe `getTotalReceived` ainda.** O ROADMAP sugeria já nascer com ele; como nenhum
   relatório existe nesta leva, ele seria código morto. A regra (`Kind <> 'transfer'` em todo
   total de "quanto entrou") está gravada no cabeçalho do model, que é onde a próxima pessoa a
