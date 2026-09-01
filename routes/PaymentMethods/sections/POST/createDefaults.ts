@@ -1,5 +1,6 @@
 import { Knex } from "knex"
 import { class_PaymentMethods_model } from "../../PaymentMethods.model"
+import { AccountsNamespace } from "root/routes/Accounts/sections/types"
 
 //  O pix e o débito que nascem com a conta.
 //
@@ -17,11 +18,18 @@ export class CreateDefaults {
         this.PaymentMethods_model = new class_PaymentMethods_model(tx)
     }
 
-    public async run(IdWorkspace: number, IdAccount: number, AccountName: string) {
+    public async run(IdWorkspace: number, IdAccount: number, data: AccountsNamespace.CreateAccountPayload) {
+
+        if (data.Type === "cash") {
+            return await this.PaymentMethods_model.create([
+                { IdWorkspace, IdAccount, Name: `${data.Name}`, Kind: "debit", Position: 1 },
+            ])
+        }
+
         //  Sem ClosingDay/DueDay: fatura só existe em cartão de crédito.
         return await this.PaymentMethods_model.create([
-            { IdWorkspace, IdAccount, Name: `${AccountName} - Pix`, Kind: "pix", Position: 1 },
-            { IdWorkspace, IdAccount, Name: `${AccountName} - Débito`, Kind: "debit", Position: 2 },
+            { IdWorkspace, IdAccount, Name: `${data.Name} - Pix`, Kind: "pix", Position: 1 },
+            { IdWorkspace, IdAccount, Name: `${data.Name} - Débito`, Kind: "debit", Position: 2 },
         ])
     }
 }
