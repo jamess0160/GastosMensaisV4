@@ -1,6 +1,6 @@
 import Joi from "joi"
 import { joiController } from "root/Utils/joiController"
-import { color, isoDate } from "root/Utils/joiSchemas"
+import { color, isoDate, referenceMonth } from "root/Utils/joiSchemas"
 import { paymentMethodResponse } from "root/routes/PaymentMethods/PaymentMethods.schema"
 
 class Schema {
@@ -8,6 +8,12 @@ class Schema {
     //  Sem validateParams em nenhuma rota daqui: o IdWorkspace saiu do caminho e vem do
     //  token da sessão, e o único parâmetro que sobrou é o id da própria linha.
     public readonly getByWorkspace = [
+        //  Mês, e não From/To como nas listagens de movimento: o saldo não é um recorte, é uma
+        //  posição — "quanto eu tinha no fim de agosto". Opcional porque a tela abre no mês
+        //  corrente e só manda o parâmetro quando o usuário navega.
+        joiController.validateQuery(Joi.object({
+            ReferenceMonth: referenceMonth.optional(),
+        })),
         //  Espelha a linha de Accounts, mais o Balance, que **não é coluna**: é calculado dos
         //  lançamentos a cada leitura (sections/AccountBalance.section.ts).
         joiController.validateResponse(Joi.array().items(Joi.object({
@@ -20,8 +26,9 @@ class Schema {
             Color: Joi.string().allow(null).required(),
             InitialBalance: Joi.number().required(),
             InitialBalanceDate: isoDate.allow(null).required(),
-            //  Saldo realizado: abertura + entradas recebidas − transferências que saíram −
-            //  pernas de gasto pagas. O pendente é previsão e não entra.
+            //  Saldo realizado **até o fim do ReferenceMonth**: abertura + entradas recebidas
+            //  − transferências que saíram − pernas de gasto pagas, tudo com data até o corte.
+            //  O pendente é previsão e não entra.
             Balance: Joi.number().required(),
             Position: Joi.number().allow(null).required(),
             Active: Joi.boolean().required(),

@@ -13,6 +13,10 @@ export const Accounts_route = express()
 //  revogada, ou o papel rebaixado, depois de o token ser emitido. Toda section daqui começa
 //  por assertMember/assertRole e usa o IdWorkspace que volta da matrícula, não o que entrou.
 
+//  ?ReferenceMonth=YYYY-MM (opcional, default o mês corrente) recorta **o saldo**, não a
+//  lista: as contas são as mesmas em qualquer mês, o que muda é até onde os lançamentos são
+//  somados. Mês em vez do From/To das listagens de movimento porque saldo é posição, não
+//  recorte — ver sections/AccountBalance.section.ts.
 Accounts_route.get("/Accounts", Accounts_schema.getByWorkspace, AsyncHandler(Accounts_controller.getByWorkspace))
 
 Accounts_route.post("/Accounts", Accounts_schema.create, AsyncHandler(Accounts_controller.create))

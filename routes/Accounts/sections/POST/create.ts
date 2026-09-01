@@ -21,7 +21,7 @@ export class Create {
             //  IdUser é o autor do cadastro; o dono do dado é o workspace.
             let IdAccount = await Accounts_model.create({ ...body, IdWorkspace, IdUser }).returnId("IdAccount")
 
-            await new CreateDefaults(tx).run(IdWorkspace, IdAccount, body.Name)
+            await new CreateDefaults(tx).run(IdWorkspace, IdAccount, body)
 
             return { IdAccount }
         })

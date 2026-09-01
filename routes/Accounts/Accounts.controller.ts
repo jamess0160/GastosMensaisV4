@@ -9,7 +9,7 @@ import { Update } from "./sections/PUT/update"
 class Controller {
 
     getByWorkspace = async (req: Request, res: Response) => {
-        res.json(await new GetByWorkspace().run(res.locals.IdWorkspace, res.locals.IdUser))
+        res.json(await new GetByWorkspace().run(res.locals.IdWorkspace, res.locals.IdUser, req.query.ReferenceMonth as string | undefined))
     }
 
     create = async (req: Request, res: Response) => {

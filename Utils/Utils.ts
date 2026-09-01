@@ -210,6 +210,17 @@ export namespace Utils {
         return moment(reference, "YYYY-MM", true).format(calendarFormat)
     }
 
+    /**
+     * O mês corrente, "YYYY-MM", no formato que `monthStart` consome.
+     *
+     * É o único lugar do projeto que olha o relógio para montar uma data de calendário, e por
+     * isso passa pelo mesmo `format` de todo o resto: um `new Date()` solto aqui traria o fuso
+     * de volta — em UTC-3, à meia-noite do dia 1 o mês corrente ainda seria o anterior.
+     */
+    export function currentMonth() {
+        return moment().format("YYYY-MM")
+    }
+
     export function buildTree<T>(items: T[], getId: (item: T) => number, getParentId: (item: T) => number | null): TreeNode<T>[] {
         let map = new Map<number, TreeNode<T>>()
         let treeTable: TreeNode<T>[] = []

@@ -1,4 +1,5 @@
 import { WorkspacesAcessControl } from "root/routes/Workspaces/sections/AcessControl.section"
+import { Utils } from "root/Utils/Utils"
 import { Accounts_model } from "../../Accounts.model"
 import { AccountBalance } from "../AccountBalance.section"
 
@@ -8,7 +9,7 @@ import { AccountBalance } from "../AccountBalance.section"
 export class GetByWorkspace {
     //  SelectedIdWorkspace é o valor que veio do token da sessão. O IdWorkspace usado na consulta
     //  é o que volta da matrícula: veio do banco e está conferido.
-    public async run(SelectedIdWorkspace: number, IdUser: number) {
+    public async run(SelectedIdWorkspace: number, IdUser: number, ReferenceMonth?: string) {
         //  O token é assinado, mas foi emitido no login e vale 24h: a matrícula pode ter caído
         //  trivial. Sem esta conferência, isso viraria a lista de contas do vizinho.
         let { IdWorkspace } = await WorkspacesAcessControl.assertMember(SelectedIdWorkspace, IdUser)
@@ -22,10 +23,22 @@ export class GetByWorkspace {
             },
         })
 
+        //  O saldo é sempre o saldo **de um mês**: sem corte, uma entrada de setembro já
+        //  marcada como recebida entraria no saldo de agosto. Omitir o mês é pedir o corrente,
+        //  que é o que a tela abre — o cliente só manda o parâmetro quando navega.
+        let month = Utils.monthStart(ReferenceMonth ?? Utils.currentMonth())
+
+        //  Limite exclusivo: "até o fim do mês" é "antes do dia 1 do seguinte".
+        let nextMonth = Utils.addMonthsToDate(month, 1)
+
         //  O saldo não é coluna: é sempre calculado dos lançamentos, num lugar só. Vai junto
         //  com a conta porque não existe tela que mostre uma sem o outro.
-        let balances = await AccountBalance.getByAccounts(accounts)
+        let balances = await AccountBalance.getByAccounts(accounts, nextMonth)
 
-        return accounts.map((account) => ({ ...account, Balance: balances.get(account.IdAccount) ?? account.InitialBalance }))
+        console.log(balances)
+
+        //  O mapa vem com uma entrada por conta, inclusive as sem lançamento nenhum — o
+        //  fallback aqui é só o tipo, não uma regra de saldo (a abertura já foi cortada lá).
+        return accounts.map((account) => ({ ...account, Balance: balances.get(account.IdAccount) ?? 0 }))
     }
 }
