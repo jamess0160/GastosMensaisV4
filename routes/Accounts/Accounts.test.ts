@@ -1,3 +1,4 @@
+import { Utils } from "root/Utils/Utils"
 import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
 
 //  Testes integrados de Accounts. Um describe por rota de Accounts.route.ts, mais o fluxo
@@ -107,6 +108,101 @@ describe("Accounts", () => {
 
             expect(response.body.map((item: { Name: string }) => item.Name)).toEqual(["Conta viva"])
             expect(response.body[0].PaymentMethods.map((item: { Kind: string }) => item.Kind)).toEqual(["pix", "debit"])
+        })
+
+        it("recusa ReferenceMonth fora do formato YYYY-MM", async () => {
+            let response = await client.get(`/Accounts?ReferenceMonth=2026-08-01`)
+
+            expect(response.status).toBe(406)
+        })
+
+        //  **O caso que motivou o corte.** Estado não é data: nada impede marcar como recebida
+        //  uma entrada de setembro, e sem o corte esse dinheiro apareceria no saldo de agosto —
+        //  um saldo plausível e errado, que é a pior falha possível aqui.
+        it("não soma no saldo do mês a entrada recebida com data de mês futuro", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+            let IdWorkspace = user.workspace.IdWorkspace
+
+            let account = await workspaceClient.post(`/Accounts`, { Name: "Conta", InitialBalance: 1000 })
+
+            await seedInflow(IdWorkspace, account.body.IdAccount, "received", "2026-08-10", 100)
+            await seedInflow(IdWorkspace, account.body.IdAccount, "received", "2026-09-05", 5000)
+
+            expect(await balanceOf(workspaceClient, account.body.IdAccount, "2026-08")).toBe(1100)
+
+            //  Chegado setembro, o mesmo dinheiro aparece — não sumiu, só não era de agosto
+            expect(await balanceOf(workspaceClient, account.body.IdAccount, "2026-09")).toBe(6100)
+        })
+
+        //  O corte vale para trás também: o saldo de um mês passado é o que havia naquele mês,
+        //  não o de hoje. É o que faz "quanto eu tinha em julho" ser uma pergunta respondível.
+        it("devolve o saldo do mês pedido, sem o que veio depois", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+            let IdWorkspace = user.workspace.IdWorkspace
+
+            let account = await workspaceClient.post(`/Accounts`, { Name: "Conta", InitialBalance: 1000 })
+
+            await seedInflow(IdWorkspace, account.body.IdAccount, "received", "2026-07-20", 200)
+            await seedInflow(IdWorkspace, account.body.IdAccount, "received", "2026-08-10", 300)
+
+            expect(await balanceOf(workspaceClient, account.body.IdAccount, "2026-07")).toBe(1200)
+            expect(await balanceOf(workspaceClient, account.body.IdAccount, "2026-08")).toBe(1500)
+
+            //  O último dia do mês entra: o corte é `< dia 1 do mês seguinte`, e o dia 31 não
+            //  pode escapar dele
+            await seedInflow(IdWorkspace, account.body.IdAccount, "received", "2026-08-31", 50)
+
+            expect(await balanceOf(workspaceClient, account.body.IdAccount, "2026-08")).toBe(1550)
+        })
+
+        //  Sem o parâmetro é o mês corrente, que é o que a tela abre. Calculado do relógio de
+        //  propósito: uma data fixa aqui passaria a testar outro mês a cada virada de mês.
+        it("usa o mês corrente quando o ReferenceMonth é omitido", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+            let IdWorkspace = user.workspace.IdWorkspace
+
+            let account = await workspaceClient.post(`/Accounts`, { Name: "Conta", InitialBalance: 1000 })
+
+            let thisMonth = Utils.monthStart(Utils.currentMonth())
+            let nextMonth = Utils.addMonthsToDate(thisMonth, 1)
+
+            await seedInflow(IdWorkspace, account.body.IdAccount, "received", thisMonth, 100)
+            await seedInflow(IdWorkspace, account.body.IdAccount, "received", nextMonth, 5000)
+
+            let response = await workspaceClient.get(`/Accounts`)
+
+            expect(response.status).toBe(200)
+            expect(response.body[0].Balance).toBe(1100)
+        })
+
+        //  A abertura é um lançamento como outro qualquer para efeito de corte: uma conta
+        //  aberta em agosto não tinha saldo nenhum em março.
+        it("não conta o saldo de abertura em mês anterior à data de abertura", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+
+            let account = await workspaceClient.post(`/Accounts`, {
+                Name: "Conta aberta em agosto",
+                InitialBalance: 1000,
+                InitialBalanceDate: "2026-08-01",
+            })
+
+            expect(await balanceOf(workspaceClient, account.body.IdAccount, "2026-03")).toBe(0)
+            expect(await balanceOf(workspaceClient, account.body.IdAccount, "2026-08")).toBe(1000)
+        })
+
+        //  Sem data de abertura não há o que cortar: do ponto de vista do sistema a conta
+        //  sempre existiu, e o default do POST é justamente null.
+        it("conta o saldo de abertura sem data em qualquer mês", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+
+            let account = await workspaceClient.post(`/Accounts`, { Name: "Conta sem abertura", InitialBalance: 700 })
+
+            expect(await balanceOf(workspaceClient, account.body.IdAccount, "2020-01")).toBe(700)
         })
     })
 
@@ -481,18 +577,34 @@ function findPaymentMethods(IdAccount: number, Active = true) {
     return TestDatabase.connection().select("*").from("PaymentMethods").where("IdAccount", IdAccount).where("Active", Active).orderBy("IdPaymentMethod")
 }
 
-//  Inflows ainda não tem rota (etapa 4): a única forma de arranjar uma conta com movimento
-//  é semear direto. Assim que a rota existir, este helper vira uma chamada HTTP.
-function seedInflow(IdWorkspace: number, IdToAccount: number, Status: "pending" | "received" | "canceled" = "received") {
+//  Semeia direto porque aqui a entrada é arranjo, não o que está sob teste — a suíte de
+//  Inflows é que exercita a rota. A data importa: é ela que o corte do saldo lê.
+function seedInflow(
+    IdWorkspace: number,
+    IdToAccount: number,
+    Status: "pending" | "received" | "canceled" = "received",
+    CompetenceDate = "2026-08-10",
+    TotalValue = 10,
+) {
     return TestDatabase.connection().insert({
         IdWorkspace,
         IdToAccount,
         Description: "Movimento de teste",
-        TotalValue: 10,
+        TotalValue,
         Status,
         Kind: "inflow",
-        CompetenceDate: "2026-08-10",
+        CompetenceDate,
     }).into("Inflows")
+}
+
+//  O saldo sai pela rota de contas: não é coluna, é calculado a cada leitura — e agora sempre
+//  até o fim de um mês.
+async function balanceOf(client: TestClient, IdAccount: number, ReferenceMonth: string) {
+    let response = await client.get(`/Accounts?ReferenceMonth=${ReferenceMonth}`)
+
+    expect(response.status).toBe(200)
+
+    return response.body.find((item: { IdAccount: number }) => item.IdAccount === IdAccount).Balance as number
 }
 
 //  Troca o IdWorkspace dentro do payload e remonta o token sem reassinar: é exatamente o que

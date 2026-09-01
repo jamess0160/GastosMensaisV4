@@ -1,7 +1,10 @@
 import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
 
-//  Testes integrados de Budgets e BudgetPeriods — a entrega reduzida do orçamento, em que o
-//  cadastro do mês é manual. Um describe por rota das duas features, mais o fluxo end to end.
+//  Testes integrados de Budgets — a entrega reduzida do orçamento, em que o cadastro do mês é
+//  manual. Um describe por rota de Budgets.route.ts, mais o fluxo end to end no fim.
+//
+//  As rotas do mês congelado são de outra feature e vivem em BudgetPeriods.test.ts; aqui o
+//  período aparece como **efeito** do cadastro, que é o que este POST faz em duas tabelas.
 //
 //  Duas coisas carregam a suíte:
 //
@@ -317,121 +320,6 @@ describe("Budgets", () => {
         })
     })
 
-    describe("PUT /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", () => {
-
-        it("recusa sem token", async () => {
-            let response = await client.anonymous().put(`/BudgetPeriods/IdBudgetPeriod=1`, { LimitValue: 100 })
-
-            expect(response.status).toBe(401)
-        })
-
-        it("recusa período inexistente", async () => {
-            let response = await client.put(`/BudgetPeriods/IdBudgetPeriod=999999`, { LimitValue: 100 })
-
-            expect(response.status).toBe(406)
-        })
-
-        //  O IdBudgetPeriod é sequencial: sem o filtro de workspace no getUnique, a matrícula
-        //  conferida no próprio tenant liberaria mexer no teto do vizinho
-        it("recusa o período de outro workspace", async () => {
-            let owner = await buildWorkspace()
-            let created = await createBudget(owner, { LimitValue: 800 })
-
-            let response = await otherClient.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, { LimitValue: 1 })
-
-            expect(response.status).toBe(406)
-            expect((await findPeriodById(created.IdBudgetPeriod)).LimitValue).toBe(800)
-        })
-
-        //  "Em dezembro pode 1.500" não mexe na definição nem em nenhum outro mês
-        it("muda o teto só daquele mês", async () => {
-            let workspace = await buildWorkspace()
-
-            let august = await createBudget(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
-            let december = await createBudget(workspace, { ReferenceMonth: "2026-12", LimitValue: 800 })
-
-            let response = await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${december.IdBudgetPeriod}`, {
-                LimitValue: 1500,
-                AlertPercent: 95,
-            })
-
-            expect(response.status).toBe(200)
-            expect(await findPeriodById(december.IdBudgetPeriod)).toMatchObject({ LimitValue: 1500, AlertPercent: 95 })
-
-            //  Agosto e a definição intactos
-            expect((await findPeriodById(august.IdBudgetPeriod)).LimitValue).toBe(800)
-            expect((await findBudgets(workspace.user.workspace.IdWorkspace))[0].LimitValue).toBe(800)
-        })
-
-        it("recusa mês ou orçamento no corpo", async () => {
-            let workspace = await buildWorkspace()
-            let created = await createBudget(workspace)
-
-            let response = await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, {
-                LimitValue: 900,
-                ReferenceMonth: "2026-09-01",
-            })
-
-            expect(response.status).toBe(406)
-        })
-    })
-
-    describe("DELETE /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", () => {
-
-        it("recusa sem token", async () => {
-            let response = await client.anonymous().delete(`/BudgetPeriods/IdBudgetPeriod=1`)
-
-            expect(response.status).toBe(401)
-        })
-
-        it("recusa período inexistente", async () => {
-            let response = await client.delete(`/BudgetPeriods/IdBudgetPeriod=999999`)
-
-            expect(response.status).toBe(406)
-        })
-
-        it("recusa o período de outro workspace", async () => {
-            let owner = await buildWorkspace()
-            let created = await createBudget(owner)
-
-            let response = await otherClient.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
-
-            expect(response.status).toBe(406)
-            expect(await findPeriodById(created.IdBudgetPeriod)).toBeDefined()
-        })
-
-        //  Delete físico, ao contrário de toda tabela de cadastro: o período é plano, não
-        //  lançamento. A definição fica, porque é dela que a rotina vai materializar os
-        //  próximos meses.
-        it("apaga o mês e mantém a definição", async () => {
-            let workspace = await buildWorkspace()
-
-            let created = await createBudget(workspace)
-
-            let response = await workspace.client.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
-
-            expect(response.status).toBe(200)
-            expect(await findPeriodById(created.IdBudgetPeriod)).toBeUndefined()
-            expect(await findBudgets(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
-
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body).toEqual([])
-        })
-
-        //  Apagado o mês, a categoria pode ser orçada de novo nele
-        it("libera o mês para um cadastro novo", async () => {
-            let workspace = await buildWorkspace()
-
-            let created = await createBudget(workspace, { LimitValue: 800 })
-
-            await workspace.client.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
-
-            let response = await workspace.client.post(`/Budgets`, buildBody(workspace, { LimitValue: 500 }))
-
-            expect(response.status).toBe(200)
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([500])
-        })
-    })
-
     describe("Fluxo end to end", () => {
 
         //  O mês de uso do orçamento, só por HTTP: orça, gasta, acompanha o comprometido,
@@ -604,10 +492,6 @@ function findBudgets(IdWorkspace: number) {
 
 function findPeriods(IdBudget: number) {
     return TestDatabase.connection().select("*").from("BudgetPeriods").where("IdBudget", IdBudget).orderBy("ReferenceMonth")
-}
-
-function findPeriodById(IdBudgetPeriod: number) {
-    return TestDatabase.connection().select("*").from("BudgetPeriods").where("IdBudgetPeriod", IdBudgetPeriod).first()
 }
 
 //#endregion
