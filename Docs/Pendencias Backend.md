@@ -9,7 +9,7 @@ cliente seria contornar uma decisão de segurança do servidor. Onde faz
 sentido, proponho a forma do endpoint para poupar uma rodada de conversa.
 
 O que é só decisão de produto (tela X ou Y) não está aqui: está no
-[Plano de Desenvolvimento](Plano%20de%20Desenvolvimento.md).
+[Plano de Desenvolvimento](levas/1.%20Plano%20de%20Desenvolvimento.md).
 
 ## Prioridade
 
@@ -24,10 +24,16 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | 7 | [Conciliação de extrato](#7-conciliação-de-extrato) | Produto | Tela 08, frame B |
 | 8 | [Exportar para Excel](#8-exportar-para-excel) | Produto | Item fixo da sidebar |
 | 9 | [Notificações](#9-notificações) | Produto | "Avisos" do Dashboard |
+| 10 | [`Occurrences` fora do `POST /Expenses`](#10-occurrences-fora-do-post-expenses) | Contrato | Gasto fixo — **já aplicado no cliente** |
+| 11 | [Clonar o mês anterior de Renda](#11-clonar-o-mês-anterior-de-renda) | Produto | Botão "Clonar mês anterior" |
+| 12 | [Lista de gastos com os filhos](#12-lista-de-gastos-com-os-filhos) | Performance | Colunas de destino e forma de pagamento |
 
 Os itens 1 e 2 são de segurança e valem ser tratados antes do MVP ir ao
-ar. Do 3 ao 9 são cortes conscientes do MVP — o frontend já está
-desenhado para viver sem eles.
+ar. O **10 é o mais urgente depois deles**, e por um motivo diferente: o
+cliente já parou de mandar o campo, então contrato e implementação estão
+divergindo agora. Os itens 11 e 12 seguram funcionalidade que já está
+desenhada na tela. Do 3 ao 9 são cortes conscientes do MVP — o frontend
+já está desenhado para viver sem eles.
 
 ---
 
@@ -253,6 +259,160 @@ Antes disso, é preciso definir o que gera aviso — parcela vencendo,
 orçamento estourado, entrada prevista não recebida.
 
 **Estado no frontend.** Fora do MVP.
+
+---
+
+## 10. `Occurrences` fora do `POST /Expenses`
+
+**O que mudou.** O campo `Occurrences` sai do corpo de criação de gasto.
+O contrato ainda o documenta (`só em fixed, 1-60, default 12`), mas ele
+**não vai mais ser enviado**.
+
+**Estado no frontend.** Já aplicado, e é por isso que este item está no
+topo da lista depois dos dois de segurança: o cliente e o documento estão
+divergindo *agora*.
+
+- O campo saiu do formulário de gasto e do rascunho (`ExpenseDraft`).
+- Saiu de `ExpenseCreateBody` em `src/types/api.ts`.
+- Saiu do corpo do `POST` em
+  `src/pages/AddExpense/sections/submitExpense.ts`, com teste que prova
+  que a chave não é enviada.
+- A validação "de 1 a 60" foi removida junto — não havia mais o que
+  validar.
+
+**O que o backend precisa decidir e responder:**
+
+1. **Remover `Occurrences` do schema do `POST`.** Enquanto ele for
+   opcional e ignorado, nada quebra; se virar `forbidden` no Joi, também
+   não — o cliente não o manda. O que **não** pode acontecer é ele virar
+   obrigatório.
+2. **O que limita a série agora.** A leitura do frontend é que
+   `RecurrenceEndDate` passa a ser o único freio: sem ela, a recorrência
+   é aberta. Se a regra for outra (um teto fixo no servidor, por
+   exemplo), a tela precisa saber o número para dizê-lo ao usuário antes
+   de salvar.
+3. **`Occurrences` na resposta.** Hoje o `POST` devolve
+   `{ IdExpense, Occurrences }`, e a tela usa esse número para dizer
+   quantas ocorrências nasceram. O cliente já trata a **ausência** dele
+   (assume 1), então mantê-lo ou removê-lo é decisão de vocês — só não
+   deixe de ser número quando vier.
+
+> Enquanto o documento de contrato não for atualizado, ele e o cliente
+> discordam neste ponto. A fonte da verdade é este item.
+
+---
+
+## 11. Clonar o mês anterior de Renda
+
+**O problema.** Não existe entrada recorrente no contrato: salário,
+aluguel recebido e benefício são lançamentos avulsos que se repetem todo
+mês. Sem um caminho de repetição, o usuário redigita os mesmos cinco
+lançamentos toda virada de mês — e o layout de Renda desenha exatamente
+esse atalho ("Clonar mês anterior", e a sugestão "Trazer 3 entradas
+recorrentes de abril").
+
+**Por que não fica no cliente.** Foi implementado no cliente e **desfeito
+de propósito**. Clonar no cliente é: listar o mês anterior, pedir um
+`get(id)` por linha (o rateio só existe lá) e disparar um `POST` por
+entrada. Isso tem três problemas que nenhum cuidado no frontend resolve:
+
+- **Não é atômico.** Cinco entradas, a terceira recusada: o mês fica pela
+  metade e não há como voltar atrás.
+- **Não é idempotente.** Dois cliques, ou duas abas, duplicam o mês
+  inteiro. O cliente não tem como saber que aquela entrada já foi
+  clonada — não há vínculo entre a original e a cópia.
+- **É N+1 requisições** para uma operação que, no servidor, é um
+  `INSERT ... SELECT` dentro de uma transaction.
+
+**Proposta:**
+
+```
+POST /Inflows/clone        🔒
+```
+
+```json
+{ "FromMonth": "2026-07", "ToMonth": "2026-08" }
+```
+
+Regras que o frontend assume (confirmem ou corrijam):
+
+- Copia só `Kind = 'inflow'` e `Status <> 'canceled'`. **Transferência
+  fica de fora**: ela é movimento entre contas, não renda que se repete,
+  e clonar uma criaria uma mudança de bolso que nunca aconteceu.
+- `CompetenceDate` e `ExpectedDate` avançam um mês, **aparando o dia no
+  mês curto** — 31/01 vira 28/02, nunca 03/03.
+- O rateio (`Persons`) vai junto, com os mesmos valores.
+- As cópias nascem `pending`. Nenhum saldo se move até o `receive` de
+  cada uma — é isso que faz a operação ser segura de repetir.
+- **Idempotente por mês de destino:** uma entrada já clonada não é
+  clonada de novo. Se o vínculo exigir coluna nova
+  (`IdSourceInflow`), ela resolve o problema de vez; sem ela, casar por
+  (descrição, valor, conta) já evita o pior.
+
+**Resposta:**
+
+```json
+{ "msg": "3 entradas trazidas de julho", "Created": 3, "Skipped": 0 }
+```
+
+`Created` é o que a tela mostra ao usuário; `Skipped` é o que explica
+"cliquei e não aconteceu nada" quando o mês já tinha sido clonado.
+
+**Estado no frontend.** Botão presente e desabilitado, rotulado "ainda
+sem API" — como os outros desta lista que fazem parte da composição do
+layout.
+
+---
+
+## 12. Lista de gastos com os filhos
+
+**O problema.** `GET /Expenses` não traz `Payments`, `Persons` nem
+`Tags` — só o `get(id)` traz. Mas a tela de Gastos mostra **destino
+(pessoa)** e **forma de pagamento** em cada linha, e o Início desenha os
+dois breakdowns correspondentes. Os dois dados só existem no detalhe.
+
+**Consequência hoje.** Abrir a lista do mês dispara **uma requisição por
+gasto** (`useMonthExpenseDetails` em `src/data/month.ts`). Num mês com 47
+lançamentos, são 47 chamadas para preencher duas colunas. O frontend as
+guarda sob a mesma chave de cache que o slide-over de detalhe usa, então
+abrir um gasto depois é instantâneo e trocar de tela reaproveita tudo —
+mas o primeiro carregamento paga o preço inteiro.
+
+**Um segundo furo, do mesmo tronco.** A lista filtra por `ExpenseDate`,
+então uma compra de 6× feita em março **não aparece** na lista de agosto
+— e a 6ª parcela dela pesa em agosto. O cliente compensa varrendo 24
+meses para trás atrás de parcelados
+(`INSTALLMENT_LOOKBACK_MONTHS` em `src/data/month.ts`), com um `get(id)`
+por compra encontrada. O contrato permite 120 parcelas: **acima da
+janela, a parcela some do total do mês.** É a única lacuna do MVP em que
+o número na tela fica *errado*, e não só ausente.
+
+**Proposta.** Qualquer uma das duas resolve; a segunda resolve as duas
+coisas de uma vez.
+
+1. **Filhos sob demanda na lista:**
+
+   ```
+   GET /Expenses?Include=Payments,Persons,Tags        🔒
+   ```
+
+   Mesma resposta de hoje, com os filhos embutidos quando pedidos. Mata
+   o N+1 das colunas. **Não** resolve a janela de parcelados.
+
+2. **Pernas de um período** (preferida):
+
+   ```
+   GET /ExpensePayments?From=YYYY-MM-DD&To=YYYY-MM-DD        🔒
+   ```
+
+   Devolve as pernas cuja `coalesce(DueDate, ExpenseDate)` cai no
+   intervalo, cada uma com o gasto de origem, o rateio e a forma. É
+   exatamente a unidade que todo total do sistema já usa — "600 em 6×
+   custa 100 ao mês" —, mata o N+1 **e** dispensa a janela de 24 meses.
+
+Relacionado ao item [3](#3-agregados-do-mês-para-o-dashboard): se os
+agregados do mês vierem do servidor, esta rota é a que sobra para as
+telas de lista, que precisam da linha e não só do total.
 
 ---
 

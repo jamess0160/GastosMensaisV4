@@ -2,13 +2,14 @@ import {
     forwardRef,
     useId,
     useState,
+    type ChangeEvent,
     type InputHTMLAttributes,
     type ReactNode,
     type SelectHTMLAttributes,
     type TextareaHTMLAttributes,
 } from "react";
 import styles from "./form.module.css";
-import { IconAlert, IconChevronDown, IconEye, IconEyeOff, IconInfo } from "./icons";
+import { IconChevronDown, IconEye, IconEyeOff } from "./icons";
 import { formatAmount, parseMoneyInput } from "@/lib/money";
 import type { ApiTypes } from "@/types/api";
 
@@ -156,13 +157,48 @@ export function PasswordInput({ className, ...rest }: InputProps) {
 
 /* ── Dinheiro ─────────────────────────────────────────────── */
 
-/** Campo de dinheiro.
+/** As props de um `<input>` de dinheiro, sem opinião nenhuma de visual.
  *
- *  Guarda o texto digitado enquanto o campo está focado e só normaliza
- *  ao sair: formatar a cada tecla faria o cursor pular no meio do
- *  número. Quem converte é `parseMoneyInput`, que aceita "1.234,56";
- *  texto que não é número vira `null`, e não zero — zero é um valor
- *  legítimo e não pode significar "não entendi". */
+ *  O TEXTO DIGITADO FICA CRU ENQUANTO O CAMPO ESTÁ FOCADO, e só se
+ *  normaliza ao sair. Formatar a cada tecla parece inofensivo e não é:
+ *  digitar "1" viraria "1,00" na hora, o cursor pularia para o fim, e a
+ *  próxima tecla montaria "1,002" — que `parseMoneyInput` recusa por ter
+ *  três casas e devolve `null`, apagando o campo. O usuário digita 123 e
+ *  fica com 3.
+ *
+ *  Quem converte é `parseMoneyInput`, que aceita "1.234,56"; texto que
+ *  não é número vira `null`, e não zero — zero é um valor legítimo e não
+ *  pode significar "não entendi".
+ *
+ *  Está como hook, e não escondido dentro de `MoneyInput`, porque há
+ *  mais de um visual de campo de dinheiro no sistema (o do formulário e
+ *  o campo grande do painel de gasto) e o cuidado acima é o mesmo nos
+ *  dois. */
+export function useMoneyField(
+    value: ApiTypes.Money | null,
+    onValueChange: (value: ApiTypes.Money | null) => void,
+): {
+    value: string;
+    inputMode: "decimal";
+    placeholder: string;
+    onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+    onBlur: () => void;
+} {
+    const [draft, setDraft] = useState<string | null>(null);
+
+    return {
+        value: draft ?? (value === null ? "" : formatAmount(value)),
+        inputMode: "decimal",
+        placeholder: "0,00",
+        onChange: (event) => {
+            setDraft(event.target.value);
+            onValueChange(parseMoneyInput(event.target.value));
+        },
+        onBlur: () => setDraft(null),
+    };
+}
+
+/** Campo de dinheiro com o "R$" na moldura, do kit de formulário. */
 export function MoneyInput({
     value,
     onValueChange,
@@ -174,27 +210,26 @@ export function MoneyInput({
     onValueChange: (value: ApiTypes.Money | null) => void;
     invalid?: boolean;
 }) {
-    const [draft, setDraft] = useState<string | null>(null);
-    const shown = draft ?? (value === null ? "" : formatAmount(value));
+    const field = useMoneyField(value, onValueChange);
 
     return (
         <span className={styles.adorned}>
             <span className={styles.prefix}>R$</span>
             <Input
-                inputMode="decimal"
                 className={cx(styles.money, className)}
                 invalid={invalid}
-                placeholder="0,00"
-                value={shown}
-                onChange={(event) => {
-                    setDraft(event.target.value);
-                    onValueChange(parseMoneyInput(event.target.value));
-                }}
+                /* `placeholder` antes do resto para o chamador poder
+                   trocá-lo; `value` e `onChange` depois, porque quem
+                   manda no texto é o hook. */
+                placeholder={field.placeholder}
+                {...rest}
+                value={field.value}
+                inputMode={field.inputMode}
+                onChange={field.onChange}
                 onBlur={(event) => {
-                    setDraft(null);
+                    field.onBlur();
                     rest.onBlur?.(event);
                 }}
-                {...rest}
             />
         </span>
     );
@@ -367,25 +402,6 @@ export function Stepper({
             >
                 +
             </button>
-        </div>
-    );
-}
-
-/* ── Notas ────────────────────────────────────────────────── */
-
-export function InfoNote({
-    children,
-    tone = "info",
-}: {
-    children: ReactNode;
-    tone?: "info" | "warn";
-}) {
-    return (
-        <div className={cx(styles.note, tone === "warn" && styles.noteWarn)}>
-            <span className={styles.noteMark}>
-                {tone === "warn" ? <IconAlert /> : <IconInfo />}
-            </span>
-            <div>{children}</div>
         </div>
     );
 }

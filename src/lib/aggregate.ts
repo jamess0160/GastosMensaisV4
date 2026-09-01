@@ -165,6 +165,95 @@ export function spentByCategory(
         .sort((a, b) => b.value - a.value);
 }
 
+/** Onde uma perna encontra o gasto detalhado a que pertence. A lista
+ *  não traz `Payments` nem `Persons`; quem os tem é o `get(id)`, e é
+ *  ele que estes dois recortes exigem. */
+export type DetailLookup = (idExpense: number) => ApiTypes.ExpenseDetail | undefined;
+
+/** Total por forma de pagamento.
+ *
+ *  A perna já sabe a forma quando veio do detalhe. Quando ela é a perna
+ *  IMPLÍCITA da lista (`single` e `fixed`, que têm uma ocorrência por
+ *  linha), a forma só existe no detalhe — e o gasto pode ter sido pago
+ *  com duas formas, então o que se soma são as pernas dele, cuja soma é
+ *  o próprio valor da perna implícita.
+ *
+ *  Gasto cujo detalhe ainda não chegou fica de fora em vez de virar uma
+ *  fatia "desconhecido": a lista se completa sozinha em segundos, e uma
+ *  fatia que encolhe sozinha é pior do que uma que aparece. */
+export function spentByPaymentMethod(
+    legs: readonly ExpenseLeg[],
+    detailOf: DetailLookup,
+): { IdPaymentMethod: number; value: ApiTypes.Money }[] {
+    const byMethod = new Map<number, number>();
+
+    const add = (idPaymentMethod: number, cents: number) =>
+        byMethod.set(idPaymentMethod, (byMethod.get(idPaymentMethod) ?? 0) + cents);
+
+    for (const leg of legs) {
+        if (leg.payment) {
+            add(leg.payment.IdPaymentMethod, toCents(leg.value));
+            continue;
+        }
+        const detail = detailOf(leg.expense.IdExpense);
+        if (!detail) continue;
+        for (const payment of detail.Payments) add(payment.IdPaymentMethod, toCents(payment.Value));
+    }
+
+    return [...byMethod.entries()]
+        .map(([IdPaymentMethod, cents]) => ({ IdPaymentMethod, value: fromCents(cents) }))
+        .sort((a, b) => b.value - a.value);
+}
+
+/** Total por destino (pessoa).
+ *
+ *  O rateio entre pessoas é gravado sobre o TOTAL DA COMPRA, não sobre a
+ *  perna: numa compra de 600 em 6x dividida meio a meio, cada pessoa tem
+ *  300 gravados e o mês custa 50 a cada uma. Por isso a fatia da pessoa
+ *  é proporcional — `valor da perna × (fatia da pessoa ÷ total)`.
+ *
+ *  `IdPerson: null` é o gasto sem rateio nenhum, que é a maioria: ele
+ *  não pertence a ninguém em particular e some se for descartado. */
+export function spentByPerson(
+    legs: readonly ExpenseLeg[],
+    detailOf: DetailLookup,
+): { IdPerson: number | null; value: ApiTypes.Money }[] {
+    const byPerson = new Map<number | null, number>();
+
+    const add = (idPerson: number | null, cents: number) =>
+        byPerson.set(idPerson, (byPerson.get(idPerson) ?? 0) + cents);
+
+    for (const leg of legs) {
+        const detail = detailOf(leg.expense.IdExpense);
+        const split = detail?.Persons ?? [];
+
+        if (split.length === 0 || leg.expense.TotalValue <= 0) {
+            add(null, toCents(leg.value));
+            continue;
+        }
+
+        const legCents = toCents(leg.value);
+        const totalCents = toCents(leg.expense.TotalValue);
+        let distributed = 0;
+
+        split.forEach((person, index) => {
+            // O centavo que sobra vai no primeiro, a mesma regra do
+            // parcelamento — sem isso a soma das fatias não fecha com o
+            // total do mês e o gráfico mente no último dígito.
+            const share =
+                index === split.length - 1
+                    ? legCents - distributed
+                    : Math.round((toCents(person.Value) * legCents) / totalCents);
+            distributed += share;
+            add(person.IdPerson, share);
+        });
+    }
+
+    return [...byPerson.entries()]
+        .map(([IdPerson, cents]) => ({ IdPerson, value: fromCents(cents) }))
+        .sort((a, b) => b.value - a.value);
+}
+
 /** Total por dia de competência — a linha do relatório. Devolve um valor
  *  por dia informado, zero incluído: o gráfico precisa do eixo inteiro,
  *  não só dos dias em que houve gasto. */

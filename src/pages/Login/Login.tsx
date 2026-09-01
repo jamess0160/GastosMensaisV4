@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { AuthLayout, authStyles as styles } from "@/ui/AuthLayout";
+import { Button } from "@/ui/primitives";
 import { ConfirmDialog } from "@/ui/overlay";
 import { FormField, Input, PasswordInput } from "@/ui/form";
+import { clearSignedOut, markSignedOut } from "@/app/session";
 import { IconFingerprint } from "@/ui/icons";
 import { LoginController, type LoginContext } from "./controller";
 import { readDeviceKey, writeDeviceKey } from "@/lib/deviceKey";
@@ -35,6 +37,9 @@ export function Login() {
             },
             finishSignIn() {
                 setPending(false);
+                // A sessão nova é o único momento em que a trava de saída
+                // cai — ver `markSignedOut` em src/app/session.tsx.
+                clearSignedOut();
                 queryClient.clear();
                 navigate("/", { replace: true });
             },
@@ -50,6 +55,20 @@ export function Login() {
         }),
         [deviceKey, email, password, navigate, queryClient],
     );
+
+    /* Chegar ao login é sair.
+     *
+     *  Sem rota de logout o cookie sobrevive, e sem esta trava abrir
+     *  /login com sessão de pé mostrava o formulário mas mantinha o app
+     *  logado por trás — voltar para "/" entrava direto na conta
+     *  anterior. Marcar aqui cobre os dois caminhos que o usuário chama
+     *  de "sair": o botão do menu e digitar o endereço do login. */
+    useEffect(() => {
+        markSignedOut();
+        queryClient.clear();
+        // Só na montagem: é a chegada à tela que desconecta.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         void LoginController.loadBiometricsAvailability(context);
@@ -70,10 +89,11 @@ export function Login() {
                 subheading="Continue de onde parou — seus gastos e parcelas te esperam."
                 topRight={
                     <>
-                        Ainda não tem conta?
-                        <Link to="/cadastro">
-                            <strong>Criar conta</strong>
-                        </Link>
+                        <span>Ainda não tem conta?</span>
+                        {/* Botão de verdade, não link: no layout ele tem
+                            borda e fundo próprio — é o segundo caminho da
+                            tela, e precisa parecer clicável. */}
+                        <Button onClick={() => navigate("/cadastro")}>Criar conta</Button>
                     </>
                 }
             >

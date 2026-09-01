@@ -18,8 +18,9 @@ import type { ApiTypes } from "@/types/api";
    2. Todo rateio é por VALOR ABSOLUTO e a soma bate em centavos.
    3. Os campos de formato são exclusivos: `InstallmentTotal` é
       obrigatório em `installment` e PROIBIDO nos outros;
-      `RecurrenceDay`/`RecurrenceEndDate`/`Occurrences` só existem em
-      `fixed`. Não é "campo ignorado" — é recusa.
+      `RecurrenceDay`/`RecurrenceEndDate` só existem em `fixed`. Não é
+      "campo ignorado" — é recusa. `Occurrences` saiu: a API não recebe
+      mais o campo, e a série é limitada por `RecurrenceEndDate`.
    ════════════════════════════════════════════════════════════ */
 
 /** O que a tela confere antes de gastar a requisição.
@@ -53,10 +54,6 @@ export function validateExpense(draft: ExpenseDraft, isEdit: boolean): string | 
     ) {
         return "O número de parcelas vai de 2 a 120.";
     }
-    if (draft.Kind === "fixed" && (draft.Occurrences < 1 || draft.Occurrences > 60)) {
-        return "O número de ocorrências vai de 1 a 60.";
-    }
-
     // `Persons` é opcional; quando existe, fecha por conta própria.
     if (usableLines(draft.persons).length > 0 && !splitIsClosed(draft.persons, draft.TotalValue)) {
         return "A soma do rateio entre pessoas precisa fechar com o total.";
@@ -128,7 +125,6 @@ export async function submitExpense(context: AddExpenseContext): Promise<void> {
             ...(draft.Kind === "installment" ? { InstallmentTotal: draft.InstallmentTotal } : {}),
             ...(draft.Kind === "fixed"
                 ? {
-                      Occurrences: draft.Occurrences,
                       ...(draft.RecurrenceDay !== null
                           ? { RecurrenceDay: draft.RecurrenceDay }
                           : {}),
@@ -140,7 +136,8 @@ export async function submitExpense(context: AddExpenseContext): Promise<void> {
         };
 
         const { Occurrences } = await ExpensesConnection.create(body);
-        context.finishSubmit(Occurrences);
+        // A resposta pode não trazer o número quando o gasto é um só.
+        context.finishSubmit(Occurrences ?? 1);
     } catch (cause) {
         context.failSubmit(errorMessage(cause));
     }

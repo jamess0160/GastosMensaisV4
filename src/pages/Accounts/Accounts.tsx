@@ -12,7 +12,6 @@ import {
     FormError,
     FormField,
     FormGrid,
-    InfoNote,
     Input,
     MoneyInput,
     DateInput,
@@ -316,12 +315,6 @@ export function Accounts() {
                 </Table>
             )}
 
-            <InfoNote>
-                O saldo é calculado pela API a cada leitura: saldo inicial, mais o que já foi
-                recebido, menos as parcelas já quitadas. <b>O que está em aberto não entra</b> — é
-                previsão, não dinheiro.
-            </InfoNote>
-
             {/* ── Slide-over: cartões da conta ─────────────────── */}
             <SlideOver
                 open={detail !== null}
@@ -373,11 +366,6 @@ export function Accounts() {
                                 </div>
                             ))}
                         </div>
-
-                        <InfoNote>
-                            Pix e débito nascem com a conta e não se criam nem se apagam pela mão —
-                            o contrato só aceita cadastrar cartão de crédito.
-                        </InfoNote>
 
                         <div className={styles.sectionLabel}>
                             <span>Cartões de crédito</span>
@@ -574,13 +562,6 @@ export function Accounts() {
                                 />
                             )}
                         </FormField>
-
-                        {accountDraft.IdAccount === null && (
-                            <InfoNote>
-                                A conta já nasce com uma forma <b>pix</b> e uma de <b>débito</b>.
-                                Cartão de crédito você cadastra depois, abrindo a conta na lista.
-                            </InfoNote>
-                        )}
                     </form>
                 )}
             </SlideOver>
@@ -723,13 +704,6 @@ export function Accounts() {
                                 />
                             )}
                         </FormField>
-
-                        {cardDraft.IdPaymentMethod !== null && (
-                            <InfoNote>
-                                O cartão não muda de conta e não vira outro tipo: as duas trocas
-                                reescreveriam o significado de todas as compras já lançadas nele.
-                            </InfoNote>
-                        )}
                     </form>
                 )}
             </SlideOver>

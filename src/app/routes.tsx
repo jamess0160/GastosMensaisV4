@@ -48,9 +48,18 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
             { index: true, element: load(<Dashboard />) },
-            { path: "gastos", element: load(<Expenses />) },
-            { path: "gastos/novo", element: load(<AddExpense />) },
-            { path: "gastos/:idExpense/editar", element: load(<AddExpense />) },
+            /* O formulário de gasto é um slide-over SOBRE a lista, como
+               no frame 03 do layout — por isso ele é rota filha de
+               `gastos`, e não uma tela irmã: a lista continua atrás do
+               painel, e é nela que o lançamento aparece ao salvar. */
+            {
+                path: "gastos",
+                element: load(<Expenses />),
+                children: [
+                    { path: "novo", element: load(<AddExpense />) },
+                    { path: ":idExpense/editar", element: load(<AddExpense />) },
+                ],
+            },
             { path: "renda", element: load(<Income />) },
             { path: "contas", element: load(<Accounts />) },
             { path: "relatorio", element: load(<Report />) },

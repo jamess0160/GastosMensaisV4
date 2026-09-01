@@ -14,7 +14,6 @@ export const aDraft = (overrides: Partial<ExpenseDraft> = {}): ExpenseDraft => (
     InstallmentTotal: 2,
     RecurrenceDay: null,
     RecurrenceEndDate: null,
-    Occurrences: 12,
     ...overrides,
 });
 

@@ -55,10 +55,17 @@
     color: var(--neg);
 }
 
-.heroCaption {
-    font-size: 12px;
+/* A régua do cartão principal — o "76% do orçamento usado" do layout.
+   Sem a contagem de dias: ela repetia o subtítulo da página. */
+.heroMeter {
+    margin-top: 16px;
+}
+
+.heroMeterCaption {
+    margin-top: 6px;
+    font-size: 11.5px;
     color: var(--ink-2);
-    margin-top: 10px;
+    font-variant-numeric: tabular-nums;
 }
 
 .flows {
@@ -162,11 +169,47 @@
     gap: 14px;
 }
 
-.columns {
+/* Os painéis de baixo ocupam a largura inteira e têm fundo próprio —
+   era o que faltava no bloco de orçamentos. */
+.panel {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* As três quebras do layout, lado a lado. */
+.breakdowns {
     display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
     align-items: start;
+}
+
+.breakdownCard {
+    padding: 20px;
+}
+
+.breakdownHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.breakdownTotal {
+    margin-top: 4px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    font-variant-numeric: tabular-nums;
+}
+
+.breakdownEmpty {
+    font-size: 12px;
+    color: var(--ink-3);
+    padding: 8px 0 4px;
 }
 
 .notice {
@@ -232,9 +275,14 @@
     color: rgba(255, 255, 255, 0.85);
 }
 
+@media (max-width: 1240px) {
+    .breakdowns {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 @media (max-width: 1100px) {
-    .hero,
-    .columns {
+    .hero {
         grid-template-columns: minmax(0, 1fr);
     }
 }

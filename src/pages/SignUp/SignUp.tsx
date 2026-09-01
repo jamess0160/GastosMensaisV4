@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { AuthLayout, authStyles as styles } from "@/ui/AuthLayout";
 import { Checkbox, FormField, Input, PasswordInput } from "@/ui/form";
+import { Button } from "@/ui/primitives";
 import { SignUpController, type SignUpContext } from "./controller";
 
 /** "(11) 98888-7777" a partir dos dígitos. A API tipa `Phone` como
@@ -65,10 +66,8 @@ export function SignUp() {
             subheading="Seu espaço nasce junto com a conta — sem convite e sem configuração."
             topRight={
                 <>
-                    Já tem conta?
-                    <Link to="/login">
-                        <strong>Entrar</strong>
-                    </Link>
+                    <span>Já tem conta?</span>
+                    <Button onClick={() => navigate("/login")}>Entrar</Button>
                 </>
             }
         >

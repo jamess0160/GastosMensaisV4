@@ -1,31 +1,223 @@
 /* Transcrito de Layout/Hi-fi Desktop/03 - Adicionar Gasto.html
-   (.twocol do formulário, .splitcard, .grp-lab, .ptl). */
+   (.so-body do slide-over: .inbox, .grp-lab, .splitcard, .valid,
+   .pchip). O formulário é um painel à direita, não uma tela — foi o
+   que a revisão dos ajustes corrigiu. */
 
-.columns {
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* ── Grades do painel ─────────────────────────────────────── */
+.rowValue {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 360px;
-    gap: 18px;
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    gap: 12px;
 }
 
-.form {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
+.rowKind {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 12px;
 }
 
-.aside {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    position: sticky;
-    top: 24px;
+.rowPair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
 }
 
-.block {
+.rowThree {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+/* ── Caixa de campo (.inbox) ──────────────────────────────── */
+.box {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    min-width: 0;
+}
+
+.boxLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    margin-bottom: 5px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.boxHint {
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-3);
+}
+
+/* O valor é o campo mais alto do painel de propósito: é o número que o
+   usuário confere antes de salvar, e o que o rateio tem que fechar. */
+.amountField {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.amountPrefix {
+    font-size: 16px;
+    color: var(--ink-2);
+    font-weight: 500;
+}
+
+.amountInput {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-family: var(--font);
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.6px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+}
+
+.amountInput:focus {
+    outline: none;
+}
+
+.plainInput {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ink);
+    width: 100%;
+    min-width: 0;
+}
+
+.plainInput:focus {
+    outline: none;
+}
+
+.plainInput::placeholder {
+    color: var(--ink-3);
+    font-weight: 400;
+}
+
+.plainSelect {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    width: 100%;
+    min-width: 0;
+    appearance: none;
+    cursor: pointer;
+}
+
+.plainSelect:focus {
+    outline: none;
+}
+
+.selectRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.caret {
+    color: var(--ink-3);
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.caret svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ── Rótulo de grupo (.grp-lab) ───────────────────────────── */
+.groupLabel {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.groupLabelText {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.groupLabelHint {
+    font-size: 11.5px;
+    color: var(--ink-3);
+}
+
+.linkButton {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: var(--font);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.linkButton:hover {
+    color: var(--brand);
+}
+
+/* ── Resumo (.pchip) ──────────────────────────────────────── */
+.summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.chipMoney {
+    font-variant-numeric: tabular-nums;
+    color: var(--neg);
 }
 
 .blockLabel {
@@ -40,151 +232,40 @@
     font-size: 11.5px;
     color: var(--ink-3);
     line-height: 1.45;
-    margin-top: -6px;
 }
 
-/* Os dois eixos de rateio, lado a lado — é a disposição que mostra que
-   eles são independentes, e não uma matriz de formas × pessoas. */
-.axes {
+.stack {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 14px;
-    align-items: start;
-}
-
-/* ── Resumo lateral ───────────────────────────────────────── */
-.summaryValue {
-    font-size: 30px;
-    font-weight: 700;
-    letter-spacing: -0.8px;
-    font-variant-numeric: tabular-nums;
-    margin-top: 6px;
-}
-
-.summaryList {
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.summaryRow {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
     gap: 12px;
-    font-size: 12.5px;
+    margin-top: 12px;
 }
 
-.summaryRow dt {
-    color: var(--ink-2);
-    margin: 0;
+.categoryMark {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
-.summaryRow dd {
-    margin: 0;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.checks {
+.extras {
     display: flex;
     flex-direction: column;
-    gap: 7px;
-    margin-top: 4px;
+    gap: 14px;
 }
 
-.check {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--ink-2);
+.paidRow {
+    margin-top: 8px;
 }
 
-.checkMark {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    background: var(--fill-soft);
-    color: var(--ink-3);
-}
-
-.checkMark svg {
-    width: 10px;
-    height: 10px;
-}
-
-.checkOn {
-    background: var(--pos-soft);
-    color: var(--pos-ink);
-}
-
-.checkOn + span {
-    color: var(--ink);
-}
-
-.submit {
-    height: 46px;
-    border-radius: 12px;
-    border: none;
-    background: var(--brand);
-    color: #fff;
-    font-family: var(--font);
-    font-size: 14px;
-    font-weight: 700;
-    box-shadow: 0 8px 18px -6px rgba(255, 106, 0, 0.5);
-}
-
-.submit:hover:not(:disabled) {
-    background: var(--brand-press);
-}
-
-.submit:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    box-shadow: none;
-}
-
-@media (max-width: 1180px) {
-    .columns {
+@media (max-width: 720px) {
+    .rowValue,
+    .rowKind,
+    .rowPair,
+    .rowThree {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .aside {
-        position: static;
-    }
-
-    .axes {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-
-@media (max-width: 900px) {
-    /* O resumo lateral vira o topo da tela: num telefone ele é o que
-       confirma que o valor e o formato estão certos antes de rolar até
-       o botão. */
-    .columns {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .aside {
-        order: -1;
-    }
-
-    .summaryValue {
+    .amountInput {
         font-size: 26px;
     }
 }

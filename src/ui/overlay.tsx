@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import styles from "./overlay.module.css";
 import { cx } from "./form";
@@ -15,19 +15,47 @@ import { IconAlert, IconClose } from "./icons";
 const FOCUSABLE =
     'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/** Para onde vai o foco quando o painel abre.
+ *
+ *  NÃO é simplesmente o primeiro elemento focável: no DOM o `<header>`
+ *  vem antes do corpo, e o primeiro focável do painel inteiro é o botão
+ *  de fechar. Quem abre um formulário quer digitar, não fechar — então a
+ *  busca começa pelo corpo, marcado com `data-dialog-body`.
+ *
+ *  Painel sem corpo focável (uma confirmação, que só tem os botões do
+ *  rodapé) cai no primeiro focável do painel, e aí o botão certo é mesmo
+ *  o de cancelar: numa ação destrutiva, o foco inicial não deve estar
+ *  sobre o botão que confirma. */
+export function firstFocusTarget(panel: HTMLElement): HTMLElement | null {
+    const body = panel.querySelector<HTMLElement>("[data-dialog-body]");
+    return (
+        body?.querySelector<HTMLElement>(FOCUSABLE) ??
+        panel.querySelector<HTMLElement>(FOCUSABLE) ??
+        null
+    );
+}
+
 function useDialogBehavior(open: boolean, onClose: () => void) {
     const ref = useRef<HTMLDivElement>(null);
     const restoreTo = useRef<HTMLElement | null>(null);
+
+    /* O `onClose` de quem chama é quase sempre uma arrow inline, e por
+       isso muda de identidade a cada render. Guardá-lo num ref é o que
+       permite o efeito abaixo depender só de `open`: com `onClose` na
+       lista de dependências, o efeito rodava a CADA TECLA digitada
+       dentro do painel — e cada execução roubava o foco de volta para o
+       começo. */
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
 
     useEffect(() => {
         if (!open) return;
 
         restoreTo.current = document.activeElement as HTMLElement | null;
 
-        // O primeiro foco vai para o primeiro controle do painel, não
-        // para o botão de fechar: quem abre um formulário quer digitar.
-        const first = ref.current?.querySelector<HTMLElement>(FOCUSABLE);
-        (first ?? ref.current)?.focus();
+        const panel = ref.current;
+        const target = panel ? firstFocusTarget(panel) : null;
+        (target ?? panel)?.focus();
 
         // A página atrás não deve rolar junto com o painel.
         const previousOverflow = document.body.style.overflow;
@@ -36,7 +64,7 @@ function useDialogBehavior(open: boolean, onClose: () => void) {
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
                 event.stopPropagation();
-                onClose();
+                onCloseRef.current();
                 return;
             }
 
@@ -66,7 +94,8 @@ function useDialogBehavior(open: boolean, onClose: () => void) {
             document.body.style.overflow = previousOverflow;
             restoreTo.current?.focus?.();
         };
-    }, [open, onClose]);
+        // `open` e só: ver o comentário do `onCloseRef` acima.
+    }, [open]);
 
     return ref;
 }
@@ -84,15 +113,14 @@ interface PanelProps {
 /* ── Slide-over ───────────────────────────────────────────── */
 
 export function SlideOver({ open, onClose, title, subtitle, children, footer, wide }: PanelProps) {
-    const close = useCallback(() => onClose(), [onClose]);
-    const ref = useDialogBehavior(open, close);
+    const ref = useDialogBehavior(open, onClose);
     const titleId = useId();
 
     if (!open) return null;
 
     return createPortal(
         <>
-            <div className={styles.scrim} onClick={close} />
+            <div className={styles.scrim} onClick={onClose} />
             <div
                 ref={ref}
                 className={cx(styles.slideover, wide && styles.wide)}
@@ -111,13 +139,15 @@ export function SlideOver({ open, onClose, title, subtitle, children, footer, wi
                     <button
                         type="button"
                         className={styles.closeButton}
-                        onClick={close}
+                        onClick={onClose}
                         aria-label="Fechar"
                     >
                         <IconClose />
                     </button>
                 </header>
-                <div className={styles.body}>{children}</div>
+                <div className={styles.body} data-dialog-body>
+                    {children}
+                </div>
                 {footer && <footer className={styles.foot}>{footer}</footer>}
             </div>
         </>,
@@ -128,15 +158,14 @@ export function SlideOver({ open, onClose, title, subtitle, children, footer, wi
 /* ── Modal ────────────────────────────────────────────────── */
 
 export function Modal({ open, onClose, title, subtitle, children, footer, wide }: PanelProps) {
-    const close = useCallback(() => onClose(), [onClose]);
-    const ref = useDialogBehavior(open, close);
+    const ref = useDialogBehavior(open, onClose);
     const titleId = useId();
 
     if (!open) return null;
 
     return createPortal(
         <>
-            <div className={styles.scrim} onClick={close} />
+            <div className={styles.scrim} onClick={onClose} />
             <div
                 ref={ref}
                 className={cx(styles.modal, wide && styles.modalLarge)}
@@ -155,13 +184,15 @@ export function Modal({ open, onClose, title, subtitle, children, footer, wide }
                     <button
                         type="button"
                         className={styles.closeButton}
-                        onClick={close}
+                        onClick={onClose}
                         aria-label="Fechar"
                     >
                         <IconClose />
                     </button>
                 </header>
-                <div className={styles.body}>{children}</div>
+                <div className={styles.body} data-dialog-body>
+                    {children}
+                </div>
                 {footer && <footer className={styles.foot}>{footer}</footer>}
             </div>
         </>,
@@ -197,15 +228,14 @@ export function ConfirmDialog({
     danger?: boolean;
     pending?: boolean;
 }) {
-    const close = useCallback(() => onClose(), [onClose]);
-    const ref = useDialogBehavior(open, close);
+    const ref = useDialogBehavior(open, onClose);
     const titleId = useId();
 
     if (!open) return null;
 
     return createPortal(
         <>
-            <div className={styles.scrim} onClick={close} />
+            <div className={styles.scrim} onClick={onClose} />
             <div
                 ref={ref}
                 className={styles.modal}
@@ -227,7 +257,7 @@ export function ConfirmDialog({
                 </div>
                 <footer className={styles.foot}>
                     <span className={styles.footSpacer} />
-                    <Button onClick={close} disabled={pending}>
+                    <Button onClick={onClose} disabled={pending}>
                         {cancelLabel}
                     </Button>
                     <Button

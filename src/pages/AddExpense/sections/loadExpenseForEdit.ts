@@ -33,7 +33,6 @@ export function toDraft(expense: ApiTypes.ExpenseDetail): ExpenseDraft {
         InstallmentTotal: expense.Payments[0]?.InstallmentTotal ?? 2,
         RecurrenceDay: expense.RecurrenceDay,
         RecurrenceEndDate: expense.RecurrenceEndDate,
-        Occurrences: 12,
     };
 }
 

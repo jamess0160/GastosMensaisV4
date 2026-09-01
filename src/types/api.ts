@@ -190,7 +190,9 @@ export namespace ApiTypes {
         IdCategory: number;
         IdWorkspace: number | null;
         Description: string;
-        /** Chave do catálogo de ícones do cliente, não caminho de arquivo. */
+        /** O NOME DO COMPONENTE do ícone no lucide-react — "ShoppingCart",
+         *  não um caminho de arquivo. Quem transforma o nome em desenho é
+         *  `src/ui/iconCatalog.tsx`; a API só guarda a string. */
         IconKey: string | null;
         Color: Color | null;
         Position: number | null;
@@ -417,8 +419,6 @@ export namespace ApiTypes {
         /** Só em `fixed`. */
         RecurrenceDay?: number;
         RecurrenceEndDate?: CalendarDate | null;
-        /** Só em `fixed`, 1-60, default 12. */
-        Occurrences?: number;
     }
 
     /** Não se edita `Kind`, `Status` nem a recorrência. As parcelas de uma

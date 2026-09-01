@@ -6,7 +6,6 @@ import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { MonthPicker } from "@/ui/controls";
 import { ChartLegend, DonutChart, DonutWithLegend, LineChart } from "@/ui/charts";
 import { KpiCard } from "@/ui/budget";
-import { InfoNote } from "@/ui/form";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import { spentByCategory, spentByDay, sumMoney, totalSpent } from "@/lib/aggregate";
 import { categoryColor } from "@/lib/categoryColor";
@@ -159,13 +158,6 @@ export function Report() {
                             </DonutWithLegend>
                         </Card>
                     </div>
-
-                    <InfoNote>
-                        O total do donut é o mesmo “gastou no mês” do Início: os dois somam
-                        <b> parcelas</b>, cada uma no mês em que ela vence. Ele <b>não</b> bate com
-                        o total lançado na tela de Gastos, que soma compras inteiras — e é assim de
-                        propósito.
-                    </InfoNote>
                 </>
             )}
         </Page>

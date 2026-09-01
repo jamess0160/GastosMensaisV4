@@ -15,7 +15,7 @@ import {
 } from "@/data/catalogs";
 import { Badge, Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Tabs } from "@/ui/Tabs";
-import { FormError, FormField, InfoNote, Input } from "@/ui/form";
+import { FormError, FormField, Input } from "@/ui/form";
 import { CategoryPreview, ColorPicker, IconPicker } from "@/ui/controls";
 import { ConfirmDialog } from "@/ui/overlay";
 import { CategoryIcon } from "@/ui/iconCatalog";
@@ -310,11 +310,6 @@ export function Settings() {
                                 </div>
                             </form>
                         </Card>
-
-                        <InfoNote>
-                            As categorias que vêm com o sistema aparecem em todo espaço e não se
-                            editam nem se arquivam — crie a sua ao lado se precisar de outra.
-                        </InfoNote>
                     </div>
                 </div>
             ) : (
@@ -470,11 +465,6 @@ export function Settings() {
                                 </div>
                             </form>
                         </Card>
-
-                        <InfoNote>
-                            Um nome já usado neste espaço é recusado, mesmo que a pessoa tenha sido
-                            arquivada — a comparação ignora maiúsculas.
-                        </InfoNote>
                     </div>
                 </div>
             )}

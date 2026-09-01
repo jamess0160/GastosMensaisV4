@@ -25,10 +25,11 @@ export interface ExpenseDraft {
     tags: string[];
     /** Só em `installment`: 2 a 120. */
     InstallmentTotal: number;
-    /** Só em `fixed`. */
+    /** Só em `fixed`. `Occurrences` saiu do formulário: a API deixou de
+     *  aceitar o campo, e quem decide até quando a série vai é
+     *  `RecurrenceEndDate`. */
     RecurrenceDay: number | null;
     RecurrenceEndDate: ApiTypes.CalendarDate | null;
-    Occurrences: number;
 }
 
 export interface AddExpenseContext {
@@ -38,7 +39,7 @@ export interface AddExpenseContext {
     beginSubmit(): void;
     failSubmit(message: string): void;
     /** Gravou. `occurrences` é quantas linhas nasceram — 1, ou a série
-     *  inteira em `fixed`. */
+     *  inteira em `fixed`, quando a resposta informa. */
     finishSubmit(occurrences: number): void;
     /** O gasto veio do servidor e o formulário já pode ser usado. É
      *  separado de `finishSubmit` porque este NÃO sai da tela. */

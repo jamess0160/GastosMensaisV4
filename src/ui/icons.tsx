@@ -1,259 +1,120 @@
-/** Ícones de ação da interface, no mesmo traço dos da navegação
- *  (`src/app/icons.tsx`): viewBox 18×18, `currentColor`, 1.5 de traço.
- *  Quem os dimensiona é o CSS de quem os usa. */
+import {
+    Archive,
+    ArrowDown,
+    ArrowLeftRight,
+    ArrowUp,
+    Banknote,
+    Calendar,
+    Check,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Copy,
+    CreditCard,
+    Eye,
+    EyeOff,
+    Fingerprint,
+    Landmark,
+    Layers,
+    Pencil,
+    Plus,
+    Repeat2,
+    Search,
+    Tag,
+    TriangleAlert,
+    User,
+    X,
+    type LucideIcon,
+} from "lucide-react";
+
+/* ════════════════════════════════════════════════════════════
+   Ícones do sistema — lucide-react.
+
+   O mesmo traço do catálogo de categorias (`src/ui/iconCatalog.tsx`).
+   Antes eram SVGs desenhados à mão a partir do layout, e conviver com
+   duas famílias de desenho na mesma tela é o tipo de inconsistência que
+   ninguém sabe apontar mas todo mundo enxerga.
+
+   Os NOMES daqui não mudaram: o que cada tela pede é a função, não o
+   ícone do lucide. Trocar `IconPix` de desenho é uma linha neste
+   arquivo, e nenhuma tela fica sabendo.
+   ════════════════════════════════════════════════════════════ */
 
 type IconProps = { className?: string };
 
-const base = {
-    viewBox: "0 0 18 18",
-    fill: "none",
-    "aria-hidden": true,
-} as const;
-
-const stroke = {
-    stroke: "currentColor",
-    strokeWidth: 1.5,
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-} as const;
-
-export function IconPlus({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M9 4v10M4 9h10" {...stroke} />
-        </svg>
+/** Adapta um ícone do lucide ao contrato desta pasta.
+ *
+ *  O lucide escreve `width="24" height="24"` nos atributos do `<svg>`, e
+ *  as telas daqui dimensionam pelo CONTÊINER — `.btn svg { width: 16px }`
+ *  e companhia. Passar `undefined` APAGA os dois atributos (o React
+ *  omite prop indefinida), deixando o `<svg>` só com o `viewBox`: é
+ *  exatamente o que os desenhos à mão que este arquivo substituiu
+ *  faziam.
+ *
+ *  Não é a mesma coisa que `width="100%"`: onde a folha dá só a largura,
+ *  sem atributo a altura sai da proporção do desenho; com 100% ela sairia
+ *  da altura do contêiner, e o ícone entortaria em toda caixa que não
+ *  fosse quadrada. */
+const adapt = (Icon: LucideIcon, displayName: string) => {
+    const Adapted = ({ className }: IconProps) => (
+        <Icon className={className} width={undefined} height={undefined} aria-hidden />
     );
-}
+    Adapted.displayName = displayName;
+    return Adapted;
+};
 
-export function IconClose({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M5 5l8 8M13 5l-8 8" {...stroke} />
-        </svg>
-    );
-}
+/* ── Ações ────────────────────────────────────────────────── */
+export const IconPlus = adapt(Plus, "IconPlus");
+export const IconClose = adapt(X, "IconClose");
+export const IconCheck = adapt(Check, "IconCheck");
+export const IconEdit = adapt(Pencil, "IconEdit");
+export const IconArchive = adapt(Archive, "IconArchive");
+export const IconCopy = adapt(Copy, "IconCopy");
 
-export function IconCheck({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M4 9.5l3.2 3.2L14 6" {...stroke} />
-        </svg>
-    );
-}
+/* ── Navegação e seleção ──────────────────────────────────── */
+export const IconChevronDown = adapt(ChevronDown, "IconChevronDown");
+export const IconChevronLeft = adapt(ChevronLeft, "IconChevronLeft");
+export const IconChevronRight = adapt(ChevronRight, "IconChevronRight");
+export const IconCalendar = adapt(Calendar, "IconCalendar");
+export const IconSearch = adapt(Search, "IconSearch");
 
-export function IconEdit({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M12.2 3.6l2.2 2.2-7.5 7.5-2.9.7.7-2.9 7.5-7.5z" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconArchive({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M3 5.5h12v2.5H3z" {...stroke} />
-            <path d="M4.2 8v6.5h9.6V8M7.3 10.8h3.4" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconChevronDown({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M5 7.2l4 4 4-4" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconChevronLeft({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M11 4l-4.5 5 4.5 5" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconChevronRight({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M7 4l4.5 5-4.5 5" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconCalendar({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <rect x="3" y="4.5" width="12" height="10" rx="2" {...stroke} />
-            <path d="M3 7.6h12M6.4 3v2.6M11.6 3v2.6" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconSearch({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <circle cx="8.2" cy="8.2" r="4.2" {...stroke} />
-            <path d="M11.4 11.4L14.5 14.5" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconFilter({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M3.5 5h11l-4.3 5v4l-2.4 1.2V10L3.5 5z" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconArrowUp({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M9 14V4M4.8 8.2L9 4l4.2 4.2" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconArrowDown({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M9 4v10M4.8 9.8L9 14l4.2-4.2" {...stroke} />
-        </svg>
-    );
-}
-
-/** Transferência: as duas pontas, porque ela move os dois lados. */
-export function IconTransfer({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M4 6.5h10L11.5 4M14 11.5H4l2.5 2.5" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconCard({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <rect x="2.5" y="4.5" width="13" height="9" rx="2" {...stroke} />
-            <path d="M2.5 7.8h13M5 11.2h2.6" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconBank({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M9 3.2L15 6.4H3L9 3.2z" {...stroke} />
-            <path d="M5 7.6v5M9 7.6v5M13 7.6v5M3.2 14.4h11.6" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconCash({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <rect x="2.5" y="5" width="13" height="8" rx="1.6" {...stroke} />
-            <circle cx="9" cy="9" r="1.9" {...stroke} />
-        </svg>
-    );
-}
-
+/* ── Dinheiro ─────────────────────────────────────────────── */
+export const IconArrowUp = adapt(ArrowUp, "IconArrowUp");
+export const IconArrowDown = adapt(ArrowDown, "IconArrowDown");
+/** Transferência: as duas pontas do saldo se movendo ao mesmo tempo. */
+export const IconTransfer = adapt(ArrowLeftRight, "IconTransfer");
+export const IconCard = adapt(CreditCard, "IconCard");
+export const IconBank = adapt(Landmark, "IconBank");
+export const IconCash = adapt(Banknote, "IconCash");
+/** Pix é MARCA, não ícone de traço: o lucide não tem, e redesenhar o
+ *  logotipo de terceiro à mão seria pior do que usá-lo. O arquivo mora em
+ *  `public/pix.webp`, como o `logo.png`.
+ *
+ *  Vai DENTRO de um `<svg>` com `viewBox`, e não como `<img>` solto, por
+ *  um motivo prático: todo o CSS deste projeto dimensiona ícone por
+ *  `svg { width: … }` — `.tile svg`, `.method svg`, `.cardMark svg`. Um
+ *  `<img>` não seria alcançado por regra nenhuma dessas e apareceria no
+ *  tamanho natural, 512px. Embrulhado assim, ele se comporta como
+ *  qualquer outro ícone daqui, e nenhuma folha precisou mudar.
+ *
+ *  Não herda `currentColor` — e é o certo: é a marca, com as cores dela. */
 export function IconPix({ className }: IconProps) {
     return (
-        <svg {...base} className={className}>
-            <path d="M9 2.8l6.2 6.2L9 15.2 2.8 9 9 2.8z" {...stroke} />
+        <svg viewBox="0 0 24 24" className={className} aria-hidden>
+            <image href="/pix.webp" width="24" height="24" />
         </svg>
     );
 }
 
-export function IconTag({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M3.5 3.5h5.2l5.8 5.8-5.2 5.2-5.8-5.8V3.5z" {...stroke} />
-            <circle cx="6.4" cy="6.4" r="1" {...stroke} />
-        </svg>
-    );
-}
+/* ── Lançamento ───────────────────────────────────────────── */
+export const IconTag = adapt(Tag, "IconTag");
+/** Gasto fixo — o mesmo desenho que o catálogo usa em "Recorrentes". */
+export const IconRepeat = adapt(Repeat2, "IconRepeat");
+export const IconLayers = adapt(Layers, "IconLayers");
+export const IconAlert = adapt(TriangleAlert, "IconAlert");
 
-export function IconRepeat({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M4 8a5 5 0 018.6-3.4M14 10a5 5 0 01-8.6 3.4" {...stroke} />
-            <path d="M12.2 2.6v2.4h-2.4M5.8 15.4V13h2.4" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconLayers({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M9 3l6 3-6 3-6-3 6-3z" {...stroke} />
-            <path d="M3 9.6l6 3 6-3M3 12.6l6 3 6-3" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconAlert({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <circle cx="9" cy="9" r="6.2" {...stroke} />
-            <path d="M9 5.8v3.6M9 12.1v.1" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconInfo({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <circle cx="9" cy="9" r="6.2" {...stroke} />
-            <path d="M9 8.4v3.8M9 5.9v.1" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconEye({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path
-                d="M1.8 9S4.6 4.6 9 4.6 16.2 9 16.2 9 13.4 13.4 9 13.4 1.8 9 1.8 9z"
-                {...stroke}
-            />
-            <circle cx="9" cy="9" r="1.9" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconEyeOff({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path
-                d="M6.6 5.2A7.7 7.7 0 019 4.6c4.4 0 7.2 4.4 7.2 4.4a13 13 0 01-2.4 2.9"
-                {...stroke}
-            />
-            <path d="M4.4 6.3A13 13 0 001.8 9S4.6 13.4 9 13.4c1 0 1.9-.2 2.7-.6" {...stroke} />
-            <path d="M3 3l12 12" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconFingerprint({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <path d="M9 8.2v2.4a4 4 0 001 2.7" {...stroke} />
-            <path d="M6.4 6.8a3.4 3.4 0 015.2 2.9v1.5" {...stroke} />
-            <path d="M4.2 8.6A5.3 5.3 0 019 3.9a5.3 5.3 0 014.8 3" {...stroke} />
-            <path d="M6.6 13.9a6 6 0 01-1.3-2.6" {...stroke} />
-        </svg>
-    );
-}
-
-export function IconUser({ className }: IconProps) {
-    return (
-        <svg {...base} className={className}>
-            <circle cx="9" cy="6.6" r="2.6" {...stroke} />
-            <path d="M3.8 14.6a5.2 5.2 0 0110.4 0" {...stroke} />
-        </svg>
-    );
-}
+/* ── Conta e sessão ───────────────────────────────────────── */
+export const IconEye = adapt(Eye, "IconEye");
+export const IconEyeOff = adapt(EyeOff, "IconEyeOff");
+export const IconFingerprint = adapt(Fingerprint, "IconFingerprint");
+export const IconUser = adapt(User, "IconUser");

@@ -5,7 +5,7 @@ import { ProfileController, type ProfileContext, type ProfileScope } from "./con
 import { useSession, sessionKeys } from "@/app/session";
 import { UsersAuthConnection } from "@/api/UsersAuth.connection";
 import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
-import { FormError, FormField, FormGrid, Input, InfoNote, PasswordInput } from "@/ui/form";
+import { FormError, FormField, FormGrid, Input, PasswordInput } from "@/ui/form";
 import { IconFingerprint, IconTransfer } from "@/ui/icons";
 import { ConfirmDialog } from "@/ui/overlay";
 import { EmptyState } from "@/ui/states";
@@ -333,9 +333,11 @@ export function Profile() {
                             <FormError>{errors.workspace}</FormError>
 
                             {/* Hoje é um workspace por usuário e ele nasce
-                                no cadastro: com um só, o seletor seria uma
-                                escolha sem alternativa. */}
-                            {workspaces.length > 1 ? (
+                                no cadastro. A lista aparece mesmo com um só:
+                                o atual já vem desabilitado e rotulado
+                                "Espaço atual", e mostrá-lo diz mais do que
+                                uma seção vazia. */}
+                            {workspaces.length > 0 && (
                                 <div className={styles.workspaces}>
                                     {workspaces.map((workspace, index) => (
                                         <button
@@ -366,12 +368,6 @@ export function Profile() {
                                         </button>
                                     ))}
                                 </div>
-                            ) : (
-                                <InfoNote>
-                                    Você tem um espaço só — <b>{workspaces[0]?.Name ?? "—"}</b>. O
-                                    contrato ainda não tem rota para criar outro nem para convidar
-                                    alguém: o espaço nasce junto com a conta.
-                                </InfoNote>
                             )}
                         </div>
                     </Card>
@@ -394,11 +390,6 @@ export function Profile() {
                                     </div>
                                 </div>
                             </div>
-                            <InfoNote tone="warn">
-                                O contrato não tem rota de logout e o cookie é <code>HttpOnly</code>
-                                : “Sair” limpa este aparelho, mas a sessão no servidor só morre
-                                quando o prazo de 24h expira.
-                            </InfoNote>
                         </div>
                     </Card>
                 </div>

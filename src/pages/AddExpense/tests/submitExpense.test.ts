@@ -48,14 +48,31 @@ describe("submitExpense · os três formatos", () => {
     it("grava um fixo e reporta as ocorrências criadas", async () => {
         const seen = capture(12);
         const context = fakeAddExpenseContext({
-            draft: aDraft({ Kind: "fixed", Occurrences: 12, RecurrenceDay: 5 }),
+            draft: aDraft({ Kind: "fixed", RecurrenceDay: 5 }),
         });
 
         await submitExpense(context);
 
-        expect(seen.body?.Occurrences).toBe(12);
+        // `Occurrences` saiu do contrato de ENTRADA — quem limita a série
+        // é `RecurrenceEndDate`. Na resposta ele continua sendo lido.
+        expect(seen.body).not.toHaveProperty("Occurrences");
         expect(seen.body?.RecurrenceDay).toBe(5);
         expect(context.finishSubmit).toHaveBeenCalledWith(12);
+    });
+
+    it("assume uma ocorrência quando a resposta não traz o número", async () => {
+        const seen: { body?: Record<string, unknown> } = {};
+        server.use(
+            msw.post(route, async ({ request }) => {
+                seen.body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ IdExpense: 1 });
+            }),
+        );
+        const context = fakeAddExpenseContext();
+
+        await submitExpense(context);
+
+        expect(context.finishSubmit).toHaveBeenCalledWith(1);
     });
 });
 
@@ -89,7 +106,6 @@ describe("submitExpense · os campos exclusivos de cada formato", () => {
                     Kind: "single",
                     RecurrenceDay: 5,
                     RecurrenceEndDate: "2027-01-01",
-                    Occurrences: 12,
                 }),
             }),
         );
@@ -112,7 +128,6 @@ describe("submitExpense · os campos exclusivos de cada formato", () => {
         // mas explicitar evita que um refactor mande `null` — que o Joi
         // trata como valor, não como ausência.
         expect(seen.body).not.toHaveProperty("RecurrenceDay");
-        expect(seen.body?.Occurrences).toBe(12);
     });
 
     it("nunca manda Status — ele é derivado", async () => {
@@ -275,16 +290,6 @@ describe("submitExpense · validação local", () => {
         await submitExpense(context);
 
         expect(context.failSubmit).toHaveBeenCalledWith("O número de parcelas vai de 2 a 120.");
-    });
-
-    it("recusa ocorrências fora de 1 a 60", async () => {
-        const context = fakeAddExpenseContext({
-            draft: aDraft({ Kind: "fixed", Occurrences: 99 }),
-        });
-
-        await submitExpense(context);
-
-        expect(context.failSubmit).toHaveBeenCalledWith("O número de ocorrências vai de 1 a 60.");
     });
 });
 

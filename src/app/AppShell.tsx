@@ -2,7 +2,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import styles from "./AppShell.module.css";
 import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
-import { SessionProvider, useSessionQuery, useUnauthorizedRedirect } from "./session";
+import { isSignedOut, SessionProvider, useSessionQuery, useUnauthorizedRedirect } from "./session";
 import { ApiUnauthorizedError } from "@/api/client";
 
 /** Guard + chassi das rotas autenticadas. Quem decide se há sessão é o
@@ -10,6 +10,13 @@ import { ApiUnauthorizedError } from "@/api/client";
 export function AppShell() {
     useUnauthorizedRedirect();
     const session = useSessionQuery();
+
+    /* Saiu pelo menu (ou passou pelo login): o cookie pode continuar
+       válido, mas a sessão do cliente não. Sem esta linha, "Sair" só
+       recarregaria a mesma tela logada — não há rota de logout. */
+    if (isSignedOut()) {
+        return <Navigate to="/login" replace />;
+    }
 
     if (session.isPending) {
         return <div className={styles.center}>Carregando…</div>;

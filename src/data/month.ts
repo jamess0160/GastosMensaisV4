@@ -155,6 +155,91 @@ export function useMonthLegs(month: ApiTypes.ReferenceMonth): {
     };
 }
 
+/* ── Detalhes do mês ──────────────────────────────────────── */
+
+/** Os detalhes dos gastos do mês, indexados por id.
+ *
+ *  A lista NÃO traz pernas, rateio nem tags — quem os traz é o
+ *  `get(id)`. Sem eles não há como mostrar "de quem é" nem "com o que
+ *  foi pago" numa linha de tabela, que é justamente o que o layout
+ *  desenha na lista de Gastos e nos dois breakdowns do Início.
+ *
+ *  É uma requisição por gasto do mês, e é caro de propósito ser
+ *  explícito: **uma rota que devolvesse a lista já com os filhos
+ *  eliminaria este bloco inteiro** (candidata a Pendencias Backend).
+ *  O que o torna suportável é a chave: cada detalhe é guardado sob
+ *  `queryKeys.expense(id)`, a mesma que o slide-over de detalhe usa —
+ *  então abrir um gasto depois disso não faz requisição nenhuma, e
+ *  trocar de tela reaproveita tudo.
+ *
+ *  A tela nunca espera por eles: as colunas que dependem do detalhe
+ *  aparecem conforme chegam, e o resto da lista já está de pé. */
+export function useMonthExpenseDetails(month: ApiTypes.ReferenceMonth): {
+    byId: Map<number, ApiTypes.ExpenseDetail>;
+    isPending: boolean;
+} {
+    const list = useMonthExpenses(month);
+
+    const details = useQueries({
+        queries: (list.data ?? []).map((expense) => ({
+            queryKey: queryKeys.expense(expense.IdExpense),
+            queryFn: () => ExpensesConnection.get(expense.IdExpense),
+        })),
+    });
+
+    /* `details` é um array novo a cada render, e o índice não pode ser
+       remontado junto — ele alimenta o filtro da lista inteira. A chave
+       carrega o `dataUpdatedAt` de cada consulta, e não só os ids: sem
+       ele, quitar uma parcela invalidaria a consulta, os dados novos
+       chegariam e o índice continuaria mostrando a versão antiga. */
+    const stamp = details
+        .map((query) => `${query.data?.IdExpense ?? 0}:${query.dataUpdatedAt}`)
+        .join(",");
+
+    const byId = useMemo(() => {
+        const index = new Map<number, ApiTypes.ExpenseDetail>();
+        for (const query of details) {
+            if (query.data) index.set(query.data.IdExpense, query.data);
+        }
+        return index;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stamp]);
+
+    return { byId, isPending: list.isPending || details.some((query) => query.isPending) };
+}
+
+/** O mesmo para entradas: só o `get(id)` traz `Persons`, e é dele que
+ *  sai a coluna "Destino" da tela de Renda. */
+export function useMonthInflowDetails(month: ApiTypes.ReferenceMonth): {
+    byId: Map<number, ApiTypes.InflowDetail>;
+    isPending: boolean;
+} {
+    const list = useMonthInflows(month);
+
+    const details = useQueries({
+        queries: (list.data ?? []).map((inflow) => ({
+            queryKey: queryKeys.inflow(inflow.IdInflow),
+            queryFn: () => InflowsConnection.get(inflow.IdInflow),
+        })),
+    });
+
+    // Ver o comentário do `stamp` acima.
+    const stamp = details
+        .map((query) => `${query.data?.IdInflow ?? 0}:${query.dataUpdatedAt}`)
+        .join(",");
+
+    const byId = useMemo(() => {
+        const index = new Map<number, ApiTypes.InflowDetail>();
+        for (const query of details) {
+            if (query.data) index.set(query.data.IdInflow, query.data);
+        }
+        return index;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stamp]);
+
+    return { byId, isPending: list.isPending || details.some((query) => query.isPending) };
+}
+
 /* ── Invalidação ──────────────────────────────────────────── */
 
 /** Depois de escrever em gasto, entrada ou orçamento.

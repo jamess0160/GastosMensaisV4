@@ -1,0 +1,56 @@
+/* Transcrito de `.topbar` da folha compartilhada do layout
+   (Layout/Hi-fi Desktop/*.html): a faixa branca acima da área de
+   trabalho, com a saudação, a troca de mês e a ação principal da tela. */
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    min-height: 72px;
+    padding: 12px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.left {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.greet {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+    .topbar {
+        position: static;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 14px 16px;
+    }
+
+    .actions > * {
+        flex: 1;
+        justify-content: center;
+    }
+}

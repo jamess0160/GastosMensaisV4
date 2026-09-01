@@ -27,11 +27,13 @@ class Connection {
     }
 
     /** `Occurrences` na resposta = quantas linhas de gasto nasceram: 1, ou
-     *  a série inteira em `fixed`. `Status` não é aceito. */
+     *  a série inteira em `fixed`. É opcional porque o campo de entrada
+     *  de mesmo nome saiu do contrato, e a resposta pode omiti-lo.
+     *  `Status` não é aceito. */
     async create(
         body: ApiTypes.ExpenseCreateBody,
-    ): Promise<{ IdExpense: number; Occurrences: number }> {
-        const { data } = await http.post<{ IdExpense: number; Occurrences: number }>(
+    ): Promise<{ IdExpense: number; Occurrences?: number }> {
+        const { data } = await http.post<{ IdExpense: number; Occurrences?: number }>(
             this.route,
             body,
         );

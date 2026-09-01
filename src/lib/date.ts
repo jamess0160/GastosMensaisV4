@@ -136,16 +136,6 @@ export function addMonths(month: ApiTypes.ReferenceMonth, delta: number): ApiTyp
     return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Dias que faltam até o fim do mês, contando hoje. O "13 dias restantes"
- *  do dashboard. Zero quando o mês já passou. */
-export function daysLeftInMonth(month: ApiTypes.ReferenceMonth = currentMonth()): number {
-    const now = today();
-    const { From, To } = monthRange(month);
-    if (now > To) return 0;
-    if (now < From) return toLocalDate(To).getDate();
-    return toLocalDate(To).getDate() - toLocalDate(now).getDate() + 1;
-}
-
 /** Todos os dias do mês, em ordem — o eixo X do relatório diário. */
 export function daysOfMonth(month: ApiTypes.ReferenceMonth): ApiTypes.CalendarDate[] {
     const { From, To } = monthRange(month);
