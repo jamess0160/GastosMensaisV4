@@ -18,4 +18,17 @@ knex.QueryBuilder.extend("returnId", function (IdKey: string) {
     return new ReturnId().run(this, IdKey)
 })
 
+knex.QueryBuilder.extend("debugQuery", function () {
+    console.log(this.toQuery())
+    return this
+})
+
 export const appKnex = knex
+
+declare module 'knex' {
+    namespace Knex {
+        interface QueryBuilder<TRecord extends {}, TResult = any> {
+            debugQuery(): this
+        }
+    }
+}
