@@ -27,6 +27,10 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | 10 | [`Occurrences` fora do `POST /Expenses`](#10-occurrences-fora-do-post-expenses) | Contrato | Gasto fixo — **já aplicado no cliente** |
 | 11 | [Clonar o mês anterior de Renda](#11-clonar-o-mês-anterior-de-renda) | Produto | Botão "Clonar mês anterior" |
 | 12 | [Lista de gastos com os filhos](#12-lista-de-gastos-com-os-filhos) | Performance | Colunas de destino e forma de pagamento |
+| 13 | [`IncludeCanceled` em `GET /Expenses`](#13-includecanceled-em-get-expenses) | Contrato | Filtro de status multi-seleção |
+| 14 | [Desfazer recebimento de entrada](#14-desfazer-recebimento-de-entrada) | Produto | Botão de status na linha de Renda |
+| 15 | [Criação de entradas em lote](#15-criação-de-entradas-em-lote) | Produto | Clonagem do mês anterior |
+| 16 | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | — (limpeza) |
 
 Os itens 1 e 2 são de segurança e valem ser tratados antes do MVP ir ao
 ar. O **10 é o mais urgente depois deles**, e por um motivo diferente: o
@@ -34,6 +38,12 @@ cliente já parou de mandar o campo, então contrato e implementação estão
 divergindo agora. Os itens 11 e 12 seguram funcionalidade que já está
 desenhada na tela. Do 3 ao 9 são cortes conscientes do MVP — o frontend
 já está desenhado para viver sem eles.
+
+Os itens **13 a 16 nasceram da leva 3 de ajustes** (ver
+[3. Plano de Ajustes 2](levas/3.%20Plano%20de%20Ajustes%202.md)) e cada um
+tem tela do lado do cliente esperando por ele. O 15 **substitui a forma**
+proposta no 11 — a escolha do que clonar passou a ser do usuário, e o que
+falta no servidor mudou junto.
 
 ---
 
@@ -311,20 +321,32 @@ lançamentos toda virada de mês — e o layout de Renda desenha exatamente
 esse atalho ("Clonar mês anterior", e a sugestão "Trazer 3 entradas
 recorrentes de abril").
 
-**Por que não fica no cliente.** Foi implementado no cliente e **desfeito
-de propósito**. Clonar no cliente é: listar o mês anterior, pedir um
-`get(id)` por linha (o rateio só existe lá) e disparar um `POST` por
-entrada. Isso tem três problemas que nenhum cuidado no frontend resolve:
+> **Esta pendência mudou de forma na leva 3.** A decisão de produto
+> passou a ser que **o usuário escolhe o que clonar** — o layout de Renda
+> desenha essa lista com caixinhas, e clonar o mês inteiro às cegas
+> deixava de fora justamente o caso comum (o salário mudou de valor, o
+> freela de abril não se repete). Com a escolha no cliente, o servidor
+> não tem como montar a cópia sozinho: o que falta dele é gravar as
+> entradas escolhidas **de uma vez só**, que é o item
+> [15](#15-criação-de-entradas-em-lote).
+>
+> O `POST /Inflows/clone` descrito abaixo **não é mais o pedido**. O
+> texto fica como registro da necessidade de produto e das regras de
+> cópia (que o cliente agora aplica), não como especificação de rota.
+
+**Por que o cliente não faz sozinho até o fim.** Listar o mês anterior,
+pedir um `get(id)` por linha (o rateio só existe lá) e montar as cópias:
+tudo isso o cliente faz. O que ele não resolve é a **gravação**:
 
 - **Não é atômico.** Cinco entradas, a terceira recusada: o mês fica pela
-  metade e não há como voltar atrás.
+  metade e não há como voltar atrás. É o que o item 15 resolve.
 - **Não é idempotente.** Dois cliques, ou duas abas, duplicam o mês
-  inteiro. O cliente não tem como saber que aquela entrada já foi
-  clonada — não há vínculo entre a original e a cópia.
-- **É N+1 requisições** para uma operação que, no servidor, é um
-  `INSERT ... SELECT` dentro de uma transaction.
+  inteiro. Com a escolha explícita do usuário isso vira risco de duplo
+  clique, e não de repetição silenciosa — o cliente desabilita o botão
+  enquanto grava.
+- **É N+1 requisições** na gravação. Com o lote, é uma.
 
-**Proposta:**
+**Proposta original (superada pelo item 15):**
 
 ```
 POST /Inflows/clone        🔒
@@ -358,9 +380,9 @@ Regras que o frontend assume (confirmem ou corrijam):
 `Created` é o que a tela mostra ao usuário; `Skipped` é o que explica
 "cliquei e não aconteceu nada" quando o mês já tinha sido clonado.
 
-**Estado no frontend.** Botão presente e desabilitado, rotulado "ainda
-sem API" — como os outros desta lista que fazem parte da composição do
-layout.
+**Estado no frontend.** O fluxo de escolha é implementado por inteiro
+(lista do mês anterior, seleção, avanço das datas, montagem das cópias);
+o que espera rota é só o `POST` final — ver item 15.
 
 ---
 
@@ -413,6 +435,171 @@ coisas de uma vez.
 Relacionado ao item [3](#3-agregados-do-mês-para-o-dashboard): se os
 agregados do mês vierem do servidor, esta rota é a que sobra para as
 telas de lista, que precisam da linha e não só do total.
+
+---
+
+## 13. `IncludeCanceled` em `GET /Expenses`
+
+**O problema.** Hoje a **ausência** do `Status` carrega significado: sem
+ele a resposta vem sem os cancelados, e `Status=canceled` traz *só* os
+cancelados. Não existe forma de pedir "em aberto **e** cancelados" numa
+requisição — e a tela de Gastos passou a ter filtro de status de
+**multi-seleção**, onde essa combinação é um clique normal do usuário.
+
+**Por que o frontend não resolve.** Resolveria, e mal: disparando as
+duas consultas e fundindo por id. Isso dobra a requisição do mês, cria
+uma segunda chave de cache por mês e coloca no cliente uma regra de
+"o que a lista contém" que é do servidor.
+
+**Proposta.** Um booleano que **tira o significado especial da
+ausência**:
+
+```
+GET /Expenses?From=&To=&IncludeCanceled=true        🔒
+```
+
+- `IncludeCanceled` ausente ou `false` → **exatamente a resposta de
+  hoje** (cancelados fora). Nada que já existe quebra.
+- `IncludeCanceled=true` → a lista vem completa, cancelados incluídos, e
+  o cliente separa por `Status` no próprio cliente.
+
+**Por que um booleano e não `Status` aceitando lista.** As duas formas
+resolvem o filtro. A diferença é o que sobra no cliente: com o booleano,
+o app pede **o mês uma vez** e aplica os cinco filtros (status, formato,
+categoria, pessoa, forma) sobre a lista que já está em cache — uma chave
+de cache por mês, reaproveitada entre Início, Gastos e Relatório, que é
+como `src/data/month.ts` já está desenhado. Com `Status` em lista, cada
+combinação de filtro vira uma consulta e uma chave nova, e o
+reaproveitamento entre telas morre.
+
+> Se um dia `Status` passar a aceitar lista por outro motivo, tudo bem —
+> mas então **defina o formato na query** (`Status=pending&Status=paid`,
+> sem colchetes) para o cliente e o servidor não discordarem em silêncio.
+
+**Estado no frontend.** O filtro multi-seleção é implementado assumindo
+esta rota: o cliente para de mandar `Status` e passa a mandar
+`IncludeCanceled=true`. Até subir, marcar "Cancelados" simplesmente não
+traz nada — a lista continua vindo sem eles.
+
+---
+
+## 14. Desfazer recebimento de entrada
+
+**O problema.** Existe `POST /Inflows/IdInflow=:IdInflow/receive`, que é
+o que põe o dinheiro no saldo. **Não existe o inverso.** Um clique errado
+em "Recebido" credita a conta e não há caminho de volta pela tela.
+
+Isso já era desconfortável quando receber era uma ação dentro do painel
+de detalhe. Na leva 3 a tela de Renda ganhou **botão de status direto na
+linha** — o mesmo gesto que a lista de Gastos tem para quitar parcela —,
+e lá o par existe: `pay` e `unpay`. Aqui falta a metade de trás.
+
+**Por que o frontend não resolve.** É a rota que move saldo. O cliente
+não tem como estornar.
+
+**Proposta.** O espelho exato do `receive`, e o irmão do `unpay` que já
+existe em `/ExpensePayments`:
+
+```
+POST /Inflows/IdInflow=:IdInflow/unreceive        🔒
+```
+
+Sem body. Volta o `Status` para `pending` e **retira do saldo da conta**
+o que o `receive` creditou, na mesma transaction. `406` quando a entrada
+já está `pending`, quando está cancelada, ou quando o id não existe no
+workspace — com `msg` pronta, como o resto do contrato.
+
+**Estado no frontend.** O botão está implementado **e habilitado nos dois
+sentidos**. Enquanto a rota não subir, desfazer mostra a mensagem de erro
+da API, como qualquer 406 — decisão consciente: esconder o caminho
+ensinaria o usuário que ele não existe.
+
+---
+
+## 15. Criação de entradas em lote
+
+**O problema.** A clonagem do mês (item 11) passou a ser assim: o cliente
+lista o mês anterior, o usuário marca o que quer trazer, o cliente avança
+as datas e monta as cópias. Falta gravar — e gravar uma por uma significa
+mês pela metade quando a terceira das cinco é recusada.
+
+**Por que o frontend não resolve.** Atomicidade é do banco. Não há como
+desfazer as duas primeiras do cliente depois que a terceira falhou.
+
+**Proposta.**
+
+```
+POST /Inflows/batch        🔒
+```
+
+```json
+{
+  "Inflows": [
+    { "Description": "Salário", "TotalValue": 6200, "Kind": "inflow",
+      "IdToAccount": 3, "CompetenceDate": "2026-09-05",
+      "ExpectedDate": "2026-09-05",
+      "Persons": [{ "IdPerson": 1, "Value": 6200 }] }
+  ]
+}
+```
+
+Regras que o frontend assume (confirmem ou corrijam):
+
+- Cada item é **o mesmo corpo do `POST /Inflows`**, validado igual. Nada
+  de schema paralelo: o que é 406 sozinho é 406 no lote.
+- **Tudo ou nada**, numa transaction. Um item recusado derruba o lote
+  inteiro, e a `msg` diz **qual** item e por quê (índice na lista já
+  basta).
+- Todas nascem `pending`, como no `POST` avulso. Nenhum saldo se move até
+  o `receive` de cada uma — é isso que faz a operação ser segura de
+  repetir.
+- Um **teto de itens** (sugestão: 100) para a rota não virar vetor de
+  carga. Um mês de renda tem cinco a dez entradas.
+
+**Resposta:**
+
+```json
+{ "msg": "3 entradas criadas", "IdInflows": [41, 42, 43] }
+```
+
+Os ids voltam para o cliente invalidar o cache do mês certo sem
+readivinhar.
+
+**Sobre idempotência.** Ela deixou de ser problema do servidor: quem
+escolhe o que copiar é o usuário, item a item, então não há repetição
+silenciosa a evitar — só duplo clique, e o cliente desabilita o botão
+enquanto grava. Se um dia quiserem a trava no servidor, ela é a mesma do
+item 11 (casar por descrição, valor, conta e mês de competência).
+
+**Estado no frontend.** `InflowsConnection.createBatch` implementado, o
+fluxo de escolha inteiro de pé, esperando a rota.
+
+---
+
+## 16. Bandeira e final do cartão saem do cadastro
+
+**O problema.** `PaymentMethod` tem `Brand` e `LastDigits`, e o
+formulário de cartão os pedia. Nenhum dos dois é usado em regra nenhuma
+do sistema — não entram em saldo, fatura, filtro ou relatório. São
+decoração num formulário que o usuário preenche uma vez por cartão, e
+`LastDigits` ainda é dado de cartão guardado sem precisar ser.
+
+**Decisão.** Saem do MVP. **Sem compatibilidade com legado**: o cliente
+para de enviar e de exibir, e o banco é ajustado junto — sem leitura
+defensiva e sem mapa de campo antigo.
+
+**O que o backend precisa fazer:**
+
+1. **Remover `Brand` e `LastDigits`** do schema de `POST /PaymentMethods`
+   e `PUT /PaymentMethods/IdPaymentMethod=:id`, e as colunas da tabela.
+2. **Tirar os dois da resposta** de `GET /Accounts` (onde a forma vem
+   embutida). Enquanto vierem, o cliente ignora — o que **não** pode
+   acontecer é virarem obrigatórios.
+
+**Estado no frontend.** Removidos do formulário, da linha que os exibia e
+dos tipos `PaymentMethodCreateBody` / `PaymentMethodUpdateBody` em
+`src/types/api.ts`. Como no item 10, cliente e contrato divergem até o
+documento ser atualizado — a fonte da verdade é este item.
 
 ---
 
