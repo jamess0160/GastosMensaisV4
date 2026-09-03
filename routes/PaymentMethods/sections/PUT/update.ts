@@ -20,7 +20,7 @@ export class Update {
 
         //  O Kind que manda é o da linha gravada, não o do body — o schema nem aceita Kind,
         //  porque trocá-lo mudaria a regra de fatura de todas as compras já lançadas nesta
-        //  forma de pagamento. Só aqui dá para saber se ClosingDay/DueDay cabem.
+        //  forma de pagamento. Só aqui dá para saber se DueDay/ClosingOffsetDays cabem.
         PaymentMethodKind.assertKindFields(paymentMethod.Kind, body)
 
         //  A conta não muda: mover um cartão de conta moveria junto o saldo de todas as

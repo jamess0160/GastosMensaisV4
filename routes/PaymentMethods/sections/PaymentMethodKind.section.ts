@@ -2,14 +2,15 @@ import { APIError } from "root/Utils/Logs"
 import { Database } from "root/Utils/database"
 import { PaymentMethodsNamespace } from "./types"
 
-//  ClosingDay/DueDay decidem em qual fatura uma compra cai, e só fazem sentido em cartão de
-//  crédito. O banco não tem CHECK para isso: um pix gravado com DueDay=10 passa na inserção e
-//  só aparece lá na etapa 5, como uma data de vencimento em cima de um pagamento à vista.
+//  DueDay/ClosingOffsetDays decidem em qual fatura uma compra cai, e só fazem sentido em
+//  cartão de crédito. O banco não tem CHECK para isso: um pix gravado com DueDay=10 passa na
+//  inserção e só aparece lá na etapa 5, como uma data de vencimento em cima de um pagamento à
+//  vista.
 //
 //  A regra vive num lugar só porque tem dois pontos de escrita e o Joi não cobre os dois: no
 //  POST ele consegue usar o `when` sobre o Kind do body, mas no PUT o Kind que manda é o da
 //  linha gravada, que o schema não enxerga.
-const creditCardOnly = ["ClosingDay", "DueDay", "Brand", "LastDigits"] as const
+const creditCardOnly = ["DueDay", "ClosingOffsetDays", "Brand", "LastDigits"] as const
 
 class Controller {
 
@@ -29,9 +30,9 @@ class Controller {
             return
         }
 
-        //  Em cartão, apagar fechamento ou vencimento não é edição parcial: é deixar a compra
-        //  sem fatura. Omitir mantém o que está gravado; mandar null é recusado.
-        let cleared = (["ClosingDay", "DueDay"] as const).filter((field) => field in body && body[field] === null)
+        //  Em cartão, apagar vencimento ou folga de fechamento não é edição parcial: é deixar
+        //  a compra sem fatura. Omitir mantém o que está gravado; mandar null é recusado.
+        let cleared = (["DueDay", "ClosingOffsetDays"] as const).filter((field) => field in body && body[field] === null)
 
         if (cleared.length) {
             throw new APIError({

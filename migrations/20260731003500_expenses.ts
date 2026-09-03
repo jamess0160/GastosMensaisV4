@@ -60,7 +60,7 @@ export async function up(knex: Knex): Promise<void> {
     // ClosingDate/DueDate. Melhor que o CurrentInstallment/MaxInstallment numa
     // linha so do V3, porque deixa ver o comprometimento futuro mes a mes.
     //
-    // ClosingDate/DueDate saem do ClosingDay/DueDay da PaymentMethods quando
+    // ClosingDate/DueDate saem do DueDay/ClosingOffsetDays da PaymentMethods quando
     // Kind='credit_card'; em pix e debito ficam nulas.
     await knex.schema.createTable("ExpensePayments", (table) => {
         table.increments("IdExpensePayment").primary()

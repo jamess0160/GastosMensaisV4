@@ -433,8 +433,8 @@ async function createCard(workspace: TestWorkspace) {
         IdAccount: account.IdAccount,
         Name: "Cartão",
         Kind: "credit_card",
-        ClosingDay: 20,
         DueDay: 28,
+        ClosingOffsetDays: 8,
     })
 
     return response.body.IdPaymentMethod as number

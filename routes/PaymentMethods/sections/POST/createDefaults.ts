@@ -26,7 +26,7 @@ export class CreateDefaults {
             ])
         }
 
-        //  Sem ClosingDay/DueDay: fatura só existe em cartão de crédito.
+        //  Sem DueDay/ClosingOffsetDays: fatura só existe em cartão de crédito.
         return await this.PaymentMethods_model.create([
             { IdWorkspace, IdAccount, Name: "Pix", Kind: "pix", Position: 1 },
             { IdWorkspace, IdAccount, Name: "Débito", Kind: "debit", Position: 2 },

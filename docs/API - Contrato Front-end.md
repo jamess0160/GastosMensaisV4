@@ -406,8 +406,8 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
   "IdAccount": 1,
   "Name": "Cartão Roxo",
   "Kind": "credit_card",
-  "ClosingDay": 20,
   "DueDay": 27,
+  "ClosingOffsetDays": 7,
   "Brand": "Mastercard",
   "LastDigits": "1234",
   "IconPath": null,
@@ -419,7 +419,11 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
 }
 ```
 
-`Kind` ∈ `pix` | `debit` | `credit_card`. `ClosingDay`/`DueDay` só fazem sentido em `credit_card` — nas outras são `null`.
+`Kind` ∈ `pix` | `debit` | `credit_card`. `DueDay`/`ClosingOffsetDays` só fazem sentido em `credit_card` — nas outras são `null`.
+
+**O cartão é descrito pelo vencimento, não pelo fechamento.** `DueDay` é o dia do mês em que a fatura vence e `ClosingOffsetDays` é quantos dias **antes** dele ela fecha — é o dado que o emissor realmente pede ao cliente, e a folga é o que ele aplica por baixo. Não existe mais um campo com o dia do fechamento: ele é `DueDay − ClosingOffsetDays` e muda de mês para mês (vencendo dia 5 com folga de 7, a fatura fecha em 26/02 e em 29/03).
+
+Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias, e o **default é 7**. Na tela de cadastro, peça o vencimento e deixe a folga num campo avançado já preenchido.
 
 ### `POST /PaymentMethods`
 
@@ -430,8 +434,8 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
 | `IdAccount` | number | obrigatório |
 | `Name` | string | obrigatório, ≤255 |
 | `Kind` | `credit_card` | obrigatório, único valor aceito |
-| `ClosingDay` | int 1–31 | **obrigatório** |
 | `DueDay` | int 1–31 | **obrigatório** |
+| `ClosingOffsetDays` | int 1–28 | default `7` |
 | `Brand` | string \| null | ≤100, default `null` |
 | `LastDigits` | string \| null | exatamente 4 dígitos, default `null` |
 | `IconPath` | string \| null | ≤255, default `null` |
@@ -442,9 +446,11 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
 
 ### `PUT /PaymentMethods/IdPaymentMethod=:IdPaymentMethod`
 
-`Name` obrigatório; `ClosingDay`, `DueDay`, `Brand`, `LastDigits`, `IconPath`, `Color`, `Position` opcionais.
+`Name` obrigatório; `DueDay`, `ClosingOffsetDays`, `Brand`, `LastDigits`, `IconPath`, `Color`, `Position` opcionais.
 
-**`Kind` e `IdAccount` não são aceitos:** um pix não vira cartão e um cartão não muda de conta — as duas trocas reescreveriam o significado das compras já lançadas nele. Mandar `null` em `ClosingDay`/`DueDay` de um cartão dá `406`.
+**`Kind` e `IdAccount` não são aceitos:** um pix não vira cartão e um cartão não muda de conta — as duas trocas reescreveriam o significado das compras já lançadas nele. Mandar `null` em `DueDay`/`ClosingOffsetDays` de um cartão dá `406`.
+
+**Editar o cartão não recalcula as compras já lançadas.** `ClosingDate`/`DueDate` são gravadas na perna no momento do lançamento (seção 11) e não são revistas depois. Corrigir o vencimento ou a folga vale para o que vier daí em diante; o que já está gravado só muda por um `PUT` no próprio gasto.
 
 **Resposta:** `{ "msg": "Forma de pagamento atualizada com sucesso" }`.
 
@@ -784,7 +790,7 @@ A mesma linha **mais os três filhos**:
 
 **`ClosingDate`/`DueDate` vivem na perna, não no gasto** — cada parcela cai numa fatura. São `null` fora de `credit_card`, **exceto** que uma parcela sempre ganha `DueDate` de mês em mês: parcelamento não é privilégio de cartão (crediário, dividir uma compra com um amigo no pix).
 
-> Em cartão, um dia de diferença na compra vira **um mês** de diferença no caixa: comprou até o dia do fechamento, cai na fatura deste mês; depois dele, na do mês seguinte.
+> Em cartão, um dia de diferença na compra vira **um mês** de diferença no caixa: a compra entra na **primeira fatura que ainda não fechou**. O fechamento sai do cartão como `DueDay − ClosingOffsetDays` (seção 6), então ele é uma data que muda de mês para mês — não um dia fixo do calendário.
 
 ### `POST /Expenses`
 
@@ -1083,6 +1089,24 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-03 — `/PaymentMethods`: o cartão passa a ser descrito pelo **vencimento e uma folga**, não por um dia de fechamento
+
+🔴 **Quebra** — ver as seções 6, `/PaymentMethods`, e 11, `/Expenses`.
+
+**`ClosingDay` deixou de existir.** No lugar entrou **`ClosingOffsetDays`**: quantos dias antes do vencimento a fatura fecha, default `7`, aceito de 1 a 28. `DueDay` continua igual e passa a ser o único campo obrigatório dos dois.
+
+**Ação do front:**
+
+- **`POST` e `PUT /PaymentMethods`:** trocar `ClosingDay` por `ClosingOffsetDays`. Mandar `ClosingDay` agora é `406`. Se o formulário só pedir o vencimento, **omita a folga** e deixe o default de 7 valer.
+- **Ler a linha da forma de pagamento** (dentro de `GET /Accounts`): `ClosingDay` sumiu da resposta. Quem mostrava "fecha dia 20" tem que calcular a data a partir de `DueDay − ClosingOffsetDays`, lembrando que ela **muda de mês para mês**.
+- **Tela de cadastro:** pergunte o **vencimento**, que é o que o usuário sabe de cabeça, e deixe a folga num campo avançado já preenchido com 7.
+
+**Por que mudou** — o modelo pedia um dado que o usuário não tem: nenhum emissor brasileiro deixa escolher o dia do fechamento, todos pedem o vencimento e fecham N dias antes. Pior, um fechamento guardado como dia do mês precisava ser grampeado onde o dia não existe (dia 30 em fevereiro) enquanto a comparação que decide a fatura seguia usando o número original — as duas metades da regra passavam a falar de datas diferentes. E a rolagem do vencimento tinha que ser inferida de dois números soltos, em vez de ser a própria subtração.
+
+**Os cálculos de `ClosingDate`/`DueDate` das pernas mudam junto** (seção 11), mesmo para cartões cujo cadastro não for tocado, porque a regra de qual fatura recebe a compra é outra. Um cartão que vence dia 10 com folga de 7 agora fecha dia 3: a compra do dia 2 vence **no mesmo mês**, onde antes o par `fecha 30 / vence 10` sempre a jogava para o mês seguinte. Confira as datas que a sua tela mostra depois de subir.
+
+**Gastos já lançados não são recalculados pela API.** As pernas guardam as datas do momento do lançamento; nada as revisita.
 
 ### 2026-08-31 — `GET /Accounts`: o saldo agora é sempre o saldo **de um mês**
 

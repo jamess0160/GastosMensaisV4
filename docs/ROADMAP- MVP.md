@@ -232,8 +232,12 @@ na mão — é o que a recorrência do dia 31 e o vencimento da parcela precisam
 
 - Conta nasce com `pix` e `debit` automáticos: é regra do modelo, não conveniência. As duas
   escritas na mesma transaction, como o cadastro de usuário faz com o workspace.
-- `ClosingDay`/`DueDay` **só** em `Kind='credit_card'`. Validar no Joi (`when`) e na section —
-  o banco não tem CHECK para isso.
+- `DueDay`/`ClosingOffsetDays` **só** em `Kind='credit_card'`. Validar no Joi (`when`) e na
+  section — o banco não tem CHECK para isso.
+- **O cartão é descrito pelo vencimento, não pelo fechamento.** `ClosingOffsetDays` é a folga
+  em dias antes do vencimento (default 7), porque é isso que o emissor pede ao cliente — e
+  porque um fechamento guardado como dia do mês teria que ser grampeado onde o dia não existe,
+  desencontrando-se da comparação que decide a fatura.
 - Não existe conta do tipo `credit_card`: cartão é forma de pagamento, não conta.
 - `InitialBalance` só pode mudar enquanto a conta não tem movimento, senão o saldo histórico
   muda debaixo de lançamento já feito. **DECIDIDO: trava.** Não há o que recalcular — o saldo
@@ -434,9 +438,11 @@ CRUD simples nas duas, escopado por workspace:
   pessoas geram **2 + 2 linhas, nunca 4**. Se o código produzir 4, o modelo foi entendido errado.
 - Soma das pernas `== TotalValue`, soma do rateio `== TotalValue`. Nenhuma das duas é
   garantida pelo banco.
-- `ClosingDate`/`DueDate` saem do `ClosingDay`/`DueDay` da forma de pagamento quando é
+- `ClosingDate`/`DueDate` saem do `DueDay`/`ClosingOffsetDays` da forma de pagamento quando é
   cartão, e ficam nulas em pix e débito. Isolar numa section (`InvoiceDates`) porque a etapa 6
-  vai reusar — um dia de diferença na compra vira um mês de diferença no caixa.
+  vai reusar — um dia de diferença na compra vira um mês de diferença no caixa. A compra entra
+  na **primeira fatura que ainda não fechou**, e não basta uma rolagem: com folga grande perto
+  do dia de vencer, a fatura do mês seguinte também já fechou.
 - `Status` nunca no body do `PUT`.
 
 **Como ficou** — o que a implementação decidiu além do que estava previsto aqui:

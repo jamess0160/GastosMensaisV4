@@ -278,10 +278,10 @@ describe("Expenses", () => {
         })
 
         //  A regra que o ROADMAP avisa: um dia de diferença na compra vira um mês no caixa
-        it("calcula a fatura do cartão a partir do dia do fechamento", async () => {
+        it("calcula a fatura do cartão a partir da folga de fechamento", async () => {
             let workspace = await buildWorkspace()
-            //  Fecha dia 20, vence dia 28
-            let card = await createCard(workspace, { ClosingDay: 20, DueDay: 28 })
+            //  Vence dia 28 e fecha 8 dias antes, ou seja, no dia 20
+            let card = await createCard(workspace, { DueDay: 28, ClosingOffsetDays: 8 })
 
             let before = await createExpense(workspace, {
                 ExpenseDate: "2026-08-19",
@@ -299,10 +299,12 @@ describe("Expenses", () => {
             expect((await findPayments(after.IdExpense))[0]).toMatchObject({ ClosingDate: "2026-09-20", DueDate: "2026-09-28" })
         })
 
-        //  Cartão que fecha no 28 e vence no 5: o vencimento é do mês seguinte ao fechamento
-        it("joga o vencimento para o mês seguinte quando ele é anterior ao fechamento", async () => {
+        //  Vence no dia 5 com folga de 8: a fatura fecha no dia 28 do mês anterior ao próprio
+        //  vencimento. No modelo antigo essa relação tinha que ser inferida de dois números
+        //  soltos (DueDay <= ClosingDay); aqui ela é só a subtração dando um mês para trás.
+        it("fecha no mês anterior quando a folga atravessa a virada do mês", async () => {
             let workspace = await buildWorkspace()
-            let card = await createCard(workspace, { ClosingDay: 28, DueDay: 5 })
+            let card = await createCard(workspace, { DueDay: 5, ClosingOffsetDays: 8 })
 
             let created = await createExpense(workspace, {
                 ExpenseDate: "2026-08-10",
@@ -311,6 +313,62 @@ describe("Expenses", () => {
 
             expect((await findPayments(created.IdExpense))[0]).toMatchObject({ ClosingDate: "2026-08-28", DueDate: "2026-09-05" })
         })
+
+        //  O caso que derrubou o modelo de dia do mês: com fechamento no dia 30, uma compra do
+        //  começo de setembro caía na fatura que vence em **outubro**, porque o vencimento no
+        //  dia 10 sempre rolava um mês. Pela folga, o mesmo cartão fecha no dia 3 e a compra do
+        //  dia 2 vence ainda em setembro — que é o que o extrato do banco mostra.
+        it("mantém no mês a compra feita antes do fechamento de um cartão que vence cedo", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { DueDay: 10, ClosingOffsetDays: 7 })
+
+            let created = await createExpense(workspace, {
+                ExpenseDate: "2026-09-02",
+                Payments: [{ IdPaymentMethod: card, Value: 100 }],
+            })
+
+            expect((await findPayments(created.IdExpense))[0]).toMatchObject({ ClosingDate: "2026-09-03", DueDate: "2026-09-10" })
+        })
+
+        //  **O motivo de a folga existir.** Um fechamento guardado como dia do mês tem que ser
+        //  grampeado onde o dia não existe, e aí deixa de bater com a comparação que decide a
+        //  fatura. A folga produz sempre uma data real: 05/03 − 7 é 26/02, e fevereiro não tem
+        //  tratamento nenhum.
+        it("não grampeia o fechamento num mês curto", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { DueDay: 5, ClosingOffsetDays: 7 })
+
+            let before = await createExpense(workspace, {
+                ExpenseDate: "2027-02-25",
+                Payments: [{ IdPaymentMethod: card, Value: 100 }],
+            })
+
+            let after = await createExpense(workspace, {
+                ExpenseDate: "2027-02-27",
+                Payments: [{ IdPaymentMethod: card, Value: 100 }],
+            })
+
+            expect((await findPayments(before.IdExpense))[0]).toMatchObject({ ClosingDate: "2027-02-26", DueDate: "2027-03-05" })
+            expect((await findPayments(after.IdExpense))[0]).toMatchObject({ ClosingDate: "2027-03-29", DueDate: "2027-04-05" })
+        })
+
+        //  Vencimento no dia 31: o mês curto grampeia o vencimento, mas cada parcela é contada
+        //  a partir da compra, então o 28 de fevereiro não vira âncora e março volta ao 31.
+        it("não arrasta o grampeamento do vencimento de uma parcela para a seguinte", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { DueDay: 31, ClosingOffsetDays: 7 })
+
+            let created = await createExpense(workspace, {
+                TotalValue: 300,
+                Kind: "installment",
+                InstallmentTotal: 3,
+                ExpenseDate: "2027-01-10",
+                Payments: [{ IdPaymentMethod: card, Value: 300 }],
+            })
+
+            expect((await findPayments(created.IdExpense)).map((item) => item.DueDate))
+                .toEqual(["2027-01-31", "2027-02-28", "2027-03-31"])
+        })
     })
 
     describe("POST /Expenses — parcelamento", () => {
@@ -318,7 +376,7 @@ describe("Expenses", () => {
         //  600 em 6x são 6 pernas de 100, e o TotalValue continua sendo o total da compra
         it("cria 6 pernas de 100 numa compra de 600 em 6x", async () => {
             let workspace = await buildWorkspace()
-            let card = await createCard(workspace, { ClosingDay: 20, DueDay: 28 })
+            let card = await createCard(workspace, { DueDay: 28, ClosingOffsetDays: 8 })
 
             let created = await createExpense(workspace, {
                 Description: "Notebook",
@@ -967,8 +1025,8 @@ describe("Expenses", () => {
                 IdAccount: account.body.IdAccount,
                 Name: "Cartão",
                 Kind: "credit_card",
-                ClosingDay: 20,
                 DueDay: 28,
+                ClosingOffsetDays: 8,
             })
 
             let category = await flowClient.post(`/Categories`, { Description: "Casa" })
@@ -1104,13 +1162,13 @@ async function buildWorkspace(): Promise<TestWorkspace> {
     }
 }
 
-async function createCard(workspace: TestWorkspace, overrides: { ClosingDay?: number, DueDay?: number } = {}) {
+async function createCard(workspace: TestWorkspace, overrides: { DueDay?: number, ClosingOffsetDays?: number } = {}) {
     let response = await workspace.client.post(`/PaymentMethods`, {
         IdAccount: workspace.IdAccount,
         Name: "Cartão",
         Kind: "credit_card",
-        ClosingDay: overrides.ClosingDay ?? 20,
         DueDay: overrides.DueDay ?? 28,
+        ClosingOffsetDays: overrides.ClosingOffsetDays ?? 8,
     })
 
     return response.body.IdPaymentMethod as number

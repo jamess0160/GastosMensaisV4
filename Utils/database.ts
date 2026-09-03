@@ -85,10 +85,15 @@ export namespace Database {
         IdAccount: number
         Name: string
         Kind: "pix" | "debit" | "credit_card"
-        /** So em Kind='credit_card'. Decide em qual fatura a compra cai. */
-        ClosingDay: number | null
-        /** So em Kind='credit_card'. */
+        /** So em Kind='credit_card'. O dia do mes em que a fatura vence. */
         DueDay: number | null
+        /**
+         * So em Kind='credit_card'. Quantos dias antes do vencimento a fatura fecha.
+         *
+         * E a folga do emissor, nao um dia do mes: o cliente escolhe o vencimento e o
+         * fechamento sai dele por subtracao. Ver InvoiceDates.section.ts.
+         */
+        ClosingOffsetDays: number | null
         Brand: string | null
         LastDigits: string | null
         IconPath: string | null

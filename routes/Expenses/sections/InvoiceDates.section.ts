@@ -7,8 +7,8 @@ import { Utils } from "root/Utils/Utils"
 //  própria porque o parcelamento reusa a mesma conta: **um dia de diferença na compra vira um
 //  mês de diferença no caixa**, e essa regra não pode ter duas cópias.
 //
-//  Toda a aritmética é sobre "YYYY-MM-DD" (Utils.addMonthsToDate, moment por baixo), nunca
-//  sobre Date solto — em UTC-3 o dia 01 viraria o 31 do mês anterior.
+//  Toda a aritmética é sobre "YYYY-MM-DD" (Utils.addMonthsToDate/addDaysToDate, moment por
+//  baixo), nunca sobre Date solto — em UTC-3 o dia 01 viraria o 31 do mês anterior.
 class Controller {
 
     /**
@@ -41,31 +41,64 @@ class Controller {
         return this.creditCardInvoice(paymentMethod, ExpenseDate, index)
     }
 
-    //  Regra do fechamento: comprou até o dia do fechamento, cai na fatura que fecha neste mês;
-    //  comprou depois, já é a do mês seguinte. É a linha que separa a compra do dia 20 da do
-    //  dia 21 num cartão que fecha no 20.
+    /**
+     * **O vencimento é a âncora; o fechamento nasce dele.** É assim que o emissor funciona — o
+     * cliente escolhe o dia de vencer e o banco fecha a fatura N dias antes — e é o que deixa
+     * as duas datas sempre coerentes entre si.
+     *
+     * Guardar o fechamento como dia do mês custava dois defeitos que a folga não tem. O dia 30
+     * precisava ser grampeado em fevereiro, enquanto a comparação que decide a fatura seguia
+     * usando o nominal: as duas metades da regra passavam a falar de datas diferentes. E a
+     * rolagem do vencimento tinha que ser **inferida** de dois números soltos, porque o modelo
+     * não guardava a relação entre eles — aqui ela é a própria subtração.
+     */
     private creditCardInvoice(paymentMethod: Database.PaymentMethods, ExpenseDate: string, index: number) {
-        let purchaseDay = Number(ExpenseDate.split("-")[2])
+        //  Regra do fechamento: a compra entra na **primeira fatura que ainda não fechou**. É a
+        //  linha que separa a compra do dia 20 da do dia 21 num cartão que fecha no 20 — e agora
+        //  são duas datas reais sendo comparadas, não um dia nominal contra uma data grampeada.
+        //  Em "YYYY-MM-DD" a ordem lexicográfica é a ordem cronológica, que é o motivo de o
+        //  formato ser esse.
+        //
+        //  O laço existe porque **uma rolagem só nem sempre basta**: quando a folga é grande
+        //  perto do dia de vencer, a fatura que vence no mês seguinte também já fechou (vence
+        //  no dia 5 com folga de 7 e a compra é do dia 27 — a de março fechou em 26/02). Duas
+        //  rodadas sempre bastam, e é o teto de 28 dias da folga no Joi que garante isso: a
+        //  fatura de dois meses à frente fecha, no pior caso, no dia seguinte ao último dia do
+        //  mês da compra.
+        let monthsAhead = 0
 
-        let closingMonth = purchaseDay <= paymentMethod.ClosingDay! ? 0 : 1
-
-        let ClosingDate = Utils.setDayOfMonth(Utils.addMonthsToDate(ExpenseDate, closingMonth + index), paymentMethod.ClosingDay!)
-
-        //  O vencimento é depois do fechamento: quando o dia de vencer é menor ou igual ao de
-        //  fechar, ele já é do mês seguinte — cartão que fecha no 28 e vence no 5 vence em
-        //  março a fatura que fechou em fevereiro.
-        let dueMonth = paymentMethod.DueDay! > paymentMethod.ClosingDay! ? 0 : 1
+        while (monthsAhead < 2 && ExpenseDate > this.closingOf(paymentMethod, ExpenseDate, monthsAhead)) {
+            monthsAhead++
+        }
 
         return {
-            ClosingDate,
-            DueDate: Utils.setDayOfMonth(Utils.addMonthsToDate(ClosingDate, dueMonth), paymentMethod.DueDay!),
+            ClosingDate: this.closingOf(paymentMethod, ExpenseDate, monthsAhead + index),
+            DueDate: this.dueOf(paymentMethod, ExpenseDate, monthsAhead + index),
         }
     }
 
-    //  Cartão sem fechamento ou vencimento não existe (o PaymentMethodKind garante), mas a
-    //  checagem das duas colunas é o que deixa o `!` acima honesto.
+    /**
+     * O vencimento `monthsAhead` meses depois da compra.
+     *
+     * Sempre contado **a partir da data da compra**, nunca encadeado no vencimento anterior: o
+     * `setDayOfMonth` depois do `addMonthsToDate` desfaz o arrasto do grampeamento. Vencendo no
+     * dia 31, a parcela de fevereiro cai no 28 — e a de março tem que voltar ao 31, o que só
+     * acontece porque o 28 nunca vira a nova âncora.
+     */
+    private dueOf(paymentMethod: Database.PaymentMethods, ExpenseDate: string, monthsAhead: number) {
+        return Utils.setDayOfMonth(Utils.addMonthsToDate(ExpenseDate, monthsAhead), paymentMethod.DueDay!)
+    }
+
+    //  O fechamento é o vencimento menos a folga, e nada mais. Nunca grampeia, porque uma
+    //  contagem de dias corridos sempre cai num dia que existe.
+    private closingOf(paymentMethod: Database.PaymentMethods, ExpenseDate: string, monthsAhead: number) {
+        return Utils.addDaysToDate(this.dueOf(paymentMethod, ExpenseDate, monthsAhead), -paymentMethod.ClosingOffsetDays!)
+    }
+
+    //  Cartão sem vencimento ou sem folga de fechamento não existe (o PaymentMethodKind
+    //  garante), mas a checagem das duas colunas é o que deixa o `!` acima honesto.
     private isCreditCard(paymentMethod: Database.PaymentMethods) {
-        return paymentMethod.Kind === "credit_card" && Boolean(paymentMethod.ClosingDay) && Boolean(paymentMethod.DueDay)
+        return paymentMethod.Kind === "credit_card" && Boolean(paymentMethod.DueDay) && Boolean(paymentMethod.ClosingOffsetDays)
     }
 }
 

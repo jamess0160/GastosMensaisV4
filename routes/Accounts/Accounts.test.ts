@@ -97,8 +97,8 @@ describe("Accounts", () => {
                 IdAccount: visible.body.IdAccount,
                 Name: "Cartão cancelado",
                 Kind: "credit_card",
-                ClosingDay: 20,
                 DueDay: 28,
+                ClosingOffsetDays: 8,
             })
 
             await workspaceClient.delete(`/Accounts/IdAccount=${archived.body.IdAccount}`)
@@ -285,7 +285,7 @@ describe("Accounts", () => {
 
             expect(methods.map((item) => item.Kind)).toEqual(["pix", "debit"])
             //  Fatura só existe em cartão
-            expect(methods.every((item) => item.ClosingDay === null && item.DueDay === null)).toBe(true)
+            expect(methods.every((item) => item.DueDay === null && item.ClosingOffsetDays === null)).toBe(true)
         })
 
         it("usa checking e saldo zero como padrão", async () => {

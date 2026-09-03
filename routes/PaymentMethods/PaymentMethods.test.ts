@@ -44,8 +44,8 @@ describe("PaymentMethods", () => {
                 IdAccount,
                 Name: "Cartão roxo",
                 Kind: "credit_card",
-                ClosingDay: 20,
                 DueDay: 28,
+                ClosingOffsetDays: 8,
                 Brand: "Mastercard",
                 LastDigits: "4321",
             })
@@ -53,13 +53,13 @@ describe("PaymentMethods", () => {
             expect(response.status).toBe(401)
         })
 
-        it("cadastra o cartão de crédito com fechamento e vencimento", async () => {
+        it("cadastra o cartão de crédito com vencimento e folga de fechamento", async () => {
             let response = await workspaceClient.post(`/PaymentMethods`, {
                 IdAccount,
                 Name: "Cartão roxo",
                 Kind: "credit_card",
-                ClosingDay: 20,
                 DueDay: 28,
+                ClosingOffsetDays: 8,
                 Brand: "Mastercard",
                 LastDigits: "4321",
             })
@@ -73,8 +73,8 @@ describe("PaymentMethods", () => {
                 IdWorkspace: user.workspace.IdWorkspace,
                 IdAccount,
                 Kind: "credit_card",
-                ClosingDay: 20,
                 DueDay: 28,
+                ClosingOffsetDays: 8,
                 Brand: "Mastercard",
                 LastDigits: "4321",
             })
@@ -92,9 +92,9 @@ describe("PaymentMethods", () => {
             expect(response.status).toBe(406)
         })
 
-        //  ClosingDay/DueDay decidem em qual fatura a compra cai: sem eles, a etapa 5 não
-        //  tem como calcular a data de vencimento da perna do gasto
-        it("recusa cartão sem fechamento e vencimento", async () => {
+        //  O vencimento decide em qual fatura a compra cai: sem ele, a etapa 5 não tem como
+        //  calcular a data de vencimento da perna do gasto
+        it("recusa cartão sem vencimento", async () => {
             let response = await workspaceClient.post(`/PaymentMethods`, {
                 IdAccount,
                 Name: "Cartão sem fatura",
@@ -104,13 +104,40 @@ describe("PaymentMethods", () => {
             expect(response.status).toBe(406)
         })
 
-        it("recusa dia de fechamento fora de 1..31", async () => {
+        //  A folga é o único dos dois que o usuário pode não saber de cabeça — pedir um número
+        //  que ele teria que deduzir foi o que fez o modelo anterior aceitar dado inventado.
+        //  7 dias é o valor mais comum entre os emissores.
+        it("assume 7 dias de folga quando o cadastro não manda", async () => {
+            let response = await workspaceClient.post(`/PaymentMethods`, {
+                IdAccount,
+                Name: "Cartão sem folga informada",
+                Kind: "credit_card",
+                DueDay: 10,
+            })
+
+            expect(response.status).toBe(200)
+            expect(await findPaymentMethodById(response.body.IdPaymentMethod)).toMatchObject({ DueDay: 10, ClosingOffsetDays: 7 })
+        })
+
+        //  Uma folga maior que o mês jogaria o fechamento para antes da fatura anterior
+        it("recusa folga de fechamento fora de 1..28", async () => {
             let response = await workspaceClient.post(`/PaymentMethods`, {
                 IdAccount,
                 Name: "Cartão",
                 Kind: "credit_card",
-                ClosingDay: 45,
                 DueDay: 10,
+                ClosingOffsetDays: 45,
+            })
+
+            expect(response.status).toBe(406)
+        })
+
+        it("recusa dia de vencimento fora de 1..31", async () => {
+            let response = await workspaceClient.post(`/PaymentMethods`, {
+                IdAccount,
+                Name: "Cartão",
+                Kind: "credit_card",
+                DueDay: 45,
             })
 
             expect(response.status).toBe(406)
@@ -123,8 +150,8 @@ describe("PaymentMethods", () => {
                 IdAccount,
                 Name: "Cartão invasor",
                 Kind: "credit_card",
-                ClosingDay: 5,
                 DueDay: 15,
+                ClosingOffsetDays: 10,
             })
 
             expect(response.status).toBe(406)
@@ -153,8 +180,8 @@ describe("PaymentMethods", () => {
                 IdAccount,
                 Name: "Cartão",
                 Kind: "credit_card",
-                ClosingDay: 10,
                 DueDay: 20,
+                ClosingOffsetDays: 10,
             })
             IdCard = card.body.IdPaymentMethod
         })
@@ -174,8 +201,8 @@ describe("PaymentMethods", () => {
         it("edita o cartão", async () => {
             let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${IdCard}`, {
                 Name: "Cartão renomeado",
-                ClosingDay: 15,
                 DueDay: 25,
+                ClosingOffsetDays: 10,
                 Color: "#00FF00",
             })
 
@@ -183,25 +210,25 @@ describe("PaymentMethods", () => {
 
             let card = await findPaymentMethodById(IdCard)
 
-            expect(card).toMatchObject({ Name: "Cartão renomeado", ClosingDay: 15, DueDay: 25, Color: "#00FF00" })
+            expect(card).toMatchObject({ Name: "Cartão renomeado", DueDay: 25, ClosingOffsetDays: 10, Color: "#00FF00" })
         })
 
         //  O banco não tem CHECK para isso: um pix com DueDay gravado só apareceria lá na
         //  etapa 5, como vencimento de fatura em cima de um pagamento à vista
-        it("recusa fechamento e vencimento em pix", async () => {
+        it("recusa vencimento e folga de fechamento em pix", async () => {
             let [pix] = await findPaymentMethods(IdAccount)
 
             let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${pix.IdPaymentMethod}`, {
                 Name: "Pix",
-                ClosingDay: 10,
                 DueDay: 20,
+                ClosingOffsetDays: 10,
             })
 
             expect(response.status).toBe(406)
 
             let unchanged = await findPaymentMethodById(pix.IdPaymentMethod)
 
-            expect(unchanged.ClosingDay).toBeNull()
+            expect(unchanged.ClosingOffsetDays).toBeNull()
         })
 
         it("aceita renomear o pix sem tocar nos campos de cartão", async () => {
@@ -215,11 +242,11 @@ describe("PaymentMethods", () => {
             expect((await findPaymentMethodById(pix.IdPaymentMethod)).Name).toBe("Pix da conta")
         })
 
-        //  Apagar o fechamento de um cartão não é edição parcial: é deixar a compra sem fatura
-        it("recusa apagar o fechamento de um cartão", async () => {
+        //  Apagar a folga de um cartão não é edição parcial: é deixar a compra sem fatura
+        it("recusa apagar a folga de fechamento de um cartão", async () => {
             let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${IdCard}`, {
                 Name: "Cartão",
-                ClosingDay: null,
+                ClosingOffsetDays: null,
             })
 
             expect(response.status).toBe(406)
@@ -263,8 +290,8 @@ describe("PaymentMethods", () => {
                 IdAccount: account.body.IdAccount,
                 Name: "Cartão a arquivar",
                 Kind: "credit_card",
-                ClosingDay: 1,
                 DueDay: 10,
+                ClosingOffsetDays: 7,
             })
 
             let response = await workspaceClient.delete(`/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`)
@@ -297,8 +324,8 @@ describe("PaymentMethods", () => {
                 IdAccount: account.body.IdAccount,
                 Name: "Cartão principal",
                 Kind: "credit_card",
-                ClosingDay: 20,
                 DueDay: 28,
+                ClosingOffsetDays: 8,
                 LastDigits: "1234",
             })
 
@@ -309,18 +336,18 @@ describe("PaymentMethods", () => {
             expect(withCard.map((item) => item.Kind)).toEqual(["pix", "debit", "credit_card"])
             //  Só o cartão carrega as datas de fatura: é o que a etapa 5 vai ler para saber
             //  em qual fatura a compra cai
-            expect(withCard.filter((item) => item.ClosingDay !== null)).toHaveLength(1)
-            expect(withCard.find((item) => item.Kind === "credit_card")).toMatchObject({ Name: "Cartão principal", ClosingDay: 20, DueDay: 28 })
+            expect(withCard.filter((item) => item.DueDay !== null)).toHaveLength(1)
+            expect(withCard.find((item) => item.Kind === "credit_card")).toMatchObject({ Name: "Cartão principal", DueDay: 28, ClosingOffsetDays: 8 })
 
             expect((await user.client.put(`/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`, {
                 Name: "Cartão do dia a dia",
-                ClosingDay: 5,
                 DueDay: 12,
+                ClosingOffsetDays: 6,
             })).status).toBe(200)
 
             let edited = await readMethods(user.client, IdWorkspace)
 
-            expect(edited.find((item) => item.Kind === "credit_card")).toMatchObject({ Name: "Cartão do dia a dia", ClosingDay: 5, DueDay: 12 })
+            expect(edited.find((item) => item.Kind === "credit_card")).toMatchObject({ Name: "Cartão do dia a dia", DueDay: 12, ClosingOffsetDays: 6 })
 
             expect((await user.client.delete(`/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}`)).status).toBe(200)
 
@@ -335,8 +362,8 @@ interface MethodResponse {
     IdPaymentMethod: number
     Name: string
     Kind: string
-    ClosingDay: number | null
     DueDay: number | null
+    ClosingOffsetDays: number | null
 }
 
 //  Esta feature não tem GET: a forma de pagamento é sempre lida embutida na conta

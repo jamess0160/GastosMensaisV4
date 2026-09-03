@@ -184,6 +184,19 @@ export namespace Utils {
         return toCalendar(date).add(months, "months").format(calendarFormat)
     }
 
+    /**
+     * Soma dias corridos (negativo subtrai). Atravessa mês e ano sem grampear nada.
+     *
+     * É o oposto de `setDayOfMonth`, e é de propósito: o fechamento do cartão é o vencimento
+     * menos a folga do emissor, e uma folga é uma contagem de dias, não um dia do mês. Por
+     * isso o resultado é sempre uma data que existe — 15/03 − 7 é 08/03, 15/02 − 7 é 08/02 —
+     * enquanto um "dia 30" precisa virar 28 em fevereiro e deixa de bater com a comparação
+     * que decide a fatura. Ver InvoiceDates.section.ts.
+     */
+    export function addDaysToDate(date: string, days: number) {
+        return toCalendar(date).add(days, "days").format(calendarFormat)
+    }
+
     /** Move a data para um dia do mês, grampeando no último dia quando ele não existe. */
     export function setDayOfMonth(date: string, day: number) {
         let target = toCalendar(date)
