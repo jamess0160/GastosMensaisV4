@@ -20,7 +20,7 @@ import {
     useMonthLegs,
 } from "@/data/month";
 import { Avatar, Button, Card, Chip, PageHead, Workspace as Page } from "@/ui/primitives";
-import { Topbar } from "@/ui/topbar";
+import { HideOnMobile, Topbar } from "@/ui/topbar";
 import {
     ClearFilters,
     FilterBar,
@@ -238,10 +238,14 @@ export function Expenses() {
                 month={month}
                 onMonthChange={setMonth}
                 actions={
-                    <Button variant="primary" onClick={() => navigate("/gastos/novo")}>
-                        <IconPlus />
-                        Novo gasto
-                    </Button>
+                    /* No mobile quem lança gasto é o FAB da barra
+                       inferior — ver `HideOnMobile`. */
+                    <HideOnMobile>
+                        <Button variant="primary" onClick={() => navigate("/gastos/novo")}>
+                            <IconPlus />
+                            Novo gasto
+                        </Button>
+                    </HideOnMobile>
                 }
             />
 

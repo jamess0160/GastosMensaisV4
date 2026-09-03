@@ -37,3 +37,14 @@ export function Topbar({
         </div>
     );
 }
+
+/** Esconde a ação abaixo de 900px.
+ *
+ *  É para o "Novo gasto": no mobile o FAB da barra inferior já é esse
+ *  botão, e repeti-lo no cabeçalho gasta a largura da tela com o mesmo
+ *  toque. NÃO é regra geral do `.actions` — Renda tem "Nova renda",
+ *  "Transferir" e "Clonar mês anterior", que não têm outro caminho no
+ *  mobile e precisam continuar aparecendo. */
+export function HideOnMobile({ children }: { children: ReactNode }) {
+    return <span className={styles.hideMobile}>{children}</span>;
+}

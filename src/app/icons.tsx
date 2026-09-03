@@ -1,10 +1,12 @@
 import {
     ChartColumn,
+    Ellipsis,
     House,
     LogOut,
     ReceiptText,
     Settings,
     TrendingUp,
+    User,
     Wallet,
     FileSpreadsheet,
     type LucideIcon,
@@ -35,3 +37,8 @@ export const IconReport = adapt(ChartColumn, "IconReport");
 export const IconSettings = adapt(Settings, "IconSettings");
 export const IconExport = adapt(FileSpreadsheet, "IconExport");
 export const IconSignOut = adapt(LogOut, "IconSignOut");
+export const IconProfile = adapt(User, "IconProfile");
+
+/** "Mais" — os três pontos que o layout desenha na quinta fatia da
+ *  barra inferior (`Layout/Hi-fi Mobile/04`). */
+export const IconMore = adapt(Ellipsis, "IconMore");

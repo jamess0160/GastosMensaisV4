@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import styles from "./overlay.module.css";
 import { cx } from "./form";
 import { Button } from "./primitives";
-import { IconAlert, IconClose } from "./icons";
+import { IconAlert, IconChevronRight, IconClose } from "./icons";
 
 /* ════════════════════════════════════════════════════════════
    Slide-over e modal. Os dois têm o mesmo comportamento de camada —
@@ -194,6 +194,102 @@ export function Modal({ open, onClose, title, subtitle, children, footer, wide }
                     {children}
                 </div>
                 {footer && <footer className={styles.foot}>{footer}</footer>}
+            </div>
+        </>,
+        document.body,
+    );
+}
+
+/* ── Bottom sheet ─────────────────────────────────────────── */
+
+export interface SheetMenuItem {
+    label: string;
+    /** A linha de baixo, quando o rótulo sozinho não diz o bastante. */
+    description?: string;
+    icon?: ReactNode;
+    onSelect: () => void;
+    disabled?: boolean;
+    /** Vira o `title` do botão — é onde se diz por que está desligado. */
+    reason?: string;
+    danger?: boolean;
+}
+
+/** O menu que sobe de baixo, transcrito de `.sheet` / `.srow` do
+ *  `Layout/Hi-fi Mobile/04` (frame B).
+ *
+ *  No mobile o padrão do layout é este, e não o popover ancorado do
+ *  desktop: com o dedo, uma lista colada na base da tela é o que se
+ *  alcança sem trocar a mão de posição. Ele herda o comportamento de
+ *  camada dos outros painéis daqui — Escape, clique fora, foco preso e
+ *  devolvido a quem abriu.
+ *
+ *  Escolher uma linha FECHA o sheet antes de agir: quase toda ação leva
+ *  para outra tela, e o painel não pode ficar por cima dela. */
+export function SheetMenu({
+    open,
+    onClose,
+    title,
+    items,
+}: {
+    open: boolean;
+    onClose: () => void;
+    /** Não aparece na tela: é o nome acessível do diálogo. */
+    title: string;
+    items: SheetMenuItem[];
+}) {
+    const ref = useDialogBehavior(open, onClose);
+
+    if (!open) return null;
+
+    return createPortal(
+        <>
+            <div className={styles.scrim} onClick={onClose} />
+            <div
+                ref={ref}
+                className={styles.sheet}
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
+                tabIndex={-1}
+            >
+                {/* A alça é desenho: quem fecha é o Escape, o scrim e o
+                    botão de baixo. */}
+                <div className={styles.grab} aria-hidden>
+                    <i />
+                </div>
+
+                <div className={styles.sheetRows} data-dialog-body>
+                    {items.map((item) => (
+                        <button
+                            key={item.label}
+                            type="button"
+                            className={cx(styles.sheetRow, item.danger && styles.sheetRowDanger)}
+                            disabled={item.disabled}
+                            title={item.reason}
+                            onClick={() => {
+                                onClose();
+                                item.onSelect();
+                            }}
+                        >
+                            {item.icon && <span className={styles.sheetIcon}>{item.icon}</span>}
+                            <span className={styles.sheetText}>
+                                <span className={styles.sheetLabel}>{item.label}</span>
+                                {item.description && (
+                                    <span className={styles.sheetDescription}>
+                                        {item.description}
+                                    </span>
+                                )}
+                            </span>
+                            <span className={styles.sheetChevron} aria-hidden>
+                                <IconChevronRight />
+                            </span>
+                        </button>
+                    ))}
+                </div>
+
+                <button type="button" className={styles.sheetCancel} onClick={onClose}>
+                    Cancelar
+                </button>
             </div>
         </>,
         document.body,

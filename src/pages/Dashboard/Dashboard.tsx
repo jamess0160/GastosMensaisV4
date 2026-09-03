@@ -19,7 +19,7 @@ import {
     useMonthLegs,
 } from "@/data/month";
 import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
-import { Topbar } from "@/ui/topbar";
+import { HideOnMobile, Topbar } from "@/ui/topbar";
 import { BreakdownRow, BudgetBar, DeltaPill, KpiCard, ProgressMeter } from "@/ui/budget";
 import { FormError, FormField, FormGrid, Input, MoneyInput } from "@/ui/form";
 import { Select } from "@/ui/select";
@@ -201,10 +201,14 @@ export function Dashboard() {
                 month={month}
                 onMonthChange={setMonth}
                 actions={
-                    <Button variant="primary" onClick={() => navigate("/gastos/novo")}>
-                        <IconPlus />
-                        Novo gasto
-                    </Button>
+                    /* No mobile quem lança gasto é o FAB da barra
+                       inferior — ver `HideOnMobile`. */
+                    <HideOnMobile>
+                        <Button variant="primary" onClick={() => navigate("/gastos/novo")}>
+                            <IconPlus />
+                            Novo gasto
+                        </Button>
+                    </HideOnMobile>
                 }
             />
 
