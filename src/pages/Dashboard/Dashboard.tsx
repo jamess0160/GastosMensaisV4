@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { DashboardController, type BudgetDraft, type DashboardContext } from "./controller";
+import { useMonthScope } from "@/app/monthScope";
 import { useSession } from "@/app/session";
 import {
     useAccounts,
@@ -41,7 +42,7 @@ import {
 } from "@/lib/aggregate";
 import { accentColor, categoryColor, paletteColor } from "@/lib/categoryColor";
 import { formatMoney, fromCents, toCents } from "@/lib/money";
-import { currentMonth, formatMonthLabel } from "@/lib/date";
+import { formatMonthLabel } from "@/lib/date";
 
 const newBudgetDraft = (month: string): BudgetDraft => ({
     IdBudgetPeriod: null,
@@ -98,7 +99,7 @@ export function Dashboard() {
     const { user } = useSession();
     const navigate = useNavigate();
 
-    const [month, setMonth] = useState(currentMonth);
+    const [month, setMonth] = useMonthScope();
     const [budgetDraft, setBudgetDraft] = useState<BudgetDraft | null>(null);
     const [removing, setRemoving] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);

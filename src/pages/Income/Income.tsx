@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import styles from "./src/styles.module.css";
 import { IncomeController, type IncomeContext, type InflowDraft } from "./controller";
 import { validateInflow } from "./sections/submitInflow";
+import { useMonthScope } from "@/app/monthScope";
 import { useSession } from "@/app/session";
 import { useAccounts, usePersonIndex, usePersons } from "@/data/catalogs";
 import {
@@ -49,7 +50,7 @@ import { EmptyState, ErrorState, LoadingRows, StatusBadge } from "@/ui/states";
 import { accentColor } from "@/lib/categoryColor";
 import { sumMoney, totalExpectedInflow, totalReceived } from "@/lib/aggregate";
 import { formatMoney } from "@/lib/money";
-import { currentMonth, formatDate, formatDateTime, formatMonthLabel, today } from "@/lib/date";
+import { formatDate, formatDateTime, formatMonthLabel, today } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
 const newDraft = (kind: ApiTypes.InflowKind): InflowDraft => ({
@@ -67,7 +68,7 @@ const newDraft = (kind: ApiTypes.InflowKind): InflowDraft => ({
 });
 
 export function Income() {
-    const [month, setMonth] = useState(currentMonth);
+    const [month, setMonth] = useMonthScope();
     const [status, setStatus] = useState<ApiTypes.InflowStatus | null>(null);
     const [kindFilter, setKindFilter] = useState<ApiTypes.InflowKind | null>(null);
     const [idPerson, setIdPerson] = useState<number | null>(null);

@@ -2,6 +2,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import styles from "./AppShell.module.css";
 import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
+import { MonthProvider } from "./monthScope";
 import { isSignedOut, SessionProvider, useSessionQuery, useUnauthorizedRedirect } from "./session";
 import { ApiUnauthorizedError } from "@/api/client";
 
@@ -34,7 +35,12 @@ export function AppShell() {
             <div className={styles.shell}>
                 <Sidebar />
                 <main className={styles.main}>
-                    <Outlet />
+                    {/* O mês vive aqui e não dentro de cada tela: trocar
+                        de página não pode zerar o mês que se está
+                        olhando. */}
+                    <MonthProvider>
+                        <Outlet />
+                    </MonthProvider>
                 </main>
                 {/* Abaixo de 900px a sidebar sai e a barra inferior
                     entra — as duas nunca aparecem juntas. */}

@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { ExpensesController, type ExpensesContext, type SeriesDraft } from "./controller";
+import { useMonthScope } from "@/app/monthScope";
 import { useSession } from "@/app/session";
 import {
     useCategoryIndex,
@@ -60,7 +61,7 @@ import {
 } from "@/lib/aggregate";
 import { accentColor, categoryColor } from "@/lib/categoryColor";
 import { formatMoney } from "@/lib/money";
-import { currentMonth, formatDate, formatDateTime, formatMonthLabel, today } from "@/lib/date";
+import { formatDate, formatDateTime, formatMonthLabel, today } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
 const KIND_LABEL: Record<ApiTypes.ExpenseKind, string> = {
@@ -89,7 +90,7 @@ export function Expenses() {
     const navigate = useNavigate();
     const { user } = useSession();
 
-    const [month, setMonth] = useState(currentMonth);
+    const [month, setMonth] = useMonthScope();
     const [status, setStatus] = useState<ApiTypes.ExpenseStatus | null>(null);
     const [kind, setKind] = useState<ApiTypes.ExpenseKind | null>(null);
     const [idCategory, setIdCategory] = useState<number | null>(null);
