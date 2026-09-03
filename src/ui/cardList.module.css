@@ -1,0 +1,115 @@
+/* Transcrito de .items / .item / .ghdr de Layout/Hi-fi Mobile/04 e 05.
+   É a forma que as listas de Gastos, Renda e Contas tomam no telefone,
+   no lugar da tabela. */
+
+.items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* ── Cabeçalho de grupo ───────────────────────────────────── */
+.group {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 2px 3px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.groupMeta {
+    letter-spacing: 0;
+    text-transform: none;
+    font-weight: 500;
+    color: var(--ink-3);
+    white-space: nowrap;
+}
+
+/* ── Cartão ───────────────────────────────────────────────── */
+.item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.clickable {
+    cursor: pointer;
+}
+
+.clickable:active {
+    background: var(--surface-alt);
+}
+
+.faded {
+    opacity: 0.6;
+}
+
+.left {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* O alvo de foco cobre o título inteiro e não desenha nada: a moldura
+   do cartão já é a caixa, e um botão visível dentro dela seria uma
+   segunda borda. */
+.trigger {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+}
+
+.trigger:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 3px;
+    border-radius: var(--r-xs);
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    min-width: 0;
+}
+
+.meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 7px;
+    flex-shrink: 0;
+}
+
+.amount {
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+}

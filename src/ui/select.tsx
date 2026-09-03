@@ -11,7 +11,8 @@ import {
 import { createPortal } from "react-dom";
 import styles from "./select.module.css";
 import { cx } from "./form";
-import { IconChevronDown } from "./icons";
+import { IconCheck, IconChevronDown } from "./icons";
+import { useIsMobile } from "@/lib/useMediaQuery";
 
 /* ════════════════════════════════════════════════════════════
    Seletor padrão do sistema.
@@ -36,6 +37,12 @@ import { IconChevronDown } from "./icons";
    - Teclado. Setas, Home/End, Enter/Espaço, Escape e busca por digitação
      estão implementados; Tab fecha e deixa o foco seguir, que é o que o
      nativo faz.
+
+   DUAS PELES, UM MOTOR. `Select` escolhe uma; `MultiSelect` marca
+   várias e é só para filtro. As duas montam o mesmo `Combobox` daqui —
+   o que muda é o que uma linha faz ao ser escolhida e se a lista fecha
+   depois. Foi assim para que as quatro coisas caras acima (APG, portal,
+   teclado, foco) existissem uma vez só.
 
    As opções vêm por PROP, não por filhos: com filhos, o ícone e a cor de
    cada linha teriam que viajar dentro de um `<option>` que não os
@@ -85,48 +92,86 @@ interface Row<T> {
     disabled?: boolean;
 }
 
-export function Select<T extends string | number>({
-    value,
-    onChange,
-    options,
-    placeholder = "Escolha…",
-    variant = "field",
-    emptyLabel = "Nada para escolher",
+/* ── Motor comum ──────────────────────────────────────────── */
+
+interface ComboboxProps<T extends string | number> {
+    rows: Row<T>[];
+    /** Sem opção nenhuma a lista mostra só o `emptyLabel`. */
+    hasOptions: boolean;
+    isSelected: (row: Row<T>) => boolean;
+    /** Linha em que a lista abre — a escolhida, quando há uma. */
+    startAt: number;
+    onPick: (row: Row<T>) => void;
+    /** Uma escolha só fecha a lista; multi-seleção não. */
+    closeOnPick: boolean;
+    /** Caixinha em cada linha e `aria-multiselectable` na lista. */
+    multiple?: boolean;
+    /** No mobile a lista sobe do rodapé em vez de ancorar no gatilho. */
+    sheetOnMobile?: boolean;
+    /** O miolo do gatilho — ícone e texto. A seta é daqui. */
+    label: ReactNode;
+    /** Pinta a pílula de filtro de "ligado". */
+    on?: boolean;
+    emptyLabel: string;
+    variant: SelectVariant;
+    id?: string;
+    disabled?: boolean;
+    invalid?: boolean;
+    className?: string;
+    ariaLabel?: string;
+    ariaInvalid?: true;
+    describedBy?: string;
+}
+
+/** O combobox de verdade: gatilho, portal, teclado e foco.
+ *
+ *  `Select` e `MultiSelect` são as duas peles dele. O que muda entre
+ *  elas é o que uma escolha faz (trocar ou alternar), se a lista fecha
+ *  depois, e a caixinha na linha — todo o resto, principalmente as
+ *  quatro coisas caras (APG, portal, teclado, foco), é o mesmo código. */
+function Combobox<T extends string | number>({
+    rows,
+    hasOptions,
+    isSelected,
+    startAt,
+    onPick,
+    closeOnPick,
+    multiple,
+    sheetOnMobile,
+    label,
+    on,
+    emptyLabel,
+    variant,
     id,
     disabled,
     invalid,
     className,
     ariaLabel,
-    "aria-invalid": ariaInvalid,
-    "aria-describedby": describedBy,
-}: SelectProps<T>) {
+    ariaInvalid,
+    describedBy,
+}: ComboboxProps<T>) {
     const listId = useId();
     const [open, setOpen] = useState(false);
     const [active, setActive] = useState(0);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
 
-    const rows: Row<T>[] = useMemo(
-        () => [{ value: null, label: placeholder }, ...options],
-        [options, placeholder],
-    );
+    const isMobile = useIsMobile();
+    const asSheet = Boolean(sheetOnMobile) && isMobile;
 
-    const selected = value === null ? null : (options.find((o) => o.value === value) ?? null);
-    const selectedIndex = rows.findIndex((row) => row.value === value);
+    const position = useAnchoredPosition(open && !asSheet, triggerRef);
 
-    const position = useAnchoredPosition(open, triggerRef);
-
-    const openList = (startAt?: number) => {
+    const openList = (startFrom?: number) => {
         if (disabled) return;
-        setActive(startAt ?? (selectedIndex >= 0 ? selectedIndex : 0));
+        setActive(startFrom ?? (startAt >= 0 ? startAt : 0));
         setOpen(true);
     };
 
     const commit = (index: number) => {
         const row = rows[index];
         if (!row || row.disabled) return;
-        onChange(row.value);
-        setOpen(false);
+        onPick(row);
+        if (closeOnPick) setOpen(false);
     };
 
     /* Anda pela lista pulando o que está desabilitado — parar em cima de
@@ -142,7 +187,11 @@ export function Select<T extends string | number>({
 
     const typeahead = useTypeahead(rows, (index) => {
         setActive(index);
-        if (!open) commit(index);
+        /* Com a lista fechada, digitar escolhe direto — como no `<select>`
+           nativo. Só que numa multi-seleção "escolher" é ALTERNAR, e
+           alternar às cegas o que não se está vendo tiraria uma marca sem
+           aviso: ali a tecla só move a linha ativa. */
+        if (!open && closeOnPick) commit(index);
     });
 
     /* Fecha ao clicar fora. `mousedown` na fase de captura, e não
@@ -215,97 +264,245 @@ export function Select<T extends string | number>({
         }
     };
 
-    const trigger = (
-        <button
-            ref={triggerRef}
-            type="button"
-            id={id}
-            role="combobox"
-            aria-haspopup="listbox"
-            aria-expanded={open}
-            aria-controls={open ? listId : undefined}
-            aria-activedescendant={open ? `${listId}-${active}` : undefined}
+    const list = (
+        <div
+            ref={popupRef}
+            id={listId}
+            role="listbox"
             aria-label={ariaLabel}
-            aria-invalid={ariaInvalid ?? (invalid || undefined)}
-            aria-describedby={describedBy}
-            disabled={disabled}
-            className={cx(
-                styles.trigger,
-                styles[variant],
-                open && styles.open,
-                invalid && styles.invalid,
-                variant === "filter" && value !== null && styles.filterOn,
-                className,
-            )}
-            onClick={() => (open ? setOpen(false) : openList())}
-            onKeyDown={onKeyDown}
-            onBlur={() => setOpen(false)}
+            aria-multiselectable={multiple || undefined}
+            className={cx(styles.popup, asSheet && styles.sheet)}
+            style={asSheet ? undefined : position}
+            /* Segurar o `mousedown` é o que mantém o foco no gatilho
+               durante o clique: sem isso o `onBlur` fecharia a lista
+               antes do clique virar escolha. */
+            onMouseDown={(event) => event.preventDefault()}
         >
-            {selected?.icon && (
-                <span className={styles.icon} style={{ color: selected.color }}>
-                    {selected.icon}
-                </span>
-            )}
-            <span className={cx(styles.text, selected === null && styles.placeholder)}>
-                {selected ? selected.label : placeholder}
-            </span>
-            <span className={styles.caret}>
-                <IconChevronDown />
-            </span>
-        </button>
+            {!hasOptions && <div className={styles.empty}>{emptyLabel}</div>}
+            {(hasOptions ? rows : []).map((row, index) => (
+                <button
+                    key={row.value === null ? "__none" : String(row.value)}
+                    type="button"
+                    role="option"
+                    id={`${listId}-${index}`}
+                    data-index={index}
+                    aria-selected={isSelected(row)}
+                    disabled={row.disabled}
+                    className={cx(
+                        styles.option,
+                        index === active && styles.optionActive,
+                        isSelected(row) && styles.optionOn,
+                        row.value === null && styles.optionOff,
+                    )}
+                    onMouseMove={() => setActive(index)}
+                    onClick={() => commit(index)}
+                >
+                    {multiple && (
+                        <span
+                            className={cx(styles.check, isSelected(row) && styles.checkOn)}
+                            aria-hidden
+                        >
+                            {isSelected(row) && <IconCheck />}
+                        </span>
+                    )}
+                    {row.icon && (
+                        <span className={styles.optionIcon} style={{ color: row.color }}>
+                            {row.icon}
+                        </span>
+                    )}
+                    <span className={styles.optionText}>{row.label}</span>
+                </button>
+            ))}
+        </div>
     );
 
     return (
         <span className={styles.wrap}>
-            {trigger}
+            <button
+                ref={triggerRef}
+                type="button"
+                id={id}
+                role="combobox"
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                aria-controls={open ? listId : undefined}
+                aria-activedescendant={open ? `${listId}-${active}` : undefined}
+                aria-label={ariaLabel}
+                aria-invalid={ariaInvalid ?? (invalid || undefined)}
+                aria-describedby={describedBy}
+                disabled={disabled}
+                className={cx(
+                    styles.trigger,
+                    styles[variant],
+                    open && styles.open,
+                    invalid && styles.invalid,
+                    variant === "filter" && on && styles.filterOn,
+                    className,
+                )}
+                onClick={() => (open ? setOpen(false) : openList())}
+                onKeyDown={onKeyDown}
+                onBlur={() => setOpen(false)}
+            >
+                {label}
+                <span className={styles.caret}>
+                    <IconChevronDown />
+                </span>
+            </button>
+
             {open &&
                 createPortal(
-                    <div
-                        ref={popupRef}
-                        id={listId}
-                        role="listbox"
-                        aria-label={ariaLabel}
-                        className={styles.popup}
-                        style={position}
-                        /* Segurar o `mousedown` é o que mantém o foco no
-                           gatilho durante o clique: sem isso o `onBlur`
-                           fecharia a lista antes do clique virar escolha. */
-                        onMouseDown={(event) => event.preventDefault()}
-                    >
-                        {options.length === 0 && <div className={styles.empty}>{emptyLabel}</div>}
-                        {(options.length === 0 ? [] : rows).map((row, index) => (
-                            <button
-                                key={row.value === null ? "__none" : String(row.value)}
-                                type="button"
-                                role="option"
-                                id={`${listId}-${index}`}
-                                data-index={index}
-                                aria-selected={row.value === value}
-                                disabled={row.disabled}
-                                className={cx(
-                                    styles.option,
-                                    index === active && styles.optionActive,
-                                    row.value === value && styles.optionOn,
-                                    row.value === null && styles.optionOff,
-                                )}
-                                onMouseMove={() => setActive(index)}
-                                onClick={() => commit(index)}
-                            >
-                                {row.icon && (
-                                    <span
-                                        className={styles.optionIcon}
-                                        style={{ color: row.color }}
-                                    >
-                                        {row.icon}
-                                    </span>
-                                )}
-                                <span className={styles.optionText}>{row.label}</span>
-                            </button>
-                        ))}
-                    </div>,
+                    asSheet ? (
+                        <>
+                            {/* O véu escurece a tela atrás; quem fecha no
+                                toque fora continua sendo o `mousedown` de
+                                captura lá em cima. */}
+                            <div className={styles.sheetScrim} />
+                            {list}
+                        </>
+                    ) : (
+                        list
+                    ),
                     document.body,
                 )}
         </span>
+    );
+}
+
+/* ── Escolha única ────────────────────────────────────────── */
+
+export function Select<T extends string | number>({
+    value,
+    onChange,
+    options,
+    placeholder = "Escolha…",
+    variant = "field",
+    emptyLabel = "Nada para escolher",
+    id,
+    disabled,
+    invalid,
+    className,
+    ariaLabel,
+    "aria-invalid": ariaInvalid,
+    "aria-describedby": describedBy,
+}: SelectProps<T>) {
+    const rows: Row<T>[] = useMemo(
+        () => [{ value: null, label: placeholder }, ...options],
+        [options, placeholder],
+    );
+
+    const selected = value === null ? null : (options.find((o) => o.value === value) ?? null);
+
+    return (
+        <Combobox
+            rows={rows}
+            hasOptions={options.length > 0}
+            isSelected={(row) => row.value === value}
+            startAt={rows.findIndex((row) => row.value === value)}
+            onPick={(row) => onChange(row.value)}
+            closeOnPick
+            label={
+                <>
+                    {selected?.icon && (
+                        <span className={styles.icon} style={{ color: selected.color }}>
+                            {selected.icon}
+                        </span>
+                    )}
+                    <span className={cx(styles.text, selected === null && styles.placeholder)}>
+                        {selected ? selected.label : placeholder}
+                    </span>
+                </>
+            }
+            on={value !== null}
+            emptyLabel={emptyLabel}
+            variant={variant}
+            id={id}
+            disabled={disabled}
+            invalid={invalid}
+            className={className}
+            ariaLabel={ariaLabel}
+            ariaInvalid={ariaInvalid}
+            describedBy={describedBy}
+        />
+    );
+}
+
+/* ── Multi-seleção ────────────────────────────────────────── */
+
+/** O irmão do `Select` para filtro: várias marcas ao mesmo tempo.
+ *
+ *  Só existe para FILTRO. Formulário continua com o `Select` de uma
+ *  escolha — a categoria de um gasto é uma, e virar multi-seleção só
+ *  para reaproveitar componente convidaria a mandar dois valores onde o
+ *  contrato aceita um.
+ *
+ *  Três diferenças, e todas vêm do que multi-seleção é:
+ *  - a lista NÃO fecha ao marcar, porque quase nunca se marca uma coisa
+ *    só e reabrir a cada marca é um clique a mais por escolha;
+ *  - o gatilho conta o que está marcado — "2 · Tiago, Luana", como o
+ *    `.filt` do Relatório desenha;
+ *  - nada marcado é "todas", e não "nenhuma": no filtro, o vazio é a
+ *    escolha de não recortar. A primeira linha volta para esse estado. */
+export function MultiSelect<T extends string | number>({
+    values,
+    onChange,
+    options,
+    placeholder = "Todas",
+    variant = "filter",
+    emptyLabel = "Nada para escolher",
+    id,
+    disabled,
+    className,
+    ariaLabel,
+}: {
+    values: readonly T[];
+    onChange: (values: T[]) => void;
+    options: readonly SelectOption<T>[];
+    /** O rótulo do "nada marcado" — "Todas as pessoas". */
+    placeholder?: string;
+    variant?: SelectVariant;
+    emptyLabel?: string;
+    id?: string;
+    disabled?: boolean;
+    className?: string;
+    ariaLabel?: string;
+}) {
+    const rows: Row<T>[] = useMemo(
+        () => [{ value: null, label: placeholder }, ...options],
+        [options, placeholder],
+    );
+
+    /* O resumo segue a ordem das OPÇÕES, não a de clique: assim o mesmo
+       conjunto de marcas escreve sempre o mesmo texto. */
+    const chosen = options.filter((option) => values.includes(option.value));
+    const summary =
+        chosen.length === 0
+            ? placeholder
+            : `${chosen.length} · ${chosen.map((option) => option.label).join(", ")}`;
+
+    const toggle = (value: T) =>
+        onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+
+    return (
+        <Combobox
+            rows={rows}
+            hasOptions={options.length > 0}
+            isSelected={(row) =>
+                row.value === null ? values.length === 0 : values.includes(row.value)
+            }
+            startAt={rows.findIndex((row) => row.value !== null && values.includes(row.value))}
+            onPick={(row) => (row.value === null ? onChange([]) : toggle(row.value))}
+            closeOnPick={false}
+            multiple
+            sheetOnMobile
+            label={<span className={styles.text}>{summary}</span>}
+            on={values.length > 0}
+            emptyLabel={emptyLabel}
+            variant={variant}
+            id={id}
+            disabled={disabled}
+            className={className}
+            ariaLabel={ariaLabel}
+        />
     );
 }
 

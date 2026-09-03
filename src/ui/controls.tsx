@@ -3,7 +3,7 @@ import styles from "./controls.module.css";
 import { cx } from "./form";
 import { IconCalendar, IconChevronLeft, IconChevronRight, IconClose, IconSearch } from "./icons";
 import { CategoryIcon, ICON_CATALOG } from "./iconCatalog";
-import { Select, type SelectOption } from "./select";
+import { MultiSelect, Select, type SelectOption } from "./select";
 import { addMonths, currentMonth, formatMonthLabel } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
@@ -142,6 +142,76 @@ export function FilterSelect<T extends string | number>({
             placeholder={allLabel}
             ariaLabel={ariaLabel}
         />
+    );
+}
+
+/** A variante pílula da multi-seleção — o irmão do `FilterSelect`.
+ *
+ *  Lista vazia é "todas", como lá: quem não escolheu ninguém quer ver
+ *  todo mundo. O gatilho conta o que está marcado. */
+export function FilterMultiSelect<T extends string | number>({
+    values,
+    onChange,
+    options,
+    allLabel = "Todas",
+    ariaLabel,
+}: {
+    values: readonly T[];
+    onChange: (values: T[]) => void;
+    options: readonly SelectOption<T>[];
+    allLabel?: string;
+    ariaLabel?: string;
+}) {
+    return (
+        <MultiSelect
+            variant="filter"
+            values={values}
+            onChange={onChange}
+            options={options}
+            placeholder={allLabel}
+            ariaLabel={ariaLabel}
+        />
+    );
+}
+
+/** Um grupo de chips que aceita várias marcas — status, formato.
+ *
+ *  Eles eram exclusivos: escolher "Pagos" apagava "Em aberto", e não
+ *  havia como ver os dois sem ver também os cancelados. Aqui cada chip
+ *  entra e sai do array por conta própria, e o chip de "todos" é o
+ *  atalho para o vazio — que continua significando "sem recorte".
+ *
+ *  `aria-pressed` em cada botão já é o que anuncia isso: um grupo de
+ *  alternadores independentes, não um rádio. */
+export function FilterChips<T extends string>({
+    values,
+    onChange,
+    options,
+    allLabel = "Todos",
+}: {
+    values: readonly T[];
+    onChange: (values: T[]) => void;
+    options: readonly { value: T; label: string }[];
+    allLabel?: string;
+}) {
+    const toggle = (value: T) =>
+        onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+
+    return (
+        <>
+            <FilterChip active={values.length === 0} onClick={() => onChange([])}>
+                {allLabel}
+            </FilterChip>
+            {options.map(({ value, label }) => (
+                <FilterChip
+                    key={value}
+                    active={values.includes(value)}
+                    onClick={() => toggle(value)}
+                >
+                    {label}
+                </FilterChip>
+            ))}
+        </>
     );
 }
 

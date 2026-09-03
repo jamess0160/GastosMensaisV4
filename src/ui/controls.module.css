@@ -349,4 +349,21 @@
     .filterGroup {
         flex-shrink: 0;
     }
+
+    /* A busca não entra na faixa que rola: ela toma a linha inteira
+       acima dos chips. Buscar é a primeira coisa que se faz numa lista
+       de telefone, e um campo de 180px espremido entre pílulas não é
+       alvo de dedo. */
+    .search {
+        width: 100%;
+        min-width: 0;
+        flex: none;
+    }
+
+    /* Chip e gatilho de filtro (`.filter` de select.module.css) andam
+       na mesma faixa e têm que ter a mesma altura — 28px é alvo de
+       mouse, não de dedo. */
+    .chip {
+        height: 32px;
+    }
 }

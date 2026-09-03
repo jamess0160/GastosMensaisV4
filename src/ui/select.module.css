@@ -275,3 +275,79 @@
     color: var(--ink-3);
     text-align: center;
 }
+
+/* ── Caixinha da multi-seleção ────────────────────────────── */
+
+/* A marca é um quadradinho, e não um `<input type=checkbox>`: a linha
+   inteira já é o `role="option"` que o leitor de tela anuncia com
+   `aria-selected`, e um checkbox de verdade ali dentro seria um
+   segundo alvo de foco dizendo a mesma coisa. */
+.check {
+    width: 16px;
+    height: 16px;
+    border-radius: 5px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.check svg {
+    width: 11px;
+    height: 11px;
+}
+
+.checkOn {
+    background: var(--brand);
+    border-color: var(--brand);
+}
+
+/* ── Lista como sheet (mobile) ────────────────────────────── */
+
+/* Ancorar uma lista num gatilho de 28px que fica no meio de uma faixa
+   que rola de lado dá uma caixa estreita e fora do alcance do polegar.
+   No telefone ela sobe do rodapé, com o mesmo miolo. */
+.sheetScrim {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    background: rgba(20, 18, 15, 0.34);
+}
+
+.sheet {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 62vh;
+    padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    border: 1px solid var(--border-strong);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -12px 40px rgba(20, 18, 15, 0.18);
+    animation: sheetup 0.16s ease-out;
+}
+
+@keyframes sheetup {
+    from {
+        transform: translateY(16px);
+        opacity: 0.6;
+    }
+}
+
+/* Alvo de dedo, não de mouse. */
+.sheet .option {
+    height: 44px;
+    font-size: 14.5px;
+}
+
+@media (max-width: 900px) {
+    /* A mesma altura do `.chip` da barra de filtros — os dois dividem a
+       faixa que rola de lado. */
+    .filter {
+        height: 32px;
+    }
+}
