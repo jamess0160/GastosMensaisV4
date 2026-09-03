@@ -35,8 +35,6 @@ export class GetByWorkspace {
         //  com a conta porque não existe tela que mostre uma sem o outro.
         let balances = await AccountBalance.getByAccounts(accounts, nextMonth)
 
-        console.log(balances)
-
         //  O mapa vem com uma entrada por conta, inclusive as sem lançamento nenhum — o
         //  fallback aqui é só o tipo, não uma regra de saldo (a abertura já foi cortada lá).
         return accounts.map((account) => ({ ...account, Balance: balances.get(account.IdAccount) ?? 0 }))
