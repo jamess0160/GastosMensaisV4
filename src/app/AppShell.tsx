@@ -3,6 +3,7 @@ import styles from "./AppShell.module.css";
 import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { MonthProvider } from "./monthScope";
+import { ScreenRoutes, useScreenLocation } from "./modalRoute";
 import { isSignedOut, SessionProvider, useSessionQuery, useUnauthorizedRedirect } from "./session";
 import { ApiUnauthorizedError } from "@/api/client";
 
@@ -11,6 +12,7 @@ import { ApiUnauthorizedError } from "@/api/client";
 export function AppShell() {
     useUnauthorizedRedirect();
     const session = useSessionQuery();
+    const screenAt = useScreenLocation();
 
     /* Saiu pelo menu (ou passou pelo login): o cookie pode continuar
        válido, mas a sessão do cliente não. Sem esta linha, "Sair" só
@@ -39,6 +41,10 @@ export function AppShell() {
                         de página não pode zerar o mês que se está
                         olhando. */}
                     <MonthProvider>
+                        {/* A tela, e depois o que estiver por cima
+                            dela: o `<Outlet />` aqui só desenha rota
+                            modal. Ver `modalRoute.tsx`. */}
+                        <ScreenRoutes at={screenAt} />
                         <Outlet />
                     </MonthProvider>
                 </main>

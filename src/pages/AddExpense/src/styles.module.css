@@ -58,6 +58,17 @@
     gap: 8px;
 }
 
+/* O rótulo tem altura fixa; o resto da caixa é do controle, e ele se
+   centraliza nesse espaço. Numa grade em que as caixas esticam para a
+   altura da mais alta, é isto que alinha os controles entre elas. */
+.boxContent {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
 .boxHint {
     font-size: 10.5px;
     font-weight: 500;
@@ -117,6 +128,17 @@
 .plainInput::placeholder {
     color: var(--ink-3);
     font-weight: 400;
+}
+
+/* O dia do mês é o único campo do painel com moldura própria: são dois
+   dígitos, e sem caixa ele se lê como texto e não como campo. A moldura
+   preenche a caixa, como a de "Repetir até" ao lado — um campo estreito
+   no canto de uma caixa larga deixa um vazio que parece falta. */
+.dayInput {
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    font-size: 15px;
 }
 
 /* ── Rótulo de grupo (.grp-lab) ───────────────────────────── */

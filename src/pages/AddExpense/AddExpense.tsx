@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { AddExpenseController, type AddExpenseContext, type ExpenseDraft } from "./controller";
 import { validateExpense } from "./sections/submitExpense";
@@ -12,6 +12,8 @@ import {
     DateInput,
     FormError,
     FormField,
+    FormNotice,
+    Input,
     SegmentedControl,
     Stepper,
     Textarea,
@@ -81,7 +83,11 @@ function Box({
                 <span>{label}</span>
                 {hint && <span className={styles.boxHint}>{hint}</span>}
             </label>
-            {children}
+            {/* O conteúdo se centraliza no que sobra DEPOIS do rótulo:
+                numa fileira de caixas de alturas diferentes ("Dia do
+                mês" ao lado de "Repetir até"), sem isto o controle
+                fica grudado no topo de umas e no meio de outras. */}
+            <div className={styles.boxContent}>{children}</div>
         </div>
     );
 }
@@ -101,6 +107,7 @@ export function AddExpense() {
         () => (draftKey ? readDraft<ExpenseDraft>(draftKey) : null) ?? emptyDraft(),
     );
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [loading, setLoading] = useState(isEdit);
     /* O layout desenha UMA forma de pagamento. O contrato aceita várias,
@@ -114,7 +121,11 @@ export function AddExpense() {
     const methods = usePaymentMethods();
     const invalidateMovement = useInvalidateMovement();
 
-    const close = () => navigate("/gastos");
+    /* De onde o painel foi aberto — ver `modalRoute.tsx`. Fechar
+       devolve para lá; quem chegou por link direto cai na lista. */
+    const location = useLocation();
+    const cameFrom = (location.state as { background?: string } | null)?.background ?? null;
+    const close = () => (cameFrom ? navigate(-1) : navigate("/gastos"));
 
     const context = useMemo<AddExpenseContext>(
         () => ({
@@ -127,13 +138,38 @@ export function AddExpense() {
             failSubmit(message) {
                 setPending(false);
                 setLoading(false);
+                setNotice(null);
                 setError(message);
             },
+            /* LANÇAR NÃO FECHA O PAINEL. Quem abre o formulário de gasto
+               quase nunca tem um só para lançar — fechar a cada gravação
+               obrigava a reabrir, reescolher a forma de pagamento e
+               reencontrar o lugar. O painel se esvazia, avisa o que
+               gravou e espera o próximo; fechar é do usuário.
+
+               Na EDIÇÃO não: ali existe um gasto sendo alterado, não uma
+               fila para digitar, e salvar significa terminar. */
             finishSubmit(occurrences) {
                 setPending(false);
                 if (draftKey) clearDraft(draftKey);
                 invalidateMovement();
-                navigate("/gastos", { replace: true, state: { occurrences } });
+
+                if (isEdit) {
+                    close();
+                    return;
+                }
+
+                setDraft(emptyDraft());
+                setSplitPayments(false);
+                setError(null);
+                setNotice(
+                    occurrences > 1
+                        ? `Gasto lançado em ${occurrences} ocorrências — o próximo já pode ser digitado.`
+                        : "Gasto lançado — o próximo já pode ser digitado.",
+                );
+                // O valor é o primeiro campo do painel e o começo de todo
+                // lançamento: é para lá que o cursor volta.
+                document.getElementById("expense-total")?.focus();
             },
             finishLoad(loaded) {
                 setPending(false);
@@ -152,12 +188,16 @@ export function AddExpense() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [idExpense]);
 
-    const patch = (change: Partial<ExpenseDraft>) =>
+    const patch = (change: Partial<ExpenseDraft>) => {
+        // O aviso é do que ACABOU de ser gravado: à primeira tecla do
+        // próximo lançamento ele já não fala do que está na tela.
+        setNotice(null);
         setDraft((current) => {
             const next = { ...current, ...change };
             if (draftKey) writeDraft(draftKey, next);
             return next;
         });
+    };
 
     const singlePayment = draft.payments[0] ?? emptyLine();
 
@@ -222,6 +262,7 @@ export function AddExpense() {
                 }}
             >
                 <FormError>{error}</FormError>
+                <FormNotice>{notice}</FormNotice>
 
                 {/* ── Valor e descrição ──────────────────────── */}
                 <div className={styles.rowValue}>
@@ -340,9 +381,16 @@ export function AddExpense() {
                                 hint="vazio usa o dia da data"
                                 htmlFor="rec-day"
                             >
-                                <input
+                                {/* Este é o único campo do painel que
+                                    pede uma caixa de verdade: sem
+                                    moldura, um número de dois dígitos
+                                    solto ao lado de uma data com moldura
+                                    não se lê como campo. E com largura
+                                    própria, para não esticar junto com o
+                                    "Repetir até". */}
+                                <Input
                                     id="rec-day"
-                                    className={styles.plainInput}
+                                    className={styles.dayInput}
                                     type="number"
                                     min={1}
                                     max={31}
@@ -374,7 +422,7 @@ export function AddExpense() {
                 {/* ── Destino: de quem é o custo ─────────────── */}
                 <div>
                     <div className={styles.groupLabel}>
-                        <span className={styles.groupLabelText}>Destino</span>
+                        <span className={styles.groupLabelText}>Pessoa</span>
                         <span className={styles.groupLabelHint}>
                             {personsUsed === 0
                                 ? "opcional"
@@ -388,7 +436,7 @@ export function AddExpense() {
                     <SplitEditor
                         label="De quem é o custo"
                         optionLabel="Pessoa"
-                        addLabel="Adicionar destino"
+                        addLabel="Adicionar pessoa"
                         options={activePersons.map((person) => ({
                             id: person.IdPerson,
                             label: person.Name,

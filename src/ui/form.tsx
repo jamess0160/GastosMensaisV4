@@ -338,7 +338,14 @@ export function SegmentedControl<T extends string>({
 /* ── Stepper ──────────────────────────────────────────────── */
 
 /** Contador com os limites do contrato embutidos (2–120 parcelas, 1–60
- *  ocorrências): o botão apaga no limite em vez de deixar a API recusar. */
+ *  ocorrências): o botão apaga no limite em vez de deixar a API recusar.
+ *
+ *  Enquanto se DIGITA, porém, o campo guarda o texto cru e não aplica o
+ *  limite. Com `clamp` a cada tecla era impossível chegar a "12": o
+ *  "1" virava 2 na hora, e a tecla seguinte escrevia 2 seguido de 2.
+ *  O piso volta no `blur` — e enquanto o número estiver abaixo dele
+ *  quem barra o envio é a validação da tela, que apaga o botão de
+ *  salvar. Bloquear no envio, não na tecla. */
 export function Stepper({
     value,
     onChange,
@@ -356,11 +363,20 @@ export function Stepper({
 }) {
     const clamp = (next: number) => Math.min(max, Math.max(min, next));
 
+    /** O que está escrito, enquanto se escreve. `null` = o campo
+     *  espelha o `value`. */
+    const [typed, setTyped] = useState<string | null>(null);
+
+    const step = (delta: number) => {
+        setTyped(null);
+        onChange(clamp(value + delta));
+    };
+
     return (
         <div className={styles.stepper}>
             <button
                 type="button"
-                onClick={() => onChange(clamp(value - 1))}
+                onClick={() => step(-1)}
                 disabled={value <= min}
                 aria-label="Diminuir"
             >
@@ -371,15 +387,28 @@ export function Stepper({
                 className={styles.value}
                 inputMode="numeric"
                 aria-label={ariaLabel}
-                value={value}
+                value={typed ?? String(value)}
                 onChange={(event) => {
-                    const next = Number(event.target.value.replace(/\D/g, ""));
-                    if (Number.isFinite(next) && next > 0) onChange(clamp(next));
+                    const raw = event.target.value.replace(/\D/g, "");
+                    setTyped(raw);
+                    /* O rascunho acompanha o que está escrito — é dele
+                       que saem o resumo e a validação. Só o TETO segura
+                       aqui: um 1200 digitado no caminho para 120
+                       desenharia mil e duzentas parcelas na linha do
+                       tempo antes do blur. */
+                    const next = Number(raw);
+                    if (raw !== "" && next > 0 && next <= max) onChange(next);
+                }}
+                onBlur={() => {
+                    const next = Number(typed);
+                    setTyped(null);
+                    if (typed === null) return;
+                    onChange(clamp(typed === "" || !Number.isFinite(next) ? value : next));
                 }}
             />
             <button
                 type="button"
-                onClick={() => onChange(clamp(value + 1))}
+                onClick={() => step(1)}
                 disabled={value >= max}
                 aria-label="Aumentar"
             >
@@ -395,6 +424,18 @@ export function FormError({ children }: { children: ReactNode }) {
     if (!children) return null;
     return (
         <div className={styles.formError} role="alert">
+            {children}
+        </div>
+    );
+}
+
+/** O contrário: deu certo. `role="status"` e não `alert` — o leitor de
+ *  tela anuncia quando terminar o que está fazendo, sem interromper
+ *  quem já está digitando a próxima linha. */
+export function FormNotice({ children }: { children: ReactNode }) {
+    if (!children) return null;
+    return (
+        <div className={styles.formNotice} role="status">
             {children}
         </div>
     );

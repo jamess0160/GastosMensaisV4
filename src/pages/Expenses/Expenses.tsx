@@ -1,8 +1,8 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { ExpensesController, type ExpensesContext, type SeriesDraft } from "./controller";
 import { useMonthScope } from "@/app/monthScope";
+import { useOpenModal } from "@/app/modalRoute";
 import { useSession } from "@/app/session";
 import {
     useCategoryIndex,
@@ -87,7 +87,7 @@ const emptySeriesDraft = (): SeriesDraft => ({
 });
 
 export function Expenses() {
-    const navigate = useNavigate();
+    const openModal = useOpenModal();
     const { user } = useSession();
 
     const [month, setMonth] = useMonthScope();
@@ -241,7 +241,7 @@ export function Expenses() {
                     /* No mobile quem lança gasto é o FAB da barra
                        inferior — ver `HideOnMobile`. */
                     <HideOnMobile>
-                        <Button variant="primary" onClick={() => navigate("/gastos/novo")}>
+                        <Button variant="primary" onClick={() => openModal("/gastos/novo")}>
                             <IconPlus />
                             Novo gasto
                         </Button>
@@ -403,7 +403,7 @@ export function Expenses() {
                             hasFilters ? (
                                 <Button onClick={clearAll}>Limpar filtros</Button>
                             ) : (
-                                <Button variant="primary" onClick={() => navigate("/gastos/novo")}>
+                                <Button variant="primary" onClick={() => openModal("/gastos/novo")}>
                                     <IconPlus />
                                     Novo gasto
                                 </Button>
@@ -642,7 +642,7 @@ export function Expenses() {
                                         {expense.Kind !== "installment" && (
                                             <Button
                                                 onClick={() =>
-                                                    navigate(`/gastos/${expense.IdExpense}/editar`)
+                                                    openModal(`/gastos/${expense.IdExpense}/editar`)
                                                 }
                                             >
                                                 <IconEdit />
@@ -996,10 +996,6 @@ export function Expenses() {
                     pending={pending}
                 />
             </Page>
-
-            {/* O formulário de gasto — rota filha, slide-over sobre a
-                lista. Ver `routes.tsx`. */}
-            <Outlet />
         </>
     );
 }

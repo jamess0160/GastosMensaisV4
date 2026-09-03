@@ -14,6 +14,7 @@ import {
     IconSignOut,
 } from "./icons";
 import { useSignOut } from "./session";
+import { useOpenModal } from "./modalRoute";
 import { SheetMenu, type SheetMenuItem } from "@/ui/overlay";
 import { IconPlus } from "@/ui/icons";
 
@@ -45,6 +46,7 @@ export function TabBar() {
     const navigate = useNavigate();
     const location = useLocation();
     const signOut = useSignOut();
+    const openModal = useOpenModal();
     const [menuOpen, setMenuOpen] = useState(false);
 
     const item = ({
@@ -125,7 +127,9 @@ export function TabBar() {
                     <button
                         type="button"
                         className={styles.fab}
-                        onClick={() => navigate("/gastos/novo")}
+                        /* O FAB abre o painel por cima da tela em que
+                           se está, como o botão do cabeçalho. */
+                        onClick={() => openModal("/gastos/novo")}
                         aria-label="Adicionar gasto"
                     >
                         <IconPlus />

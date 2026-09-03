@@ -1,8 +1,8 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { DashboardController, type BudgetDraft, type DashboardContext } from "./controller";
 import { useMonthScope } from "@/app/monthScope";
+import { useOpenModal } from "@/app/modalRoute";
 import { useSession } from "@/app/session";
 import {
     useAccounts,
@@ -97,7 +97,7 @@ function Breakdown({
 
 export function Dashboard() {
     const { user } = useSession();
-    const navigate = useNavigate();
+    const openModal = useOpenModal();
 
     const [month, setMonth] = useMonthScope();
     const [budgetDraft, setBudgetDraft] = useState<BudgetDraft | null>(null);
@@ -204,7 +204,7 @@ export function Dashboard() {
                     /* No mobile quem lança gasto é o FAB da barra
                        inferior — ver `HideOnMobile`. */
                     <HideOnMobile>
-                        <Button variant="primary" onClick={() => navigate("/gastos/novo")}>
+                        <Button variant="primary" onClick={() => openModal("/gastos/novo")}>
                             <IconPlus />
                             Novo gasto
                         </Button>

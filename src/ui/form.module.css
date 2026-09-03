@@ -320,8 +320,12 @@
 }
 
 /* ── Stepper ──────────────────────────────────────────────── */
+/* Ocupa a largura de quem o contém: dentro de uma caixa de campo, um
+   controle de 120px no canto esquerdo se lê como sobra, não como campo.
+   Os botões ficam do tamanho do dedo e o número toma o meio. */
 .stepper {
-    display: inline-flex;
+    display: flex;
+    width: 100%;
     align-items: center;
     border: 1px solid var(--border-strong);
     border-radius: 9px;
@@ -331,6 +335,7 @@
 
 .stepper button {
     width: 34px;
+    flex-shrink: 0;
     height: 32px;
     border: none;
     background: var(--surface-alt);
@@ -351,7 +356,8 @@
 }
 
 .stepper .value {
-    width: 52px;
+    flex: 1;
+    min-width: 52px;
     height: 32px;
     text-align: center;
     border: none;
@@ -386,6 +392,16 @@
     border-radius: 10px;
     background: var(--neg-soft);
     color: var(--neg);
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+.formNotice {
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--pos-soft);
+    color: var(--pos-ink);
     font-size: 12.5px;
     font-weight: 600;
     line-height: 1.45;
