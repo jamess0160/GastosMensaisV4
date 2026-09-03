@@ -119,42 +119,6 @@
     font-weight: 400;
 }
 
-.plainSelect {
-    border: none;
-    background: transparent;
-    padding: 0;
-    font-family: var(--font);
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--ink);
-    width: 100%;
-    min-width: 0;
-    appearance: none;
-    cursor: pointer;
-}
-
-.plainSelect:focus {
-    outline: none;
-}
-
-.selectRow {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-}
-
-.caret {
-    color: var(--ink-3);
-    display: inline-flex;
-    flex-shrink: 0;
-}
-
-.caret svg {
-    width: 16px;
-    height: 16px;
-}
-
 /* ── Rótulo de grupo (.grp-lab) ───────────────────────────── */
 .groupLabel {
     display: flex;
@@ -238,13 +202,6 @@
     display: grid;
     gap: 12px;
     margin-top: 12px;
-}
-
-.categoryMark {
-    display: inline-flex;
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
 }
 
 .extras {

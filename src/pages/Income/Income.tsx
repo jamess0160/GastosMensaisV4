@@ -28,12 +28,12 @@ import {
     Input,
     MoneyInput,
     SegmentedControl,
-    Select,
     Textarea,
 } from "@/ui/form";
+import { Select } from "@/ui/select";
 import { SplitEditor } from "@/ui/SplitEditor";
 import { ConfirmDialog, FooterSpacer, SlideOver } from "@/ui/overlay";
-import { IconArrowUp, IconCopy, IconEdit, IconPlus, IconTransfer } from "@/ui/icons";
+import { IconArrowUp, IconBank, IconCopy, IconEdit, IconPlus, IconTransfer } from "@/ui/icons";
 import {
     Cell,
     CellAmount,
@@ -46,6 +46,7 @@ import {
     TypeTile,
 } from "@/ui/table";
 import { EmptyState, ErrorState, LoadingRows, StatusBadge } from "@/ui/states";
+import { accentColor } from "@/lib/categoryColor";
 import { sumMoney, totalExpectedInflow, totalReceived } from "@/lib/aggregate";
 import { formatMoney } from "@/lib/money";
 import { currentMonth, formatDate, formatDateTime, formatMonthLabel, today } from "@/lib/date";
@@ -117,6 +118,15 @@ export function Income() {
     );
     const activeAccounts = (accounts.data ?? []).filter((account) => account.Active);
     const activePersons = (persons.data ?? []).filter((person) => person.Active);
+
+    /** As duas pontas da transferência escolhem da mesma lista de contas —
+     *  e a cor do cadastro é o que separa uma da outra de relance. */
+    const accountOptions = activeAccounts.map((account) => ({
+        value: account.IdAccount,
+        label: account.Name,
+        icon: <IconBank />,
+        color: accentColor(account.Color),
+    }));
 
     /* O destino vive no DETALHE — a lista não traz `Persons`. Enquanto
        ele não chega, a linha não passa no filtro de destino; sem filtro
@@ -253,8 +263,16 @@ export function Income() {
                             ariaLabel="Tipo"
                             allLabel="Todos os tipos"
                             options={[
-                                { value: "inflow" as const, label: "Entradas" },
-                                { value: "transfer" as const, label: "Transferências" },
+                                {
+                                    value: "inflow" as const,
+                                    label: "Entradas",
+                                    icon: <IconArrowUp />,
+                                },
+                                {
+                                    value: "transfer" as const,
+                                    label: "Transferências",
+                                    icon: <IconTransfer />,
+                                },
                             ]}
                         />
 
@@ -669,30 +687,14 @@ export function Income() {
                                             <Select
                                                 {...field}
                                                 disabled={draft.IdInflow !== null}
-                                                value={draft.IdFromAccount ?? ""}
-                                                onChange={(event) =>
+                                                value={draft.IdFromAccount}
+                                                onChange={(IdFromAccount) =>
                                                     setDraft((c) =>
-                                                        c
-                                                            ? {
-                                                                  ...c,
-                                                                  IdFromAccount: event.target.value
-                                                                      ? Number(event.target.value)
-                                                                      : null,
-                                                              }
-                                                            : c,
+                                                        c ? { ...c, IdFromAccount } : c,
                                                     )
                                                 }
-                                            >
-                                                <option value="">Escolha…</option>
-                                                {activeAccounts.map((account) => (
-                                                    <option
-                                                        key={account.IdAccount}
-                                                        value={account.IdAccount}
-                                                    >
-                                                        {account.Name}
-                                                    </option>
-                                                ))}
-                                            </Select>
+                                                options={accountOptions}
+                                            />
                                         )}
                                     </FormField>
                                 )}
@@ -702,30 +704,12 @@ export function Income() {
                                         <Select
                                             {...field}
                                             disabled={draft.IdInflow !== null}
-                                            value={draft.IdToAccount ?? ""}
-                                            onChange={(event) =>
-                                                setDraft((c) =>
-                                                    c
-                                                        ? {
-                                                              ...c,
-                                                              IdToAccount: event.target.value
-                                                                  ? Number(event.target.value)
-                                                                  : null,
-                                                          }
-                                                        : c,
-                                                )
+                                            value={draft.IdToAccount}
+                                            onChange={(IdToAccount) =>
+                                                setDraft((c) => (c ? { ...c, IdToAccount } : c))
                                             }
-                                        >
-                                            <option value="">Escolha…</option>
-                                            {activeAccounts.map((account) => (
-                                                <option
-                                                    key={account.IdAccount}
-                                                    value={account.IdAccount}
-                                                >
-                                                    {account.Name}
-                                                </option>
-                                            ))}
-                                        </Select>
+                                            options={accountOptions}
+                                        />
                                     )}
                                 </FormField>
                             </FormGrid>

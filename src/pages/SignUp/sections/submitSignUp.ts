@@ -54,15 +54,10 @@ export async function submitSignUp(context: SignUpContext): Promise<void> {
             Password: context.password,
             Phone: Number(context.phone),
         });
+
+        context.finishSignUp();
     } catch (cause) {
         context.failSubmit(errorMessage(cause));
         return;
-    }
-
-    try {
-        await UsersConnection.login({ login: context.email.trim(), password: context.password });
-        context.finishSignUp();
-    } catch {
-        context.failSubmit("Conta criada, mas não foi possível entrar. Tente fazer login.");
     }
 }

@@ -19,12 +19,13 @@ import {
     useMoneyField,
 } from "@/ui/form";
 import { SplitEditor, emptyLine, usableLines } from "@/ui/SplitEditor";
+import { Select } from "@/ui/select";
 import { InstallmentTimeline } from "@/ui/InstallmentTimeline";
 import { TagInput } from "@/ui/TagInput";
 import { CategoryIcon } from "@/ui/iconCatalog";
-import { IconAlert, IconChevronDown } from "@/ui/icons";
+import { IconAlert, METHOD_ICON } from "@/ui/icons";
 import { EmptyState, LoadingRows } from "@/ui/states";
-import { categoryColor } from "@/lib/categoryColor";
+import { accentColor, categoryColor } from "@/lib/categoryColor";
 import { formatMoney, splitEvenly } from "@/lib/money";
 import { addMonths, formatDate, formatMonthLabel, today, toReferenceMonth } from "@/lib/date";
 import { clearDraft, readDraft, writeDraft } from "@/lib/draftStorage";
@@ -376,7 +377,7 @@ export function AddExpense() {
                         <span className={styles.groupLabelText}>Destino</span>
                         <span className={styles.groupLabelHint}>
                             {personsUsed === 0
-                                ? "opcional — não move saldo, é só análise"
+                                ? "opcional"
                                 : `${personsUsed} selecionado${personsUsed === 1 ? "" : "s"} · dividindo ${
                                       draft.TotalValue === null
                                           ? "o total"
@@ -386,7 +387,6 @@ export function AddExpense() {
                     </div>
                     <SplitEditor
                         label="De quem é o custo"
-                        hint="Não move saldo"
                         optionLabel="Pessoa"
                         addLabel="Adicionar destino"
                         options={activePersons.map((person) => ({
@@ -402,75 +402,42 @@ export function AddExpense() {
                 {/* ── Categoria e forma de pagamento ─────────── */}
                 <div className={styles.rowPair}>
                     <Box label="Categoria" htmlFor="expense-category">
-                        <div className={styles.selectRow}>
-                            {category && (
-                                <span
-                                    className={styles.categoryMark}
-                                    style={{ color: categoryColor(category) }}
-                                >
-                                    <CategoryIcon iconKey={category.IconKey} />
-                                </span>
-                            )}
-                            <select
-                                id="expense-category"
-                                className={styles.plainSelect}
-                                value={draft.IdCategory ?? ""}
-                                onChange={(event) =>
-                                    patch({
-                                        IdCategory: event.target.value
-                                            ? Number(event.target.value)
-                                            : null,
-                                    })
-                                }
-                            >
-                                <option value="">Escolha…</option>
-                                {activeCategories.map((item) => (
-                                    <option key={item.IdCategory} value={item.IdCategory}>
-                                        {item.Description}
-                                    </option>
-                                ))}
-                            </select>
-                            <span className={styles.caret}>
-                                <IconChevronDown />
-                            </span>
-                        </div>
+                        <Select
+                            variant="plain"
+                            id="expense-category"
+                            value={draft.IdCategory}
+                            onChange={(IdCategory) => patch({ IdCategory })}
+                            options={activeCategories.map((item) => ({
+                                value: item.IdCategory,
+                                label: item.Description,
+                                icon: <CategoryIcon iconKey={item.IconKey} />,
+                                color: categoryColor(item),
+                            }))}
+                            emptyLabel="Nenhuma categoria ativa"
+                        />
                     </Box>
 
                     {!splitPayments && (
                         <Box label="Forma de pagamento" htmlFor="expense-method">
-                            <div className={styles.selectRow}>
-                                <select
-                                    id="expense-method"
-                                    className={styles.plainSelect}
-                                    value={singlePayment.id ?? ""}
-                                    onChange={(event) =>
-                                        patch({
-                                            payments: [
-                                                {
-                                                    ...singlePayment,
-                                                    id: event.target.value
-                                                        ? Number(event.target.value)
-                                                        : null,
-                                                    value: draft.TotalValue,
-                                                },
-                                            ],
-                                        })
-                                    }
-                                >
-                                    <option value="">Escolha…</option>
-                                    {methods.map(({ method, account }) => (
-                                        <option
-                                            key={method.IdPaymentMethod}
-                                            value={method.IdPaymentMethod}
-                                        >
-                                            {account.Name} · {method.Name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <span className={styles.caret}>
-                                    <IconChevronDown />
-                                </span>
-                            </div>
+                            <Select
+                                variant="plain"
+                                id="expense-method"
+                                value={singlePayment.id}
+                                onChange={(id) =>
+                                    patch({
+                                        payments: [
+                                            { ...singlePayment, id, value: draft.TotalValue },
+                                        ],
+                                    })
+                                }
+                                options={methods.map(({ method, account }) => ({
+                                    value: method.IdPaymentMethod,
+                                    label: `${account.Name} · ${method.Name}`,
+                                    icon: METHOD_ICON[method.Kind],
+                                    color: accentColor(method.Color ?? account.Color),
+                                }))}
+                                emptyLabel="Nenhuma forma cadastrada"
+                            />
                             <div className={styles.paidRow}>
                                 {/* `Paid: true` é o caso do débito e do pix,
                                     que saem pagos no ato; no cartão a perna
@@ -525,13 +492,14 @@ export function AddExpense() {
                         {splitPayments && (
                             <SplitEditor
                                 label="Com o que foi pago"
-                                hint="Move o saldo da conta"
                                 optionLabel="Forma de pagamento"
                                 addLabel="Outra forma"
                                 options={methods.map(({ method, account }) => ({
                                     id: method.IdPaymentMethod,
                                     label: method.Name,
                                     group: account.Name,
+                                    icon: METHOD_ICON[method.Kind],
+                                    color: accentColor(method.Color ?? account.Color),
                                 }))}
                                 lines={draft.payments}
                                 onChange={(payments) => patch({ payments })}

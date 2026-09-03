@@ -5,11 +5,10 @@ import {
     type ChangeEvent,
     type InputHTMLAttributes,
     type ReactNode,
-    type SelectHTMLAttributes,
     type TextareaHTMLAttributes,
 } from "react";
 import styles from "./form.module.css";
-import { IconChevronDown, IconEye, IconEyeOff } from "./icons";
+import { IconEye, IconEyeOff } from "./icons";
 import { formatAmount, parseMoneyInput } from "@/lib/money";
 import type { ApiTypes } from "@/types/api";
 
@@ -106,25 +105,9 @@ export const Textarea = forwardRef<
     );
 });
 
-export const Select = forwardRef<
-    HTMLSelectElement,
-    SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }
->(function Select({ className, invalid, children, ...rest }, ref) {
-    return (
-        <span className={styles.selectWrap}>
-            <select
-                ref={ref}
-                className={cx(styles.select, invalid && styles.invalid, className)}
-                {...rest}
-            >
-                {children}
-            </select>
-            <span className={styles.caret}>
-                <IconChevronDown />
-            </span>
-        </span>
-    );
-});
+/* O seletor NÃO mora aqui: ele não é um `<select>` com estilo, é um
+   combobox montado à mão para poder desenhar ícone nas opções. Está em
+   src/ui/select.tsx, com o porquê escrito lá. */
 
 /** Senha com o olho de revelar.
  *

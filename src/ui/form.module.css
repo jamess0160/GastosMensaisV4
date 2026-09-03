@@ -56,7 +56,6 @@
 
 /* ── Controles de texto ───────────────────────────────────── */
 .input,
-.select,
 .textarea {
     width: 100%;
     padding: 0 14px;
@@ -69,8 +68,7 @@
     color: var(--ink);
 }
 
-.input,
-.select {
+.input {
     height: 42px;
 }
 
@@ -88,7 +86,6 @@
 }
 
 .input:focus,
-.select:focus,
 .textarea:focus {
     outline: none;
     border-color: var(--brand);
@@ -96,7 +93,6 @@
 }
 
 .input:disabled,
-.select:disabled,
 .textarea:disabled {
     background: var(--surface-alt);
     color: var(--ink-3);
@@ -107,33 +103,6 @@
 .invalid:focus {
     border-color: var(--neg);
     box-shadow: 0 0 0 4px var(--neg-soft);
-}
-
-.select {
-    appearance: none;
-    cursor: pointer;
-    /* Espaço para a seta desenhada pelo ::after do wrapper. */
-    padding-right: 36px;
-}
-
-.selectWrap {
-    position: relative;
-    display: block;
-}
-
-.caret {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--ink-3);
-    pointer-events: none;
-    display: inline-flex;
-}
-
-.caret svg {
-    width: 18px;
-    height: 18px;
 }
 
 /* ── Campo com adorno (R$, %, olho da senha) ──────────────── */

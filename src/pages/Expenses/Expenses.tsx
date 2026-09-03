@@ -28,11 +28,12 @@ import {
     FilterSelect,
     SearchInput,
 } from "@/ui/controls";
-import { FormError, FormField, FormGrid, Input, MoneyInput, Select, Textarea } from "@/ui/form";
+import { FormError, FormField, FormGrid, Input, MoneyInput, Textarea } from "@/ui/form";
+import { Select } from "@/ui/select";
 import { SplitEditor } from "@/ui/SplitEditor";
 import { ConfirmDialog, FooterSpacer, Modal, SlideOver } from "@/ui/overlay";
 import { CategoryIcon } from "@/ui/iconCatalog";
-import { IconBank, IconCard, IconEdit, IconPix, IconPlus, IconRepeat, IconTag } from "@/ui/icons";
+import { IconCard, IconEdit, IconPlus, IconRepeat, IconTag, METHOD_ICON } from "@/ui/icons";
 import {
     Cell,
     CellAmount,
@@ -57,7 +58,7 @@ import {
     totalSpent,
     type ExpenseLeg,
 } from "@/lib/aggregate";
-import { categoryColor } from "@/lib/categoryColor";
+import { accentColor, categoryColor } from "@/lib/categoryColor";
 import { formatMoney } from "@/lib/money";
 import { currentMonth, formatDate, formatDateTime, formatMonthLabel, today } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
@@ -74,13 +75,6 @@ const KIND_ICON: Record<ApiTypes.ExpenseKind, ReactNode> = {
     single: <IconTag />,
     installment: <IconCard />,
     fixed: <IconRepeat />,
-};
-
-/** O ícone da forma de pagamento vem do `Kind`; a cor, do cadastro. */
-const METHOD_ICON: Record<ApiTypes.PaymentMethodKind, ReactNode> = {
-    credit_card: <IconCard />,
-    pix: <IconPix />,
-    debit: <IconBank />,
 };
 
 const emptySeriesDraft = (): SeriesDraft => ({
@@ -331,9 +325,17 @@ export function Expenses() {
                             ariaLabel="Formato"
                             allLabel="Todos os formatos"
                             options={[
-                                { value: "single" as const, label: "Avulso" },
-                                { value: "installment" as const, label: "Parcelado" },
-                                { value: "fixed" as const, label: "Fixo" },
+                                {
+                                    value: "single" as const,
+                                    label: "Avulso",
+                                    icon: KIND_ICON.single,
+                                },
+                                {
+                                    value: "installment" as const,
+                                    label: "Parcelado",
+                                    icon: KIND_ICON.installment,
+                                },
+                                { value: "fixed" as const, label: "Fixo", icon: KIND_ICON.fixed },
                             ]}
                         />
 
@@ -345,6 +347,8 @@ export function Expenses() {
                             options={activeCategories.map((category) => ({
                                 value: category.IdCategory,
                                 label: category.Description,
+                                icon: <CategoryIcon iconKey={category.IconKey} />,
+                                color: categoryColor(category),
                             }))}
                         />
 
@@ -367,6 +371,8 @@ export function Expenses() {
                             options={methods.map(({ method, account }) => ({
                                 value: method.IdPaymentMethod,
                                 label: `${account.Name} · ${method.Name}`,
+                                icon: METHOD_ICON[method.Kind],
+                                color: accentColor(method.Color ?? account.Color),
                             }))}
                         />
 
@@ -710,7 +716,6 @@ export function Expenses() {
                                 {/* ── Pernas ─────────────────────────── */}
                                 <div className={styles.sectionLabel}>
                                     <span>Com o que foi pago</span>
-                                    <span className={styles.sectionHint}>move o saldo</span>
                                 </div>
                                 <div className={styles.legs}>
                                     {expense.Payments.map((leg) => {
@@ -767,9 +772,6 @@ export function Expenses() {
                                     <>
                                         <div className={styles.sectionLabel}>
                                             <span>De quem é o custo</span>
-                                            <span className={styles.sectionHint}>
-                                                não move saldo
-                                            </span>
                                         </div>
                                         <div className={styles.splitRows}>
                                             {expense.Persons.map((person) => (
@@ -897,37 +899,25 @@ export function Expenses() {
                                     {(field) => (
                                         <Select
                                             {...field}
-                                            value={seriesDraft.IdCategory ?? ""}
-                                            onChange={(event) =>
+                                            value={seriesDraft.IdCategory}
+                                            onChange={(IdCategory) =>
                                                 setSeriesDraft((c) =>
-                                                    c
-                                                        ? {
-                                                              ...c,
-                                                              IdCategory: event.target.value
-                                                                  ? Number(event.target.value)
-                                                                  : null,
-                                                          }
-                                                        : c,
+                                                    c ? { ...c, IdCategory } : c,
                                                 )
                                             }
-                                        >
-                                            <option value="">Escolha…</option>
-                                            {activeCategories.map((category) => (
-                                                <option
-                                                    key={category.IdCategory}
-                                                    value={category.IdCategory}
-                                                >
-                                                    {category.Description}
-                                                </option>
-                                            ))}
-                                        </Select>
+                                            options={activeCategories.map((category) => ({
+                                                value: category.IdCategory,
+                                                label: category.Description,
+                                                icon: <CategoryIcon iconKey={category.IconKey} />,
+                                                color: categoryColor(category),
+                                            }))}
+                                        />
                                     )}
                                 </FormField>
                             </FormGrid>
 
                             <SplitEditor
                                 label="De quem é o custo"
-                                hint="Não move saldo"
                                 optionLabel="Pessoa"
                                 addLabel="Outra pessoa"
                                 options={activePersons.map((person) => ({

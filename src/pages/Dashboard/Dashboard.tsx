@@ -20,7 +20,9 @@ import {
 import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
 import { BreakdownRow, BudgetBar, DeltaPill, KpiCard, ProgressMeter } from "@/ui/budget";
-import { FormError, FormField, FormGrid, Input, MoneyInput, Select } from "@/ui/form";
+import { FormError, FormField, FormGrid, Input, MoneyInput } from "@/ui/form";
+import { Select } from "@/ui/select";
+import { CategoryIcon } from "@/ui/iconCatalog";
 import { ConfirmDialog, FooterSpacer, Modal } from "@/ui/overlay";
 import { IconAlert, IconArrowDown, IconArrowUp, IconPlus } from "@/ui/icons";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
@@ -544,36 +546,24 @@ export function Dashboard() {
                                            congelado: mover o teto de lugar é
                                            apagar este e cadastrar outro. */
                                         disabled={budgetDraft.IdBudgetPeriod !== null}
-                                        value={budgetDraft.IdCategory ?? ""}
-                                        onChange={(event) =>
-                                            setBudgetDraft((c) =>
-                                                c
-                                                    ? {
-                                                          ...c,
-                                                          IdCategory: event.target.value
-                                                              ? Number(event.target.value)
-                                                              : null,
-                                                      }
-                                                    : c,
-                                            )
+                                        value={budgetDraft.IdCategory}
+                                        onChange={(IdCategory) =>
+                                            setBudgetDraft((c) => (c ? { ...c, IdCategory } : c))
                                         }
-                                    >
-                                        <option value="">Escolha…</option>
-                                        {activeCategories
+                                        options={activeCategories
                                             .filter(
                                                 (category) =>
                                                     budgetDraft.IdBudgetPeriod !== null ||
                                                     !budgeted.has(category.IdCategory),
                                             )
-                                            .map((category) => (
-                                                <option
-                                                    key={category.IdCategory}
-                                                    value={category.IdCategory}
-                                                >
-                                                    {category.Description}
-                                                </option>
-                                            ))}
-                                    </Select>
+                                            .map((category) => ({
+                                                value: category.IdCategory,
+                                                label: category.Description,
+                                                icon: <CategoryIcon iconKey={category.IconKey} />,
+                                                color: categoryColor(category),
+                                            }))}
+                                        emptyLabel="Toda categoria já tem teto neste mês"
+                                    />
                                 )}
                             </FormField>
 

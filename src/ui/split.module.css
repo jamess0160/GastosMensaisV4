@@ -48,47 +48,10 @@
     border: 1px solid var(--border);
 }
 
-.rowSelect {
-    flex: 1;
-    min-width: 0;
-    height: 34px;
-    padding: 0 26px 0 10px;
-    border-radius: 8px;
-    border: 1px solid var(--border-strong);
-    background: var(--surface);
-    font-family: var(--font);
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink);
-    appearance: none;
-    cursor: pointer;
-}
-
-.rowSelect:focus {
-    outline: none;
-    border-color: var(--brand);
-    box-shadow: var(--ring-brand);
-}
-
 .selectWrap {
-    position: relative;
-    display: flex;
-    align-items: center;
+    display: block;
     flex: 1;
     min-width: 0;
-}
-
-.caret {
-    position: absolute;
-    right: 8px;
-    color: var(--ink-3);
-    pointer-events: none;
-    display: inline-flex;
-}
-
-.caret svg {
-    width: 14px;
-    height: 14px;
 }
 
 .amount {

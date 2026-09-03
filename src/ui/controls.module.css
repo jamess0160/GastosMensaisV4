@@ -146,49 +146,6 @@
     background: var(--brand-press);
 }
 
-.filterSelect {
-    height: 28px;
-    padding: 0 26px 0 11px;
-    border-radius: var(--r-pill);
-    border: 1px solid var(--border);
-    background: var(--surface);
-    font-family: var(--font);
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--ink);
-    appearance: none;
-    cursor: pointer;
-}
-
-.filterSelect:hover {
-    background: var(--surface-alt);
-}
-
-.filterSelectOn {
-    border-color: var(--brand);
-    color: var(--brand);
-    font-weight: 600;
-}
-
-.selectWrap {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-}
-
-.selectCaret {
-    position: absolute;
-    right: 8px;
-    color: var(--ink-3);
-    pointer-events: none;
-    display: inline-flex;
-}
-
-.selectCaret svg {
-    width: 14px;
-    height: 14px;
-}
-
 .search {
     position: relative;
     display: inline-flex;

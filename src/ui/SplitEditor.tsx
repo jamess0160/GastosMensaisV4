@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import styles from "./split.module.css";
 import { cx } from "./form";
 import { Button } from "./primitives";
-import { IconCheck, IconChevronDown, IconClose, IconPlus } from "./icons";
+import { IconCheck, IconClose, IconPlus } from "./icons";
+import { Select } from "./select";
 import {
     formatAmount,
     formatMoney,
@@ -39,7 +40,11 @@ export interface SplitLine {
 export interface SplitOption {
     id: number;
     label: string;
+    /** A conta dona da forma de pagamento — entra na frente do nome,
+     *  porque "Crédito" sozinho não diz de qual conta o dinheiro sai. */
     group?: string;
+    icon?: ReactNode;
+    color?: string;
 }
 
 /** Uma linha em branco — o estado inicial de qualquer rateio. */
@@ -125,29 +130,22 @@ export function SplitEditor({
                 {lines.map((line, index) => (
                     <div className={styles.row} key={index}>
                         <span className={styles.selectWrap}>
-                            <select
-                                className={styles.rowSelect}
-                                value={line.id ?? ""}
+                            <Select
+                                variant="compact"
+                                value={line.id}
                                 disabled={disabled}
-                                aria-label={optionLabel}
-                                onChange={(event) =>
-                                    patch(index, {
-                                        id: event.target.value ? Number(event.target.value) : null,
-                                    })
-                                }
-                            >
-                                <option value="">{optionLabel}…</option>
-                                {options.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.group
-                                            ? `${option.group} · ${option.label}`
-                                            : option.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <span className={styles.caret}>
-                                <IconChevronDown />
-                            </span>
+                                ariaLabel={optionLabel}
+                                placeholder={`${optionLabel}…`}
+                                options={options.map((option) => ({
+                                    value: option.id,
+                                    label: option.group
+                                        ? `${option.group} · ${option.label}`
+                                        : option.label,
+                                    icon: option.icon,
+                                    color: option.color,
+                                }))}
+                                onChange={(id) => patch(index, { id })}
+                            />
                         </span>
 
                         <span className={styles.amount}>

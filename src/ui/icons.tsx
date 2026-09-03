@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
     Archive,
     ArrowDown,
@@ -26,6 +27,7 @@ import {
     X,
     type LucideIcon,
 } from "lucide-react";
+import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
    Ícones do sistema — lucide-react.
@@ -118,3 +120,12 @@ export const IconEye = adapt(Eye, "IconEye");
 export const IconEyeOff = adapt(EyeOff, "IconEyeOff");
 export const IconFingerprint = adapt(Fingerprint, "IconFingerprint");
 export const IconUser = adapt(User, "IconUser");
+
+/** O ícone de uma forma de pagamento sai do `Kind` — mesmo desenho na
+ *  lista de gastos e nos seletores, para o Pix da lista e o Pix do
+ *  seletor serem visivelmente a mesma coisa. */
+export const METHOD_ICON: Record<ApiTypes.PaymentMethodKind, ReactNode> = {
+    credit_card: <IconCard />,
+    pix: <IconPix />,
+    debit: <IconBank />,
+};

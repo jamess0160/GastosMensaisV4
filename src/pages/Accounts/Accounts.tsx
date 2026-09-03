@@ -519,7 +519,7 @@ export function Accounts() {
                                 help={
                                     accountDraft.balanceFrozen
                                         ? "Esta conta já tem lançamentos: o saldo inicial não pode mais mudar."
-                                        : "Negativo é válido — é o cheque especial."
+                                        : ""
                                 }
                             >
                                 {(field) => (

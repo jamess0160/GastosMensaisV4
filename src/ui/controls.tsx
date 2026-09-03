@@ -1,15 +1,9 @@
 import { useRef, type ReactNode } from "react";
 import styles from "./controls.module.css";
 import { cx } from "./form";
-import {
-    IconCalendar,
-    IconChevronDown,
-    IconChevronLeft,
-    IconChevronRight,
-    IconClose,
-    IconSearch,
-} from "./icons";
+import { IconCalendar, IconChevronLeft, IconChevronRight, IconClose, IconSearch } from "./icons";
 import { CategoryIcon, ICON_CATALOG } from "./iconCatalog";
+import { Select, type SelectOption } from "./select";
 import { addMonths, currentMonth, formatMonthLabel } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
@@ -121,6 +115,11 @@ export function FilterChip({
     );
 }
 
+/** O filtro é o seletor padrão na variante pílula.
+ *
+ *  `allLabel` ocupa o lugar do "Escolha…": aqui o vazio não é falta de
+ *  resposta, é a resposta "todas" — e por isso ele aparece na lista como
+ *  uma opção como as outras, para dar para voltar atrás. */
 export function FilterSelect<T extends string | number>({
     value,
     onChange,
@@ -130,34 +129,19 @@ export function FilterSelect<T extends string | number>({
 }: {
     value: T | null;
     onChange: (value: T | null) => void;
-    options: readonly { value: T; label: string }[];
+    options: readonly SelectOption<T>[];
     allLabel?: string;
     ariaLabel?: string;
 }) {
     return (
-        <span className={styles.selectWrap}>
-            <select
-                className={cx(styles.filterSelect, value !== null && styles.filterSelectOn)}
-                aria-label={ariaLabel}
-                value={value === null ? "" : String(value)}
-                onChange={(event) => {
-                    const raw = event.target.value;
-                    if (!raw) return onChange(null);
-                    const found = options.find((option) => String(option.value) === raw);
-                    onChange(found ? found.value : null);
-                }}
-            >
-                <option value="">{allLabel}</option>
-                {options.map((option) => (
-                    <option key={String(option.value)} value={String(option.value)}>
-                        {option.label}
-                    </option>
-                ))}
-            </select>
-            <span className={styles.selectCaret}>
-                <IconChevronDown />
-            </span>
-        </span>
+        <Select
+            variant="filter"
+            value={value}
+            onChange={onChange}
+            options={options}
+            placeholder={allLabel}
+            ariaLabel={ariaLabel}
+        />
     );
 }
 
