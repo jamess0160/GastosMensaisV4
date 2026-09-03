@@ -22,14 +22,14 @@ export class CreateDefaults {
 
         if (data.Type === "cash") {
             return await this.PaymentMethods_model.create([
-                { IdWorkspace, IdAccount, Name: `${data.Name}`, Kind: "debit", Position: 1 },
+                { IdWorkspace, IdAccount, Name: "Dinheiro", Kind: "debit", Position: 1 },
             ])
         }
 
         //  Sem ClosingDay/DueDay: fatura só existe em cartão de crédito.
         return await this.PaymentMethods_model.create([
-            { IdWorkspace, IdAccount, Name: `${data.Name} - Pix`, Kind: "pix", Position: 1 },
-            { IdWorkspace, IdAccount, Name: `${data.Name} - Débito`, Kind: "debit", Position: 2 },
+            { IdWorkspace, IdAccount, Name: "Pix", Kind: "pix", Position: 1 },
+            { IdWorkspace, IdAccount, Name: "Débito", Kind: "debit", Position: 2 },
         ])
     }
 }
