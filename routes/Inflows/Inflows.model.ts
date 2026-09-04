@@ -48,6 +48,15 @@ export class class_Inflows_model extends BaseModel {
         return this.update(IdInflow, { Status: "received", ReceivedAt: this.KnexConnection.fn.now() as unknown as Database.Inflows["ReceivedAt"] })
     }
 
+    //  A simétrica do receive. O ReceivedAt volta a null junto com o Status: guardar a data de
+    //  um recebimento que se desfez deixaria a linha dizendo duas coisas ao mesmo tempo.
+    //
+    //  Não há nada a estornar do saldo — ele não é gravado, é somado dos lançamentos 'received'
+    //  a cada leitura. Voltar o Status É a retirada.
+    unreceive(IdInflow: number) {
+        return this.update(IdInflow, { Status: "pending", ReceivedAt: null })
+    }
+
     //  O "delete" da tabela. Não há Active aqui: cancelar é o estado terminal, e a linha fica
     //  para o histórico — o Inflows aponta para Accounts com ON DELETE RESTRICT dos dois lados.
     cancel(IdInflow: number) {

@@ -116,6 +116,12 @@ class Schema {
         })),
     ]
 
+    public readonly unreceive = [
+        joiController.validateParams(Joi.object({
+            IdInflow: Joi.number().required(),
+        })),
+    ]
+
     public readonly remove = [
         joiController.validateParams(Joi.object({
             IdInflow: Joi.number().required(),

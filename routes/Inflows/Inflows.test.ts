@@ -618,6 +618,126 @@ describe("Inflows", () => {
         })
     })
 
+    describe("POST /Inflows/IdInflow=:IdInflow/unreceive", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().post(`/Inflows/IdInflow=1/unreceive`)
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa entrada inexistente", async () => {
+            let response = await client.post(`/Inflows/IdInflow=999999/unreceive`)
+
+            expect(response.status).toBe(406)
+        })
+
+        it("recusa a entrada de outro workspace", async () => {
+            let owner = await buildWorkspace()
+            let created = await createInflow(owner)
+
+            await owner.client.post(`/Inflows/IdInflow=${created.IdInflow}/receive`)
+
+            let response = await otherClient.post(`/Inflows/IdInflow=${created.IdInflow}/unreceive`)
+
+            expect(response.status).toBe(406)
+            expect((await findInflow(created.IdInflow)).Status).toBe("received")
+        })
+
+        //  **O expect do saldo é o teste da etapa.** O documento do front pedia "retirar do
+        //  saldo o que o receive creditou"; não há o que retirar, porque o saldo nunca é
+        //  gravado — ele é somado dos lançamentos 'received' a cada leitura. Voltar o Status
+        //  para 'pending' É a retirada, e é este `expect` que prova que está certo.
+        it("volta para pendente, limpa o ReceivedAt e o saldo volta ao valor anterior", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createInflow(workspace, { TotalValue: 500 })
+
+            expect(await accountBalance(workspace)).toBe(1000)
+
+            await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/receive`)
+
+            expect(await accountBalance(workspace)).toBe(1500)
+
+            let response = await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/unreceive`)
+
+            expect(response.status).toBe(200)
+
+            let inflow = await findInflow(created.IdInflow)
+
+            expect(inflow.Status).toBe("pending")
+            //  O ReceivedAt volta a null junto: guardar a data de um recebimento desfeito
+            //  deixaria a linha dizendo duas coisas ao mesmo tempo
+            expect(inflow.ReceivedAt).toBeNull()
+
+            expect(await accountBalance(workspace)).toBe(1000)
+        })
+
+        it("recusa desfazer duas vezes", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createInflow(workspace)
+
+            await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/receive`)
+            expect((await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/unreceive`)).status).toBe(200)
+
+            let response = await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/unreceive`)
+
+            expect(response.status).toBe(406)
+        })
+
+        it("recusa desfazer o que nunca foi recebido", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createInflow(workspace)
+
+            let response = await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/unreceive`)
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Cancelada saiu do fluxo: não se recebe nem se desfaz recebimento dela
+        it("recusa desfazer entrada cancelada", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createInflow(workspace)
+
+            await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/receive`)
+            await workspace.client.delete(`/Inflows/IdInflow=${created.IdInflow}`)
+
+            let response = await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/unreceive`)
+
+            expect(response.status).toBe(406)
+        })
+
+        //  A transferência move as duas contas na ida; desfazer tem que devolver as duas
+        it("devolve as duas contas ao desfazer uma transferência", async () => {
+            let workspace = await buildWorkspace()
+            let second = await createAccount(workspace, "Poupança")
+
+            let created = await createTransfer(workspace, { TotalValue: 400, IdToAccount: second })
+
+            await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/receive`)
+            await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/unreceive`)
+
+            let accounts = await listAccounts(workspace)
+
+            expect(accounts[workspace.IdAccount]).toBe(1000)
+            expect(accounts[second]).toBe(0)
+        })
+
+        //  Receber de novo depois de desfazer é o caso normal: quem errou o clique conserta e
+        //  segue. O ReceivedAt novo é o do segundo recebimento, que é o que de fato aconteceu.
+        it("permite receber de novo depois de desfeito", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createInflow(workspace, { TotalValue: 500 })
+
+            await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/receive`)
+            await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/unreceive`)
+
+            expect((await workspace.client.post(`/Inflows/IdInflow=${created.IdInflow}/receive`)).status).toBe(200)
+
+            expect((await findInflow(created.IdInflow)).ReceivedAt).not.toBeNull()
+            expect(await accountBalance(workspace)).toBe(1500)
+        })
+    })
+
     describe("DELETE /Inflows/IdInflow=:IdInflow", () => {
 
         it("recusa sem token", async () => {

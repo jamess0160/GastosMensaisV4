@@ -25,7 +25,13 @@ class Controller {
     }
 
     receive = async (req: Request, res: Response) => {
-        res.json(await new Receive().run(res.locals.IdWorkspace, Number(req.params.IdInflow), res.locals.IdUser))
+        res.json(await new Receive().run(res.locals.IdWorkspace, Number(req.params.IdInflow), res.locals.IdUser, true))
+    }
+
+    //  Desfazer existe porque receber errado precisa de conserto — a simétrica que faltava,
+    //  como o unpay é a do pay. Mesma section, com o booleano trocado.
+    unreceive = async (req: Request, res: Response) => {
+        res.json(await new Receive().run(res.locals.IdWorkspace, Number(req.params.IdInflow), res.locals.IdUser, false))
     }
 
     remove = async (req: Request, res: Response) => {

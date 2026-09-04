@@ -24,5 +24,10 @@ Inflows_route.put("/Inflows/IdInflow=:IdInflow", Inflows_schema.update, AsyncHan
 //  É o recebimento que entra no saldo, não o lançamento.
 Inflows_route.post("/Inflows/IdInflow=:IdInflow/receive", Inflows_schema.receive, AsyncHandler(Inflows_controller.receive))
 
+//  Volta para 'pending' e limpa o ReceivedAt. Não estorna nada: o saldo não é gravado, e
+//  voltar o Status é a retirada. Existe pelo mesmo motivo do unpay — um clique errado, sem ela,
+//  colocaria dinheiro no saldo sem volta.
+Inflows_route.post("/Inflows/IdInflow=:IdInflow/unreceive", Inflows_schema.unreceive, AsyncHandler(Inflows_controller.unreceive))
+
 //  Cancela (Status = canceled). Não há delete físico nem Active nesta tabela.
 Inflows_route.delete("/Inflows/IdInflow=:IdInflow", Inflows_schema.remove, AsyncHandler(Inflows_controller.remove))

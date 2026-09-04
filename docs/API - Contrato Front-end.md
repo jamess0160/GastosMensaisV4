@@ -806,6 +806,22 @@ Sem body. É **isto** que põe o dinheiro no saldo. Tudo ou nada.
 
 **Resposta:** `{ "msg": "Entrada recebida com sucesso" }`.
 
+`406` quando: a entrada não existe no workspace, **já está recebida**, ou está cancelada.
+
+### `POST /Inflows/IdInflow=:IdInflow/unreceive`
+
+Sem body. A simétrica do `receive`: volta o `Status` para `pending` e limpa o `ReceivedAt`. O dinheiro sai do saldo.
+
+**Resposta:** `{ "msg": "Recebimento desfeito com sucesso" }`.
+
+`406` quando: a entrada não existe no workspace, **não está recebida**, ou está cancelada.
+
+> **Não existe "estorno" a lançar.** O saldo não é guardado em lugar nenhum — ele é somado dos lançamentos a cada leitura, contando só o que está `received`. Voltar o `Status` **é** a retirada. Depois de desfazer, o `Balance` de `GET /Accounts` volta sozinho ao valor de antes; não crie lançamento nenhum para compensar.
+
+Numa **transferência**, desfazer devolve as duas contas de uma vez — a de origem e a de destino.
+
+Receber de novo depois de desfeito é o caminho normal de quem errou o clique, e grava um `ReceivedAt` novo: o do recebimento que de fato aconteceu.
+
 ### `DELETE /Inflows/IdInflow=:IdInflow`
 
 **Cancela** (`Status = 'canceled'`). Não há delete físico nem `Active` nesta tabela.
@@ -1191,6 +1207,7 @@ Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de
 | POST | `/Inflows` | 🔒 |
 | PUT | `/Inflows/IdInflow=:IdInflow` | 🔒 |
 | POST | `/Inflows/IdInflow=:IdInflow/receive` | 🔒 |
+| POST | `/Inflows/IdInflow=:IdInflow/unreceive` | 🔒 |
 | DELETE | `/Inflows/IdInflow=:IdInflow` | 🔒 |
 | GET | `/Expenses` | 🔒 |
 | GET | `/Expenses/IdExpense=:IdExpense` | 🔒 |
@@ -1229,6 +1246,22 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-04 — `/Inflows`: dá para **desfazer** um recebimento
+
+🟢 **Adição** — ver a seção 10, `/Inflows`.
+
+**O que entrou.** `POST /Inflows/IdInflow=:IdInflow/unreceive`, sem body. Volta o `Status` para `pending`, limpa o `ReceivedAt` e o dinheiro sai do saldo. É a simétrica exata do `receive`, do mesmo jeito que o `unpay` é a do `pay` na perna do gasto.
+
+**Ação do front:** ligar o botão de desfazer da tela de Renda nesta rota. Depois do `200`, **releia `GET /Accounts`** — o `Balance` volta sozinho ao valor de antes.
+
+**Não lance nada para compensar.** O saldo não é guardado: ele é somado dos lançamentos `received` a cada leitura, então voltar o `Status` já é a retirada. Uma entrada de sinal contrário criada "para estornar" contaria duas vezes.
+
+Numa **transferência**, desfazer devolve as duas contas de uma vez.
+
+`406` quando a entrada não existe no workspace, **não está recebida**, ou está cancelada — cada caso com a sua `msg`, espelhando as que o `receive` já tinha.
+
+**Não mudou:** o `receive`, o cálculo do saldo, e o fato de que editar uma entrada já recebida continua permitido.
 
 ### 2026-09-04 — `/PaymentMethods`: `Brand` e `LastDigits` deixam de existir
 
