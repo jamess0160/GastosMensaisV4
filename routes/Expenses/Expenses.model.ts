@@ -16,7 +16,13 @@ export class class_Expenses_model extends BaseModel {
     private readonly baseQuery = this.KnexConnection.select("*").from<Database.Expenses>("Expenses").orderBy("ExpenseDate").orderBy("IdExpense")
 
     //  O período (From/To) é o mesmo formato de Inflows — ver Utils/joiSchemas.ts. Sem Status
-    //  no filtro, o cancelado fica de fora: ele é lixo, não histórico.
+    //  e sem IncludeCanceled, o cancelado fica de fora: ele é lixo, não histórico.
+    //
+    //  Os dois recortes não são o mesmo: Status é "um estado só" (e 'canceled' traz só os
+    //  cancelados), IncludeCanceled é "não esconda nada". É o segundo que responde ao filtro de
+    //  status multi-seleção da tela — pedir em aberto **e** cancelado numa consulta só —, e é
+    //  por isso que ele tira o significado especial da **ausência** de Status em vez de deixar
+    //  o cliente fundir duas listas por id.
     getByWorkspace(IdWorkspace: number, filters: ExpensesNamespace.ListFilters = {}) {
         let query = this.baseQuery.clone().where("IdWorkspace", IdWorkspace)
 
@@ -25,7 +31,9 @@ export class class_Expenses_model extends BaseModel {
         if (filters.IdCategory) query = query.where("IdCategory", filters.IdCategory)
         if (filters.Kind) query = query.where("Kind", filters.Kind)
 
-        return filters.Status ? query.where("Status", filters.Status) : query.whereNot("Status", "canceled")
+        if (filters.Status) return query.where("Status", filters.Status)
+
+        return filters.IncludeCanceled ? query : query.whereNot("Status", "canceled")
     }
 
     getUnique(IdWorkspace: number, IdExpense: number) {

@@ -66,6 +66,10 @@ class Schema {
             Status: status.optional(),
             Kind: kind.optional(),
             IdCategory: Joi.number().optional(),
+            //  Ausente ou false: a resposta de sempre, sem cancelado. True: a lista completa, e
+            //  quem separa por status é o cliente — é o que faz o filtro multi-seleção da tela
+            //  caber numa requisição só, sobre o mês que já está em cache.
+            IncludeCanceled: Joi.boolean().default(false),
         })),
         joiController.validateResponse(Joi.array().items(expenseResponse)),
     ]

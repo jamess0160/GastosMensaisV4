@@ -89,6 +89,42 @@ describe("Expenses", () => {
             expect((await workspace.client.get(`/Expenses?Status=canceled`)).body.map(description)).toEqual(["Cancelado"])
         })
 
+        //  O filtro de status multi-seleção da tela: "em aberto **e** cancelado" numa consulta
+        //  só. É o IncludeCanceled que permite isso — com Status a lista sempre é de um estado.
+        it("devolve o cancelado junto com o resto quando IncludeCanceled=true", async () => {
+            let workspace = await buildWorkspace()
+
+            let canceled = await createExpense(workspace, { Description: "Cancelado" })
+            await createExpense(workspace, { Description: "Vivo" })
+
+            await workspace.client.delete(`/Expenses/IdExpense=${canceled.IdExpense}`)
+
+            let response = await workspace.client.get(`/Expenses?IncludeCanceled=true`)
+
+            expect(response.status).toBe(200)
+            expect(response.body.map(description).sort()).toEqual(["Cancelado", "Vivo"])
+            //  false é a resposta de hoje, byte a byte: nada que já existe quebra.
+            expect((await workspace.client.get(`/Expenses?IncludeCanceled=false`)).body.map(description)).toEqual(["Vivo"])
+        })
+
+        //  Status continua sendo o recorte de um estado só — IncludeCanceled não o afrouxa.
+        it("mantém o recorte do Status quando os dois vêm juntos", async () => {
+            let workspace = await buildWorkspace()
+
+            let canceled = await createExpense(workspace, { Description: "Cancelado" })
+            await createExpense(workspace, { Description: "Vivo" })
+
+            await workspace.client.delete(`/Expenses/IdExpense=${canceled.IdExpense}`)
+
+            expect((await workspace.client.get(`/Expenses?Status=pending&IncludeCanceled=true`)).body.map(description)).toEqual(["Vivo"])
+        })
+
+        it("recusa IncludeCanceled que não é booleano", async () => {
+            let response = await client.get(`/Expenses?IncludeCanceled=talvez`)
+
+            expect(response.status).toBe(406)
+        })
+
         it("não devolve o gasto de outro workspace", async () => {
             let owner = await buildWorkspace()
 

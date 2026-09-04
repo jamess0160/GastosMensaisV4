@@ -20,6 +20,8 @@ export namespace ExpensesNamespace {
         Status?: "pending" | "paid" | "canceled"
         Kind?: "single" | "installment" | "fixed"
         IdCategory?: number
+        /** Traz os cancelados junto com o resto. Sem ele (ou false), a lista de hoje. */
+        IncludeCanceled?: boolean
     }
 
     export interface CreateExpensePayload {
