@@ -15,6 +15,17 @@ class Controller {
         res.json(await new ValidateLogin().run(res, login, password))
     }
 
+    //  Chama o AcessControl direto, sem section: a regra do projeto é que nada além dele emita
+    //  ou apague sessão, e uma sections/POST/logout.ts que só repassasse a chamada daria um
+    //  segundo lugar por onde a sessão termina.
+    //
+    //  Sempre 200, com ou sem sessão: o cookie sai sobrescrito de qualquer forma.
+    logout = async (req: Request, res: Response) => {
+        AcessControl.clearTokenCookie(res)
+
+        res.json({ msg: "Sessão encerrada com sucesso" })
+    }
+
     acessMiddleware = (req: Request, res: Response) => {
         //  A sessão vem do cookie httpOnly, e só dele. O front e a API são servidos pelo mesmo
         //  domínio (www.gastosmensais.com.br e .../api pelo proxy do nginx), então são a mesma

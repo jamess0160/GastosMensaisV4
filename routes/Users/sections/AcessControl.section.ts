@@ -64,18 +64,29 @@ class Controller {
         const token = this.generateToken(IdUser, IdWorkspace)
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: this.isProduction(),
             sameSite: 'strict',
             maxAge: 24 * 60 * 60 * 1000
         })
     }
 
+    //  Emissão e remoção ficam lado a lado de propósito: o navegador casa cookie por (nome,
+    //  domínio, path) e só APAGA o que ele reconhece como o mesmo cookie. Os atributos abaixo
+    //  repetem os de cima — inclusive o Path, que hoje é o default ('/') nos dois. Mudar um sem
+    //  mudar o outro não dá erro nenhum: cria um segundo cookie ao lado e a sessão não morre.
     clearTokenCookie(res: Response): void {
         res.clearCookie('token', {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: this.isProduction(),
             sameSite: 'strict'
         })
+    }
+
+    //  Todo acesso a env passa pelo enviromentManager, e este é opcional: em desenvolvimento e
+    //  em teste a variável simplesmente não existe, e a ausência dela é a resposta 'não é
+    //  produção' — não um erro de boot como seria numa variável obrigatória.
+    private isProduction(): boolean {
+        return enviromentManager.getEnv("NODE_ENV", true) === "production"
     }
 
 }

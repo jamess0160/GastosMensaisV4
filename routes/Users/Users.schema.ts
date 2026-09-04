@@ -15,6 +15,14 @@ class Schema {
         })),
     ]
 
+    //  Sem body e sem params: a rota não recebe nada, o efeito dela é o Set-Cookie. Só a
+    //  resposta é descrita, para o msg ficar preso ao contrato como nas demais.
+    public readonly logout = [
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+        })),
+    ]
+
     //  Espelha a linha de Users, menos o Password: o hash nunca sai da API.
     //  As datas chegam aqui como Date (o res.json só serializa depois da validação).
     public readonly getSelf = [

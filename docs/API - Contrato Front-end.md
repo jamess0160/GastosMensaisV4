@@ -131,6 +131,24 @@ O login já seleciona o primeiro workspace do usuário, então a sessão nunca c
 
 ---
 
+### `POST /Users/logout` *(público)*
+
+Sem body. Sobrescreve o cookie `token` com um `Set-Cookie` expirado, encerrando a sessão.
+
+**Resposta `200`**
+
+```json
+{ "msg": "Sessão encerrada com sucesso" }
+```
+
+> **Não exige sessão de propósito.** Chamar sem cookie, com cookie expirado ou com token inválido responde `200` do mesmo jeito — um logout que respondesse `401` travaria o botão "Sair" justamente no caso em que o usuário mais quer sair.
+
+O token continua **tecnicamente válido até o `exp`** (24h) para quem tiver copiado o valor. Não há lista de revogação. Na prática o cookie é `HttpOnly`, então copiá-lo exige acesso ao aparelho.
+
+**Ação do front:** chame a rota e, em seguida, limpe o estado local (cache do mês, dados do usuário) e redirecione para o login. Não tente apagar o cookie pelo JavaScript — ele é `HttpOnly` e o `document.cookie` não o alcança.
+
+---
+
 ### `GET /Users/getSelf` 🔒
 
 **Resposta `200`** (`Password` nunca sai):
@@ -1026,6 +1044,7 @@ Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de
 |---|---|---|
 | POST | `/Users` | público |
 | POST | `/Users/login` | público |
+| POST | `/Users/logout` | público |
 | GET | `/Users/getSelf` | 🔒 |
 | PUT | `/Users/IdUser=:IdUser` | 🔒 |
 | PUT | `/Users/updatePassword` | 🔒 |
@@ -1100,6 +1119,20 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-04 — `POST /Users/logout`: agora existe como sair da sessão
+
+🟢 **Adição** — ver a seção 2, `/Users`.
+
+**O que entrou.** `POST /Users/logout`, **pública**, sem body. A resposta é `200` com `{ "msg": "Sessão encerrada com sucesso" }` e um `Set-Cookie` que expira o `token`. Depois dela, toda rota 🔒 responde `401`.
+
+**Por que ela não exige token.** Exigir sessão para encerrar sessão responde `401` no caso em que o usuário mais precisa sair — token expirado, cookie meio apagado, aba antiga —, e o botão "Sair" trava sem ter o que fazer. Não há o que autorizar aqui: o efeito da rota é apagar um cookie do próprio chamador.
+
+**Ação do front:** trocar qualquer limpeza local de sessão pela chamada à rota. O cookie é `HttpOnly`, então o `document.cookie` **nunca** conseguiu apagá-lo — quem hoje só limpa o estado da aplicação está deixando a sessão viva no navegador. Depois do `200`: limpe o cache local e redirecione para o login.
+
+**O que não mudou:** nada. Nenhuma rota existente teve resposta, corpo ou status alterados.
+
+**Limite conhecido:** não há lista de revogação. O token segue válido até o `exp` (24h) para quem tiver copiado o valor antes — o que exige acesso ao aparelho, já que ele é `HttpOnly`. Se "encerrar sessões nos outros aparelhos" virar requisito, é aí que entra uma lista de revogação, não antes.
 
 ### 2026-09-03 — `GET /Expenses`: `IncludeCanceled` traz os cancelados junto com o resto
 

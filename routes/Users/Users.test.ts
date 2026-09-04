@@ -72,6 +72,59 @@ describe("Users", () => {
         })
     })
 
+    describe("POST /Users/logout", () => {
+
+        //  O teste da etapa: o que importa não é o 200 nem o formato do Set-Cookie, é que a
+        //  sessão realmente morre — a rota protegida seguinte responde 401.
+        it("encerra a sessão: a rota protegida seguinte responde 401", async () => {
+            let session = new TestClient()
+            await session.login(root.user.Email, root.password)
+
+            expect((await session.get("/Users/getSelf")).status).toBe(200)
+
+            let logout = await session.post("/Users/logout")
+            expect(logout.status).toBe(200)
+
+            //  O navegador apagaria o cookie; aqui o cliente faz o mesmo, largando o token.
+            session.setToken(null)
+
+            expect((await session.get("/Users/getSelf")).status).toBe(401)
+        })
+
+        //  O Set-Cookie do clearCookie repete httpOnly/sameSite da emissão e manda o cookie
+        //  expirar — é isso que faz o navegador APAGAR o token em vez de guardar um segundo
+        //  cookie ao lado, que deixaria a sessão viva.
+        it("devolve um Set-Cookie que expira o token", async () => {
+            let session = new TestClient()
+            await session.login(root.user.Email, root.password)
+
+            let response = await session.post("/Users/logout")
+
+            let cookies: string[] = response.headers["set-cookie"] ?? []
+            let raw = cookies.find((cookie) => cookie.startsWith("token="))
+
+            expect(raw).toBeTruthy()
+            expect(TestClient.extractCookieToken(response)).toBe("")
+            expect(raw).toContain("HttpOnly")
+            expect(raw).toContain("SameSite=Strict")
+            expect(raw).toMatch(/Expires=Thu, 01 Jan 1970|Max-Age=0/)
+        })
+
+        //  Sem sessão também é 200: exigir token responderia 401 justamente quando o usuário
+        //  mais quer sair (token expirado, aba velha), travando o botão "Sair".
+        it("responde 200 sem sessão nenhuma", async () => {
+            let response = await client.anonymous().post("/Users/logout")
+
+            expect(response.status).toBe(200)
+        })
+
+        it("responde 200 com um token inválido", async () => {
+            let response = await new TestClient("token-invalido").post("/Users/logout")
+
+            expect(response.status).toBe(200)
+        })
+    })
+
     describe("GET /Users/getSelf", () => {
 
         //  A sessão vem do cookie e SÓ do cookie. O header 'authorization' foi tirado de
