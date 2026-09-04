@@ -34,6 +34,7 @@ export interface DBTypes {
     Users: Database.Users
     Workspaces: Database.Workspaces
     WorkspaceMembers: Database.WorkspaceMembers
+    WorkspaceInvites: Database.WorkspaceInvites
     UsersAuth: Database.UsersAuth
     TrustedDevices: Database.TrustedDevices
 

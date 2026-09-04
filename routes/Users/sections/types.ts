@@ -1,6 +1,8 @@
 export namespace UsersNamespace {
     export interface CreateUserPayload {
-        IdWorkspace?: number
+        //  O hash do convite, no lugar do IdWorkspace que esta rota aceitava: id sequencial se
+        //  adivinha contando, 32 bytes aleatórios não. Ausente = workspace próprio, novo.
+        InviteHash?: string
         Name: string
         Email: string
         Password: string

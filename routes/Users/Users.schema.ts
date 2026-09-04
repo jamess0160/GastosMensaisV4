@@ -44,11 +44,13 @@ class Schema {
     //  "Tiago@X.com" aqui deixaria o usuário sem conseguir entrar pela própria conta.
     public readonly create = [
         joiController.validateBody(Joi.object({
-            //  PENDÊNCIA CONHECIDA (etapa 9 do ROADMAP.md): esta rota é pública e este campo
-            //  entra direto como matrícula 'owner', sem convite nem conferência de dono. Um
-            //  IdWorkspace chutado (são sequenciais) dá acesso ao workspace alheio. Vai ser
-            //  substituído por um InviteToken assinado; até lá, não subir para produção.
-            IdWorkspace: Joi.number().optional(),
+            //  Entrar num workspace já existente agora exige convite, e o que a rota aceita é
+            //  o hash dele — nunca o IdWorkspace, que era o buraco: id sequencial se adivinha
+            //  contando e entrava direto como matrícula 'owner' do tenant alheio.
+            //
+            //  Mandar IdWorkspace é 406 pelo unknown do Joi, e isso é de propósito: um cliente
+            //  antigo tem que falhar alto, não ganhar um workspace próprio em silêncio.
+            InviteHash: Joi.string().trim().optional(),
             Name: Joi.string().trim().required(),
             Email: Joi.string().trim().lowercase().email(emailOptions).required(),
             Password: Joi.string().trim().required(),

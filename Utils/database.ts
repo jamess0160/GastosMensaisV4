@@ -33,6 +33,34 @@ export namespace Database {
         UpdatedAt: Datetime
     }
 
+    /**
+     * Convite para entrar num workspace. O que viaja na URL e o Hash - 32 bytes
+     * aleatorios -, nunca o IdWorkspace, que e sequencial e se adivinha contando.
+     *
+     * O Email e o que impede o link repassado: o link e compartilhavel por
+     * desenho, entao o segredo do hash sozinho nao basta. No aceite a API compara
+     * este e-mail com o da conta que esta aceitando.
+     *
+     * Sem Active: o ciclo de vida e o Status, como em Inflows e Expenses.
+     */
+    export interface WorkspaceInvites {
+        IdWorkspaceInvite: number
+        IdWorkspace: number
+        IdInviterUser: number
+        /** Sempre em minusculas, como o Email de Users */
+        Email: string
+        /** Nunca 'owner': transferir propriedade e operacao propria, nao convite. */
+        Role: "editor" | "viewer"
+        /** 32 bytes aleatorios em base64url - viaja como parametro de URL */
+        Hash: string
+        Status: "pending" | "accepted" | "revoked"
+        ExpiresAt: Datetime
+        AcceptedAt: Datetime | null
+        IdAcceptedUser: number | null
+        CreatedAt: Datetime
+        UpdatedAt: Datetime
+    }
+
     export interface UsersAuth {
         IdUserAuth: number
         IdUser: number

@@ -236,20 +236,62 @@ describe("Users", () => {
             expect(workspace?.Name).toBe(payload.Name)
         })
 
-        //  Se um usuário for criado já com um namespace, ele não deve criar um novo
-        it("cria o usuário e adicionar ele a um workspace já existente", async () => {
+        //  O TESTE DO BURACO ORIGINAL, e ele não pode sumir da suíte: a rota é pública e
+        //  aceitava um IdWorkspace no corpo, entrando direto como matrícula 'owner' do tenant
+        //  alheio. IdWorkspace é inteiro sequencial — adivinha-se contando.
+        //
+        //  Um cliente antigo tem que falhar alto, não ganhar um workspace próprio em silêncio.
+        it("recusa IdWorkspace no corpo, e não cria matrícula nenhuma com ele", async () => {
+            let before = await countMembers(IdWorkspace)
 
-            let payload = buildPayload({ IdWorkspace, Name: "Usuário com workspace" })
+            let response = await client.anonymous().post("/Users", buildPayload({ IdWorkspace } as object))
 
-            let response = await client.anonymous().post("/Users", payload)
+            expect(response.status).toBe(406)
+            expect(await countMembers(IdWorkspace)).toBe(before)
+        })
+
+        //  O que entrou no lugar: o hash do convite. 32 bytes aleatórios, que não se adivinham,
+        //  e uma linha no banco que diz para QUEM o convite é e com que papel.
+        it("entra no workspace do convite quando o InviteHash vem no corpo", async () => {
+            let payload = buildPayload({ Name: "Convidado pelo cadastro" })
+            let invite = await seedInvite(IdWorkspace, root.user.IdUser, payload.Email, "editor")
+
+            let response = await client.anonymous().post("/Users", { ...payload, InviteHash: invite.Hash })
 
             expect(response.status).toBe(200)
-            expect(response.body).toEqual({
-                IdUser: expect.any(Number),
-                IdWorkspace: expect.any(Number),
+            expect(response.body.IdWorkspace).toBe(IdWorkspace)
+
+            //  O papel vem da linha do convite, nunca do cliente
+            let membership = await findMembership(IdWorkspace, response.body.IdUser)
+
+            expect(membership?.Role).toBe("editor")
+
+            //  E o convite fica gasto, na mesma transaction
+            expect(await findInvite(invite.IdWorkspaceInvite)).toMatchObject({
+                Status: "accepted",
+                IdAcceptedUser: response.body.IdUser,
             })
-            
-            expect(response.body.IdWorkspace).toEqual(IdWorkspace)
+        })
+
+        //  O e-mail é o que impede o link repassado: o link é compartilhável por desenho (uma
+        //  URL que o usuário manda por WhatsApp), então o segredo do hash sozinho não basta.
+        it("recusa o cadastro por convite com um e-mail diferente, e não matricula ninguém", async () => {
+            let invite = await seedInvite(IdWorkspace, root.user.IdUser, UsersFactory.buildEmail(), "editor")
+            let before = await countMembers(IdWorkspace)
+
+            let payload = buildPayload({ Name: "Quem recebeu o encaminhamento" })
+            let response = await client.anonymous().post("/Users", { ...payload, InviteHash: invite.Hash })
+
+            expect(response.status).toBe(406)
+            expect(await countMembers(IdWorkspace)).toBe(before)
+            //  E nem o usuário nasce: o convite é conferido antes da transaction
+            expect(await findByEmail(payload.Email)).toBeUndefined()
+        })
+
+        it("recusa um InviteHash que não existe", async () => {
+            let response = await client.anonymous().post("/Users", buildPayload({ InviteHash: "hash-que-nao-existe" }))
+
+            expect(response.status).toBe(406)
         })
 
         //  Sem a matrícula o workspace é órfão: as leituras saem de WorkspaceMembers
@@ -287,10 +329,10 @@ describe("Users", () => {
             let owner = buildPayload({ Name: "Nome repetido" })
             let created = await client.anonymous().post("/Users", owner)
 
-            let response = await client.anonymous().post("/Users", buildPayload({
-                Name: "Nome repetido",
-                IdWorkspace: created.body.IdWorkspace,
-            }))
+            let guest = buildPayload({ Name: "Nome repetido" })
+            let invite = await seedInvite(created.body.IdWorkspace, created.body.IdUser, guest.Email, "editor")
+
+            let response = await client.anonymous().post("/Users", { ...guest, InviteHash: invite.Hash })
 
             expect(response.status).toBe(200)
 
@@ -488,6 +530,38 @@ function findWorkspace(IdWorkspace: number) {
 
 function findPerson(IdWorkspace: number) {
     return TestDatabase.connection().select("*").from("Persons").where("IdWorkspace", IdWorkspace).first()
+}
+
+//  Semeia o convite direto no banco: aqui ele é arranjo de estado, não o objeto do teste — a
+//  rota que o cria é coberta em Workspaces.test.ts.
+async function seedInvite(IdWorkspace: number, IdInviterUser: number, Email: string, Role: "editor" | "viewer") {
+    let [invite] = await TestDatabase.connection()
+        .insert({
+            IdWorkspace,
+            IdInviterUser,
+            Email: Email.toLowerCase(),
+            Role,
+            Hash: `hash-de-teste-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            ExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        })
+        .into("WorkspaceInvites")
+        .returning("*")
+
+    return invite as { IdWorkspaceInvite: number, Hash: string }
+}
+
+function findInvite(IdWorkspaceInvite: number) {
+    return TestDatabase.connection().select("*").from("WorkspaceInvites").where("IdWorkspaceInvite", IdWorkspaceInvite).first()
+}
+
+function findMembership(IdWorkspace: number, IdUser: number) {
+    return TestDatabase.connection().select("*").from("WorkspaceMembers").where("IdWorkspace", IdWorkspace).where("IdUser", IdUser).first()
+}
+
+async function countMembers(IdWorkspace: number) {
+    let rows = await TestDatabase.connection().select("*").from("WorkspaceMembers").where("IdWorkspace", IdWorkspace)
+
+    return rows.length
 }
 
 function findPersons(IdWorkspace: number) {

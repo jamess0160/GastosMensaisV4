@@ -92,11 +92,17 @@ Cria, numa única transaction: o **usuário**, o **workspace** dele, a **matríc
 | `Email` | string | obrigatório, formato de e-mail, normalizado para minúsculas |
 | `Password` | string | obrigatório, **texto puro** (ver aviso) |
 | `Phone` | number | obrigatório |
-| `IdWorkspace` | number | opcional — entrar em workspace existente |
+| `InviteHash` | string | opcional — o hash do convite, para entrar num workspace existente |
 
 > ⚠️ **Não pré-hasheie nem criptografe a senha no cliente.** O que a API recebe vira a credencial efetiva: um hash vazado seria reproduzido como está. O bcrypt (custo 12) roda no servidor.
 
-> ⚠️ **`IdWorkspace` é uma pendência conhecida de segurança:** hoje entra direto como matrícula `owner`, sem convite nem conferência. Não use até virar convite assinado.
+> ⚠️ **`IdWorkspace` não é mais aceito** e mandá-lo responde `406`. Entrar num workspace existente exige convite — ver a seção 4.
+
+**Sem `InviteHash`:** nasce o workspace próprio do usuário, e ele é `owner` dele.
+
+**Com `InviteHash`:** **não** nasce workspace nenhum. O usuário é matriculado no workspace do convite, com o `Role` que a **linha do convite** manda (`editor` ou `viewer`), e ganha a `Person` dele nesse workspace. O `IdWorkspace` da resposta é o do convite.
+
+O `Email` do corpo **tem que ser o mesmo do convite** — diferente responde `406` e nada é gravado, nem o usuário. Convite inexistente, revogado, expirado ou já usado: `406`, cada um com a sua `msg`.
 
 **Resposta `200`**
 
@@ -308,9 +314,9 @@ Soft delete (a linha fica, para o `CredentialId` seguir ocupando o índice únic
 
 ---
 
-## 4. Workspaces — `/Workspaces` 🔒
+## 4. Workspaces — `/Workspaces` 🔒 *(exceto `GET /Workspaces/invite/Hash=:Hash`)*
 
-Não há `POST`: hoje é um workspace por usuário e ele nasce no cadastro.
+Não há `POST`: um workspace nasce no cadastro, e a única forma de entrar num que já existe é o **convite** (4.1). Um usuário pode ser membro de mais de um — `getSelf` devolve todos, e é o `switch` que escolhe em qual a sessão está.
 
 ### `GET /Workspaces/getSelf`
 
@@ -335,6 +341,104 @@ Edita o workspace **selecionado na sessão** — sem id no caminho.
 **Body:** `Name` (obrigatório, ≤255).
 
 **Resposta:** `{ "msg": "Workspace atualizado com sucesso" }`.
+
+---
+
+### 4.1 Convites — como se entra num workspace alheio
+
+Um convite é **uma linha no banco**, e o que viaja no link é o `Hash`: 32 bytes aleatórios em base64url (43 caracteres, seguros em URL). Nunca o `IdWorkspace`, que é sequencial.
+
+**A API não manda e-mail.** Ela devolve o hash; **quem entrega o link é o usuário** — monte a URL da sua tela de aceite com ele (ex.: `https://www.gastosmensais.com.br/convite/<Hash>`) e deixe o dono copiar ou compartilhar.
+
+**O e-mail é parte da tranca, não enfeite.** O link é compartilhável por desenho — vai por WhatsApp —, então o segredo do hash sozinho não bastaria: quem recebesse o encaminhamento entraria. No aceite a API compara o e-mail do convite com o da conta que está aceitando (o da sessão no `join`, o do corpo no cadastro). Diferente: `406`. **Diga isso na tela de aceite**, mostrando o `Email` que o `GET` público devolve.
+
+Um convite é de **uso único**, vale **7 dias** e pode ser **revogado** a qualquer momento.
+
+---
+
+### `POST /Workspaces/invite` 🔒 *(só `owner`)*
+
+**Body**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Email` | string | obrigatório, formato de e-mail, normalizado para minúsculas |
+| `Role` | `"editor"` \| `"viewer"` | opcional, default `"editor"` |
+
+`Role: "owner"` responde `406`: **propriedade não se convida.**
+
+**Resposta `200`**
+
+```json
+{ "Hash": "Yk3s...43 caracteres", "ExpiresAt": "2026-09-11T12:00:00.000Z" }
+```
+
+- Quem não é `owner` do workspace da sessão: `403`.
+- Convidar quem **já é membro**: `406`.
+- **Convidar o mesmo e-mail de novo renova o convite pendente** — hash e validade novos, o hash anterior deixa de funcionar. Não nascem dois links.
+
+---
+
+### `GET /Workspaces/invites` 🔒 *(só `owner`)*
+
+Os convites **pendentes** do workspace da sessão — "quem eu convidei e ainda não entrou". Aceitos e revogados não aparecem.
+
+```json
+[{
+  "IdWorkspaceInvite": 3, "IdWorkspace": 1, "IdInviterUser": 1,
+  "Email": "alguem@exemplo.com", "Role": "editor",
+  "Hash": "Yk3s...", "Status": "pending",
+  "ExpiresAt": "2026-09-11T12:00:00.000Z",
+  "AcceptedAt": null, "IdAcceptedUser": null,
+  "CreatedAt": "...", "UpdatedAt": "..."
+}]
+```
+
+O `Hash` volta para o dono conseguir **reenviar o link** sem precisar revogar e criar outro.
+
+---
+
+### `GET /Workspaces/invite/Hash=:Hash` *(público)*
+
+A tela de aceite, **antes de qualquer sessão**: quem recebeu o link ainda pode não ter conta.
+
+```json
+{
+  "WorkspaceName": "Casa",
+  "InviterName": "Tiago",
+  "Email": "alguem@exemplo.com",
+  "Role": "editor",
+  "ExpiresAt": "2026-09-11T12:00:00.000Z"
+}
+```
+
+**Nenhum id na resposta**, de propósito — a rota não pode virar sonda para descobrir workspace por id.
+
+Convite inexistente, revogado, expirado ou já aceito: `406`, e a `msg` diz qual dos quatro. Mostre a `msg`: "expirou, peça outro" e "não encontrado" mandam o usuário para lugares diferentes.
+
+---
+
+### `POST /Workspaces/join` 🔒
+
+Aceite de quem **já tem conta**. Quem ainda não tem se cadastra pelo `POST /Users` com `InviteHash`.
+
+**Body:** `{ "Hash": "Yk3s..." }` — só isso. O papel vem da linha do convite, nunca do cliente.
+
+**Resposta `200`:** `{ "IdWorkspace": 1 }`.
+
+> ⚠️ **O join NÃO troca a sessão.** Ele dá a matrícula e o cookie continua apontando para o workspace em que você estava — de propósito: aceitar não pode trocar o workspace debaixo da tela que o usuário estava usando. Para operar no workspace novo, chame **`POST /Workspaces/switch`** com o `IdWorkspace` que voltou.
+
+`406` quando: o e-mail da sessão não é o do convite, o convite não existe, foi revogado, expirou ou já foi usado.
+
+---
+
+### `DELETE /Workspaces/invite/IdWorkspaceInvite=:IdWorkspaceInvite` 🔒 *(só `owner`)*
+
+Revoga o convite (`Status = 'revoked'`): o link para de funcionar **na hora**.
+
+**Resposta `200`:** `{ "msg": "Convite revogado com sucesso" }`.
+
+Convite de outro workspace, ou que não está mais `pending` (já aceito ou já revogado): `406`. **Revogar não desfaz matrícula já criada** — remover membro é outra coisa, e ainda não existe.
 
 ---
 
@@ -1032,6 +1136,8 @@ Numa transaction: resolve a definição vigente (cria, ou **atualiza** para o no
 
 Existe no banco, mas **sem rota**: `UserDevices`, `Notifications`, `Plans`, `Subscriptions`.
 
+**Gestão de membros ainda não existe:** listar quem é membro, trocar o papel de alguém, remover um membro, sair de um workspace e transferir propriedade. O convite (4.1) entrega só a entrada. Revogar um convite **não** desfaz matrícula já criada.
+
 Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de `PaymentMethods` (vem embutido na conta), CRUD de `Tags` além de busca e arquivar, `GET`/`POST` de `BudgetPeriods`, e a **rotina mensal** que materializaria os orçamentos.
 
 **Fora deste contrato:** `/Cache` (`GET /Cache/CacheName=:CacheName`, `POST /Cache`, `POST /Cache/Reset/CacheName=:CacheName`) é o subsistema interno de cache em memória sincronizado por socket. Não tem schema Joi, não é escopado por workspace e não faz parte do domínio do app — não consuma a partir das telas.
@@ -1058,6 +1164,11 @@ Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de
 | DELETE | `/UsersAuth/IdUserAuth=:IdUserAuth` | 🔒 |
 | GET | `/Workspaces/getSelf` | 🔒 |
 | POST | `/Workspaces/switch` | 🔒 |
+| POST | `/Workspaces/invite` | 🔒 `owner` |
+| GET | `/Workspaces/invites` | 🔒 `owner` |
+| GET | `/Workspaces/invite/Hash=:Hash` | público |
+| POST | `/Workspaces/join` | 🔒 |
+| DELETE | `/Workspaces/invite/IdWorkspaceInvite=:Id` | 🔒 `owner` |
 | PUT | `/Workspaces` | 🔒 |
 | GET | `/Accounts` | 🔒 |
 | POST | `/Accounts` | 🔒 |
@@ -1119,6 +1230,32 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-04 — `POST /Users`: `IdWorkspace` sai do cadastro; entrar em workspace alheio agora exige **convite**
+
+🔴 **Quebra** · 🟢 **Adição** — ver as seções 2, `/Users`, e 4.1, convites.
+
+**O que quebrou.** `POST /Users` **não aceita mais `IdWorkspace`**. Mandar o campo agora responde `406` (`"Dados de entrada inválidos."`), e nenhuma matrícula nasce dele.
+
+**Por que.** A rota é pública e esse campo entrava direto como matrícula **`owner`** do workspace informado, sem convite e sem conferência de dono. `IdWorkspace` é inteiro sequencial: adivinhava-se contando. Era a pendência que segurava o deploy, e ela está fechada.
+
+**O que entrou no lugar: `InviteHash`.** Mesmo campo opcional, outro valor — o hash de 32 bytes de uma linha de convite, que só existe se alguém criou. Com ele, o cadastro entra no workspace do convite com o papel que a **linha** manda; sem ele, nasce o workspace próprio, como sempre.
+
+**Cinco rotas novas em `/Workspaces`** (seção 4.1): criar convite, listar pendentes, descrever um convite pelo hash (**pública**), aceitar quem já tem conta, e revogar. **A API não manda e-mail** — ela devolve o hash e quem entrega o link é o usuário.
+
+**Ação do front:**
+
+1. **Tirar `IdWorkspace` de qualquer chamada de cadastro.** Se a sua tela ainda tem esse campo, ele agora quebra o cadastro inteiro em vez de fazer nada.
+2. **Tela de convite (dono):** `POST /Workspaces/invite` com `{ Email, Role }`, montar a URL da sua tela de aceite com o `Hash` que voltou, e oferecer copiar/compartilhar. `GET /Workspaces/invites` lista os pendentes com o `Hash` de cada um, para reenviar; `DELETE` revoga.
+3. **Tela de aceite (convidado), pública:** `GET /Workspaces/invite/Hash=:Hash` para mostrar quem convidou, para qual workspace e **para qual e-mail** — sem sessão. Daí saem dois caminhos: quem não tem conta vai para o cadastro com `InviteHash`; quem já tem entra e chama `POST /Workspaces/join`.
+4. **Depois do `join`, chame `POST /Workspaces/switch`.** O `join` **não** troca a sessão de propósito. Sem o switch, o usuário aceita e continua vendo o workspace antigo — que é o bug mais provável desta entrega.
+5. **Trate os `406` pela `msg`.** Convite inexistente, revogado, expirado, já usado e e-mail diferente são cinco mensagens distintas, e cada uma manda o usuário para um lugar diferente.
+
+**A regra que não é óbvia: o e-mail tem que bater.** O link é compartilhável por desenho, então o hash sozinho não é a tranca — quem recebesse o encaminhamento entraria. A API compara o e-mail do convite com o da conta que aceita (o da sessão no `join`, o do corpo no cadastro). Deixe isso claro na tela: mostre o `Email` que o `GET` público devolve, com um "entre com esta conta".
+
+**Convidar o mesmo e-mail duas vezes renova o convite**, com hash novo — o link anterior morre. Não gere dois links esperando que os dois funcionem.
+
+**Não mudou:** o `POST /Users` sem convite, o login, o `switch`, e o formato de `GET /Workspaces/getSelf` (que agora simplesmente pode devolver mais de um workspace).
 
 ### 2026-09-04 — `POST /Users/logout`: agora existe como sair da sessão
 
