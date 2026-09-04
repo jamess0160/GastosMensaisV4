@@ -29,26 +29,29 @@ import type { ApiTypes } from "@/types/api";
  *  aqui, com nome, e não escondido numa chamada. */
 export const INSTALLMENT_LOOKBACK_MONTHS = 24;
 
-/** Os gastos de um mês.
+/** Os gastos de um mês — TODOS eles, cancelados inclusive.
  *
- *  `status` só é repassado à API quando a tela pede CANCELADOS: sem
- *  `Status` na query a resposta já vem sem eles, então "em aberto" e
- *  "pago" se separam no cliente, sobre a mesma lista — e é essa lista
- *  que o Início e o Relatório reaproveitam do cache. Pedir cancelados,
- *  ao contrário, é uma consulta diferente, e ganha chave própria. */
+ *  UMA chave por mês, e nenhum filtro na query. O status virou
+ *  multi-seleção na tela de Gastos, e um filtro que conversa com a API
+ *  quebraria isso duas vezes: "em aberto + cancelados" não é uma
+ *  consulta que exista, e cada combinação viraria uma chave de cache
+ *  diferente — o Início, Gastos e o Relatório deixariam de reaproveitar
+ *  a mesma lista e o mês seria baixado de novo a cada clique num chip.
+ *
+ *  Por isso a lista vem completa e os cinco filtros são aplicados no
+ *  cliente. `IncludeCanceled` é a pendência 13; enquanto a rota não a
+ *  aceitar, o parâmetro é ignorado e a resposta continua vindo sem
+ *  cancelados — marcar "Cancelados" simplesmente não traz nada, e o
+ *  resto funciona igual.
+ *
+ *  ATENÇÃO a quem somar sobre esta lista: ela CONTÉM cancelados. Todo
+ *  total precisa passar por `isLive` — `monthLegs` já passa. */
 export function useMonthExpenses(
     month: ApiTypes.ReferenceMonth,
-    status?: ApiTypes.ExpenseStatus | null,
 ): UseQueryResult<ApiTypes.Expense[]> {
-    const canceled = status === "canceled";
-
     return useQuery({
-        queryKey: canceled ? [...queryKeys.expenses(month), "canceled"] : queryKeys.expenses(month),
-        queryFn: () =>
-            ExpensesConnection.list({
-                ...monthRange(month),
-                ...(canceled ? { Status: "canceled" as const } : {}),
-            }),
+        queryKey: queryKeys.expenses(month),
+        queryFn: () => ExpensesConnection.list({ ...monthRange(month), IncludeCanceled: true }),
     });
 }
 

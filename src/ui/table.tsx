@@ -204,11 +204,15 @@ export function PayButton({
     onToggle,
     disabled,
     pending,
+    /** Por que o botão está apagado. Desabilitar sem dizer o motivo é o
+     *  que faz o usuário clicar três vezes e desistir. */
+    reason,
 }: {
     paid: boolean;
     onToggle: () => void;
     disabled?: boolean;
     pending?: boolean;
+    reason?: string;
 }) {
     if (paid) {
         return (
@@ -218,7 +222,7 @@ export function PayButton({
                 onClick={onToggle}
                 disabled={disabled || pending}
                 aria-label="Desfazer quitação"
-                title="Desfazer quitação"
+                title={reason ?? "Desfazer quitação"}
             >
                 <IconCheck />
             </button>
@@ -231,6 +235,7 @@ export function PayButton({
             className={styles.payButton}
             onClick={onToggle}
             disabled={disabled || pending}
+            title={reason}
         >
             {pending ? "…" : "Quitar"}
         </button>

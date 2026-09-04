@@ -19,14 +19,14 @@ import {
     useMonthExpenses,
     useMonthLegs,
 } from "@/data/month";
-import { Avatar, Button, Card, Chip, PageHead, Workspace as Page } from "@/ui/primitives";
+import { Avatar, Badge, Button, Card, Chip, PageHead, Workspace as Page } from "@/ui/primitives";
 import { HideOnMobile, Topbar } from "@/ui/topbar";
 import {
     ClearFilters,
     FilterBar,
-    FilterChip,
+    FilterChips,
     FilterGroup,
-    FilterSelect,
+    FilterMultiSelect,
     SearchInput,
 } from "@/ui/controls";
 import { FormError, FormField, FormGrid, Input, MoneyInput, Textarea } from "@/ui/form";
@@ -48,6 +48,7 @@ import {
     TableRow,
     TypeTile,
 } from "@/ui/table";
+import { CardGroup, CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows, StatusBadge } from "@/ui/states";
 import {
     isLive,
@@ -60,6 +61,7 @@ import {
     type ExpenseLeg,
 } from "@/lib/aggregate";
 import { accentColor, categoryColor } from "@/lib/categoryColor";
+import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatMoney } from "@/lib/money";
 import { formatDate, formatDateTime, formatMonthLabel, today } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
@@ -71,6 +73,22 @@ const KIND_LABEL: Record<ApiTypes.ExpenseKind, string> = {
 };
 
 const KIND_ORDER: ApiTypes.ExpenseKind[] = ["fixed", "installment", "single"];
+
+/** O rótulo curto, para o badge do card no mobile — onde não cabe a
+ *  linha inteira de "Ocorrência de um gasto fixo". */
+const KIND_BADGE: Record<ApiTypes.ExpenseKind, string> = {
+    single: "Avulso",
+    installment: "Parcelado",
+    fixed: "Fixo",
+};
+
+/** O status em que a lista nasce: tudo menos cancelado.
+ *
+ *  A lista do mês agora VEM com os cancelados (ver `useMonthExpenses`),
+ *  então "nenhum chip marcado" passou a significar mesmo "tudo,
+ *  inclusive cancelado" — e não é isso que se quer ver ao abrir o mês.
+ *  O padrão é explícito, e é para ele que "limpar filtros" volta. */
+const LIVE_STATUSES: ApiTypes.ExpenseStatus[] = ["pending", "paid"];
 
 const KIND_ICON: Record<ApiTypes.ExpenseKind, ReactNode> = {
     single: <IconTag />,
@@ -90,13 +108,21 @@ export function Expenses() {
     const openModal = useOpenModal();
     const { user } = useSession();
 
+    const isMobile = useIsMobile();
+
     const [month, setMonth] = useMonthScope();
-    const [status, setStatus] = useState<ApiTypes.ExpenseStatus | null>(null);
-    const [kind, setKind] = useState<ApiTypes.ExpenseKind | null>(null);
-    const [idCategory, setIdCategory] = useState<number | null>(null);
-    const [idPerson, setIdPerson] = useState<number | null>(null);
-    const [idPaymentMethod, setIdPaymentMethod] = useState<number | null>(null);
+    /* Os cinco filtros são multi-seleção: ver "em aberto + pago" sem ver
+       cancelado, ou duas categorias juntas, é a pergunta que se faz de
+       verdade. Vazio = sem recorte. */
+    const [statuses, setStatuses] = useState<ApiTypes.ExpenseStatus[]>(LIVE_STATUSES);
+    const [kinds, setKinds] = useState<ApiTypes.ExpenseKind[]>([]);
+    const [idCategories, setIdCategories] = useState<number[]>([]);
+    const [idPersons, setIdPersons] = useState<number[]>([]);
+    const [idMethods, setIdMethods] = useState<number[]>([]);
     const [search, setSearch] = useState("");
+    /* Os parcelados em que o usuário pediu para ver o total da compra no
+       lugar da parcela do mês. */
+    const [revealed, setRevealed] = useState<number[]>([]);
     const [openExpense, setOpenExpense] = useState<number | null>(null);
     const [seriesDraft, setSeriesDraft] = useState<SeriesDraft | null>(null);
     const [confirming, setConfirming] = useState<"cancel" | "cancelSeries" | null>(null);
@@ -104,7 +130,7 @@ export function Expenses() {
     const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
-    const expenses = useMonthExpenses(month, status);
+    const expenses = useMonthExpenses(month);
     const monthLegs = useMonthLegs(month);
     const monthDetails = useMonthExpenseDetails(month);
     const detail = useExpenseDetail(openExpense);
@@ -154,23 +180,23 @@ export function Expenses() {
         const term = search.trim().toLowerCase();
 
         return (expense: ApiTypes.Expense): boolean => {
-            if (status !== null && status !== "canceled" && expense.Status !== status) return false;
-            if (kind !== null && expense.Kind !== kind) return false;
-            if (idCategory !== null && expense.IdCategory !== idCategory) return false;
+            if (statuses.length > 0 && !statuses.includes(expense.Status)) return false;
+            if (kinds.length > 0 && !kinds.includes(expense.Kind)) return false;
+            if (idCategories.length > 0 && !idCategories.includes(expense.IdCategory)) return false;
             if (term && !expense.Description.toLowerCase().includes(term)) return false;
 
-            if (idPerson !== null || idPaymentMethod !== null) {
+            if (idPersons.length > 0 || idMethods.length > 0) {
                 const found = monthDetails.byId.get(expense.IdExpense);
                 if (!found) return false;
                 if (
-                    idPerson !== null &&
-                    !found.Persons.some((person) => person.IdPerson === idPerson)
+                    idPersons.length > 0 &&
+                    !found.Persons.some((person) => idPersons.includes(person.IdPerson))
                 ) {
                     return false;
                 }
                 if (
-                    idPaymentMethod !== null &&
-                    !found.Payments.some((payment) => payment.IdPaymentMethod === idPaymentMethod)
+                    idMethods.length > 0 &&
+                    !found.Payments.some((payment) => idMethods.includes(payment.IdPaymentMethod))
                 ) {
                     return false;
                 }
@@ -178,7 +204,7 @@ export function Expenses() {
 
             return true;
         };
-    }, [search, status, kind, idCategory, idPerson, idPaymentMethod, monthDetails.byId]);
+    }, [search, statuses, kinds, idCategories, idPersons, idMethods, monthDetails.byId]);
 
     const rows = useMemo(() => (expenses.data ?? []).filter(matches), [expenses.data, matches]);
 
@@ -209,20 +235,26 @@ export function Expenses() {
     const live = rows.filter(isLive);
     const totalPurchases = sumMoney(live.map((expense) => expense.TotalValue));
 
+    /* "Sem filtro" é o padrão de status, não o vazio: com nenhum chip
+       marcado a lista mostraria os cancelados. */
+    const defaultStatuses =
+        statuses.length === LIVE_STATUSES.length &&
+        LIVE_STATUSES.every((value) => statuses.includes(value));
+
     const hasFilters =
-        status !== null ||
-        kind !== null ||
-        idCategory !== null ||
-        idPerson !== null ||
-        idPaymentMethod !== null ||
+        !defaultStatuses ||
+        kinds.length > 0 ||
+        idCategories.length > 0 ||
+        idPersons.length > 0 ||
+        idMethods.length > 0 ||
         search.trim() !== "";
 
     const clearAll = () => {
-        setStatus(null);
-        setKind(null);
-        setIdCategory(null);
-        setIdPerson(null);
-        setIdPaymentMethod(null);
+        setStatuses(LIVE_STATUSES);
+        setKinds([]);
+        setIdCategories([]);
+        setIdPersons([]);
+        setIdMethods([]);
         setSearch("");
     };
 
@@ -230,6 +262,114 @@ export function Expenses() {
     const activePersons = (persons.data ?? []).filter((person) => person.Active);
 
     const expense = detail.data;
+
+    /* ── O que cada linha precisa saber ────────────────────────
+       A tabela e a lista de cards mostram os mesmos dados em formatos
+       diferentes. O cálculo mora aqui, uma vez: as duas leem daqui. */
+    const rowInfo = (row: ApiTypes.Expense) => {
+        const category = categoryIndex.get(row.IdCategory);
+        const found = monthDetails.byId.get(row.IdExpense);
+
+        const legs = found ? legsOf(found) : [];
+        const dueThisMonth = legs.filter((leg) => leg.month === month);
+
+        /* Qual perna o botão de status move. `single` e `fixed` têm UMA
+           por definição, e é dela que o status da linha fala — mesmo
+           que ela vença noutro mês. `installment` tem N, e só a do mês
+           visível faz sentido aqui. Com mais de uma candidata, adivinhar
+           qual quitar seria pior do que não oferecer: o botão apaga e
+           diz por quê. */
+        const candidates = row.Kind === "installment" ? dueThisMonth : legs;
+        const payable = candidates.length === 1 ? candidates[0] : null;
+
+        const persons = found?.Persons ?? [];
+        const methods = found?.Payments ?? [];
+
+        return {
+            category,
+            color: category ? categoryColor(category) : "var(--ink-3)",
+            found,
+            dueThisMonth,
+            payable,
+            payReason: !found
+                ? "Carregando o detalhe deste gasto…"
+                : candidates.length === 0
+                  ? "Nenhuma parcela deste gasto vence no mês visível"
+                  : candidates.length > 1
+                    ? "Este gasto tem mais de uma perna no mês — abra o detalhe para escolher"
+                    : undefined,
+            persons,
+            firstPerson: persons.length > 0 ? personIndex.get(persons[0].IdPerson) : undefined,
+            methods,
+            firstMethod:
+                methods.length > 0 ? methodIndex.get(methods[0].IdPaymentMethod) : undefined,
+        };
+    };
+
+    type RowInfo = ReturnType<typeof rowInfo>;
+
+    /** O valor da linha. Em parcelado é a PARCELA do mês, com "8/12"
+     *  embaixo — o total da compra é outra pergunta, e um clique no
+     *  próprio valor a responde ali mesmo, sem abrir o painel. */
+    const amountOf = (row: ApiTypes.Expense, info: RowInfo) => {
+        const leg = info.dueThisMonth[0];
+        const payment = leg?.payment;
+
+        if (row.Kind !== "installment" || !payment?.InstallmentTotal) {
+            return formatMoney(row.TotalValue);
+        }
+
+        const showTotal = revealed.includes(row.IdExpense);
+
+        return (
+            <button
+                type="button"
+                className={styles.amountReveal}
+                title={showTotal ? "Ver a parcela do mês" : "Ver o total da compra"}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    setRevealed((current) =>
+                        current.includes(row.IdExpense)
+                            ? current.filter((id) => id !== row.IdExpense)
+                            : [...current, row.IdExpense],
+                    );
+                }}
+            >
+                <span>{formatMoney(showTotal ? row.TotalValue : leg.value)}</span>
+                <span className={styles.amountCaption}>
+                    {showTotal
+                        ? "total da compra"
+                        : `${payment.InstallmentNumber}/${payment.InstallmentTotal}`}
+                </span>
+            </button>
+        );
+    };
+
+    /** O botão de status, em TODA linha não cancelada. */
+    const payButtonOf = (row: ApiTypes.Expense, info: RowInfo) => {
+        if (row.Status === "canceled") return null;
+
+        const payment = info.payable?.payment ?? null;
+
+        return (
+            <span onClick={(event) => event.stopPropagation()}>
+                <PayButton
+                    paid={payment?.Paid ?? row.Status === "paid"}
+                    disabled={payment === null}
+                    reason={info.payReason}
+                    pending={pending}
+                    onToggle={() => {
+                        if (!payment) return;
+                        void ExpensesController.toggleLegPayment(
+                            context,
+                            payment.IdExpensePayment,
+                            payment.Paid,
+                        );
+                    }}
+                />
+            </span>
+        );
+    };
 
     return (
         <>
@@ -299,34 +439,26 @@ export function Expenses() {
 
                     <FilterBar>
                         <FilterGroup label="Status">
-                            <FilterChip active={status === null} onClick={() => setStatus(null)}>
-                                Todos
-                            </FilterChip>
-                            <FilterChip
-                                active={status === "pending"}
-                                onClick={() => setStatus("pending")}
-                            >
-                                Em aberto
-                            </FilterChip>
-                            <FilterChip
-                                active={status === "paid"}
-                                onClick={() => setStatus("paid")}
-                            >
-                                Pagos
-                            </FilterChip>
-                            {/* Sem `Status` na query a API já esconde os
-                                cancelados: vê-los é pedir por eles. */}
-                            <FilterChip
-                                active={status === "canceled"}
-                                onClick={() => setStatus("canceled")}
-                            >
-                                Cancelados
-                            </FilterChip>
+                            {/* Os cancelados agora VÊM na lista do mês
+                                (ver `useMonthExpenses`), então este
+                                grupo os esconde e os mostra sem nova
+                                consulta — e "em aberto + pago" deixou de
+                                obrigar a escolher um dos dois. */}
+                            <FilterChips
+                                values={statuses}
+                                onChange={setStatuses}
+                                allLabel="Todos"
+                                options={[
+                                    { value: "pending" as const, label: "Em aberto" },
+                                    { value: "paid" as const, label: "Pagos" },
+                                    { value: "canceled" as const, label: "Cancelados" },
+                                ]}
+                            />
                         </FilterGroup>
 
-                        <FilterSelect
-                            value={kind}
-                            onChange={setKind}
+                        <FilterMultiSelect
+                            values={kinds}
+                            onChange={setKinds}
                             ariaLabel="Formato"
                             allLabel="Todos os formatos"
                             options={[
@@ -344,9 +476,9 @@ export function Expenses() {
                             ]}
                         />
 
-                        <FilterSelect
-                            value={idCategory}
-                            onChange={setIdCategory}
+                        <FilterMultiSelect
+                            values={idCategories}
+                            onChange={setIdCategories}
                             ariaLabel="Categoria"
                             allLabel="Todas as categorias"
                             options={activeCategories.map((category) => ({
@@ -357,20 +489,20 @@ export function Expenses() {
                             }))}
                         />
 
-                        <FilterSelect
-                            value={idPerson}
-                            onChange={setIdPerson}
-                            ariaLabel="Destino"
-                            allLabel="Todos os destinos"
+                        <FilterMultiSelect
+                            values={idPersons}
+                            onChange={setIdPersons}
+                            ariaLabel="Pessoa"
+                            allLabel="Todas as pessoas"
                             options={activePersons.map((person) => ({
                                 value: person.IdPerson,
                                 label: person.Name,
                             }))}
                         />
 
-                        <FilterSelect
-                            value={idPaymentMethod}
-                            onChange={setIdPaymentMethod}
+                        <FilterMultiSelect
+                            values={idMethods}
+                            onChange={setIdMethods}
                             ariaLabel="Forma de pagamento"
                             allLabel="Todas as formas"
                             options={methods.map(({ method, account }) => ({
@@ -410,6 +542,86 @@ export function Expenses() {
                             )
                         }
                     />
+                ) : isMobile ? (
+                    /* Cada grupo é uma `CardList` — a lista de cards é a
+                       forma que a tabela toma no telefone, e os
+                       cabeçalhos de Fixos/Parcelados/Avulsos continuam
+                       separando os três. */
+                    <div>
+                        {grouped.map((group) => {
+                            const groupLive = group.items.filter(isLive);
+                            return (
+                                <div key={group.kind}>
+                                    <CardGroup
+                                        title={KIND_LABEL[group.kind]}
+                                        meta={`${group.items.length} · ${formatMoney(
+                                            sumMoney(groupLive.map((e) => e.TotalValue)),
+                                        )}`}
+                                    />
+                                    <CardList>
+                                        {group.items.map((row) => {
+                                            const info = rowInfo(row);
+                                            return (
+                                                <ItemCard
+                                                    key={row.IdExpense}
+                                                    onClick={() => setOpenExpense(row.IdExpense)}
+                                                    faded={row.Status === "canceled"}
+                                                    label={`Abrir ${row.Description}`}
+                                                    title={row.Description}
+                                                    badges={<Badge>{KIND_BADGE[row.Kind]}</Badge>}
+                                                    meta={
+                                                        <>
+                                                            <StatusBadge status={row.Status} />
+                                                            {info.category && (
+                                                                <Chip>
+                                                                    <span
+                                                                        className={styles.chipIcon}
+                                                                        style={{
+                                                                            color: info.color,
+                                                                        }}
+                                                                    >
+                                                                        <CategoryIcon
+                                                                            iconKey={
+                                                                                info.category
+                                                                                    .IconKey
+                                                                            }
+                                                                        />
+                                                                    </span>
+                                                                    {info.category.Description}
+                                                                </Chip>
+                                                            )}
+                                                            {info.firstPerson && (
+                                                                <Chip>
+                                                                    {info.firstPerson.Name}
+                                                                    {info.persons.length > 1 &&
+                                                                        ` +${info.persons.length - 1}`}
+                                                                </Chip>
+                                                            )}
+                                                            <span className={styles.meta}>
+                                                                {formatDate(row.ExpenseDate)}
+                                                            </span>
+                                                        </>
+                                                    }
+                                                    amount={amountOf(row, info)}
+                                                    trailing={payButtonOf(row, info)}
+                                                />
+                                            );
+                                        })}
+                                    </CardList>
+                                </div>
+                            );
+                        })}
+
+                        <div className={styles.cardFoot}>
+                            <span>
+                                {live.length} lançamento{live.length === 1 ? "" : "s"} em{" "}
+                                {formatMonthLabel(month)}
+                            </span>
+                            <span>
+                                Total lançado <b>{formatMoney(totalPurchases)}</b>
+                            </span>
+                        </div>
+                    </div>
                 ) : (
                     <Table columns="minmax(0,1.5fr) minmax(0,1fr) minmax(0,0.9fr) minmax(0,1.2fr) 110px 130px 150px">
                         <TableHead>
@@ -438,35 +650,7 @@ export function Expenses() {
                                         )}
                                     />
                                     {group.items.map((row) => {
-                                        const category = categoryIndex.get(row.IdCategory);
-                                        const color = category
-                                            ? categoryColor(category)
-                                            : "var(--ink-3)";
-                                        const found = monthDetails.byId.get(row.IdExpense);
-
-                                        /* A perna quitável é a que vence NESTE
-                                           mês. Uma só: com duas, qual delas o
-                                           botão pagaria seria adivinhação — aí
-                                           o caminho é abrir o detalhe. */
-                                        const dueThisMonth = found
-                                            ? legsOf(found).filter((leg) => leg.month === month)
-                                            : [];
-                                        const payable =
-                                            row.Status !== "canceled" && dueThisMonth.length === 1
-                                                ? dueThisMonth[0].payment
-                                                : null;
-
-                                        const rowPersons = found?.Persons ?? [];
-                                        const firstPerson =
-                                            rowPersons.length > 0
-                                                ? personIndex.get(rowPersons[0].IdPerson)
-                                                : undefined;
-
-                                        const rowMethods = found?.Payments ?? [];
-                                        const firstMethod =
-                                            rowMethods.length > 0
-                                                ? methodIndex.get(rowMethods[0].IdPaymentMethod)
-                                                : undefined;
+                                        const info = rowInfo(row);
 
                                         return (
                                             <TableRow
@@ -482,12 +666,7 @@ export function Expenses() {
                                                         </div>
                                                         <div className={styles.meta}>
                                                             {row.Kind === "installment"
-                                                                ? `Parcelado${
-                                                                      dueThisMonth[0]?.payment
-                                                                          ?.InstallmentNumber
-                                                                          ? ` · ${dueThisMonth[0].payment?.InstallmentNumber}/${dueThisMonth[0].payment?.InstallmentTotal}`
-                                                                          : ""
-                                                                  }`
+                                                                ? "Parcelado"
                                                                 : row.Kind === "fixed"
                                                                   ? "Ocorrência de um gasto fixo"
                                                                   : "Compra à vista"}
@@ -496,17 +675,17 @@ export function Expenses() {
                                                 </RowTrigger>
 
                                                 <Cell>
-                                                    {category ? (
+                                                    {info.category ? (
                                                         <Chip>
                                                             <span
                                                                 className={styles.chipIcon}
-                                                                style={{ color }}
+                                                                style={{ color: info.color }}
                                                             >
                                                                 <CategoryIcon
-                                                                    iconKey={category.IconKey}
+                                                                    iconKey={info.category.IconKey}
                                                                 />
                                                             </span>
-                                                            {category.Description}
+                                                            {info.category.Description}
                                                         </Chip>
                                                     ) : (
                                                         <span className={styles.meta}>—</span>
@@ -514,52 +693,55 @@ export function Expenses() {
                                                 </Cell>
 
                                                 <Cell>
-                                                    {rowPersons.length === 0 ? (
+                                                    {info.persons.length === 0 ? (
                                                         <span className={styles.meta}>
-                                                            {found ? "—" : ""}
+                                                            {info.found ? "—" : ""}
                                                         </span>
                                                     ) : (
                                                         <span className={styles.who}>
                                                             <Avatar
-                                                                name={firstPerson?.Name ?? "?"}
+                                                                name={info.firstPerson?.Name ?? "?"}
                                                                 size={22}
                                                             />
                                                             <span className={styles.whoName}>
-                                                                {firstPerson?.Name ?? "Arquivada"}
-                                                                {rowPersons.length > 1 &&
-                                                                    ` +${rowPersons.length - 1}`}
+                                                                {info.firstPerson?.Name ??
+                                                                    "Arquivada"}
+                                                                {info.persons.length > 1 &&
+                                                                    ` +${info.persons.length - 1}`}
                                                             </span>
                                                         </span>
                                                     )}
                                                 </Cell>
 
                                                 <Cell>
-                                                    {rowMethods.length === 0 ? (
+                                                    {info.methods.length === 0 ? (
                                                         <span className={styles.meta}>
-                                                            {found ? "—" : ""}
+                                                            {info.found ? "—" : ""}
                                                         </span>
                                                     ) : (
                                                         <span className={styles.who}>
                                                             <TypeTile
                                                                 color={
-                                                                    firstMethod?.method.Color ??
-                                                                    firstMethod?.account.Color ??
+                                                                    info.firstMethod?.method
+                                                                        .Color ??
+                                                                    info.firstMethod?.account
+                                                                        .Color ??
                                                                     "var(--ink-2)"
                                                                 }
                                                             >
                                                                 {
                                                                     METHOD_ICON[
-                                                                        firstMethod?.method.Kind ??
-                                                                            "debit"
+                                                                        info.firstMethod?.method
+                                                                            .Kind ?? "debit"
                                                                     ]
                                                                 }
                                                             </TypeTile>
                                                             <span className={styles.whoName}>
-                                                                {firstMethod
-                                                                    ? `${firstMethod.account.Name} · ${firstMethod.method.Name}`
+                                                                {info.firstMethod
+                                                                    ? `${info.firstMethod.account.Name} · ${info.firstMethod.method.Name}`
                                                                     : "Forma arquivada"}
-                                                                {rowMethods.length > 1 &&
-                                                                    ` +${rowMethods.length - 1}`}
+                                                                {info.methods.length > 1 &&
+                                                                    ` +${info.methods.length - 1}`}
                                                             </span>
                                                         </span>
                                                     )}
@@ -576,31 +758,11 @@ export function Expenses() {
                                                     </DueDate>
                                                 </Cell>
 
-                                                <CellAmount>
-                                                    {formatMoney(row.TotalValue)}
-                                                </CellAmount>
+                                                <CellAmount>{amountOf(row, info)}</CellAmount>
 
                                                 <Cell className={styles.statusCell}>
                                                     <StatusBadge status={row.Status} />
-                                                    {payable && (
-                                                        <span
-                                                            onClick={(event) =>
-                                                                event.stopPropagation()
-                                                            }
-                                                        >
-                                                            <PayButton
-                                                                paid={payable.Paid}
-                                                                pending={pending}
-                                                                onToggle={() =>
-                                                                    void ExpensesController.toggleLegPayment(
-                                                                        context,
-                                                                        payable.IdExpensePayment,
-                                                                        payable.Paid,
-                                                                    )
-                                                                }
-                                                            />
-                                                        </span>
-                                                    )}
+                                                    {payButtonOf(row, info)}
                                                 </Cell>
                                             </TableRow>
                                         );

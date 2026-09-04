@@ -11,8 +11,9 @@ import type { ApiTypes } from "@/types/api";
 class Connection {
     private readonly route = "/Expenses";
 
-    /** Filtra por `ExpenseDate`. Sem `Status`, os cancelados ficam de
-     *  fora. A lista não traz pernas, rateio nem tags. */
+    /** Filtra por `ExpenseDate`. Sem `Status` nem `IncludeCanceled`, os
+     *  cancelados ficam de fora. A lista não traz pernas, rateio nem
+     *  tags. */
     async list(query: ApiTypes.ExpenseListQuery = {}): Promise<ApiTypes.Expense[]> {
         const { data } = await http.get<ApiTypes.Expense[]>(this.route, { params: query });
         return data;

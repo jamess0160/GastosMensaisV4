@@ -391,6 +391,10 @@ export namespace ApiTypes {
         To?: CalendarDate;
         /** Sem `Status`, os cancelados ficam de fora. */
         Status?: ExpenseStatus;
+        /** Traz os cancelados JUNTO com o resto, em vez de trocar um
+         *  recorte por outro — é o que permite o filtro de status ser
+         *  multi-seleção sobre uma lista só. Pendência 13. */
+        IncludeCanceled?: boolean;
         Kind?: ExpenseKind;
         IdCategory?: number;
     }
