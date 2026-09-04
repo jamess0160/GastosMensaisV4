@@ -53,6 +53,31 @@ class Connection {
         return data;
     }
 
+    /** O espelho do `receive`: volta para `pending` e RETIRA do saldo o
+     *  que o recebimento creditou. Pendência 14 — a rota ainda não
+     *  existe, e enquanto não subir a chamada devolve o erro da API.
+     *  Está aqui, e não escondida, porque esconder o caminho ensinaria
+     *  que ele não existe. */
+    async unreceive(idInflow: number): Promise<{ msg: string }> {
+        const { data } = await http.post<{ msg: string }>(
+            `${this.route}/IdInflow=${idInflow}/unreceive`,
+        );
+        return data;
+    }
+
+    /** Várias entradas numa transaction só — pendência 15. É o que a
+     *  clonagem do mês usa: gravar uma por uma deixaria metade do mês
+     *  criado quando a terceira das cinco fosse recusada. */
+    async createBatch(
+        body: ApiTypes.InflowBatchCreateBody,
+    ): Promise<{ msg: string; IdInflows: number[] }> {
+        const { data } = await http.post<{ msg: string; IdInflows: number[] }>(
+            `${this.route}/batch`,
+            body,
+        );
+        return data;
+    }
+
     /** Cancela (Status = canceled). Não há delete físico nem `Active`
      *  nesta tabela. */
     async cancel(idInflow: number): Promise<{ msg: string }> {

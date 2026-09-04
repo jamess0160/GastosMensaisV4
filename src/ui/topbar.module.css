@@ -56,8 +56,20 @@
         padding: 14px 16px;
     }
 
+    /* Três ações lado a lado ("Clonar mês anterior", "Transferir",
+       "Nova renda") viram três botões de 100px com o texto cortado. Em
+       coluna, cada uma continua legível. */
+    .actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    /* SEM `flex: 1` aqui. Em coluna, o eixo principal é a altura, e
+       `flex: 1` traz `flex-basis: 0` junto: os botões perdiam os 36px do
+       `.btn` e viravam três fios. Quem os alarga é o `stretch` do
+       contêiner; a altura é a do próprio botão. */
     .actions > * {
-        flex: 1;
+        flex-shrink: 0;
         justify-content: center;
     }
 

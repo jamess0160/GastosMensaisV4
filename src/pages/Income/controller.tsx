@@ -1,6 +1,8 @@
 import { cancelInflow } from "./sections/cancelInflow";
+import { cloneMonth } from "./sections/cloneMonth";
 import { loadInflowForEdit } from "./sections/loadInflowForEdit";
 import { receiveInflow } from "./sections/receiveInflow";
+import { unreceiveInflow } from "./sections/unreceiveInflow";
 import { submitInflow } from "./sections/submitInflow";
 import type { SplitLine } from "@/ui/SplitEditor";
 import type { ApiTypes } from "@/types/api";
@@ -33,12 +35,15 @@ export interface IncomeContext {
     finishSubmit(message: string): void;
     closeForm(): void;
     closeDetail(): void;
+    closeCloneMonth(): void;
     setDraft(draft: InflowDraft): void;
 }
 
 class Controller {
     readonly submitInflow = submitInflow;
     readonly receiveInflow = receiveInflow;
+    readonly unreceiveInflow = unreceiveInflow;
+    readonly cloneMonth = cloneMonth;
     readonly cancelInflow = cancelInflow;
     readonly loadInflowForEdit = loadInflowForEdit;
 }

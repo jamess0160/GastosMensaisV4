@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     addMonths,
+    addMonthsToDate,
     daysOfMonth,
     formatDate,
     formatMonthLabel,
@@ -79,6 +80,30 @@ describe("addMonths", () => {
 
     it("vira o ano para trás", () => {
         expect(addMonths("2026-01", -1)).toBe("2025-12");
+    });
+});
+
+describe("addMonthsToDate", () => {
+    it("avança a data mantendo o dia", () => {
+        expect(addMonthsToDate("2026-05-05", 1)).toBe("2026-06-05");
+    });
+
+    it("apara o dia no mês curto em vez de vazar para o mês seguinte", () => {
+        // O erro que isto existe para evitar: `new Date(2026, 1, 31)`
+        // é 3 de março. Um salário do dia 31 não pode nascer no dia 3.
+        expect(addMonthsToDate("2026-01-31", 1)).toBe("2026-02-28");
+    });
+
+    it("respeita fevereiro de ano bissexto", () => {
+        expect(addMonthsToDate("2028-01-31", 1)).toBe("2028-02-29");
+    });
+
+    it("vira o ano", () => {
+        expect(addMonthsToDate("2026-12-15", 1)).toBe("2027-01-15");
+    });
+
+    it("anda para trás", () => {
+        expect(addMonthsToDate("2026-03-31", -1)).toBe("2026-02-28");
     });
 });
 

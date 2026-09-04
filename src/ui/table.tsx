@@ -207,12 +207,18 @@ export function PayButton({
     /** Por que o botão está apagado. Desabilitar sem dizer o motivo é o
      *  que faz o usuário clicar três vezes e desistir. */
     reason,
+    /* Gasto quita, entrada recebe: o gesto é o mesmo e as palavras não.
+       O padrão é o do gasto, que é onde o botão nasceu. */
+    label = "Quitar",
+    doneLabel = "Desfazer quitação",
 }: {
     paid: boolean;
     onToggle: () => void;
     disabled?: boolean;
     pending?: boolean;
     reason?: string;
+    label?: string;
+    doneLabel?: string;
 }) {
     if (paid) {
         return (
@@ -221,8 +227,8 @@ export function PayButton({
                 className={styles.payDone}
                 onClick={onToggle}
                 disabled={disabled || pending}
-                aria-label="Desfazer quitação"
-                title={reason ?? "Desfazer quitação"}
+                aria-label={doneLabel}
+                title={reason ?? doneLabel}
             >
                 <IconCheck />
             </button>
@@ -237,7 +243,7 @@ export function PayButton({
             disabled={disabled || pending}
             title={reason}
         >
-            {pending ? "…" : "Quitar"}
+            {pending ? "…" : label}
         </button>
     );
 }

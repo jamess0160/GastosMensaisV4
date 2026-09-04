@@ -25,6 +25,7 @@ export function fakeIncomeContext(overrides: Partial<IncomeContext> = {}): Incom
         finishSubmit: vi.fn(),
         closeForm: vi.fn(),
         closeDetail: vi.fn(),
+        closeCloneMonth: vi.fn(),
         setDraft: vi.fn(),
         ...overrides,
     };

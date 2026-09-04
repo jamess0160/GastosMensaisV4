@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import styles from "./src/styles.module.css";
 import { IncomeController, type IncomeContext, type InflowDraft } from "./controller";
+import { clonable } from "./sections/cloneMonth";
 import { validateInflow } from "./sections/submitInflow";
 import { useMonthScope } from "@/app/monthScope";
 import { useSession } from "@/app/session";
@@ -11,17 +12,18 @@ import {
     useMonthInflowDetails,
     useMonthInflows,
 } from "@/data/month";
-import { Avatar, Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
+import { Avatar, Badge, Button, Card, Chip, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
 import {
     ClearFilters,
     FilterBar,
-    FilterChip,
+    FilterChips,
     FilterGroup,
-    FilterSelect,
+    FilterMultiSelect,
     SearchInput,
 } from "@/ui/controls";
 import {
+    Checkbox,
     DateInput,
     FormError,
     FormField,
@@ -33,12 +35,13 @@ import {
 } from "@/ui/form";
 import { Select } from "@/ui/select";
 import { SplitEditor } from "@/ui/SplitEditor";
-import { ConfirmDialog, FooterSpacer, SlideOver } from "@/ui/overlay";
+import { ConfirmDialog, FooterSpacer, Modal, SlideOver } from "@/ui/overlay";
 import { IconArrowUp, IconBank, IconCopy, IconEdit, IconPlus, IconTransfer } from "@/ui/icons";
 import {
     Cell,
     CellAmount,
     DueDate,
+    PayButton,
     RowTrigger,
     Table,
     TableFoot,
@@ -46,11 +49,20 @@ import {
     TableRow,
     TypeTile,
 } from "@/ui/table";
+import { CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows, StatusBadge } from "@/ui/states";
 import { accentColor } from "@/lib/categoryColor";
 import { sumMoney, totalExpectedInflow, totalReceived } from "@/lib/aggregate";
+import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatMoney } from "@/lib/money";
-import { formatDate, formatDateTime, formatMonthLabel, today } from "@/lib/date";
+import {
+    addMonths,
+    addMonthsToDate,
+    formatDate,
+    formatDateTime,
+    formatMonthLabel,
+    today,
+} from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
 const newDraft = (kind: ApiTypes.InflowKind): InflowDraft => ({
@@ -68,11 +80,20 @@ const newDraft = (kind: ApiTypes.InflowKind): InflowDraft => ({
 });
 
 export function Income() {
+    const isMobile = useIsMobile();
+
     const [month, setMonth] = useMonthScope();
-    const [status, setStatus] = useState<ApiTypes.InflowStatus | null>(null);
-    const [kindFilter, setKindFilter] = useState<ApiTypes.InflowKind | null>(null);
-    const [idPerson, setIdPerson] = useState<number | null>(null);
+    /* Multi-seleção, como em Gastos: vazio = sem recorte. A lista de
+       entradas não traz canceladas (a API só as devolve sob pedido), por
+       isso aqui não há o chip de "Canceladas" que Gastos tem. */
+    const [statuses, setStatuses] = useState<ApiTypes.InflowStatus[]>([]);
+    const [kinds, setKinds] = useState<ApiTypes.InflowKind[]>([]);
+    const [idPersons, setIdPersons] = useState<number[]>([]);
     const [search, setSearch] = useState("");
+    /* A escolha da clonagem. `null` é "ainda não mexeu" e vale por
+       TODAS marcadas — que é como o painel abre. */
+    const [cloning, setCloning] = useState(false);
+    const [cloneChoice, setCloneChoice] = useState<number[] | null>(null);
     const [openInflow, setOpenInflow] = useState<number | null>(null);
     const [draft, setDraft] = useState<InflowDraft | null>(null);
     const [confirming, setConfirming] = useState<number | null>(null);
@@ -108,6 +129,7 @@ export function Income() {
             },
             closeForm: () => setDraft(null),
             closeDetail: () => setOpenInflow(null),
+            closeCloneMonth: () => setCloning(false),
             setDraft,
         }),
         [draft, invalidateMovement],
@@ -135,16 +157,18 @@ export function Income() {
     const rows = useMemo(() => {
         const term = search.trim().toLowerCase();
         return (inflows.data ?? []).filter((inflow) => {
-            if (status !== null && inflow.Status !== status) return false;
-            if (kindFilter !== null && inflow.Kind !== kindFilter) return false;
+            if (statuses.length > 0 && !statuses.includes(inflow.Status)) return false;
+            if (kinds.length > 0 && !kinds.includes(inflow.Kind)) return false;
             if (term && !inflow.Description.toLowerCase().includes(term)) return false;
-            if (idPerson !== null) {
+            if (idPersons.length > 0) {
                 const found = monthDetails.byId.get(inflow.IdInflow);
-                if (!found?.Persons.some((person) => person.IdPerson === idPerson)) return false;
+                if (!found?.Persons.some((person) => idPersons.includes(person.IdPerson))) {
+                    return false;
+                }
             }
             return true;
         });
-    }, [inflows.data, status, kindFilter, search, idPerson, monthDetails.byId]);
+    }, [inflows.data, statuses, kinds, search, idPersons, monthDetails.byId]);
 
     const all = inflows.data ?? [];
     const received = totalReceived(all);
@@ -156,17 +180,87 @@ export function Income() {
     );
 
     const hasFilters =
-        status !== null || kindFilter !== null || idPerson !== null || search.trim() !== "";
+        statuses.length > 0 || kinds.length > 0 || idPersons.length > 0 || search.trim() !== "";
 
     const clearAll = () => {
-        setStatus(null);
-        setKindFilter(null);
-        setIdPerson(null);
+        setStatuses([]);
+        setKinds([]);
+        setIdPersons([]);
         setSearch("");
     };
 
     const inflow = detail.data;
     const blocking = draft ? validateInflow(draft) : null;
+
+    /* ── Clonagem do mês anterior ──────────────────────────────
+       O mês passado só é buscado quando o painel abre — ver o `enabled`
+       de `useMonthInflows`. */
+    const previousMonth = addMonths(month, -1);
+    const previous = useMonthInflows(previousMonth, cloning);
+    const clonableRows = useMemo(() => clonable(previous.data ?? []), [previous.data]);
+
+    const chosenIds = cloneChoice ?? clonableRows.map((row) => row.IdInflow);
+    const chosen = clonableRows.filter((row) => chosenIds.includes(row.IdInflow));
+
+    const toggleClone = (idInflow: number) =>
+        setCloneChoice(
+            chosenIds.includes(idInflow)
+                ? chosenIds.filter((id) => id !== idInflow)
+                : [...chosenIds, idInflow],
+        );
+
+    const openCloneMonth = () => {
+        setCloneChoice(null);
+        setCloning(true);
+    };
+
+    /** O que cada linha precisa além do que a lista traz — a tabela e a
+     *  lista de cards leem daqui.
+     *
+     *  O destino é o RATEIO da entrada, e ele só existe no `get(id)`; a
+     *  conta virou a linha de apoio da descrição, e na transferência ela
+     *  é o par "origem → destino". */
+    const lineOf = (row: ApiTypes.Inflow) => {
+        const to = accountIndex.get(row.IdToAccount);
+        const from = row.IdFromAccount !== null ? accountIndex.get(row.IdFromAccount) : null;
+        const found = monthDetails.byId.get(row.IdInflow);
+        const split = found?.Persons ?? [];
+
+        return {
+            isTransfer: row.Kind === "transfer",
+            route: `${from ? `${from.Name} → ` : ""}${to?.Name ?? "conta arquivada"}`,
+            found,
+            split,
+            firstPerson: split.length > 0 ? personIndex.get(split[0].IdPerson) : undefined,
+        };
+    };
+
+    /** O botão de status na linha — o mesmo gesto que Gastos tem para
+     *  quitar parcela.
+     *
+     *  Habilitado nos DOIS sentidos: desfazer é a pendência 14 e ainda
+     *  não existe na API, e enquanto não subir o clique mostra o erro
+     *  dela. Ver `unreceiveInflow`. */
+    const statusButtonOf = (row: ApiTypes.Inflow) => {
+        if (row.Status === "canceled") return null;
+        const isReceived = row.Status === "received";
+
+        return (
+            <span onClick={(event) => event.stopPropagation()}>
+                <PayButton
+                    paid={isReceived}
+                    pending={pending}
+                    label="Receber"
+                    doneLabel="Desfazer recebimento"
+                    onToggle={() =>
+                        void (isReceived
+                            ? IncomeController.unreceiveInflow(context, row.IdInflow)
+                            : IncomeController.receiveInflow(context, row.IdInflow))
+                    }
+                />
+            </span>
+        );
+    };
 
     return (
         <>
@@ -176,14 +270,12 @@ export function Income() {
                 onMonthChange={setMonth}
                 actions={
                     <>
-                        {/* Clonar o mês é operação de SERVIDOR: no
-                            cliente seriam N+1 requisições sem transaction
-                            e sem idempotência, e dois cliques duplicariam
-                            o mês inteiro. Ver a pendência 11 do backend.
-                            O botão fica desabilitado e rotulado, como os
-                            outros que o layout desenha e a API ainda não
-                            atende. */}
-                        <Button disabled title="Ainda sem API">
+                        {/* Clonar deixou de ser "operação de servidor
+                            inteira": quem escolhe o que trazer é o
+                            usuário, item a item, e só a GRAVAÇÃO é do
+                            banco — uma transaction só, a pendência 15.
+                            Ver `sections/cloneMonth.ts`. */}
+                        <Button onClick={openCloneMonth}>
                             <IconCopy />
                             Clonar mês anterior
                         </Button>
@@ -241,26 +333,20 @@ export function Income() {
 
                     <FilterBar>
                         <FilterGroup label="Status">
-                            <FilterChip active={status === null} onClick={() => setStatus(null)}>
-                                Todas
-                            </FilterChip>
-                            <FilterChip
-                                active={status === "pending"}
-                                onClick={() => setStatus("pending")}
-                            >
-                                A receber
-                            </FilterChip>
-                            <FilterChip
-                                active={status === "received"}
-                                onClick={() => setStatus("received")}
-                            >
-                                Recebidas
-                            </FilterChip>
+                            <FilterChips
+                                values={statuses}
+                                onChange={setStatuses}
+                                allLabel="Todas"
+                                options={[
+                                    { value: "pending" as const, label: "A receber" },
+                                    { value: "received" as const, label: "Recebidas" },
+                                ]}
+                            />
                         </FilterGroup>
 
-                        <FilterSelect
-                            value={kindFilter}
-                            onChange={setKindFilter}
+                        <FilterMultiSelect
+                            values={kinds}
+                            onChange={setKinds}
                             ariaLabel="Tipo"
                             allLabel="Todos os tipos"
                             options={[
@@ -282,11 +368,11 @@ export function Income() {
                             o layout desenha aqui não existe — em vez de um
                             seletor que não filtra nada, ele simplesmente não
                             entra. */}
-                        <FilterSelect
-                            value={idPerson}
-                            onChange={setIdPerson}
-                            ariaLabel="Destino"
-                            allLabel="Todos os destinos"
+                        <FilterMultiSelect
+                            values={idPersons}
+                            onChange={setIdPersons}
+                            ariaLabel="Pessoa"
+                            allLabel="Todas as pessoas"
                             options={activePersons.map((person) => ({
                                 value: person.IdPerson,
                                 label: person.Name,
@@ -326,8 +412,63 @@ export function Income() {
                             )
                         }
                     />
+                ) : isMobile ? (
+                    <CardList>
+                        {rows.map((row) => {
+                            const line = lineOf(row);
+
+                            return (
+                                <ItemCard
+                                    key={row.IdInflow}
+                                    onClick={() => setOpenInflow(row.IdInflow)}
+                                    faded={row.Status === "canceled"}
+                                    label={`Abrir ${row.Description}`}
+                                    title={row.Description}
+                                    badges={
+                                        line.isTransfer ? <Badge>Transferência</Badge> : undefined
+                                    }
+                                    meta={
+                                        <>
+                                            <StatusBadge status={row.Status} kind="inflow" />
+                                            <Chip>{line.route}</Chip>
+                                            {line.firstPerson && (
+                                                <Chip>
+                                                    {line.firstPerson.Name}
+                                                    {line.split.length > 1 &&
+                                                        ` +${line.split.length - 1}`}
+                                                </Chip>
+                                            )}
+                                            <span className={styles.meta}>
+                                                {formatDate(row.CompetenceDate)}
+                                            </span>
+                                        </>
+                                    }
+                                    amount={
+                                        <span
+                                            className={
+                                                line.isTransfer ? styles.transferValue : undefined
+                                            }
+                                        >
+                                            {formatMoney(row.TotalValue)}
+                                        </span>
+                                    }
+                                    trailing={statusButtonOf(row)}
+                                />
+                            );
+                        })}
+
+                        <div className={styles.cardFoot}>
+                            <span>
+                                {rows.length} lançamento{rows.length === 1 ? "" : "s"} em{" "}
+                                {formatMonthLabel(month)}
+                            </span>
+                            <span>
+                                Entrou de verdade <b>{formatMoney(received)}</b>
+                            </span>
+                        </div>
+                    </CardList>
                 ) : (
-                    <Table columns="minmax(0,1.6fr) minmax(0,1fr) 120px 140px 140px">
+                    <Table columns="minmax(0,1.6fr) minmax(0,1fr) 120px 140px 170px">
                         <TableHead>
                             <span>Descrição</span>
                             <span>Destino</span>
@@ -337,21 +478,7 @@ export function Income() {
                         </TableHead>
 
                         {rows.map((row) => {
-                            const to = accountIndex.get(row.IdToAccount);
-                            const from =
-                                row.IdFromAccount !== null
-                                    ? accountIndex.get(row.IdFromAccount)
-                                    : null;
-                            const isTransfer = row.Kind === "transfer";
-
-                            /* O destino é o RATEIO da entrada, e ele só existe
-                           no `get(id)`. A conta, que saiu da tabela para
-                           dar lugar a ele, desceu para a linha de apoio da
-                           descrição — nenhuma informação se perdeu. */
-                            const found = monthDetails.byId.get(row.IdInflow);
-                            const split = found?.Persons ?? [];
-                            const firstPerson =
-                                split.length > 0 ? personIndex.get(split[0].IdPerson) : undefined;
+                            const line = lineOf(row);
 
                             return (
                                 <TableRow
@@ -361,32 +488,37 @@ export function Income() {
                                     faded={row.Status === "canceled"}
                                 >
                                     <RowTrigger label={`Abrir ${row.Description}`}>
-                                        <TypeTile color={isTransfer ? undefined : "#00dc8c"}>
-                                            {isTransfer ? <IconTransfer /> : <IconArrowUp />}
+                                        <TypeTile color={line.isTransfer ? undefined : "#00dc8c"}>
+                                            {line.isTransfer ? <IconTransfer /> : <IconArrowUp />}
                                         </TypeTile>
                                         <div style={{ minWidth: 0 }}>
                                             <div className={styles.description}>
                                                 {row.Description}
                                             </div>
                                             <div className={styles.meta}>
-                                                {from ? `${from.Name} → ` : ""}
-                                                {to?.Name ?? "conta arquivada"}
-                                                {isTransfer && " · transferência"}
+                                                {line.route}
+                                                {line.isTransfer && " · transferência"}
                                             </div>
                                         </div>
                                     </RowTrigger>
 
                                     <Cell>
-                                        {isTransfer ? (
+                                        {line.isTransfer ? (
                                             <span className={styles.meta}>não tem rateio</span>
-                                        ) : split.length === 0 ? (
-                                            <span className={styles.meta}>{found ? "—" : ""}</span>
+                                        ) : line.split.length === 0 ? (
+                                            <span className={styles.meta}>
+                                                {line.found ? "—" : ""}
+                                            </span>
                                         ) : (
                                             <span className={styles.who}>
-                                                <Avatar name={firstPerson?.Name ?? "?"} size={22} />
+                                                <Avatar
+                                                    name={line.firstPerson?.Name ?? "?"}
+                                                    size={22}
+                                                />
                                                 <span className={styles.whoName}>
-                                                    {firstPerson?.Name ?? "Pessoa arquivada"}
-                                                    {split.length > 1 && ` +${split.length - 1}`}
+                                                    {line.firstPerson?.Name ?? "Pessoa arquivada"}
+                                                    {line.split.length > 1 &&
+                                                        ` +${line.split.length - 1}`}
                                                 </span>
                                             </span>
                                         )}
@@ -404,13 +536,16 @@ export function Income() {
                                     </Cell>
 
                                     <CellAmount
-                                        className={isTransfer ? styles.transferValue : undefined}
+                                        className={
+                                            line.isTransfer ? styles.transferValue : undefined
+                                        }
                                     >
                                         {formatMoney(row.TotalValue)}
                                     </CellAmount>
 
-                                    <Cell>
+                                    <Cell className={styles.statusCell}>
                                         <StatusBadge status={row.Status} kind="inflow" />
+                                        {statusButtonOf(row)}
                                     </Cell>
                                 </TableRow>
                             );
@@ -791,6 +926,87 @@ export function Income() {
                     danger
                     pending={pending}
                 />
+
+                {/* ── Clonar o mês anterior ────────────────────── */}
+                <Modal
+                    open={cloning}
+                    onClose={() => setCloning(false)}
+                    wide
+                    title="Trazer a renda do mês anterior"
+                    subtitle={`${formatMonthLabel(previousMonth)} · marque o que se repete neste mês. Tudo nasce em aberto — nada entra no saldo até você confirmar o recebimento.`}
+                    footer={
+                        <>
+                            <FooterSpacer />
+                            <Button onClick={() => setCloning(false)} disabled={pending}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                variant="primary"
+                                disabled={pending || chosen.length === 0}
+                                onClick={() => void IncomeController.cloneMonth(context, chosen)}
+                            >
+                                {pending
+                                    ? "Trazendo…"
+                                    : `Trazer ${chosen.length} entrada${chosen.length === 1 ? "" : "s"}`}
+                            </Button>
+                        </>
+                    }
+                >
+                    <FormError>{error}</FormError>
+
+                    {previous.isFetching && clonableRows.length === 0 ? (
+                        <LoadingRows rows={4} />
+                    ) : previous.isError ? (
+                        <ErrorState
+                            error={previous.error}
+                            onRetry={() => void previous.refetch()}
+                        />
+                    ) : clonableRows.length === 0 ? (
+                        <EmptyState
+                            icon={<IconCopy />}
+                            title="Nada para trazer"
+                            description={`Não há entrada em ${formatMonthLabel(previousMonth)}. Transferências não entram: elas movem saldo entre contas num dia específico, e repetir isso sozinho seria mexer no dinheiro sem ninguém pedir.`}
+                        />
+                    ) : (
+                        <div className={styles.cloneList}>
+                            {clonableRows.map((row) => {
+                                const to = accountIndex.get(row.IdToAccount);
+                                return (
+                                    /* O `Checkbox` já É um `<label>`: a
+                                       linha inteira vira o rótulo dele,
+                                       e clicar em qualquer ponto marca.
+                                       Envolvê-lo noutro label aninharia
+                                       dois, o que não é HTML válido. */
+                                    <Checkbox
+                                        key={row.IdInflow}
+                                        className={styles.cloneRow}
+                                        checked={chosenIds.includes(row.IdInflow)}
+                                        onChange={() => toggleClone(row.IdInflow)}
+                                        label={
+                                            <>
+                                                <span className={styles.cloneInfo}>
+                                                    <span className={styles.description}>
+                                                        {row.Description}
+                                                    </span>
+                                                    <span className={styles.meta}>
+                                                        {to?.Name ?? "conta arquivada"} ·{" "}
+                                                        {formatDate(row.CompetenceDate)} →{" "}
+                                                        {formatDate(
+                                                            addMonthsToDate(row.CompetenceDate, 1),
+                                                        )}
+                                                    </span>
+                                                </span>
+                                                <span className={styles.cloneValue}>
+                                                    {formatMoney(row.TotalValue)}
+                                                </span>
+                                            </>
+                                        }
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
+                </Modal>
             </Page>
         </>
     );

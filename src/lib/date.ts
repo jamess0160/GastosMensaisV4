@@ -136,6 +136,19 @@ export function addMonths(month: ApiTypes.ReferenceMonth, delta: number): ApiTyp
     return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** O mesmo salto, mas de uma DATA, aparando o dia no mês curto.
+ *
+ *  31/01 mais um mês é 28/02, e nunca 03/03: `new Date(2026, 1, 31)`
+ *  transborda para março sozinho. É o que a clonagem do mês de Renda
+ *  precisa — um salário do dia 31 não pode nascer no dia 3 do mês
+ *  seguinte. */
+export function addMonthsToDate(date: ApiTypes.CalendarDate, delta: number): ApiTypes.CalendarDate {
+    const { year, month, day } = parts(date);
+    // Dia 0 do mês seguinte = último dia do mês de destino.
+    const lastDay = new Date(year, month + delta, 0).getDate();
+    return fromLocalDate(new Date(year, month - 1 + delta, Math.min(day, lastDay)));
+}
+
 /** Todos os dias do mês, em ordem — o eixo X do relatório diário. */
 export function daysOfMonth(month: ApiTypes.ReferenceMonth): ApiTypes.CalendarDate[] {
     const { From, To } = monthRange(month);

@@ -223,3 +223,72 @@
         font-size: 26px;
     }
 }
+
+/* ── Status na linha ──────────────────────────────────────── */
+
+/* A coluna de status carrega o botão que a muda: é onde se age. */
+.statusCell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ── Rodapé da lista de cards ─────────────────────────────── */
+
+/* O par do `TableFoot`, que não existe fora da tabela. */
+.cardFoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 2px 0;
+    font-size: 12px;
+    color: var(--ink-2);
+}
+
+/* ── Escolha da clonagem ──────────────────────────────────── */
+.cloneList {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Cada linha É o rótulo do checkbox — clicar em qualquer ponto marca.
+   O seletor de elemento alcança o `<span>` que o `Checkbox` desenha em
+   volta do rótulo; CSS Modules embaralha classe, não tag. */
+.cloneRow {
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+}
+
+.cloneRow:hover {
+    background: var(--surface-alt);
+}
+
+.cloneRow > span {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cloneInfo {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.cloneValue {
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}

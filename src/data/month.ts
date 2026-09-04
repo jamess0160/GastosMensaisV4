@@ -55,10 +55,20 @@ export function useMonthExpenses(
     });
 }
 
-export function useMonthInflows(month: ApiTypes.ReferenceMonth): UseQueryResult<ApiTypes.Inflow[]> {
+/** `enabled` existe para o mês ANTERIOR: a clonagem de Renda precisa
+ *  dele, e só quando o usuário abre o painel de escolha — buscá-lo a
+ *  cada visita à tela seria uma requisição a mais em toda carga, por um
+ *  botão que quase nunca se clica. Mesma chave de sempre: se o mês
+ *  passado já estiver no cache por ter sido visitado, não há requisição
+ *  nenhuma. */
+export function useMonthInflows(
+    month: ApiTypes.ReferenceMonth,
+    enabled = true,
+): UseQueryResult<ApiTypes.Inflow[]> {
     return useQuery({
         queryKey: queryKeys.inflows(month),
         queryFn: () => InflowsConnection.list(monthRange(month)),
+        enabled,
     });
 }
 

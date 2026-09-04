@@ -310,6 +310,15 @@ export namespace ApiTypes {
         Persons?: SplitInput[];
     }
 
+    /** O corpo do `POST /Inflows/batch` — pendência 15.
+     *
+     *  Cada item é EXATAMENTE o corpo do `POST /Inflows`: o que é 406
+     *  sozinho é 406 no lote. Tudo ou nada numa transaction, que é o que
+     *  impede a clonagem de deixar o mês pela metade. */
+    export interface InflowBatchCreateBody {
+        Inflows: InflowCreateBody[];
+    }
+
     /** Não se edita `Kind`, contas nem `Status`. */
     export interface InflowUpdateBody {
         Description: string;

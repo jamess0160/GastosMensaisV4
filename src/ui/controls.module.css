@@ -337,23 +337,44 @@
         min-width: 0;
     }
 
-    /* Os filtros rolam de lado na sua própria faixa: quebrar em quatro
-       linhas empurraria a lista para fora da tela. */
+    /* OS FILTROS QUEBRAM, não rolam de lado.
+
+       A faixa que rolava vinha de quando cada filtro era uma fila de
+       chips (um por categoria, um por pessoa). Com a multi-seleção da
+       leva 3 virou UMA pílula por filtro, e o conjunto passou a caber
+       em duas ou três linhas — que é melhor do que rolar: filtro que
+       fica fora da tela é filtro que ninguém usa, porque nada indica
+       que ele existe. */
     .filters {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-        padding-bottom: 4px;
+        flex-wrap: wrap;
+        row-gap: 8px;
     }
 
+    /* Os chips de status também quebram: "Todos · Em aberto · Pagos ·
+       Cancelados" mais o rótulo passa de 390px sozinho. */
     .filterGroup {
-        flex-shrink: 0;
+        flex-wrap: wrap;
     }
 
-    /* A busca não entra na faixa que rola: ela toma a linha inteira
-       acima dos chips. Buscar é a primeira coisa que se faz numa lista
-       de telefone, e um campo de 180px espremido entre pílulas não é
-       alvo de dedo. */
+    /* As pílulas CRESCEM para fechar a linha em que caíram.
+
+       Sem isto, "Todos os formatos" sozinho numa linha de 310px deixava
+       160px de branco ao lado — a quebra estava certa (o vizinho não
+       cabia por poucos pixels), o que ficava errado era a sobra. Com o
+       crescimento, cada linha termina rente à borda: sozinha, a pílula
+       ocupa a linha inteira; em par, as duas dividem.
+
+       `flex-basis: auto` (e não 0) de propósito: a quebra continua sendo
+       decidida pelo tamanho do texto, então nada é espremido a ponto de
+       cortar. */
+    .filters > * {
+        flex: 1 1 auto;
+        max-width: 100%;
+    }
+
+    /* A busca toma a linha inteira, acima dos filtros: buscar é a
+       primeira coisa que se faz numa lista de telefone, e um campo de
+       180px espremido entre pílulas não é alvo de dedo. */
     .search {
         width: 100%;
         min-width: 0;
