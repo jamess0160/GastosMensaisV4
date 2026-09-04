@@ -783,6 +783,38 @@ Mesma linha **mais** `Persons`:
 
 **Resposta:** `{ "IdInflow": 1 }`.
 
+### `POST /Inflows/batch`
+
+Grava **N entradas numa transaction só: tudo ou nada.** É a rota da tela de "repetir o mês passado".
+
+**Body**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Inflows` | array | obrigatório, **1 a 100** itens |
+
+**Cada item é exatamente o body do `POST /Inflows`**, validado pelo mesmo schema — o que é `406` sozinho é `406` no lote. Transferência (`Kind: "transfer"`) pode vir no mesmo lote que entrada.
+
+**Resposta `200`**
+
+```json
+{ "msg": "Entradas cadastradas com sucesso", "IdInflows": [12, 13, 14] }
+```
+
+Os ids voltam na **ordem em que você mandou**, para invalidar o cache do mês certo.
+
+**Se um item for recusado, nenhum é gravado** — nem os que estavam certos. A `msg` diz **qual**:
+
+```json
+{ "msg": "Item 2: A soma do rateio precisa fechar exatamente com o valor da entrada." }
+```
+
+`"Item 2"` é o segundo item do array (posição `1`, base 0). Use isso para destacar a linha no formulário.
+
+**Todas nascem `pending`.** Nenhum saldo se move na gravação — é o `receive` de cada uma que faz isso. Por isso a operação é segura de refazer depois de um erro.
+
+> **Não existe `POST /Inflows/clone`, e não vai existir.** Quem escolhe o que copiar do mês anterior é o **usuário**, item a item; o cliente monta as cópias (avança as datas, apara o dia no mês curto, leva o rateio junto) e manda tudo aqui. Como consequência, **idempotência é problema do cliente**: desabilite o botão enquanto a requisição está em voo — repetir o lote cria tudo de novo.
+
 ### `PUT /Inflows/IdInflow=:IdInflow`
 
 | Campo | Regra |
@@ -1205,6 +1237,7 @@ Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de
 | GET | `/Inflows` | 🔒 |
 | GET | `/Inflows/IdInflow=:IdInflow` | 🔒 |
 | POST | `/Inflows` | 🔒 |
+| POST | `/Inflows/batch` | 🔒 |
 | PUT | `/Inflows/IdInflow=:IdInflow` | 🔒 |
 | POST | `/Inflows/IdInflow=:IdInflow/receive` | 🔒 |
 | POST | `/Inflows/IdInflow=:IdInflow/unreceive` | 🔒 |
@@ -1246,6 +1279,24 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-04 — `POST /Inflows/batch`: grava várias entradas de uma vez, tudo ou nada
+
+🟢 **Adição** — ver a seção 10, `/Inflows`.
+
+**O que entrou.** `POST /Inflows/batch`, com `{ "Inflows": [ ...até 100 itens... ] }`. **Cada item é exatamente o body do `POST /Inflows`**, validado pelo mesmo schema. Resposta: `{ msg, IdInflows: [...] }`, com os ids **na ordem em que você mandou**.
+
+**É tudo ou nada.** Um item recusado derruba o lote inteiro — nenhuma linha é gravada, nem as que estavam certas. A `msg` diz qual item foi: `"Item 2: ..."`, contando a partir de 1 (a posição `1` do array). Destaque essa linha no formulário.
+
+**Ação do front:** a tela de "repetir o mês passado" monta as cópias no cliente — escolha do usuário item a item, datas avançadas, dia aparado no mês curto, rateio junto — e manda tudo numa chamada. Depois do `200`, invalide o cache do mês com os `IdInflows` que voltaram.
+
+**Desabilite o botão enquanto a requisição está em voo.** Não há idempotência do lado do servidor e não vai haver: repetir o lote cria tudo de novo. Não existe repetição silenciosa a evitar aqui — só duplo clique, que é do cliente.
+
+**Todas nascem `pending`**, como no `POST` avulso: nenhum saldo se move na gravação, o que torna o erro fácil de refazer.
+
+> **`POST /Inflows/clone` não vai existir.** Ele foi substituído por esta rota: quem escolhe o que clonar é o usuário, e ao servidor sobrou gravar. Fica registrado para ninguém esperar por ele.
+
+**Não mudou:** o `POST /Inflows` avulso, nem nenhuma validação — o schema do item é literalmente o mesmo objeto.
 
 ### 2026-09-04 — `/Inflows`: dá para **desfazer** um recebimento
 

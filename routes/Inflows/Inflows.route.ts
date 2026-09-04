@@ -19,6 +19,11 @@ Inflows_route.get("/Inflows/IdInflow=:IdInflow", Inflows_schema.getUnique, Async
 
 Inflows_route.post("/Inflows", Inflows_schema.create, AsyncHandler(Inflows_controller.create))
 
+//  N entradas numa transaction só, tudo ou nada. É a rota que a tela de "repetir o mês
+//  passado" usa: quem escolhe o que copiar é o usuário, item a item, e o cliente monta as
+//  cópias — ao servidor sobrou gravar. Por isso não existe POST /Inflows/clone.
+Inflows_route.post("/Inflows/batch", Inflows_schema.createBatch, AsyncHandler(Inflows_controller.createBatch))
+
 Inflows_route.put("/Inflows/IdInflow=:IdInflow", Inflows_schema.update, AsyncHandler(Inflows_controller.update))
 
 //  É o recebimento que entra no saldo, não o lançamento.

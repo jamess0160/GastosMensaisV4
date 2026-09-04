@@ -32,6 +32,40 @@ const inflowResponse = Joi.object({
     UpdatedAt: Joi.date().required(),
 })
 
+//  O corpo de uma entrada, num const só, porque ele é usado em dois lugares: o POST avulso e
+//  cada item do POST /Inflows/batch. Um shape paralelo para o lote faria o que é 406 sozinho
+//  passar acompanhado.
+const inflowBody = Joi.object({
+    Description: Joi.string().trim().max(255).required(),
+    //  positive: entrada de valor zero ou negativo é saída, e saída é gasto.
+    TotalValue: Joi.number().precision(2).positive().required(),
+    Kind: kind.default("inflow"),
+    //  O `when` é a primeira barreira das regras do Kind; a segunda é a InflowKind
+    //  section, que é quem sabe se as contas são deste workspace.
+    IdFromAccount: Joi.number().when("Kind", {
+        is: "transfer",
+        then: Joi.required(),
+        //  Em "inflow" o dinheiro veio de fora: aceita o nulo explícito, recusa um id.
+        otherwise: Joi.valid(null).default(null),
+    }),
+    IdToAccount: Joi.number().required(),
+    CompetenceDate: isoDate.required(),
+    ExpectedDate: isoDate.allow(null).default(null),
+    Notes: Joi.string().trim().allow(null).default(null),
+    //  Só em "inflow". O forbidden aqui e a mensagem da section dizem a mesma coisa: a
+    //  transferência não muda o dono do dinheiro, então não há o que ratear.
+    Persons: Joi.array().items(splitItem).when("Kind", {
+        is: "transfer",
+        then: Joi.forbidden(),
+        otherwise: Joi.optional(),
+    }).default([]),
+    //  Sem Status: a entrada nasce pendente, e só receive/cancel a movem.
+})
+
+//  Teto do lote. Um mês de renda tem de cinco a dez linhas; 100 é folga larga e ainda impede
+//  que um corpo montado errado abra uma transaction gigante.
+const batchLimit = 100
+
 class Schema {
 
     public readonly getByWorkspace = [
@@ -62,34 +96,23 @@ class Schema {
     ]
 
     public readonly create = [
-        joiController.validateBody(Joi.object({
-            Description: Joi.string().trim().max(255).required(),
-            //  positive: entrada de valor zero ou negativo é saída, e saída é gasto.
-            TotalValue: Joi.number().precision(2).positive().required(),
-            Kind: kind.default("inflow"),
-            //  O `when` é a primeira barreira das regras do Kind; a segunda é a InflowKind
-            //  section, que é quem sabe se as contas são deste workspace.
-            IdFromAccount: Joi.number().when("Kind", {
-                is: "transfer",
-                then: Joi.required(),
-                //  Em "inflow" o dinheiro veio de fora: aceita o nulo explícito, recusa um id.
-                otherwise: Joi.valid(null).default(null),
-            }),
-            IdToAccount: Joi.number().required(),
-            CompetenceDate: isoDate.required(),
-            ExpectedDate: isoDate.allow(null).default(null),
-            Notes: Joi.string().trim().allow(null).default(null),
-            //  Só em "inflow". O forbidden aqui e a mensagem da section dizem a mesma coisa: a
-            //  transferência não muda o dono do dinheiro, então não há o que ratear.
-            Persons: Joi.array().items(splitItem).when("Kind", {
-                is: "transfer",
-                then: Joi.forbidden(),
-                otherwise: Joi.optional(),
-            }).default([]),
-            //  Sem Status: a entrada nasce pendente, e só receive/cancel a movem.
-        })),
+        joiController.validateBody(inflowBody),
         joiController.validateResponse(Joi.object({
             IdInflow: Joi.number().required(),
+        })),
+    ]
+
+    //  Cada item é o MESMO corpo do POST avulso, validado pelo MESMO schema.
+    public readonly createBatch = [
+        joiController.validateBody(Joi.object({
+            //  min(1): lote vazio não é "nada a fazer", é chamada montada errada — e responder
+            //  200 com lista vazia esconderia isso do cliente.
+            Inflows: Joi.array().items(inflowBody).min(1).max(batchLimit).required(),
+        })),
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+            //  Os ids voltam para o cliente invalidar o cache do mês certo.
+            IdInflows: Joi.array().items(Joi.number()).required(),
         })),
     ]
 

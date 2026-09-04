@@ -3,6 +3,7 @@ import { Remove } from "./sections/DELETE/remove"
 import { GetByWorkspace } from "./sections/GET/getByWorkspace"
 import { GetUnique } from "./sections/GET/getUnique"
 import { Create } from "./sections/POST/create"
+import { CreateBatch } from "./sections/POST/createBatch"
 import { Receive } from "./sections/POST/receive"
 import { Update } from "./sections/PUT/update"
 
@@ -18,6 +19,12 @@ class Controller {
 
     create = async (req: Request, res: Response) => {
         res.json(await new Create().run(res.locals.IdWorkspace, res.locals.IdUser, req.body))
+    }
+
+    //  Os itens saem de dentro da chave Inflows: o corpo é um objeto, não um array solto, para
+    //  caber um campo novo depois sem quebrar quem já chama.
+    createBatch = async (req: Request, res: Response) => {
+        res.json(await new CreateBatch().run(res.locals.IdWorkspace, res.locals.IdUser, req.body.Inflows))
     }
 
     update = async (req: Request, res: Response) => {

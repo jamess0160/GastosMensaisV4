@@ -372,6 +372,173 @@ describe("Inflows", () => {
         })
     })
 
+    describe("POST /Inflows/batch", () => {
+
+        //  Corpo válido de propósito: o schema Joi roda antes do token (AsyncHandler(..., false)
+        //  no joiController), então um corpo inválido responderia 406 sem nunca chegar no 401
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().post(`/Inflows/batch`, {
+                Inflows: [{ Description: "Salário", TotalValue: 100, IdToAccount: 1, CompetenceDate: "2026-08-10" }],
+            })
+
+            expect(response.status).toBe(401)
+        })
+
+        //  Lote vazio não é "nada a fazer": é chamada montada errada, e responder 200 com lista
+        //  vazia esconderia isso do cliente.
+        it("recusa lote vazio", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/Inflows/batch`, { Inflows: [] })
+
+            expect(response.status).toBe(406)
+        })
+
+        it("recusa lote acima de 100 itens", async () => {
+            let workspace = await buildWorkspace()
+
+            let Inflows = Array.from({ length: 101 }, (_, index) => buildBody(workspace, { Description: `Renda ${index}` }))
+
+            let response = await workspace.client.post(`/Inflows/batch`, { Inflows })
+
+            expect(response.status).toBe(406)
+            expect(await countInflows(workspace)).toBe(0)
+        })
+
+        it("cria as três entradas e devolve os três ids", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/Inflows/batch`, {
+                Inflows: [
+                    buildBody(workspace, { Description: "Salário", TotalValue: 3000 }),
+                    buildBody(workspace, { Description: "Aluguel recebido", TotalValue: 800 }),
+                    buildBody(workspace, { Description: "Freela", TotalValue: 450 }),
+                ],
+            })
+
+            expect(response.status).toBe(200)
+            expect(response.body.IdInflows).toHaveLength(3)
+
+            let created = await Promise.all(response.body.IdInflows.map((IdInflow: number) => findInflow(IdInflow)))
+
+            expect(created.map((item) => item.Description)).toEqual(["Salário", "Aluguel recebido", "Freela"])
+            //  Todas nascem pendentes, como no POST avulso: nenhum saldo se move na gravação, e
+            //  é isso que torna a operação segura de repetir
+            expect(created.every((item) => item.Status === "pending")).toBe(true)
+            expect(await accountBalance(workspace)).toBe(1000)
+        })
+
+        //  Cada item é o MESMO corpo do POST avulso, validado pelo MESMO schema: o rateio vem
+        //  junto e fecha com o total, como sozinho
+        it("grava o rateio de cada item", async () => {
+            let workspace = await buildWorkspace()
+            let maria = await createPerson(workspace, "Maria")
+
+            let response = await workspace.client.post(`/Inflows/batch`, {
+                Inflows: [
+                    buildBody(workspace, { TotalValue: 300, Persons: [{ IdPerson: maria, Value: 300 }] }),
+                    buildBody(workspace, { TotalValue: 200 }),
+                ],
+            })
+
+            expect(response.status).toBe(200)
+            expect(await findSplit(response.body.IdInflows[0])).toHaveLength(1)
+            expect(await findSplit(response.body.IdInflows[1])).toHaveLength(0)
+        })
+
+        //  **O teste da etapa.** Tudo ou nada: o item 2 derruba os 3, e o banco fica no estado
+        //  em que estava. É por isso que o miolo passou a receber a transaction.
+        it("derruba o lote inteiro quando um item não fecha o rateio", async () => {
+            let workspace = await buildWorkspace()
+            let maria = await createPerson(workspace, "Maria do lote")
+
+            let response = await workspace.client.post(`/Inflows/batch`, {
+                Inflows: [
+                    buildBody(workspace, { Description: "Primeira" }),
+                    buildBody(workspace, { Description: "Segunda", TotalValue: 200, Persons: [{ IdPerson: maria, Value: 150 }] }),
+                    buildBody(workspace, { Description: "Terceira" }),
+                ],
+            })
+
+            expect(response.status).toBe(406)
+            expect(await countInflows(workspace)).toBe(0)
+        })
+
+        //  "O rateio não fecha com o total", sem dizer qual das linhas, é um erro que o usuário
+        //  não consegue consertar — ele teria que conferir todas à mão
+        it("diz qual item foi recusado", async () => {
+            let workspace = await buildWorkspace()
+            let maria = await createPerson(workspace, "Maria do índice")
+
+            let response = await workspace.client.post(`/Inflows/batch`, {
+                Inflows: [
+                    buildBody(workspace, { Description: "Primeira" }),
+                    buildBody(workspace, { Description: "Segunda", TotalValue: 200, Persons: [{ IdPerson: maria, Value: 150 }] }),
+                ],
+            })
+
+            expect(response.status).toBe(406)
+            expect(response.body.msg).toContain("Item 2")
+        })
+
+        //  A conta chega do cliente e é sequencial: o lote não pode ser a porta de trás por onde
+        //  se lança na conta do vizinho
+        it("derruba o lote quando um item aponta para a conta de outro workspace", async () => {
+            let workspace = await buildWorkspace()
+            let other = await buildWorkspace()
+
+            let response = await workspace.client.post(`/Inflows/batch`, {
+                Inflows: [
+                    buildBody(workspace, { Description: "Legítima" }),
+                    buildBody(workspace, { Description: "Da conta alheia", IdToAccount: other.IdAccount }),
+                ],
+            })
+
+            expect(response.status).toBe(406)
+            expect(await countInflows(workspace)).toBe(0)
+            expect(await countInflows(other)).toBe(0)
+        })
+
+        //  O que é 406 sozinho é 406 no lote: o schema é o mesmo, e é essa a decisão inteira
+        it("recusa um item com corpo inválido, sem gravar os outros", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/Inflows/batch`, {
+                Inflows: [
+                    buildBody(workspace),
+                    buildBody(workspace, { TotalValue: -50 }),
+                ],
+            })
+
+            expect(response.status).toBe(406)
+            expect(await countInflows(workspace)).toBe(0)
+        })
+
+        //  Transferência é um Kind da mesma tabela, então cabe no mesmo lote
+        it("aceita transferência junto com entrada no mesmo lote", async () => {
+            let workspace = await buildWorkspace()
+            let second = await createAccount(workspace, "Poupança do lote")
+
+            let response = await workspace.client.post(`/Inflows/batch`, {
+                Inflows: [
+                    buildBody(workspace, { Description: "Salário" }),
+                    buildBody(workspace, {
+                        Description: "Para a poupança",
+                        Kind: "transfer",
+                        IdFromAccount: workspace.IdAccount,
+                        IdToAccount: second,
+                    }),
+                ],
+            })
+
+            expect(response.status).toBe(200)
+
+            let created = await Promise.all(response.body.IdInflows.map((IdInflow: number) => findInflow(IdInflow)))
+
+            expect(created.map((item) => item.Kind)).toEqual(["inflow", "transfer"])
+        })
+    })
+
     describe("PUT /Inflows/IdInflow=:IdInflow", () => {
 
         it("recusa sem token", async () => {
@@ -970,6 +1137,12 @@ async function listAccounts(workspace: TestWorkspace) {
     let response = await workspace.client.get(`/Accounts`)
 
     return Object.fromEntries(response.body.map((item: { IdAccount: number, Balance: number }) => [item.IdAccount, item.Balance])) as Record<number, number>
+}
+
+async function countInflows(workspace: TestWorkspace) {
+    let rows = await TestDatabase.connection().select("*").from("Inflows").where("IdWorkspace", workspace.user.workspace.IdWorkspace)
+
+    return rows.length
 }
 
 function findInflow(IdInflow: number) {

@@ -1,12 +1,14 @@
 import { WorkspacesAcessControl } from "root/routes/Workspaces/sections/AcessControl.section"
 import { KnexTransaction } from "root/Utils/Connections/Knex/KnexConnection"
-import { class_Inflows_model } from "../../Inflows.model"
-import { class_InflowPersons_model } from "../../InflowPersons.model"
 import { InflowKind } from "../InflowKind.section"
 import { InflowSplit } from "../InflowSplit.section"
 import { InflowsNamespace } from "../types"
+import { CreateOne } from "./createOne"
 
 //  Cria a entrada **ou** a transferência, com o rateio, numa transaction só.
+//
+//  Aqui ficam a autorização e as conferências; a escrita mesma é a CreateOne, que recebe a
+//  transaction e por isso serve tanto a esta rota quanto ao lote (POST /Inflows/batch).
 //
 //  Nasce sempre 'pending': receber é uma ação à parte (POST .../receive), porque é o
 //  recebimento que move o saldo. Lançar já recebido seria misturar as duas coisas — e o saldo
@@ -21,21 +23,8 @@ export class Create {
         await InflowKind.assertAccounts(IdWorkspace, body)
         await InflowSplit.assertSplit(IdWorkspace, body.Kind, body.TotalValue, body.Persons)
 
-        let { Persons, ...inflow } = body
-
         return await KnexTransaction(async (tx) => {
-            let IdInflow = await new class_Inflows_model(tx).create({
-                ...inflow,
-                IdWorkspace,
-                //  Autoria do lançamento; o dono do dado é o workspace.
-                IdUser,
-                //  Em 'inflow' o dinheiro veio de fora: a coluna existe, mas fica nula.
-                IdFromAccount: inflow.Kind === "transfer" ? inflow.IdFromAccount : null,
-            }).returnId("IdInflow")
-
-            if (Persons.length) {
-                await new class_InflowPersons_model(tx).create(Persons.map((person) => ({ ...person, IdWorkspace, IdInflow })))
-            }
+            let IdInflow = await new CreateOne(tx).run(IdWorkspace, IdUser, body)
 
             return { IdInflow }
         })
