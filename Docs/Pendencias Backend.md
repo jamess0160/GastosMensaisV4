@@ -597,8 +597,10 @@ defensiva e sem mapa de campo antigo.
    acontecer é virarem obrigatórios.
 
 **Estado no frontend.** Removidos do formulário, da linha que os exibia e
-dos tipos `PaymentMethodCreateBody` / `PaymentMethodUpdateBody` em
-`src/types/api.ts`. Como no item 10, cliente e contrato divergem até o
+dos tipos em `src/types/api.ts` — dos dois corpos
+(`PaymentMethodCreateBody` / `PaymentMethodUpdateBody`) **e também de
+`PaymentMethod`**, o tipo de leitura: enquanto a resposta ainda os
+trouxer, eles são campo extra que o cliente nem declara. Como no item 10, cliente e contrato divergem até o
 documento ser atualizado — a fonte da verdade é este item.
 
 ---

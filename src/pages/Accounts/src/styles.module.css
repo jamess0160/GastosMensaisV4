@@ -218,3 +218,26 @@
         padding: 18px;
     }
 }
+
+/* ── Lista de cards (mobile) ──────────────────────────────── */
+
+/* As duas ações da conta ficam sob o saldo, na coluna direita do
+   cartão. */
+.cardActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* O par do rodapé da tabela — a linha de total, que fora dela não
+   existe. */
+.cardFoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 2px 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink-2);
+}

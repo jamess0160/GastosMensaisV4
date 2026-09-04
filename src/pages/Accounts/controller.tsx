@@ -25,8 +25,6 @@ export interface CardDraft {
     Name: string;
     ClosingDay: number;
     DueDay: number;
-    Brand: string;
-    LastDigits: string;
     Color: ApiTypes.Color | null;
 }
 

@@ -141,17 +141,7 @@ describe("saveCard", () => {
         expect(context.beginSubmit).not.toHaveBeenCalled();
     });
 
-    it("recusa últimos dígitos que não sejam 4 números", async () => {
-        const context = fakeAccountsContext({ cardDraft: aCardDraft({ LastDigits: "12" }) });
-
-        await saveCard(context);
-
-        expect(context.failSubmit).toHaveBeenCalledWith(
-            "Os últimos dígitos são exatamente 4 números.",
-        );
-    });
-
-    it("manda null nos opcionais vazios, e não string vazia", async () => {
+    it("não manda bandeira nem final do cartão — eles saíram do cadastro", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
             msw.post("*/api/PaymentMethods", async ({ request }) => {
@@ -160,11 +150,9 @@ describe("saveCard", () => {
             }),
         );
 
-        await saveCard(
-            fakeAccountsContext({ cardDraft: aCardDraft({ Brand: "", LastDigits: "" }) }),
-        );
+        await saveCard(fakeAccountsContext({ cardDraft: aCardDraft() }));
 
-        expect(body?.Brand).toBeNull();
-        expect(body?.LastDigits).toBeNull();
+        expect(body).not.toHaveProperty("Brand");
+        expect(body).not.toHaveProperty("LastDigits");
     });
 });

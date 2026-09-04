@@ -18,8 +18,6 @@ export const aCardDraft = (overrides: Partial<CardDraft> = {}): CardDraft => ({
     Name: "Cartão Roxo",
     ClosingDay: 20,
     DueDay: 27,
-    Brand: "Mastercard",
-    LastDigits: "1234",
     Color: null,
     ...overrides,
 });

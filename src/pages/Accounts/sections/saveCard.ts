@@ -12,6 +12,11 @@ import type { AccountsContext } from "../controller";
  *  significado de todas as compras já lançadas nele. É por isso que o
  *  corpo do PUT abaixo é menor que o do POST, e não por esquecimento.
  *
+ *  Bandeira e final do cartão SAÍRAM (pendência 16): não entram em
+ *  regra nenhuma do sistema, e "últimos 4 dígitos" é dado de cartão
+ *  guardado à toa. Não há leitura defensiva nem campo legado — o banco
+ *  é ajustado junto.
+ *
  *  `ClosingDay` e `DueDay` são obrigatórios no cartão, e mandar `null`
  *  neles no PUT responde 406 — daí a conferência local antes. Eles não
  *  são detalhe: em cartão, um dia de diferença na compra vira um mês de
@@ -32,20 +37,12 @@ export async function saveCard(context: AccountsContext): Promise<void> {
         context.failSubmit("O dia de vencimento vai de 1 a 31.");
         return;
     }
-    // A API pede exatamente 4 dígitos quando o campo vem preenchido.
-    if (draft.LastDigits && !/^\d{4}$/.test(draft.LastDigits)) {
-        context.failSubmit("Os últimos dígitos são exatamente 4 números.");
-        return;
-    }
-
     context.beginSubmit();
 
     const common = {
         Name: draft.Name.trim(),
         ClosingDay: draft.ClosingDay,
         DueDay: draft.DueDay,
-        Brand: draft.Brand.trim() || null,
-        LastDigits: draft.LastDigits || null,
         Color: draft.Color,
     };
 

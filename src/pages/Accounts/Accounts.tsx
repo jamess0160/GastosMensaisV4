@@ -7,7 +7,7 @@ import {
     type CardDraft,
 } from "./controller";
 import { useAccounts, useInvalidateCatalogs } from "@/data/catalogs";
-import { Button, Card, Overline, PageHead, Workspace as Page } from "@/ui/primitives";
+import { Badge, Button, Card, Overline, PageHead, Workspace as Page } from "@/ui/primitives";
 import {
     FormError,
     FormField,
@@ -31,9 +31,11 @@ import {
     TableHead,
     TableRow,
 } from "@/ui/table";
+import { CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import { totalBalance } from "@/lib/aggregate";
 import { accentColor } from "@/lib/categoryColor";
+import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatMoney } from "@/lib/money";
 import { today } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
@@ -67,9 +69,20 @@ const newCardDraft = (idAccount: number): CardDraft => ({
     Name: "",
     ClosingDay: 20,
     DueDay: 27,
-    Brand: "",
-    LastDigits: "",
     Color: null,
+});
+
+/** O rascunho de edição de uma conta — a tabela e a lista de cards
+ *  abrem o mesmo. `balanceFrozen`: saldo diferente do inicial quer dizer
+ *  que já houve lançamento, e aí a API congela o campo. */
+const editDraft = (account: ApiTypes.Account): AccountDraft => ({
+    IdAccount: account.IdAccount,
+    Name: account.Name,
+    Type: account.Type,
+    Color: account.Color,
+    InitialBalance: account.InitialBalance,
+    InitialBalanceDate: account.InitialBalanceDate,
+    balanceFrozen: account.Balance !== account.InitialBalance,
 });
 
 function MethodChip({ method }: { method: ApiTypes.PaymentMethod }) {
@@ -90,6 +103,7 @@ function MethodChip({ method }: { method: ApiTypes.PaymentMethod }) {
 }
 
 export function Accounts() {
+    const isMobile = useIsMobile();
     const accounts = useAccounts();
     const invalidateCatalogs = useInvalidateCatalogs();
 
@@ -213,6 +227,65 @@ export function Accounts() {
                         </Button>
                     }
                 />
+            ) : isMobile ? (
+                <CardList>
+                    {active.map((account) => (
+                        <ItemCard
+                            key={account.IdAccount}
+                            onClick={() => setOpenAccount(account.IdAccount)}
+                            label={`Abrir ${account.Name}`}
+                            title={
+                                <>
+                                    <span
+                                        className={styles.mark}
+                                        style={{ background: accentColor(account.Color) }}
+                                    >
+                                        {initials(account.Name)}
+                                    </span>
+                                    {account.Name}
+                                </>
+                            }
+                            badges={<Badge>{TYPE_LABEL[account.Type]}</Badge>}
+                            meta={account.PaymentMethods.filter((method) => method.Active).map(
+                                (method) => (
+                                    <MethodChip key={method.IdPaymentMethod} method={method} />
+                                ),
+                            )}
+                            amount={formatMoney(account.Balance)}
+                            trailing={
+                                <span className={styles.cardActions}>
+                                    <IconButton
+                                        label="Editar conta"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            setAccountDraft(editDraft(account));
+                                        }}
+                                    >
+                                        <IconEdit />
+                                    </IconButton>
+                                    <IconButton
+                                        label="Arquivar conta"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            setArchiving({
+                                                kind: "account",
+                                                id: account.IdAccount,
+                                                name: account.Name,
+                                            });
+                                        }}
+                                    >
+                                        <IconArchive />
+                                    </IconButton>
+                                </span>
+                            }
+                        />
+                    ))}
+
+                    <div className={styles.cardFoot}>
+                        <span>Total · {active.length} contas</span>
+                        <b>{formatMoney(balance)}</b>
+                    </div>
+                </CardList>
             ) : (
                 <Table columns="minmax(0,1.4fr) 130px minmax(0,1.1fr) 150px 100px">
                     <TableHead>
@@ -269,18 +342,7 @@ export function Accounts() {
                                         label="Editar conta"
                                         onClick={(event) => {
                                             event.stopPropagation();
-                                            setAccountDraft({
-                                                IdAccount: account.IdAccount,
-                                                Name: account.Name,
-                                                Type: account.Type,
-                                                Color: account.Color,
-                                                InitialBalance: account.InitialBalance,
-                                                InitialBalanceDate: account.InitialBalanceDate,
-                                                // Saldo diferente do inicial = já houve
-                                                // lançamento, e a API congela o campo.
-                                                balanceFrozen:
-                                                    account.Balance !== account.InitialBalance,
-                                            });
+                                            setAccountDraft(editDraft(account));
                                         }}
                                     >
                                         <IconEdit />
@@ -400,12 +462,8 @@ export function Accounts() {
                                             <IconCard />
                                         </span>
                                         <div className={styles.cardBody}>
-                                            <div className={styles.cardName}>
-                                                {method.Name}
-                                                {method.LastDigits && ` ····${method.LastDigits}`}
-                                            </div>
+                                            <div className={styles.cardName}>{method.Name}</div>
                                             <div className={styles.cardSub}>
-                                                {method.Brand ? `${method.Brand} · ` : ""}
                                                 fecha dia {method.ClosingDay} · vence dia{" "}
                                                 {method.DueDay}
                                             </div>
@@ -419,8 +477,6 @@ export function Accounts() {
                                                     Name: method.Name,
                                                     ClosingDay: method.ClosingDay ?? 1,
                                                     DueDay: method.DueDay ?? 1,
-                                                    Brand: method.Brand ?? "",
-                                                    LastDigits: method.LastDigits ?? "",
                                                     Color: method.Color,
                                                 })
                                             }
@@ -645,47 +701,6 @@ export function Accounts() {
                                             setCardDraft((c) =>
                                                 c
                                                     ? { ...c, DueDay: Number(event.target.value) }
-                                                    : c,
-                                            )
-                                        }
-                                    />
-                                )}
-                            </FormField>
-                        </FormGrid>
-
-                        <FormGrid columns={2}>
-                            <FormField label="Bandeira">
-                                {(field) => (
-                                    <Input
-                                        {...field}
-                                        maxLength={100}
-                                        placeholder="Mastercard"
-                                        value={cardDraft.Brand}
-                                        onChange={(event) =>
-                                            setCardDraft((c) =>
-                                                c ? { ...c, Brand: event.target.value } : c,
-                                            )
-                                        }
-                                    />
-                                )}
-                            </FormField>
-                            <FormField label="Últimos 4 dígitos">
-                                {(field) => (
-                                    <Input
-                                        {...field}
-                                        inputMode="numeric"
-                                        maxLength={4}
-                                        placeholder="1234"
-                                        value={cardDraft.LastDigits}
-                                        onChange={(event) =>
-                                            setCardDraft((c) =>
-                                                c
-                                                    ? {
-                                                          ...c,
-                                                          LastDigits: event.target.value
-                                                              .replace(/\D/g, "")
-                                                              .slice(0, 4),
-                                                      }
                                                     : c,
                                             )
                                         }
