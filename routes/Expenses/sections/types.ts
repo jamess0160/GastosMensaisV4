@@ -47,10 +47,8 @@ export namespace ExpensesNamespace {
         InstallmentTotal?: number
         /** Só em Kind='fixed': dia do mês da cobrança. */
         RecurrenceDay?: number
-        /** Só em Kind='fixed'. Nulo = série sem fim (limitada pela janela gerada). */
+        /** Só em Kind='fixed'. Nulo = série sem fim (limitada pela janela do servidor). */
         RecurrenceEndDate?: string | null
-        /** Só em Kind='fixed': quantas ocorrências gerar de uma vez, contando a raiz. */
-        Occurrences?: number
     }
 
     //  Sem Kind, sem Status e sem os campos de recorrência: o formato do gasto não muda depois

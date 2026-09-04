@@ -564,7 +564,9 @@ describe("Expenses", () => {
                 TotalValue: 1500,
                 Kind: "fixed",
                 ExpenseDate: "2026-08-05",
-                Occurrences: 3,
+                //  Sem Occurrences no corpo: quem corta a serie antes da janela do servidor
+                //  e a data de fim, e ela e a unica das duas que o cliente escolhe.
+                RecurrenceEndDate: "2026-10-31",
             })
 
             expect(created.Occurrences).toBe(3)
@@ -584,6 +586,36 @@ describe("Expenses", () => {
             }
         })
 
+        //  A janela é do SERVIDOR, não do corpo: 12 ocorrências contando a raiz. Sem data de
+        //  fim é ela que limita a série — a recorrência nunca fica aberta, nem antes ficava.
+        //  A tela não precisa saber esse número antes de salvar: pergunta gravando.
+        it("cria a janela do servidor quando não há data de fim, e devolve quantas nasceram", async () => {
+            let workspace = await buildWorkspace()
+
+            let created = await createExpense(workspace, {
+                Description: "Streaming",
+                Kind: "fixed",
+                ExpenseDate: "2026-08-05",
+            })
+
+            expect(created.Occurrences).toBe(12)
+            expect(await findSeries(created.IdExpense)).toHaveLength(12)
+        })
+
+        //  O campo saiu do corpo, e mandá-lo tem que falhar alto: um cliente antigo que
+        //  continuasse enviando 60 receberia 12 em silêncio e mostraria o número errado.
+        it("recusa Occurrences no corpo", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
+                Kind: "fixed",
+                ExpenseDate: "2026-08-05",
+                Occurrences: 3,
+            }))
+
+            expect(response.status).toBe(406)
+        })
+
         //  O dia 31 não existe em todo mês: sem grampear, a recorrência sumiria em fevereiro
         it("grampeia o dia da recorrência no fim do mês curto", async () => {
             let workspace = await buildWorkspace()
@@ -591,7 +623,7 @@ describe("Expenses", () => {
             let created = await createExpense(workspace, {
                 Kind: "fixed",
                 ExpenseDate: "2026-01-31",
-                Occurrences: 3,
+                RecurrenceEndDate: "2026-03-31",
             })
 
             expect((await findSeries(created.IdExpense)).map((item) => item.ExpenseDate)).toEqual([
@@ -605,7 +637,6 @@ describe("Expenses", () => {
             let created = await createExpense(workspace, {
                 Kind: "fixed",
                 ExpenseDate: "2026-08-05",
-                Occurrences: 12,
                 RecurrenceEndDate: "2026-10-31",
             })
 
@@ -619,7 +650,7 @@ describe("Expenses", () => {
             let created = await createExpense(workspace, {
                 Kind: "fixed",
                 ExpenseDate: "2026-08-05",
-                Occurrences: 3,
+                RecurrenceEndDate: "2026-10-31",
                 Paid: true,
             })
 
@@ -893,7 +924,7 @@ describe("Expenses", () => {
                 TotalValue: 1500,
                 Kind: "fixed",
                 ExpenseDate: "2026-08-05",
-                Occurrences: 4,
+                RecurrenceEndDate: "2026-11-30",
             })
 
             let series = await findSeries(created.IdExpense)
@@ -925,7 +956,7 @@ describe("Expenses", () => {
                 TotalValue: 100,
                 Kind: "fixed",
                 ExpenseDate: "2026-08-05",
-                Occurrences: 3,
+                RecurrenceEndDate: "2026-10-31",
             })
 
             await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}/series`, {
@@ -946,7 +977,7 @@ describe("Expenses", () => {
                 TotalValue: 100,
                 Kind: "fixed",
                 ExpenseDate: "2026-08-05",
-                Occurrences: 2,
+                RecurrenceEndDate: "2026-09-30",
             })
 
             let response = await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}/series`, {
@@ -985,7 +1016,7 @@ describe("Expenses", () => {
                 Description: "Assinatura",
                 Kind: "fixed",
                 ExpenseDate: "2026-08-05",
-                Occurrences: 4,
+                RecurrenceEndDate: "2026-11-30",
             })
 
             let series = await findSeries(created.IdExpense)
@@ -1008,7 +1039,7 @@ describe("Expenses", () => {
             let created = await createExpense(workspace, {
                 Kind: "fixed",
                 ExpenseDate: "2026-08-05",
-                Occurrences: 3,
+                RecurrenceEndDate: "2026-10-31",
             })
 
             let response = await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}/series`)
@@ -1023,7 +1054,7 @@ describe("Expenses", () => {
             let created = await createExpense(workspace, {
                 Kind: "fixed",
                 ExpenseDate: "2026-08-05",
-                Occurrences: 2,
+                RecurrenceEndDate: "2026-09-30",
             })
 
             await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}/series`)
@@ -1113,7 +1144,7 @@ describe("Expenses", () => {
                 Kind: "fixed",
                 IdCategory: category.body.IdCategory,
                 ExpenseDate: "2026-08-05",
-                Occurrences: 3,
+                RecurrenceEndDate: "2026-10-31",
                 Payments: [{ IdPaymentMethod: debit, Value: 1500 }],
             })
 

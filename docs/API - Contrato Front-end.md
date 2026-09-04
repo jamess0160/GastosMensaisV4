@@ -835,11 +835,13 @@ Um gasto tem **dois rateios independentes que nunca se cruzam**:
 |---|---|---|
 | `single` | Compra à vista | — |
 | `installment` | 600 em 6× → **6 pernas de 100** | `InstallmentTotal` (2–120) |
-| `fixed` | Corrente de ocorrências **reais** | `RecurrenceDay`, `RecurrenceEndDate`, `Occurrences` |
+| `fixed` | Corrente de ocorrências **reais** | `RecurrenceDay`, `RecurrenceEndDate` |
 
 `installment` aceita **uma única perna** (uma forma de pagamento). O `TotalValue` continua sendo o **total da compra**, nunca o da parcela — e o centavo que sobra vai na **primeira** parcela.
 
 `fixed` **não é molde + instâncias**: toda linha é um gasto de verdade. A raiz tem `IdParentExpense: null` e carrega a recorrência; as geradas apontam para ela.
+
+**Quantas nascem é decisão do servidor:** a janela é de **12 ocorrências**, contando a raiz, e não há campo para mudá-la. O que limita a série é essa janela **ou** o `RecurrenceEndDate` — o que vier primeiro. A recorrência nunca fica aberta. Você não precisa saber esse número antes de salvar: o `POST` responde `Occurrences` com quantas nasceram.
 
 ### 11.3 `Status` é derivado — nunca envie
 
@@ -940,14 +942,13 @@ A mesma linha **mais os três filhos**:
 | `Tags` | `string[]` | default `[]`. **Texto, não id** — ≤100 cada |
 | `InstallmentTotal` | int 2–120 | **só** em `installment`: obrigatório lá, **proibido** nos outros |
 | `RecurrenceDay` | int 1–31 | **só** em `fixed`, opcional (sem ele vale o dia da compra) |
-| `RecurrenceEndDate` | CalendarDate \| null | **só** em `fixed` |
-| `Occurrences` | int 1–60 | **só** em `fixed`, default **12** |
+| `RecurrenceEndDate` | CalendarDate \| null | **só** em `fixed` — corta a série antes da janela do servidor |
 
 `Paid: true` é o caso do débito, que já sai pago no ato; no cartão a perna fica em aberto e se quita pela rota da perna.
 
 **`Tags` é texto puro.** A API reusa a tag existente (ignorando maiúsculas), desarquiva a arquivada ou insere a nova — tudo dentro da transaction do gasto. É o **único** lugar em que uma tag nasce.
 
-`Status` **não é aceito**.
+`Status` **não é aceito**. **`Occurrences` também não** — mandá-lo responde `406`; ele só existe na resposta.
 
 **Resposta**
 
@@ -955,7 +956,7 @@ A mesma linha **mais os três filhos**:
 { "IdExpense": 1, "Occurrences": 12 }
 ```
 
-`Occurrences` = quantas linhas de gasto nasceram: `1`, ou a série inteira em `fixed`.
+`Occurrences` = quantas linhas de gasto nasceram: `1`, ou a série inteira em `fixed` (a janela de 12, ou menos se o `RecurrenceEndDate` cortar antes).
 
 ### `PUT /Expenses/IdExpense=:IdExpense`
 
@@ -1230,6 +1231,20 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-04 — `POST /Expenses`: `Occurrences` sai do corpo e a janela do gasto fixo passa a ser do servidor
+
+🔴 **Quebra** — ver a seção 11, `/Expenses`.
+
+**O que quebrou.** `POST /Expenses` **não aceita mais `Occurrences`**. Mandar o campo agora responde `406` (`"Dados de entrada inválidos."`), inclusive com o valor que era o default.
+
+**O que entrou no lugar.** A janela virou **constante do servidor: 12 ocorrências, contando a raiz.** O que limita a série passa a ser essa janela **ou** o `RecurrenceEndDate`, o que vier primeiro — e o `RecurrenceEndDate` continua no corpo, igual. A recorrência **não** fica aberta; nem antes ficava.
+
+**A resposta não muda.** `POST /Expenses` continua devolvendo `{ IdExpense, Occurrences }`, e `Occurrences` continua sendo quantas linhas de gasto nasceram. O mesmo vale para `PUT .../series`.
+
+**Ação do front:** parar de enviar `Occurrences` — quem já parou não precisa fazer nada. Continue lendo o número **da resposta** para dizer quantas ocorrências foram criadas; a tela não precisa saber a janela antes de salvar, ela pergunta gravando. Se você quer uma série mais curta, mande `RecurrenceEndDate`.
+
+**Por que mudou.** Quantas ocorrências nascem de uma vez é regra de domínio, não escolha de quem lança um gasto: quem cadastra um aluguel quer "todo mês", não "doze". Enquanto o campo existia no contrato e o cliente não o mandava, quem lesse o contrato para escrever tela nova escreveria errado.
 
 ### 2026-09-04 — `POST /Users`: `IdWorkspace` sai do cadastro; entrar em workspace alheio agora exige **convite**
 

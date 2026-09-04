@@ -16,6 +16,16 @@ import { ExpensesNamespace } from "../types"
 //  consulta sem depender de agendador, e estender a série é uma edição, não uma rotina.
 export class CreateSeries {
 
+    //  Quantas ocorrências nascem de uma vez, contando a raiz.
+    //
+    //  Constante do servidor, e não campo do corpo: é regra de domínio, não escolha de quem
+    //  lança — quem cria um gasto fixo quer "todo mês", não "doze". E não vai para o
+    //  constants.json pelo mesmo motivo: não é flag de runtime, é regra, e regra mora ao lado
+    //  do código que a aplica.
+    //
+    //  O que limita a série é ESTA janela **ou** o RecurrenceEndDate, o que vier primeiro.
+    private static readonly OCCURRENCE_WINDOW = 12
+
     private readonly CreateOne: CreateOne
 
     constructor(tx: Knex.Transaction) {
@@ -55,7 +65,7 @@ export class CreateSeries {
 
         let dates = [body.ExpenseDate]
 
-        for (let index = 1; index < body.Occurrences!; index++) {
+        for (let index = 1; index < CreateSeries.OCCURRENCE_WINDOW; index++) {
             let date = Utils.setDayOfMonth(Utils.addMonthsToDate(body.ExpenseDate, index), RecurrenceDay)
 
             //  A série pode acabar antes da janela pedida.

@@ -134,14 +134,13 @@ class Schema {
                 then: Joi.optional(),
                 otherwise: Joi.forbidden(),
             }),
-            //  Quantas ocorrências gerar de uma vez, contando a raiz. Janela finita e explícita:
-            //  gerar à frente entrega o mês seguinte já visível sem depender de agendador, e o
-            //  teto existe para um erro de digitação não criar dez anos de gasto.
-            Occurrences: Joi.number().integer().min(1).max(60).when("Kind", {
-                is: "fixed",
-                then: Joi.number().default(12),
-                otherwise: Joi.forbidden(),
-            }),
+            //  Sem Occurrences: quantas ocorrências nascem de uma vez é regra do servidor, não
+            //  escolha de quem lança — a constante mora em sections/POST/createSeries.ts, junto
+            //  do código que a usa. Mandar o campo é 406, pelo unknown do Joi.
+            //
+            //  Ele continua na RESPOSTA: a tela não precisa saber a janela antes de salvar, ela
+            //  pergunta gravando e o servidor responde quantas nasceram.
+            //
             //  Sem Status: ele é derivado das pernas.
         })),
         joiController.validateResponse(Joi.object({
