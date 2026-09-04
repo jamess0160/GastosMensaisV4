@@ -18,8 +18,9 @@ import type { ApiTypes } from "@/types/api";
      o branco da superfície, e `--cat-grafite` tem croma quase zero (lê
      como cinza). A resposta é estrutural, não cromática: todo gráfico
      deste projeto sai com RÓTULO DIRETO e legenda com valor, e nunca
-     identifica uma fatia só pela cor. Ver `ChartLegend` em
-     src/ui/charts.tsx.
+     identifica uma fatia só pela cor. Ver o donut de
+     src/pages/Report/Report.tsx, que rotula a fatia com nome e
+     porcentagem além da legenda.
    - Trocar os hexadecimais resolveria os dois de uma vez, mas o
      relatório passaria a usar cor que não existe no resto do sistema.
      Isso é conversa com o layout, não decisão do cliente.

@@ -159,7 +159,7 @@ function Combobox<T extends string | number>({
     const isMobile = useIsMobile();
     const asSheet = Boolean(sheetOnMobile) && isMobile;
 
-    const position = useAnchoredPosition(open && !asSheet, triggerRef);
+    const position = useAnchoredPosition(open && !asSheet, triggerRef, popupRef);
 
     const openList = (startFrom?: number) => {
         if (disabled) return;
@@ -516,6 +516,7 @@ export function MultiSelect<T extends string | number>({
 function useAnchoredPosition(
     open: boolean,
     triggerRef: React.RefObject<HTMLElement>,
+    popupRef: React.RefObject<HTMLElement>,
 ): CSSProperties | undefined {
     const [style, setStyle] = useState<CSSProperties>();
 
@@ -532,14 +533,37 @@ function useAnchoredPosition(
             const above = anchor.top - gap - margin;
             const up = below < 180 && above > below;
 
-            /* A pílula de filtro é estreita ("Fixo"), e a lista dela traz
-               nomes longos ("Todas as formas de pagamento") — daí o piso
-               de largura, que não vale para o campo largo do formulário. */
-            const width = Math.max(anchor.width, 220);
+            /* A LISTA SE MEDE PELO TEXTO, não pelo gatilho.
+        
+               A pílula de filtro é estreita ("Fixo"), e a lista dela traz
+               nomes que não cabem ali — "Nubank Tiago · Crédito #1". Com
+               largura fixa no gatilho, todo nome longo virava reticência
+               e o filtro ficava impossível de usar.
+
+               Por isso não há `width` nenhum aqui: `position: fixed` sem
+               largura encolhe até o conteúdo, e o que a gente manda são
+               só os LIMITES — um piso, para a lista não ficar mais
+               estreita que o gatilho, e um teto, para ela não passar da
+               janela. */
+            const minWidth = Math.max(anchor.width, 220);
+            const maxWidth = window.innerWidth - 2 * margin;
+
+            /* A largura já renderizada é o que decide se a lista cabe a
+               partir da esquerda do gatilho. Na primeira passada o painel
+               já está no DOM (o efeito é de layout, roda depois da
+               montagem e antes da pintura), então a medida é real. */
+            const measured = Math.min(
+                Math.max(popupRef.current?.offsetWidth ?? 0, minWidth),
+                maxWidth,
+            );
 
             setStyle({
-                left: Math.max(margin, Math.min(anchor.left, window.innerWidth - width - margin)),
-                width,
+                left: Math.max(
+                    margin,
+                    Math.min(anchor.left, window.innerWidth - measured - margin),
+                ),
+                minWidth,
+                maxWidth,
                 maxHeight: Math.max(140, Math.min(300, up ? above : below)),
                 ...(up
                     ? { bottom: window.innerHeight - anchor.top + gap }
@@ -555,7 +579,7 @@ function useAnchoredPosition(
             window.removeEventListener("scroll", place, true);
             window.removeEventListener("resize", place);
         };
-    }, [open, triggerRef]);
+    }, [open, triggerRef, popupRef]);
 
     return style;
 }

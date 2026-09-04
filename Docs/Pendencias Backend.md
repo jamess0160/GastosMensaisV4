@@ -436,6 +436,16 @@ Relacionado ao item [3](#3-agregados-do-mês-para-o-dashboard): se os
 agregados do mês vierem do servidor, esta rota é a que sobra para as
 telas de lista, que precisam da linha e não só do total.
 
+**O Relatório multiplicou este custo.** Desde a leva 3 ele olha
+PERÍODO, não mês (`useRangeLegs`), e resolve cada mês do intervalo pelo
+mesmo caminho: lista, busca de parcelamentos abertos e um `get(id)` por
+parcelado. Um período de doze meses é uma dúzia de vezes o custo de uma
+tela de mês. O cliente segura o que dá — o preset padrão é curto (o mês
+corrente), o cache é por mês e reaproveitado entre as telas, e destino e
+forma de pagamento só disparam `get(id)` quando esses filtros estão em
+uso. Mas a proposta 2 acima resolveria o Relatório inteiro com UMA
+requisição.
+
 ---
 
 ## 13. `IncludeCanceled` em `GET /Expenses`

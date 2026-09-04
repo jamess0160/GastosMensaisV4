@@ -5,7 +5,7 @@ import { BudgetsConnection } from "@/api/Budgets.connection";
 import { ExpensesConnection } from "@/api/Expenses.connection";
 import { InflowsConnection } from "@/api/Inflows.connection";
 import { monthLegs, type ExpenseLeg } from "@/lib/aggregate";
-import { addMonths, monthRange } from "@/lib/date";
+import { addMonths, monthRange, monthsBetween } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
@@ -168,6 +168,126 @@ export function useMonthLegs(month: ApiTypes.ReferenceMonth): {
     };
 }
 
+/* ── Pernas de um período ─────────────────────────────────── */
+
+/* ════════════════════════════════════════════════════════════
+   O Relatório olha PERÍODO, não mês — e o cache continua sendo por mês.
+
+   Nada aqui inventa chave nova: cada mês do intervalo pede exatamente a
+   mesma consulta que a tela de Gastos pediria sozinha, então abrir o
+   Relatório depois de navegar por Início e Gastos reaproveita o que já
+   está em memória, e o contrário também vale.
+
+   O CUSTO. Cada mês do intervalo carrega a lista, a busca de
+   parcelamentos abertos e um `get(id)` por parcelado — o N+1 da
+   pendência 12, multiplicado pelo tamanho do período. Doze meses é uma
+   dúzia de vezes o custo de uma tela de mês. É por isso que o preset
+   padrão do Relatório é curto, e por isso que a rota que devolvesse a
+   lista já com os filhos vale ainda mais aqui do que lá.
+   ════════════════════════════════════════════════════════════ */
+
+/** As listas de gasto de vários meses, indexadas pelo mês. */
+function useRangeExpenses(months: readonly ApiTypes.ReferenceMonth[]) {
+    const queries = useQueries({
+        queries: months.map((month) => ({
+            queryKey: queryKeys.expenses(month),
+            queryFn: () => ExpensesConnection.list({ ...monthRange(month), IncludeCanceled: true }),
+        })),
+    });
+
+    const stamp = queries.map((query) => query.dataUpdatedAt).join(",");
+
+    const byMonth = useMemo(() => {
+        const index = new Map<ApiTypes.ReferenceMonth, ApiTypes.Expense[]>();
+        months.forEach((month, position) => index.set(month, queries[position]?.data ?? []));
+        return index;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stamp, months.join(",")]);
+
+    return {
+        byMonth,
+        isPending: queries.some((query) => query.isPending),
+        isError: queries.some((query) => query.isError),
+        error: queries.find((query) => query.error)?.error ?? null,
+    };
+}
+
+/** Os parcelados que podem ter perna caindo em algum mês do intervalo.
+ *
+ *  Uma busca por mês, com a mesma chave de `useInstallmentDetails` — os
+ *  intervalos se sobrepõem muito, e é o cache que paga a conta. */
+function useRangeInstallments(months: readonly ApiTypes.ReferenceMonth[]) {
+    const lists = useQueries({
+        queries: months.map((month) => ({
+            queryKey: queryKeys.installments(month),
+            queryFn: () =>
+                ExpensesConnection.list({
+                    From: monthRange(addMonths(month, -INSTALLMENT_LOOKBACK_MONTHS)).From,
+                    To: monthRange(month).To,
+                    Kind: "installment" as const,
+                }),
+        })),
+    });
+
+    const ids = [
+        ...new Set(lists.flatMap((query) => (query.data ?? []).map((row) => row.IdExpense))),
+    ];
+
+    const details = useQueries({
+        queries: ids.map((idExpense) => ({
+            queryKey: queryKeys.expense(idExpense),
+            queryFn: () => ExpensesConnection.get(idExpense),
+        })),
+    });
+
+    return {
+        data: details
+            .map((query) => query.data)
+            .filter((detail): detail is ApiTypes.ExpenseDetail => detail !== undefined),
+        isPending: lists.some((query) => query.isPending) || details.some((q) => q.isPending),
+        isError: lists.some((query) => query.isError) || details.some((q) => q.isError),
+        error: lists.find((q) => q.error)?.error ?? details.find((q) => q.error)?.error ?? null,
+    };
+}
+
+/** As pernas que pesam num intervalo de meses.
+ *
+ *  Cada mês é resolvido pela MESMA `monthLegs` da tela de mês — a
+ *  competência de uma perna é dela, não do intervalo, e é isso que faz
+ *  a parcela 8 de uma compra de março aparecer em agosto sem aparecer
+ *  duas vezes. */
+export function useRangeLegs(
+    from: ApiTypes.ReferenceMonth,
+    to: ApiTypes.ReferenceMonth,
+): {
+    legs: ExpenseLeg[];
+    months: ApiTypes.ReferenceMonth[];
+    isPending: boolean;
+    isError: boolean;
+    error: unknown;
+} {
+    const months = useMemo(() => monthsBetween(from, to), [from, to]);
+
+    const expenses = useRangeExpenses(months);
+    const installments = useRangeInstallments(months);
+
+    const legs = useMemo(
+        () =>
+            months.flatMap((month) =>
+                monthLegs(month, expenses.byMonth.get(month) ?? [], installments.data),
+            ),
+        [months, expenses.byMonth, installments.data],
+    );
+
+    return {
+        legs,
+        months,
+        isPending: expenses.isPending || installments.isPending,
+        isError: expenses.isError || installments.isError,
+        error: expenses.error ?? installments.error,
+    };
+}
+
 /* ── Detalhes do mês ──────────────────────────────────────── */
 
 /** Os detalhes dos gastos do mês, indexados por id.
@@ -219,6 +339,40 @@ export function useMonthExpenseDetails(month: ApiTypes.ReferenceMonth): {
     }, [stamp]);
 
     return { byId, isPending: list.isPending || details.some((query) => query.isPending) };
+}
+
+/** Os detalhes de um conjunto de gastos, por id.
+ *
+ *  A versão do Relatório, que olha período e não mês. `enabled` é o que
+ *  mantém o custo honesto: destino e forma de pagamento só existem no
+ *  `get(id)`, então a tela só paga por eles quando algum desses dois
+ *  filtros está em uso — nas outras vezes, nenhuma requisição sai. */
+export function useExpenseDetails(
+    idExpenses: readonly number[],
+    enabled = true,
+): { byId: Map<number, ApiTypes.ExpenseDetail>; isPending: boolean } {
+    const details = useQueries({
+        queries: (enabled ? idExpenses : []).map((idExpense) => ({
+            queryKey: queryKeys.expense(idExpense),
+            queryFn: () => ExpensesConnection.get(idExpense),
+        })),
+    });
+
+    // Ver o comentário do `stamp` acima.
+    const stamp = details
+        .map((query) => `${query.data?.IdExpense ?? 0}:${query.dataUpdatedAt}`)
+        .join(",");
+
+    const byId = useMemo(() => {
+        const index = new Map<number, ApiTypes.ExpenseDetail>();
+        for (const query of details) {
+            if (query.data) index.set(query.data.IdExpense, query.data);
+        }
+        return index;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stamp]);
+
+    return { byId, isPending: details.some((query) => query.isPending) };
 }
 
 /** O mesmo para entradas: só o `get(id)` traz `Persons`, e é dele que

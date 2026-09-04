@@ -269,6 +269,41 @@ export function spentByDay(
     return days.map((day) => fromCents(byDay.get(day) ?? 0));
 }
 
+/** Mês × categoria — as barras agrupadas do relatório por período.
+ *
+ *  Uma série por categoria, com um valor por mês do intervalo (zero
+ *  onde não houve gasto): é assim que o ECharts desenha um grupo por
+ *  mês com uma barra por categoria dentro. A ordem é por total no
+ *  período, decrescente — quem mais pesa aparece primeiro na legenda.
+ *
+ *  Os meses vêm por parâmetro, e não do que os dados trouxerem: um mês
+ *  sem gasto nenhum precisa existir no eixo, ou o período parece mais
+ *  curto do que é. */
+export function spentByMonthCategory(
+    legs: readonly ExpenseLeg[],
+    months: readonly ApiTypes.ReferenceMonth[],
+): { IdCategory: number; total: ApiTypes.Money; values: ApiTypes.Money[] }[] {
+    const index = new Map(months.map((month, position) => [month, position]));
+    const byCategory = new Map<number, number[]>();
+
+    for (const leg of legs) {
+        const position = index.get(leg.month);
+        if (position === undefined) continue;
+
+        const row = byCategory.get(leg.expense.IdCategory) ?? months.map(() => 0);
+        row[position] += toCents(leg.value);
+        byCategory.set(leg.expense.IdCategory, row);
+    }
+
+    return [...byCategory.entries()]
+        .map(([IdCategory, cents]) => ({
+            IdCategory,
+            total: fromCents(cents.reduce((sum, value) => sum + value, 0)),
+            values: cents.map(fromCents),
+        }))
+        .sort((a, b) => b.total - a.total);
+}
+
 /* ── Saldo e orçamento ────────────────────────────────────── */
 
 /** Patrimônio: a soma dos saldos das contas ativas.

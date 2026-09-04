@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
     addMonths,
     addMonthsToDate,
+    daysBetween,
     daysOfMonth,
     formatDate,
     formatMonthLabel,
     monthRange,
+    monthsBetween,
     parts,
     toLocalDate,
     toReferenceMonth,
@@ -104,6 +106,35 @@ describe("addMonthsToDate", () => {
 
     it("anda para trás", () => {
         expect(addMonthsToDate("2026-03-31", -1)).toBe("2026-02-28");
+    });
+});
+
+describe("monthsBetween", () => {
+    it("inclui as duas pontas", () => {
+        expect(monthsBetween("2026-05", "2026-07")).toEqual(["2026-05", "2026-06", "2026-07"]);
+    });
+
+    it("um mês só devolve ele mesmo", () => {
+        expect(monthsBetween("2026-05", "2026-05")).toEqual(["2026-05"]);
+    });
+
+    it("intervalo invertido não vira laço infinito", () => {
+        expect(monthsBetween("2026-07", "2026-05")).toEqual([]);
+    });
+});
+
+describe("daysBetween", () => {
+    it("vai de ponta a ponta, inclusive", () => {
+        expect(daysBetween("2026-05-30", "2026-06-02")).toEqual([
+            "2026-05-30",
+            "2026-05-31",
+            "2026-06-01",
+            "2026-06-02",
+        ]);
+    });
+
+    it("um mês inteiro tem os dias do mês", () => {
+        expect(daysBetween("2026-02-01", "2026-02-28")).toHaveLength(28);
     });
 });
 

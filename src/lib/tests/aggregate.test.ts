@@ -8,6 +8,7 @@ import {
     monthLegs,
     spentByCategory,
     spentByDay,
+    spentByMonthCategory,
     sumMoney,
     totalBalance,
     totalExpectedInflow,
@@ -179,6 +180,58 @@ describe("legsOfKind", () => {
         expect(totalSpent(legsOfKind(legs, "fixed"))).toBe(1200);
         expect(totalSpent(legsOfKind(legs, "installment"))).toBe(100);
         expect(totalSpent(legsOfKind(legs, "single"))).toBe(90);
+    });
+});
+
+describe("spentByMonthCategory", () => {
+    const months = ["2026-07", "2026-08"];
+
+    it("dá uma série por categoria, com um valor por mês do período", () => {
+        const legs = [
+            ...monthLegs("2026-07", [
+                anExpense({
+                    IdExpense: 1,
+                    IdCategory: 1,
+                    TotalValue: 100,
+                    ExpenseDate: "2026-07-05",
+                }),
+            ]),
+            ...monthLegs("2026-08", [
+                anExpense({
+                    IdExpense: 2,
+                    IdCategory: 1,
+                    TotalValue: 40,
+                    ExpenseDate: "2026-08-05",
+                }),
+                anExpense({
+                    IdExpense: 3,
+                    IdCategory: 2,
+                    TotalValue: 300,
+                    ExpenseDate: "2026-08-06",
+                }),
+            ]),
+        ];
+
+        expect(spentByMonthCategory(legs, months)).toEqual([
+            { IdCategory: 2, total: 300, values: [0, 300] },
+            { IdCategory: 1, total: 140, values: [100, 40] },
+        ]);
+    });
+
+    it("mantém o mês sem gasto no eixo, com zero", () => {
+        const legs = monthLegs("2026-08", [
+            anExpense({ IdExpense: 1, IdCategory: 1, TotalValue: 50, ExpenseDate: "2026-08-05" }),
+        ]);
+
+        expect(spentByMonthCategory(legs, months)[0].values).toEqual([0, 50]);
+    });
+
+    it("ignora a perna que cai fora do período pedido", () => {
+        const legs = monthLegs("2026-06", [
+            anExpense({ IdExpense: 1, IdCategory: 1, TotalValue: 90, ExpenseDate: "2026-06-05" }),
+        ]);
+
+        expect(spentByMonthCategory(legs, months)).toEqual([]);
     });
 });
 

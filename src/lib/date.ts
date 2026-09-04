@@ -149,6 +149,38 @@ export function addMonthsToDate(date: ApiTypes.CalendarDate, delta: number): Api
     return fromLocalDate(new Date(year, month - 1 + delta, Math.min(day, lastDay)));
 }
 
+/** Os meses de um intervalo, das duas pontas inclusive.
+ *
+ *  É a unidade em que o cache de movimento é guardado (uma chave por
+ *  mês), então é assim que um período vira requisições. */
+export function monthsBetween(
+    from: ApiTypes.ReferenceMonth,
+    to: ApiTypes.ReferenceMonth,
+): ApiTypes.ReferenceMonth[] {
+    const months: ApiTypes.ReferenceMonth[] = [];
+    for (let month = from; month <= to; month = addMonths(month, 1)) {
+        months.push(month);
+        // Trava de sanidade: intervalo invertido ou absurdo não vira laço
+        // infinito nem dez mil requisições.
+        if (months.length > 120) break;
+    }
+    return months;
+}
+
+/** Todos os dias de um intervalo, em ordem — o eixo X do relatório. */
+export function daysBetween(
+    from: ApiTypes.CalendarDate,
+    to: ApiTypes.CalendarDate,
+): ApiTypes.CalendarDate[] {
+    const days: ApiTypes.CalendarDate[] = [];
+    const last = toLocalDate(to);
+    for (const day = toLocalDate(from); day <= last; day.setDate(day.getDate() + 1)) {
+        days.push(fromLocalDate(day));
+        if (days.length > 3660) break;
+    }
+    return days;
+}
+
 /** Todos os dias do mês, em ordem — o eixo X do relatório diário. */
 export function daysOfMonth(month: ApiTypes.ReferenceMonth): ApiTypes.CalendarDate[] {
     const { From, To } = monthRange(month);
