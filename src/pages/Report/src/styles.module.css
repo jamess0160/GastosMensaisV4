@@ -51,4 +51,20 @@
         flex-direction: column;
         align-items: stretch;
     }
+
+    /* A mesma regra do Dashboard: título e ação lado a lado num
+       `space-between` sem quebra espremem os dois em 390px. Aqui a ação
+       é "Ver o mês inteiro", que aparece quando uma categoria está
+       selecionada. */
+    .sectionHead {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    /* Largura inteira pede rótulo centralizado — encostado à esquerda
+       ele fica órfão num botão de 358px. */
+    .sectionHead > button {
+        justify-content: center;
+    }
 }

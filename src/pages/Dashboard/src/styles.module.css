@@ -310,4 +310,20 @@
     .budgets {
         grid-template-columns: 1fr;
     }
+
+    /* Título e ação lado a lado num `space-between` sem quebra: em
+       390px, "Adicionar orçamento" espreme o subtítulo até ele virar
+       duas palavras por linha e ainda corta o próprio texto. Empilhados,
+       o botão toma a largura e os dois respiram. */
+    .sectionHead {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    /* Largura inteira pede rótulo centralizado — encostado à esquerda
+       ele fica órfão num botão de 358px. */
+    .sectionHead > button {
+        justify-content: center;
+    }
 }
