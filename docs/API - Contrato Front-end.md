@@ -530,8 +530,6 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
   "Kind": "credit_card",
   "DueDay": 27,
   "ClosingOffsetDays": 7,
-  "Brand": "Mastercard",
-  "LastDigits": "1234",
   "IconPath": null,
   "Color": null,
   "Position": 1,
@@ -547,6 +545,8 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
 
 Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias, e o **default é 7**. Na tela de cadastro, peça o vencimento e deixe a folga num campo avançado já preenchido.
 
+**Não existem `Brand` nem `LastDigits`.** Quem identifica o cartão na tela é o `Name`, que o usuário escreve — e o `IconPath`/`Color`, se você quiser um rótulo visual. Se a sua tela mostrava "Nubank ****1234", peça isso dentro do `Name`.
+
 ### `POST /PaymentMethods`
 
 **Só cartão de crédito.** Pix e débito nascem com a conta e não se criam pela mão.
@@ -558,8 +558,6 @@ Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias,
 | `Kind` | `credit_card` | obrigatório, único valor aceito |
 | `DueDay` | int 1–31 | **obrigatório** |
 | `ClosingOffsetDays` | int 1–28 | default `7` |
-| `Brand` | string \| null | ≤100, default `null` |
-| `LastDigits` | string \| null | exatamente 4 dígitos, default `null` |
 | `IconPath` | string \| null | ≤255, default `null` |
 | `Color` | `#RRGGBB` \| null | default `null` |
 | `Position` | int \| null | default `null` |
@@ -568,7 +566,7 @@ Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias,
 
 ### `PUT /PaymentMethods/IdPaymentMethod=:IdPaymentMethod`
 
-`Name` obrigatório; `DueDay`, `ClosingOffsetDays`, `Brand`, `LastDigits`, `IconPath`, `Color`, `Position` opcionais.
+`Name` obrigatório; `DueDay`, `ClosingOffsetDays`, `IconPath`, `Color`, `Position` opcionais.
 
 **`Kind` e `IdAccount` não são aceitos:** um pix não vira cartão e um cartão não muda de conta — as duas trocas reescreveriam o significado das compras já lançadas nele. Mandar `null` em `DueDay`/`ClosingOffsetDays` de um cartão dá `406`.
 
@@ -1231,6 +1229,21 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-04 — `/PaymentMethods`: `Brand` e `LastDigits` deixam de existir
+
+🔴 **Quebra** — ver as seções 5, `/Accounts`, e 6, `/PaymentMethods`.
+
+**As duas colunas foram derrubadas do banco.** Elas somem da resposta e deixam de ser aceitas na entrada:
+
+- **Ler:** a forma de pagamento embutida em `GET /Accounts` **não traz mais** `Brand` nem `LastDigits`. Quem lê qualquer um dos dois passa a receber `undefined`.
+- **Escrever:** `POST` e `PUT /PaymentMethods` com qualquer um dos dois respondem `406` (`"Dados de entrada inválidos."`).
+
+**Ação do front:** tirar os dois campos do formulário de cartão e de qualquer leitura. Quem mostrava "Nubank ****1234" põe isso no `Name`, que é o campo que o usuário escreve e o único que o sistema usa para identificar a forma de pagamento. O front já os havia removido de tudo — esta entrada existe para o contrato parar de prometê-los.
+
+**Por que.** Nenhuma regra do sistema lia qualquer um dos dois: a fatura sai de `DueDay`/`ClosingOffsetDays`, o saldo sai da perna, o rateio sai do gasto. E o `LastDigits` ainda carregava quatro dígitos de um cartão real gravados em texto puro para servir de rótulo — dado sensível guardado sem nada em troca.
+
+**Os dados não voltam.** As colunas foram apagadas; a bandeira e o final que estavam gravados se foram junto. Nada mais muda: `DueDay`, `ClosingOffsetDays`, `Name`, `IconPath`, `Color` e `Position` seguem iguais.
 
 ### 2026-09-04 — `POST /Expenses`: `Occurrences` sai do corpo e a janela do gasto fixo passa a ser do servidor
 

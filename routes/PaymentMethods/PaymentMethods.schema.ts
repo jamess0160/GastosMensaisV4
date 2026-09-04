@@ -21,8 +21,6 @@ export const paymentMethodResponse = Joi.object({
     Kind: Joi.string().valid("pix", "debit", "credit_card").required(),
     DueDay: Joi.number().allow(null).required(),
     ClosingOffsetDays: Joi.number().allow(null).required(),
-    Brand: Joi.string().allow(null).required(),
-    LastDigits: Joi.string().allow(null).required(),
     IconPath: Joi.string().allow(null).required(),
     Color: Joi.string().allow(null).required(),
     Position: Joi.number().allow(null).required(),
@@ -53,9 +51,9 @@ class Schema {
             //  partir da compra a cada mês, então o grampeamento de fevereiro não arrasta.
             DueDay: day.when("Kind", { is: "credit_card", then: Joi.required(), otherwise: Joi.forbidden() }),
             ClosingOffsetDays: closingOffset.when("Kind", { is: "credit_card", then: closingOffset.default(7), otherwise: Joi.forbidden() }),
-            Brand: Joi.string().trim().max(100).allow(null).default(null),
-            //  Os 4 últimos dígitos são identificação visual do cartão, não dado de pagamento.
-            LastDigits: Joi.string().trim().pattern(/^\d{4}$/).allow(null).default(null),
+            //  Sem Brand e sem LastDigits: nenhuma regra do sistema lia qualquer um dos dois, e
+            //  quem identifica o cartão na tela é o Name, que o usuário escreve. Mandá-los é
+            //  406 pelo unknown do Joi.
             IconPath: Joi.string().trim().max(255).allow(null).default(null),
             Color: color.allow(null).default(null),
             Position: Joi.number().integer().allow(null).default(null),
@@ -77,8 +75,6 @@ class Schema {
             //  o Kind gravado é ela, não o schema. Ver PaymentMethodKind.section.ts.
             DueDay: day.allow(null).optional(),
             ClosingOffsetDays: closingOffset.allow(null).optional(),
-            Brand: Joi.string().trim().max(100).allow(null).optional(),
-            LastDigits: Joi.string().trim().pattern(/^\d{4}$/).allow(null).optional(),
             IconPath: Joi.string().trim().max(255).allow(null).optional(),
             Color: color.allow(null).optional(),
             Position: Joi.number().integer().allow(null).optional(),

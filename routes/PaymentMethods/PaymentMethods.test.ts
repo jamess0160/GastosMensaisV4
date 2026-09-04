@@ -46,8 +46,6 @@ describe("PaymentMethods", () => {
                 Kind: "credit_card",
                 DueDay: 28,
                 ClosingOffsetDays: 8,
-                Brand: "Mastercard",
-                LastDigits: "4321",
             })
 
             expect(response.status).toBe(401)
@@ -60,8 +58,6 @@ describe("PaymentMethods", () => {
                 Kind: "credit_card",
                 DueDay: 28,
                 ClosingOffsetDays: 8,
-                Brand: "Mastercard",
-                LastDigits: "4321",
             })
 
             expect(response.status).toBe(200)
@@ -75,9 +71,48 @@ describe("PaymentMethods", () => {
                 Kind: "credit_card",
                 DueDay: 28,
                 ClosingOffsetDays: 8,
-                Brand: "Mastercard",
-                LastDigits: "4321",
             })
+        })
+
+        //  Os dois campos saíram do modelo: nenhuma regra do sistema lia qualquer um deles, e
+        //  quem identifica o cartão na tela é o Name. Mandá-los tem que falhar alto — um
+        //  cliente antigo que continuasse enviando acharia que a bandeira ficou gravada.
+        it("recusa Brand e LastDigits no corpo", async () => {
+            for (let field of [{ Brand: "Mastercard" }, { LastDigits: "4321" }]) {
+                let response = await workspaceClient.post(`/PaymentMethods`, {
+                    IdAccount,
+                    Name: "Cartão roxo",
+                    Kind: "credit_card",
+                    DueDay: 28,
+                    ...field,
+                })
+
+                expect(response.status).toBe(406)
+            }
+        })
+
+        //  O GET /Accounts embute a forma de pagamento importando o paymentMethodResponse
+        //  daqui, em vez de redescrever a linha: tirar os campos de um lugar tira dos dois.
+        //  É este expect que prova isso, e é por ele que a conta não precisou ser tocada.
+        it("não devolve Brand nem LastDigits na forma embutida em GET /Accounts", async () => {
+            let created = await workspaceClient.post(`/PaymentMethods`, {
+                IdAccount,
+                Name: "Cartão sem bandeira",
+                Kind: "credit_card",
+                DueDay: 28,
+            })
+
+            expect(created.status).toBe(200)
+
+            let accounts = await workspaceClient.get(`/Accounts`)
+            let methods = accounts.body.flatMap((account: { PaymentMethods: object[] }) => account.PaymentMethods)
+
+            expect(methods.length).toBeGreaterThan(0)
+
+            for (let method of methods) {
+                expect(method).not.toHaveProperty("Brand")
+                expect(method).not.toHaveProperty("LastDigits")
+            }
         })
 
         //  Pix e débito nascem com a conta: um segundo "pix" da mesma conta duplicaria a
@@ -326,7 +361,6 @@ describe("PaymentMethods", () => {
                 Kind: "credit_card",
                 DueDay: 28,
                 ClosingOffsetDays: 8,
-                LastDigits: "1234",
             })
 
             expect(card.status).toBe(200)

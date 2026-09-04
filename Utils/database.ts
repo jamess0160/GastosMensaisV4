@@ -122,8 +122,6 @@ export namespace Database {
          * fechamento sai dele por subtracao. Ver InvoiceDates.section.ts.
          */
         ClosingOffsetDays: number | null
-        Brand: string | null
-        LastDigits: string | null
         IconPath: string | null
         Color: string | null
         Position: number | null

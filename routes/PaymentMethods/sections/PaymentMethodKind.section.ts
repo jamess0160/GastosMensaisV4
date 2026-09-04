@@ -10,7 +10,9 @@ import { PaymentMethodsNamespace } from "./types"
 //  A regra vive num lugar só porque tem dois pontos de escrita e o Joi não cobre os dois: no
 //  POST ele consegue usar o `when` sobre o Kind do body, mas no PUT o Kind que manda é o da
 //  linha gravada, que o schema não enxerga.
-const creditCardOnly = ["DueDay", "ClosingOffsetDays", "Brand", "LastDigits"] as const
+//  A lista encolheu com a saída de Brand e LastDigits, mas não sumiu: DueDay e
+//  ClosingOffsetDays continuam sendo campos exclusivos de cartão que o banco não protege.
+const creditCardOnly = ["DueDay", "ClosingOffsetDays"] as const
 
 class Controller {
 
