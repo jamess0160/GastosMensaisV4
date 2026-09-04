@@ -725,9 +725,20 @@ Um gasto tem **dois rateios independentes que nunca se cruzam**:
 
 ### `GET /Expenses`
 
-**Query** (todos opcionais): `From`, `To` (`YYYY-MM-DD`, inclusivos, sobre `ExpenseDate`), `Status`, `Kind`, `IdCategory`.
+**Query** (todos opcionais): `From`, `To` (`YYYY-MM-DD`, inclusivos, sobre `ExpenseDate`), `Status`, `Kind`, `IdCategory`, `IncludeCanceled`.
 
-Sem `Status`, os cancelados ficam de fora.
+Sem `Status` e sem `IncludeCanceled`, os cancelados ficam de fora.
+
+**`IncludeCanceled`** (booleano, default `false`) existe para o filtro de status **multi-seleção**: é ele que traz "em aberto **e** cancelado" numa requisição só.
+
+| Query | O que volta |
+|---|---|
+| *(nada)* ou `IncludeCanceled=false` | Tudo menos os cancelados |
+| `IncludeCanceled=true` | **A lista completa**, cancelados incluídos — separe por `Status` no cliente |
+| `Status=canceled` | **Só** os cancelados |
+| `Status=pending` (com ou sem `IncludeCanceled`) | Só os `pending` — `Status` é sempre um estado só, e ganha do booleano |
+
+Peça o mês **uma vez** com `IncludeCanceled=true` e aplique os filtros de tela sobre essa lista: uma chave de cache por mês, em vez de uma por combinação de filtro.
 
 **Resposta** — sem pernas, rateio ou tags (a lista de mês não os mostra):
 
@@ -1089,6 +1100,18 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-03 — `GET /Expenses`: `IncludeCanceled` traz os cancelados junto com o resto
+
+🟢 **Adição** — ver a seção 11, `/Expenses`.
+
+**O que entrou.** Um booleano opcional na query, `IncludeCanceled`, default `false`. Com ele em `true` a lista vem completa, cancelados incluídos.
+
+**Nada do que já existe muda.** `IncludeCanceled` ausente ou `false` devolve exatamente a resposta de hoje, e `Status=canceled` continua trazendo só os cancelados. `Status` e `IncludeCanceled` podem vir juntos, e **`Status` ganha**: ele é sempre o recorte de um estado só.
+
+**Ação do front:** para o filtro de status multi-seleção, pare de mandar `Status` e mande `IncludeCanceled=true`, separando por `Status` no cliente. Quem não usa o filtro não muda nada.
+
+**Por que um booleano e não `Status` aceitando lista** — com o booleano o app pede **o mês uma vez** e aplica os cinco filtros de tela sobre a lista em cache: uma chave de cache por mês, reaproveitada entre Início, Gastos e Relatório. Com `Status` em lista, cada combinação de filtro vira uma consulta e uma chave nova. A alternativa do lado do cliente — disparar as duas consultas e fundir por id — dobrava a requisição do mês e mudava de lugar uma regra ("o que a lista contém") que é do servidor.
 
 ### 2026-09-03 — `/PaymentMethods`: o cartão passa a ser descrito pelo **vencimento e uma folga**, não por um dia de fechamento
 
