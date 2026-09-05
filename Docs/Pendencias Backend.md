@@ -24,26 +24,25 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | 7 | [Conciliação de extrato](#7-conciliação-de-extrato) | Produto | Tela 08, frame B |
 | 8 | [Exportar para Excel](#8-exportar-para-excel) | Produto | Item fixo da sidebar |
 | 9 | [Notificações](#9-notificações) | Produto | "Avisos" do Dashboard |
-| 10 | [`Occurrences` fora do `POST /Expenses`](#10-occurrences-fora-do-post-expenses) | Contrato | Gasto fixo — **já aplicado no cliente** |
+| ~~10~~ | [`Occurrences` fora do `POST /Expenses`](#10-occurrences-fora-do-post-expenses) | Contrato | ✅ **Entregue** em 04/09 |
 | 11 | [Clonar o mês anterior de Renda](#11-clonar-o-mês-anterior-de-renda) | Produto | Botão "Clonar mês anterior" |
 | 12 | [Lista de gastos com os filhos](#12-lista-de-gastos-com-os-filhos) | Performance | Colunas de destino e forma de pagamento |
-| 13 | [`IncludeCanceled` em `GET /Expenses`](#13-includecanceled-em-get-expenses) | Contrato | Filtro de status multi-seleção |
-| 14 | [Desfazer recebimento de entrada](#14-desfazer-recebimento-de-entrada) | Produto | Botão de status na linha de Renda |
-| 15 | [Criação de entradas em lote](#15-criação-de-entradas-em-lote) | Produto | Clonagem do mês anterior |
-| 16 | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | — (limpeza) |
+| ~~13~~ | [`IncludeCanceled` em `GET /Expenses`](#13-includecanceled-em-get-expenses) | Contrato | ✅ **Entregue** em 03/09 |
+| ~~14~~ | [Desfazer recebimento de entrada](#14-desfazer-recebimento-de-entrada) | Produto | ✅ **Entregue** em 04/09 |
+| ~~15~~ | [Criação de entradas em lote](#15-criação-de-entradas-em-lote) | Produto | ✅ **Entregue** em 04/09 |
+| ~~16~~ | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | ✅ **Entregue** em 04/09 |
+
+**Cinco itens saíram da fila.** Os de número **10, 13, 14, 15 e 16**
+subiram na virada de setembro, exatamente na forma proposta aqui — e em
+todos eles o cliente já estava escrito assumindo a rota, então não houve
+chamada nova a fazer. As seções deles ficam abaixo como registro do que
+foi pedido e do que subiu; nada nelas é trabalho pendente. O **12**
+também subiu, como `GET /ExpensePayments`.
 
 Os itens 1 e 2 são de segurança e valem ser tratados antes do MVP ir ao
-ar. O **10 é o mais urgente depois deles**, e por um motivo diferente: o
-cliente já parou de mandar o campo, então contrato e implementação estão
-divergindo agora. Os itens 11 e 12 seguram funcionalidade que já está
-desenhada na tela. Do 3 ao 9 são cortes conscientes do MVP — o frontend
-já está desenhado para viver sem eles.
-
-Os itens **13 a 16 nasceram da leva 3 de ajustes** (ver
-[3. Plano de Ajustes 2](levas/3.%20Plano%20de%20Ajustes%202.md)) e cada um
-tem tela do lado do cliente esperando por ele. O 15 **substitui a forma**
-proposta no 11 — a escolha do que clonar passou a ser do usuário, e o que
-falta no servidor mudou junto.
+ar. Do 3 ao 9 são cortes conscientes do MVP — o frontend já está
+desenhado para viver sem eles —, e o 11 virou registro histórico quando
+o 15 substituiu a forma dele.
 
 ---
 
@@ -274,6 +273,13 @@ orçamento estourado, entrada prevista não recebida.
 
 ## 10. `Occurrences` fora do `POST /Expenses`
 
+> ✅ **Entregue em 04/09.** O campo saiu do corpo do `POST /Expenses` e
+> mandá-lo agora responde `406`. A janela da série passou a ser do
+> servidor — **12 ocorrências, contando a raiz** —, limitada pelo
+> `RecurrenceEndDate` quando ele vier antes; a resposta continua trazendo
+> `Occurrences` com quantas nasceram. As três perguntas abaixo estão
+> respondidas, e o cliente não precisou mudar nada.
+
 **O que mudou.** O campo `Occurrences` sai do corpo de criação de gasto.
 O contrato ainda o documenta (`só em fixed, 1-60, default 12`), mas ele
 **não vai mais ser enviado**.
@@ -450,6 +456,12 @@ requisição.
 
 ## 13. `IncludeCanceled` em `GET /Expenses`
 
+> ✅ **Entregue em 03/09**, na forma proposta: booleano, com a ausência
+> mantendo exatamente a resposta de antes. O cliente já mandava
+> `IncludeCanceled: true` e separava por `Status` no próprio cliente —
+> marcar "Cancelados" no filtro passou a trazer os dois grupos, e nenhuma
+> linha de código mudou.
+
 **O problema.** Hoje a **ausência** do `Status` carrega significado: sem
 ele a resposta vem sem os cancelados, e `Status=canceled` traz *só* os
 cancelados. Não existe forma de pedir "em aberto **e** cancelados" numa
@@ -495,6 +507,11 @@ traz nada — a lista continua vindo sem eles.
 
 ## 14. Desfazer recebimento de entrada
 
+> ✅ **Entregue em 04/09.** `POST /Inflows/IdInflow=:IdInflow/unreceive`,
+> sem body, o espelho exato do `receive`. O botão da linha de Renda já
+> chamava a rota nos dois sentidos: desfazer deixou de mostrar erro e
+> passou a devolver o dinheiro ao saldo.
+
 **O problema.** Existe `POST /Inflows/IdInflow=:IdInflow/receive`, que é
 o que põe o dinheiro no saldo. **Não existe o inverso.** Um clique errado
 em "Recebido" credita a conta e não há caminho de volta pela tela.
@@ -527,6 +544,12 @@ ensinaria o usuário que ele não existe.
 ---
 
 ## 15. Criação de entradas em lote
+
+> ✅ **Entregue em 04/09.** `POST /Inflows/batch`, com `{ Inflows: [...] }`,
+> teto de 100 itens, cada um validado pelo mesmo schema do `POST` avulso,
+> tudo ou nada numa transaction. A `msg` da recusa aponta o item
+> (`"Item 2: ..."`), contando a partir de 1. `InflowsConnection.createBatch`
+> já existia e a clonagem do mês passou a gravar numa chamada só.
 
 **O problema.** A clonagem do mês (item 11) passou a ser assim: o cliente
 lista o mês anterior, o usuário marca o que quer trazer, o cliente avança
@@ -587,6 +610,11 @@ fluxo de escolha inteiro de pé, esperando a rota.
 ---
 
 ## 16. Bandeira e final do cartão saem do cadastro
+
+> ✅ **Entregue em 04/09.** `Brand` e `LastDigits` saíram dos dois corpos
+> e da resposta de `GET /Accounts`; mandá-los agora responde `406`. O
+> cliente já não os declarava em tipo nenhum — a divergência com o
+> contrato fechou sozinha.
 
 **O problema.** `PaymentMethod` tem `Brand` e `LastDigits`, e o
 formulário de cartão os pedia. Nenhum dos dois é usado em regra nenhuma

@@ -8,11 +8,10 @@ import type { IncomeContext } from "../controller";
  *  havia como voltar pela tela. Com o botão de status na linha, o par
  *  virou obrigatório: quem pode ligar precisa poder desligar.
  *
- *  A rota é a pendência 14 e AINDA NÃO EXISTE. O botão fica habilitado
- *  assim mesmo: enquanto ela não subir, o usuário vê a mensagem de erro
- *  da API, como em qualquer 406. Esconder o caminho ensinaria que ele
- *  não existe — e o dia em que a rota subir, nada na tela precisaria
- *  mudar. */
+ *  Sem body, como o `receive`. Volta o `Status` para `pending`, limpa o
+ *  `ReceivedAt` e tira do saldo o que o recebimento creditou, tudo na
+ *  mesma transaction. 406 quando a entrada já está pendente, quando
+ *  está cancelada, ou quando o id não existe no workspace. */
 export async function unreceiveInflow(context: IncomeContext, idInflow: number): Promise<void> {
     context.beginSubmit();
 

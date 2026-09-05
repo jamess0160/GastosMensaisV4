@@ -38,11 +38,8 @@ export const INSTALLMENT_LOOKBACK_MONTHS = 24;
  *  diferente — o Início, Gastos e o Relatório deixariam de reaproveitar
  *  a mesma lista e o mês seria baixado de novo a cada clique num chip.
  *
- *  Por isso a lista vem completa e os cinco filtros são aplicados no
- *  cliente. `IncludeCanceled` é a pendência 13; enquanto a rota não a
- *  aceitar, o parâmetro é ignorado e a resposta continua vindo sem
- *  cancelados — marcar "Cancelados" simplesmente não traz nada, e o
- *  resto funciona igual.
+ *  Por isso a lista vem completa — `IncludeCanceled: true` — e os cinco
+ *  filtros são aplicados no cliente.
  *
  *  ATENÇÃO a quem somar sobre esta lista: ela CONTÉM cancelados. Todo
  *  total precisa passar por `isLive` — `monthLegs` já passa. */

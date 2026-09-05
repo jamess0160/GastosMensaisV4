@@ -28,9 +28,11 @@ class Connection {
     }
 
     /** `Occurrences` na resposta = quantas linhas de gasto nasceram: 1, ou
-     *  a série inteira em `fixed`. É opcional porque o campo de entrada
-     *  de mesmo nome saiu do contrato, e a resposta pode omiti-lo.
-     *  `Status` não é aceito. */
+     *  a série inteira em `fixed`. É opcional porque a resposta pode
+     *  omiti-lo quando o gasto é um só. O campo de ENTRADA de mesmo nome
+     *  não existe mais: mandá-lo responde 406, e quem limita a série é a
+     *  janela do servidor ou o `RecurrenceEndDate`. `Status` também não
+     *  é aceito. */
     async create(
         body: ApiTypes.ExpenseCreateBody,
     ): Promise<{ IdExpense: number; Occurrences?: number }> {

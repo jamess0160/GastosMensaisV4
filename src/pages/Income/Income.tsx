@@ -238,9 +238,9 @@ export function Income() {
     /** O botão de status na linha — o mesmo gesto que Gastos tem para
      *  quitar parcela.
      *
-     *  Habilitado nos DOIS sentidos: desfazer é a pendência 14 e ainda
-     *  não existe na API, e enquanto não subir o clique mostra o erro
-     *  dela. Ver `unreceiveInflow`. */
+     *  Habilitado nos DOIS sentidos: `receive` credita a conta e
+     *  `unreceive` devolve o dinheiro ao saldo, na mesma transaction.
+     *  Ver `unreceiveInflow`. */
     const statusButtonOf = (row: ApiTypes.Inflow) => {
         if (row.Status === "canceled") return null;
         const isReceived = row.Status === "received";
@@ -273,7 +273,7 @@ export function Income() {
                         {/* Clonar deixou de ser "operação de servidor
                             inteira": quem escolhe o que trazer é o
                             usuário, item a item, e só a GRAVAÇÃO é do
-                            banco — uma transaction só, a pendência 15.
+                            banco — uma transaction só, tudo ou nada.
                             Ver `sections/cloneMonth.ts`. */}
                         <Button onClick={openCloneMonth}>
                             <IconCopy />

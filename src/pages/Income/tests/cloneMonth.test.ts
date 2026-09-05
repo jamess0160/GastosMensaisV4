@@ -118,18 +118,25 @@ describe("cloneMonth", () => {
         expect(context.failSubmit).toHaveBeenCalledOnce();
     });
 
-    it("mostra o erro da API — a rota em lote ainda é pendência", async () => {
+    it("mostra o erro do ITEM que derrubou o lote — ele é tudo ou nada", async () => {
+        // Um item recusado não grava nenhum, e a `msg` diz qual foi,
+        // contando a partir de 1. É essa linha que o formulário destaca.
         server.use(
             msw.get("*/api/Inflows/IdInflow=:id", () => HttpResponse.json(aDetail())),
             msw.post("*/api/Inflows/batch", () =>
-                HttpResponse.json({ msg: "Rota não encontrada" }, { status: 404 }),
+                HttpResponse.json(
+                    { msg: "Item 2: O valor precisa ser maior que zero." },
+                    { status: 406 },
+                ),
             ),
         );
         const context = fakeIncomeContext();
 
-        await cloneMonth(context, [anInflow()]);
+        await cloneMonth(context, [anInflow(), anInflow({ IdInflow: 2 })]);
 
-        expect(context.failSubmit).toHaveBeenCalledOnce();
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "Item 2: O valor precisa ser maior que zero.",
+        );
         expect(context.closeCloneMonth).not.toHaveBeenCalled();
     });
 });

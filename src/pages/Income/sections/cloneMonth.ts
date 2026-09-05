@@ -19,9 +19,10 @@ import type { ApiTypes } from "@/types/api";
    O QUE O CLIENTE FAZ, E O QUE NÃO FAZ. Ele lista, deixa escolher,
    busca o rateio de cada escolhida (a lista não traz `Persons`), avança
    as datas e monta os corpos. Gravar é UMA chamada — `POST
-   /Inflows/batch`, pendência 15 —, porque atomicidade é do banco: com
-   um POST por entrada, a terceira recusada deixaria o mês pela metade e
-   sem como voltar atrás.
+   /Inflows/batch` —, porque atomicidade é do banco: com um POST por
+   entrada, a terceira recusada deixaria o mês pela metade e sem como
+   voltar atrás. O lote é tudo ou nada, e a `msg` da recusa diz qual
+   item caiu ("Item 2: ..."), contando a partir de 1.
    ════════════════════════════════════════════════════════════ */
 
 /** As entradas que valem a pena clonar: renda, não transferência, e

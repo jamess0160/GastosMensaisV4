@@ -167,11 +167,10 @@ export namespace ApiTypes {
 
     /** POST só aceita cartão de crédito: pix e débito nascem com a conta.
      *
-     *  `Brand` e `LastDigits` saíram do MVP (pendência 16): não entram em
-     *  saldo, fatura, filtro nem relatório, e o segundo é dado de cartão
-     *  guardado sem precisar. Sem mapa de compatibilidade — o banco é
-     *  ajustado junto, e enquanto a resposta ainda os trouxer o cliente
-     *  simplesmente não os declara. */
+     *  `Brand` e `LastDigits` NÃO EXISTEM MAIS: mandá-los responde 406.
+     *  Nenhum dos dois entrava em saldo, fatura, filtro ou relatório, e
+     *  o segundo era dado de cartão guardado sem precisar. Quem
+     *  identifica o cartão na tela é o `Name`, que o usuário escreve. */
     export interface PaymentMethodCreateBody {
         IdAccount: number;
         Name: string;
@@ -328,7 +327,7 @@ export namespace ApiTypes {
         Persons?: SplitInput[];
     }
 
-    /** O corpo do `POST /Inflows/batch` — pendência 15.
+    /** O corpo do `POST /Inflows/batch`.
      *
      *  Cada item é EXATAMENTE o corpo do `POST /Inflows`: o que é 406
      *  sozinho é 406 no lote. Tudo ou nada numa transaction, que é o que
@@ -420,7 +419,7 @@ export namespace ApiTypes {
         Status?: ExpenseStatus;
         /** Traz os cancelados JUNTO com o resto, em vez de trocar um
          *  recorte por outro — é o que permite o filtro de status ser
-         *  multi-seleção sobre uma lista só. Pendência 13. */
+         *  multi-seleção sobre uma lista só. */
         IncludeCanceled?: boolean;
         Kind?: ExpenseKind;
         IdCategory?: number;
@@ -442,6 +441,11 @@ export namespace ApiTypes {
         Notes?: string | null;
         /** Obrigatório, mínimo 1, soma fecha com o total. */
         Payments: ExpensePaymentInput[];
+        /* `Occurrences` NÃO EXISTE no corpo: mandá-lo responde 406.
+           Quantas ocorrências um `fixed` gera é decisão do servidor (uma
+           janela de 12, contando a raiz), limitada pelo
+           `RecurrenceEndDate` quando ele vier antes. O número que
+           nasceu volta na resposta do POST. */
         Persons?: SplitInput[];
         /** TEXTO, não id. É o único lugar onde uma tag nasce. */
         Tags?: string[];
