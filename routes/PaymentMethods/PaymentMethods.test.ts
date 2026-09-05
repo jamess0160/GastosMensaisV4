@@ -74,6 +74,57 @@ describe("PaymentMethods", () => {
             })
         })
 
+        //  **Só conta corrente aceita cartão de crédito.** Vale e dinheiro são contas de saldo
+        //  fechado, e uma fatura nelas não teria de onde sair: o cartão de crédito é uma
+        //  dívida que vence contra uma conta bancária, e é isso que 'checking' significa.
+        it("recusa cartão de crédito em conta card", async () => {
+            let vale = await workspaceClient.post(`/Accounts`, { Name: "Vale Alimentação", Type: "card" })
+
+            let response = await workspaceClient.post(`/PaymentMethods`, {
+                IdAccount: vale.body.IdAccount,
+                Name: "Cartão no vale",
+                Kind: "credit_card",
+                DueDay: 28,
+            })
+
+            expect(response.status).toBe(406)
+            //  A conta continua com a forma única com que nasceu
+            expect(await findPaymentMethods(vale.body.IdAccount)).toHaveLength(1)
+        })
+
+        //  É regra nova para o cash também, e não só para o tipo que está nascendo: até aqui
+        //  nada impedia um credit_card numa conta de dinheiro, e fazer a regra valer para um e
+        //  não para o outro a deixaria arbitrária — a razão é a mesma nos dois.
+        it("recusa cartão de crédito em conta cash", async () => {
+            let carteira = await workspaceClient.post(`/Accounts`, { Name: "Carteira", Type: "cash" })
+
+            let response = await workspaceClient.post(`/PaymentMethods`, {
+                IdAccount: carteira.body.IdAccount,
+                Name: "Cartão na carteira",
+                Kind: "credit_card",
+                DueDay: 28,
+            })
+
+            expect(response.status).toBe(406)
+            expect(await findPaymentMethods(carteira.body.IdAccount)).toHaveLength(1)
+        })
+
+        //  E na corrente segue criando, exatamente como antes: a regra nova não pode encostar
+        //  no caminho que já funcionava
+        it("segue aceitando cartão de crédito em conta checking", async () => {
+            let corrente = await workspaceClient.post(`/Accounts`, { Name: "Outra corrente", Type: "checking" })
+
+            let response = await workspaceClient.post(`/PaymentMethods`, {
+                IdAccount: corrente.body.IdAccount,
+                Name: "Cartão da corrente",
+                Kind: "credit_card",
+                DueDay: 28,
+            })
+
+            expect(response.status).toBe(200)
+            expect((await findPaymentMethodById(response.body.IdPaymentMethod)).Kind).toBe("credit_card")
+        })
+
         //  Os dois campos saíram do modelo: nenhuma regra do sistema lia qualquer um deles, e
         //  quem identifica o cartão na tela é o Name. Mandá-los tem que falhar alto — um
         //  cliente antigo que continuasse enviando acharia que a bandeira ficou gravada.

@@ -91,7 +91,14 @@ export namespace Database {
         IdWorkspace: number
         IdUser: number | null
         Name: string
-        Type: "checking" | "cash"
+        /**
+         * 'checking' -> conta bancaria: nasce com pix + debito, e a UNICA que aceita cartao
+         *               de credito, porque a fatura vence contra ela
+         * 'cash'     -> dinheiro na carteira: nasce com uma forma "Dinheiro"
+         * 'card'     -> saldo fechado sem conta atras (o vale-alimentacao): nasce com uma
+         *               forma unica, Kind='debit', com o NOME DA CONTA
+         */
+        Type: "checking" | "cash" | "card"
         IconPath: string | null
         /** RGB em hexadecimal (#RRGGBB). */
         Color: string | null

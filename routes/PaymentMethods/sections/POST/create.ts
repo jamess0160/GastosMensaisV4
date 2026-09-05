@@ -24,6 +24,11 @@ export class Create {
             })
         }
 
+        //  Só conta corrente aceita cartão de crédito: vale e dinheiro são saldo fechado, e
+        //  uma fatura neles não teria de onde sair. A section recebe a conta que a leitura
+        //  acima já trouxe — nenhuma consulta nova.
+        PaymentMethodKind.assertAccountAcceptsKind(account, body.Kind)
+
         //  Segunda barreira depois do `when` do Joi: a regra do fechamento/vencimento é a
         //  mesma nas duas escritas e mora numa section só.
         PaymentMethodKind.assertKindFields(body.Kind, body)

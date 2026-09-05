@@ -2,8 +2,9 @@ export namespace AccountsNamespace {
 
     export interface CreateAccountPayload {
         Name: string
-        //  Não existe 'credit_card' aqui: cartão é forma de pagamento, não conta.
-        Type: "checking" | "cash"
+        //  Não existe 'credit_card' aqui: cartão de crédito é forma de pagamento, não conta.
+        //  O 'card' é outra coisa — é o vale-alimentação: saldo fechado, sem fatura nenhuma.
+        Type: "checking" | "cash" | "card"
         IconPath: string | null
         Color: string | null
         /** Saldo de abertura. Dado de origem: nenhum lançamento do sistema o deriva. */
@@ -17,7 +18,9 @@ export namespace AccountsNamespace {
     //  deixá-lo como está — e não apagá-lo por omissão.
     export interface UpdateAccountPayload {
         Name: string
-        Type?: "checking" | "cash"
+        //  Aceito aqui, mas a section recusa a troca depois que a conta tem lançamento: o
+        //  Type decide quais formas de pagamento nasceram, e trocá-lo não as refaz.
+        Type?: "checking" | "cash" | "card"
         IconPath?: string | null
         Color?: string | null
         InitialBalance?: number

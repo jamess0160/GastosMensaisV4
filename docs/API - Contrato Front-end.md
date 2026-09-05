@@ -483,27 +483,37 @@ A data que conta é a do lançamento — `CompetenceDate` na entrada, `DueDate` 
 
 O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDate`: uma conta aberta em agosto vem com `Balance: 0` em março. Sem `InitialBalanceDate`, a abertura conta em qualquer mês.
 
-`Type` ∈ `checking` | `cash`. **Não existe conta de tipo cartão** — cartão é forma de pagamento.
+**`Type` ∈ `checking` | `cash` | `card`**, e o tipo decide **quais formas de pagamento nascem com a conta**:
+
+| `Type` | O que é | Nasce com | Aceita cartão de crédito? |
+|---|---|---|---|
+| `checking` | conta bancária | **pix + débito** | **sim** — é a única |
+| `cash` | dinheiro na carteira | uma forma `debit` chamada **"Dinheiro"** | não |
+| `card` | saldo fechado sem conta atrás — o **vale-alimentação** | uma forma `debit` com o **nome da conta** | não |
+
+**`card` não é "conta de cartão de crédito"** — é o oposto disso. **Não existe conta de tipo cartão de crédito**: cartão de crédito é forma de pagamento (seção 6). O `card` é o vale: tem saldo próprio, não tem conta bancária atrás e **não tem fatura** — o gasto sai do saldo no ato, que é por isso que a forma que nasce com ele é `debit` e não um `Kind` novo. Quem precisa do rótulo "vale" na tela tem o `Name`, que é o que o usuário escreve.
 
 ### `POST /Accounts`
 
 | Campo | Tipo | Regra |
 |---|---|---|
 | `Name` | string | obrigatório, ≤255 |
-| `Type` | `checking` \| `cash` | default `checking` |
+| `Type` | `checking` \| `cash` \| `card` | default `checking` |
 | `IconPath` | string \| null | ≤255, default `null` |
 | `Color` | `#RRGGBB` \| null | default `null` |
 | `InitialBalance` | number | 2 casas, default `0`. **Negativo é válido** (cheque especial) |
 | `InitialBalanceDate` | CalendarDate \| null | default `null` |
 | `Position` | int \| null | default `null` |
 
-**Resposta:** `{ "IdAccount": 1 }`. A conta já nasce com uma forma **pix** e uma **débito** — busque-as no `GET`.
+**Resposta:** `{ "IdAccount": 1 }`. A conta já nasce com as formas de pagamento do seu `Type` (a tabela acima) — busque-as no `GET`.
 
 ### `PUT /Accounts/IdAccount=:IdAccount`
 
 `Name` obrigatório; `Type`, `IconPath`, `Color`, `InitialBalance`, `InitialBalanceDate`, `Position` opcionais (omitido = mantém).
 
 > **`InitialBalance` congela depois do primeiro lançamento:** alterá-lo responde `406` `"Esta conta já tem lançamentos: o saldo inicial não pode mais ser alterado."` Desabilite o campo na tela quando a conta já tiver movimento.
+
+> **`Type` congela pela mesma regra:** alterá-lo depois do primeiro lançamento responde `406` `"Esta conta já tem lançamentos: o tipo dela não pode mais ser alterado."` O `Type` decide quais formas de pagamento nasceram com a conta, e trocá-lo **não as refaz** — nem numa conta vazia, onde a troca é aceita: as formas que nasceram ficam como estão, e renomeá-las é do usuário. Desabilite o campo junto com o saldo inicial.
 
 **Resposta:** `{ "msg": "Conta atualizada com sucesso" }`.
 
@@ -541,6 +551,8 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
 
 `Kind` ∈ `pix` | `debit` | `credit_card`. `DueDay`/`ClosingOffsetDays` só fazem sentido em `credit_card` — nas outras são `null`.
 
+**`debit` cobre três coisas diferentes** e o que as separa é o `Name`, não o `Kind`: o débito da conta corrente, o "Dinheiro" da conta `cash` e a forma com o nome da conta num vale (`Type='card'`). Nas três o gasto sai do saldo **no ato** e não há fatura — que é exatamente o que `debit` significa no modelo.
+
 **O cartão é descrito pelo vencimento, não pelo fechamento.** `DueDay` é o dia do mês em que a fatura vence e `ClosingOffsetDays` é quantos dias **antes** dele ela fecha — é o dado que o emissor realmente pede ao cliente, e a folga é o que ele aplica por baixo. Não existe mais um campo com o dia do fechamento: ele é `DueDay − ClosingOffsetDays` e muda de mês para mês (vencendo dia 5 com folga de 7, a fatura fecha em 26/02 e em 29/03).
 
 Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias, e o **default é 7**. Na tela de cadastro, peça o vencimento e deixe a folga num campo avançado já preenchido.
@@ -550,6 +562,8 @@ Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias,
 ### `POST /PaymentMethods`
 
 **Só cartão de crédito.** Pix e débito nascem com a conta e não se criam pela mão.
+
+> **E só em conta `checking`.** `IdAccount` apontando para uma conta `cash` ou `card` responde `406` `"Cartão de crédito só existe em conta corrente."` As duas são contas de **saldo fechado** — dinheiro na carteira e vale-alimentação — e uma fatura nelas não teria de onde sair: o cartão de crédito é uma dívida que vence contra uma conta bancária. Na tela de cadastro do cartão, ofereça **só as contas `checking`** no seletor.
 
 | Campo | Tipo | Regra |
 |---|---|---|
@@ -1326,6 +1340,24 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-05 — `/Accounts` e `/PaymentMethods`: conta "apenas cartão", e quem aceita cartão de crédito
+
+🟢 **Adição** na seção 5 e 🔴 **Quebra** na seção 6.
+
+**Entrou o `Type='card'`.** O caso é o **vale-alimentação**: um cartão com saldo próprio, sem conta bancária atrás e **sem fatura**. Até aqui o cadastro obrigava a escolher entre `checking` (que nasce com pix + débito) e `cash` (que nasce com "Dinheiro"), e nenhum dos dois descreve um vale.
+
+A conta `card` nasce com **uma forma de pagamento só**, `Kind='debit'`, **com o nome da conta** — "Vale Alimentação" é o que o usuário quer ver na hora de escolher como pagou. Não há `Kind='voucher'`: vale não tem fatura, o gasto sai do saldo no ato, e isso já é o que `debit` significa. `InitialBalance` funciona normalmente e é o saldo do vale, com a trava de sempre (congela no primeiro lançamento).
+
+**Ação do front:** acrescentar a opção no seletor de tipo de conta do cadastro. Nada mais muda para quem já usa `checking` e `cash` — os dois continuam criando exatamente o que criavam.
+
+🔴 **`POST /PaymentMethods` passa a responder `406` para cartão de crédito fora de conta corrente.** `IdAccount` de uma conta `cash` **ou** `card` devolve `"Cartão de crédito só existe em conta corrente."` As duas são contas de saldo fechado e uma fatura nelas não teria de onde sair.
+
+**Ação do front:** no cadastro do cartão de crédito, oferecer **só as contas `checking`** no seletor de conta. Na prática esse caminho nunca foi oferecido, mas a chamada existia e passava — por isso entra como quebra, e não como comportamento.
+
+**É regra nova para o `cash` também**, não só para o tipo que está nascendo: fazer valer para um e não para o outro deixaria a regra arbitrária. **Linhas que já existem continuam valendo:** um cartão criado antes numa conta `cash` não é apagado nem migrado — gasto lançado aponta para ele.
+
+🟡 **`PUT /Accounts` passa a recusar a troca de `Type` em conta já movimentada**, com `406` `"Esta conta já tem lançamentos: o tipo dela não pode mais ser alterado."` — a mesma trava que o `InitialBalance` já tinha, e pela mesma pergunta ("esta conta tem movimento?"). Enquanto a conta está vazia a troca passa, e **não cria nem apaga forma de pagamento nenhuma**: as que nasceram ficam. Desabilite o campo `Type` junto com o `InitialBalance`.
 
 ### 2026-09-05 — `GET /ExpensePayments`: a lista do que **cai** no mês, com a parcela da compra antiga junto
 

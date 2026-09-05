@@ -3,6 +3,16 @@ import { joiController } from "root/Utils/joiController"
 import { color, isoDate, referenceMonth } from "root/Utils/joiSchemas"
 import { paymentMethodResponse } from "root/routes/PaymentMethods/PaymentMethods.schema"
 
+//  Os três tipos de conta, e o que cada um significa para as formas de pagamento que nascem
+//  com ela (PaymentMethods/sections/POST/createDefaults.ts):
+//
+//      checking -> conta bancária: pix + débito. A ÚNICA que aceita cartão de crédito
+//      cash     -> dinheiro na carteira: uma forma "Dinheiro"
+//      card     -> vale-alimentação: uma forma só, Kind='debit', com o nome da conta
+//
+//  'card' não é "conta de cartão de crédito": é o oposto disso — saldo fechado e sem fatura.
+const accountType = Joi.string().valid("checking", "cash", "card")
+
 class Schema {
 
     //  Sem validateParams em nenhuma rota daqui: o IdWorkspace saiu do caminho e vem do
@@ -21,7 +31,7 @@ class Schema {
             IdWorkspace: Joi.number().required(),
             IdUser: Joi.number().allow(null).required(),
             Name: Joi.string().required(),
-            Type: Joi.string().valid("checking", "cash").required(),
+            Type: accountType.required(),
             IconPath: Joi.string().allow(null).required(),
             Color: Joi.string().allow(null).required(),
             InitialBalance: Joi.number().required(),
@@ -43,8 +53,9 @@ class Schema {
     public readonly create = [
         joiController.validateBody(Joi.object({
             Name: Joi.string().trim().max(255).required(),
-            //  Não há "credit_card": cartão é forma de pagamento, filha da conta.
-            Type: Joi.string().valid("checking", "cash").default("checking"),
+            //  Não há "credit_card": cartão de crédito é forma de pagamento, filha da conta.
+            //  O 'card' é o vale-alimentação, que é conta de verdade — só não tem fatura.
+            Type: accountType.default("checking"),
             IconPath: Joi.string().trim().max(255).allow(null).default(null),
             Color: color.allow(null).default(null),
             //  Negativo é válido (conta no cheque especial). precision(2) porque a coluna é
@@ -67,7 +78,9 @@ class Schema {
         })),
         joiController.validateBody(Joi.object({
             Name: Joi.string().trim().max(255).required(),
-            Type: Joi.string().valid("checking", "cash").optional(),
+            //  Aceito, mas a section recusa a troca depois do primeiro lançamento — ver
+            //  PUT/update.ts. Trocar o Type não cria nem apaga forma de pagamento nenhuma.
+            Type: accountType.optional(),
             IconPath: Joi.string().trim().max(255).allow(null).optional(),
             Color: color.allow(null).optional(),
             //  Aceitos aqui, mas a section recusa a troca depois que a conta tem lançamento:

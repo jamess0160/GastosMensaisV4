@@ -22,10 +22,38 @@ export class Update {
         }
 
         await this.assertOpeningBalanceIsFree(account, body)
+        await this.assertTypeIsFree(account, body)
 
         await Accounts_model.update(IdAccount, body)
 
         return { msg: "Conta atualizada com sucesso" }
+    }
+
+    //  O Type decide **quais formas de pagamento nasceram com a conta** — pix + débito na
+    //  corrente, "Dinheiro" no cash, uma com o nome da conta no card — e trocá-lo não as
+    //  refaz: uma corrente virando vale ficaria com pix e débito e sem a forma do vale.
+    //
+    //  Trava pela mesma pergunta do saldo de abertura, e pelo mesmo motivo: enquanto a conta
+    //  está vazia é correção de digitação e passa direto; depois do primeiro lançamento a
+    //  troca reescreveria o significado do que já foi lançado — um gasto no crédito de uma
+    //  conta que passou a ser vale é uma fatura pendurada onde não existe fatura.
+    //
+    //  Trocar o Type numa conta vazia continua não criando nem apagando forma nenhuma: as que
+    //  nasceram ficam, e renomeá-las é do usuário. Nada fica inconsistente porque nada foi
+    //  lançado ainda.
+    private async assertTypeIsFree(account: Database.Accounts, body: AccountsNamespace.UpdateAccountPayload) {
+
+        //  Reenviar o mesmo valor não é troca: o cliente que devolve o objeto inteiro no PUT
+        //  não pode ser barrado por isso.
+        if (body.Type === undefined || body.Type === account.Type) return
+
+        if (await AccountMovement.hasMovement(account.IdAccount)) {
+            throw new APIError({
+                msg: "Esta conta já tem lançamentos: o tipo dela não pode mais ser alterado.",
+                status: 406,
+                data: { IdAccount: account.IdAccount, Type: account.Type },
+            })
+        }
     }
 
     //  O saldo de abertura é o chão de onde todo o resto é calculado — não há coluna de saldo

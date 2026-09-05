@@ -220,7 +220,8 @@ describe("Accounts", () => {
             expect(response.status).toBe(406)
         })
 
-        //  Cartão é forma de pagamento, não conta: o Type só tem checking e cash
+        //  Cartão DE CRÉDITO é forma de pagamento, não conta — o Type='card' é outra coisa:
+        //  o vale-alimentação, que é saldo fechado e sem fatura nenhuma
         it("recusa conta do tipo credit_card", async () => {
             let response = await client.post(`/Accounts`, { Name: "Cartão", Type: "credit_card" })
 
@@ -297,6 +298,80 @@ describe("Accounts", () => {
 
             expect(response.status).toBe(200)
             expect(account).toMatchObject({ Type: "checking", InitialBalance: 0, InitialBalanceDate: null })
+        })
+
+        //  O galho que nasce nesta etapa: o vale-alimentação. Uma forma só, 'debit', e o nome
+        //  é o da conta — "Vale Alimentação" é o que o usuário quer ver ao escolher como pagou.
+        it("cria conta card com uma única forma de débito, com o nome da conta", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+
+            let response = await workspaceClient.post(`/Accounts`, {
+                Name: "Vale Alimentação",
+                Type: "card",
+                InitialBalance: 500,
+            })
+
+            expect(response.status).toBe(200)
+
+            let [account] = await findAccounts(user.workspace.IdWorkspace)
+
+            expect(account).toMatchObject({ Type: "card", InitialBalance: 500 })
+
+            let methods = await findPaymentMethods(response.body.IdAccount)
+
+            expect(methods).toHaveLength(1)
+            expect(methods[0]).toMatchObject({ Kind: "debit", Name: "Vale Alimentação" })
+            //  Vale não tem fatura: nem vencimento, nem folga de fechamento
+            expect(methods[0].DueDay).toBeNull()
+            expect(methods[0].ClosingOffsetDays).toBeNull()
+        })
+
+        //  **O galho novo não pode mexer nos dois que já existem.** O cash continua com a
+        //  forma de nome fixo, e é justamente o nome que o separa do card.
+        it("mantém o cash criando a forma Dinheiro", async () => {
+            let user = await UsersFactory.create()
+
+            let response = await new TestClient(user.token).post(`/Accounts`, { Name: "Carteira", Type: "cash" })
+
+            let methods = await findPaymentMethods(response.body.IdAccount)
+
+            expect(response.status).toBe(200)
+            expect(methods).toHaveLength(1)
+            expect(methods[0]).toMatchObject({ Kind: "debit", Name: "Dinheiro" })
+        })
+
+        //  Não há fatura numa conta card, então a perna nasce sem as datas dela — e quitada
+        //  ela desce do saldo no ato, como qualquer débito.
+        it("lança gasto no vale sem datas de fatura, e a perna quitada desce do saldo", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+
+            let created = await workspaceClient.post(`/Accounts`, {
+                Name: "Vale Alimentação",
+                Type: "card",
+                InitialBalance: 500,
+            })
+
+            let [method] = await findPaymentMethods(created.body.IdAccount)
+            let category = await workspaceClient.post(`/Categories`, { Description: "Mercado" })
+
+            let expense = await workspaceClient.post(`/Expenses`, {
+                Description: "Compra do mês",
+                TotalValue: 120,
+                IdCategory: category.body.IdCategory,
+                ExpenseDate: "2026-08-10",
+                Payments: [{ IdPaymentMethod: method.IdPaymentMethod, Value: 120, Paid: true }],
+            })
+
+            expect(expense.status).toBe(200)
+
+            let [leg] = await TestDatabase.connection().select("*").from("ExpensePayments").where("IdExpense", expense.body.IdExpense)
+
+            expect(leg.ClosingDate).toBeNull()
+            expect(leg.DueDate).toBeNull()
+
+            expect(await balanceOf(workspaceClient, created.body.IdAccount, "2026-08")).toBe(380)
         })
     })
 
@@ -424,6 +499,62 @@ describe("Accounts", () => {
             let response = await workspaceClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, {
                 Name: "Renomeada",
                 InitialBalance: 100,
+            })
+
+            expect(response.status).toBe(200)
+        })
+
+        //  O Type decide quais formas de pagamento nasceram com a conta, e trocá-lo não as
+        //  refaz: uma corrente virando vale ficaria com pix e débito e sem a forma do vale.
+        //  Mesma trava do saldo de abertura, e pela mesma pergunta.
+        it("recusa trocar o Type de conta já movimentada", async () => {
+            let user = await UsersFactory.create()
+            let IdWorkspace = user.workspace.IdWorkspace
+            let workspaceClient = new TestClient(user.token)
+
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta", InitialBalance: 100 })
+
+            await seedInflow(IdWorkspace, created.body.IdAccount)
+
+            let response = await workspaceClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, {
+                Name: "Conta",
+                Type: "card",
+            })
+
+            expect(response.status).toBe(406)
+            expect((await findAccountById(created.body.IdAccount)).Type).toBe("checking")
+        })
+
+        //  Conta vazia é correção de digitação e passa direto, como o saldo de abertura
+        it("aceita trocar o Type enquanto a conta não tem lançamento", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta", Type: "checking" })
+
+            let response = await workspaceClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, {
+                Name: "Conta",
+                Type: "card",
+            })
+
+            expect(response.status).toBe(200)
+            expect((await findAccountById(created.body.IdAccount)).Type).toBe("card")
+        })
+
+        //  Reenviar o mesmo Type não é troca — o cliente que devolve o objeto inteiro no PUT
+        //  não pode ser barrado por isso
+        it("aceita reenviar o mesmo Type com a conta já movimentada", async () => {
+            let user = await UsersFactory.create()
+            let IdWorkspace = user.workspace.IdWorkspace
+            let workspaceClient = new TestClient(user.token)
+
+            let created = await workspaceClient.post(`/Accounts`, { Name: "Conta", Type: "checking" })
+
+            await seedInflow(IdWorkspace, created.body.IdAccount)
+
+            let response = await workspaceClient.put(`/Accounts/IdAccount=${created.body.IdAccount}`, {
+                Name: "Renomeada",
+                Type: "checking",
             })
 
             expect(response.status).toBe(200)
