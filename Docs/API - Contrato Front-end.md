@@ -2,6 +2,8 @@
 
 Documento gerado a partir dos `*.route.ts` e `*.schema.ts` do repositório. Ele descreve **o que a API aceita e o que devolve hoje**. Toda validação citada aqui é a que roda de verdade (Joi, em `<Feature>.schema.ts`), não uma intenção.
 
+> **Mudou alguma coisa?** O [changelog](#18-changelog) no fim do documento lista toda alteração que afeta o front, da mais recente para a mais antiga, dizendo o que quebra e o que fazer. Comece por ele.
+
 ---
 
 ## 1. Convenções gerais
@@ -320,11 +322,15 @@ Edita o workspace **selecionado na sessão** — sem id no caminho.
 
 ## 5. Accounts — `/Accounts` 🔒
 
-Uma conta **não tem saldo guardado**. `Balance` é calculado a cada leitura.
+Uma conta **não tem saldo guardado**. `Balance` é calculado a cada leitura, e é sempre o saldo **de um mês**.
 
 ### `GET /Accounts`
 
-Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
+| Query | Tipo | Regra |
+|---|---|---|
+| `ReferenceMonth` | `YYYY-MM` | opcional, default **o mês corrente** |
+
+Devolve as contas do workspace com as formas de pagamento embutidas. **O `ReferenceMonth` recorta o `Balance`, não a lista** — as contas são as mesmas em qualquer mês. Mande o mês que a tela está exibindo.
 
 ```json
 [{
@@ -346,7 +352,14 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 }]
 ```
 
-**`Balance`** = `InitialBalance` + entradas recebidas − transferências que saíram − **pernas de gasto pagas**. Pendente é previsão e **não entra**. Não é coluna: não tente recalcular somando lançamentos no cliente.
+**`Balance`** = `InitialBalance` + entradas recebidas − transferências que saíram − **pernas de gasto pagas**, tudo **com data até o último dia do `ReferenceMonth`**. Pendente é previsão e **não entra**. Não é coluna: não tente recalcular somando lançamentos no cliente.
+
+A data que conta é a do lançamento — `CompetenceDate` na entrada, `DueDate` (ou a data do gasto, fora de cartão) na perna —, **não a data em que se clicou em receber/quitar**. Duas consequências para a tela:
+
+- uma entrada de setembro já marcada como recebida **não** aparece no saldo de agosto: peça `ReferenceMonth=2026-09` para vê-la;
+- quitar hoje a parcela que vence em novembro **não** mexe no saldo de agosto — ela sai no saldo de novembro.
+
+O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDate`: uma conta aberta em agosto vem com `Balance: 0` em março. Sem `InitialBalanceDate`, a abertura conta em qualquer mês.
 
 `Type` ∈ `checking` | `cash`. **Não existe conta de tipo cartão** — cartão é forma de pagamento.
 
@@ -393,8 +406,8 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
   "IdAccount": 1,
   "Name": "Cartão Roxo",
   "Kind": "credit_card",
-  "ClosingDay": 20,
   "DueDay": 27,
+  "ClosingOffsetDays": 7,
   "Brand": "Mastercard",
   "LastDigits": "1234",
   "IconPath": null,
@@ -406,7 +419,11 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 }
 ```
 
-`Kind` ∈ `pix` | `debit` | `credit_card`. `ClosingDay`/`DueDay` só fazem sentido em `credit_card` — nas outras são `null`.
+`Kind` ∈ `pix` | `debit` | `credit_card`. `DueDay`/`ClosingOffsetDays` só fazem sentido em `credit_card` — nas outras são `null`.
+
+**O cartão é descrito pelo vencimento, não pelo fechamento.** `DueDay` é o dia do mês em que a fatura vence e `ClosingOffsetDays` é quantos dias **antes** dele ela fecha — é o dado que o emissor realmente pede ao cliente, e a folga é o que ele aplica por baixo. Não existe mais um campo com o dia do fechamento: ele é `DueDay − ClosingOffsetDays` e muda de mês para mês (vencendo dia 5 com folga de 7, a fatura fecha em 26/02 e em 29/03).
+
+Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias, e o **default é 7**. Na tela de cadastro, peça o vencimento e deixe a folga num campo avançado já preenchido.
 
 ### `POST /PaymentMethods`
 
@@ -417,8 +434,8 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 | `IdAccount` | number | obrigatório |
 | `Name` | string | obrigatório, ≤255 |
 | `Kind` | `credit_card` | obrigatório, único valor aceito |
-| `ClosingDay` | int 1–31 | **obrigatório** |
 | `DueDay` | int 1–31 | **obrigatório** |
+| `ClosingOffsetDays` | int 1–28 | default `7` |
 | `Brand` | string \| null | ≤100, default `null` |
 | `LastDigits` | string \| null | exatamente 4 dígitos, default `null` |
 | `IconPath` | string \| null | ≤255, default `null` |
@@ -429,9 +446,11 @@ Sem query. Devolve as contas do workspace com as formas de pagamento embutidas.
 
 ### `PUT /PaymentMethods/IdPaymentMethod=:IdPaymentMethod`
 
-`Name` obrigatório; `ClosingDay`, `DueDay`, `Brand`, `LastDigits`, `IconPath`, `Color`, `Position` opcionais.
+`Name` obrigatório; `DueDay`, `ClosingOffsetDays`, `Brand`, `LastDigits`, `IconPath`, `Color`, `Position` opcionais.
 
-**`Kind` e `IdAccount` não são aceitos:** um pix não vira cartão e um cartão não muda de conta — as duas trocas reescreveriam o significado das compras já lançadas nele. Mandar `null` em `ClosingDay`/`DueDay` de um cartão dá `406`.
+**`Kind` e `IdAccount` não são aceitos:** um pix não vira cartão e um cartão não muda de conta — as duas trocas reescreveriam o significado das compras já lançadas nele. Mandar `null` em `DueDay`/`ClosingOffsetDays` de um cartão dá `406`.
+
+**Editar o cartão não recalcula as compras já lançadas.** `ClosingDate`/`DueDate` são gravadas na perna no momento do lançamento (seção 11) e não são revistas depois. Corrigir o vencimento ou a folga vale para o que vier daí em diante; o que já está gravado só muda por um `PUT` no próprio gasto.
 
 **Resposta:** `{ "msg": "Forma de pagamento atualizada com sucesso" }`.
 
@@ -706,9 +725,20 @@ Um gasto tem **dois rateios independentes que nunca se cruzam**:
 
 ### `GET /Expenses`
 
-**Query** (todos opcionais): `From`, `To` (`YYYY-MM-DD`, inclusivos, sobre `ExpenseDate`), `Status`, `Kind`, `IdCategory`.
+**Query** (todos opcionais): `From`, `To` (`YYYY-MM-DD`, inclusivos, sobre `ExpenseDate`), `Status`, `Kind`, `IdCategory`, `IncludeCanceled`.
 
-Sem `Status`, os cancelados ficam de fora.
+Sem `Status` e sem `IncludeCanceled`, os cancelados ficam de fora.
+
+**`IncludeCanceled`** (booleano, default `false`) existe para o filtro de status **multi-seleção**: é ele que traz "em aberto **e** cancelado" numa requisição só.
+
+| Query | O que volta |
+|---|---|
+| *(nada)* ou `IncludeCanceled=false` | Tudo menos os cancelados |
+| `IncludeCanceled=true` | **A lista completa**, cancelados incluídos — separe por `Status` no cliente |
+| `Status=canceled` | **Só** os cancelados |
+| `Status=pending` (com ou sem `IncludeCanceled`) | Só os `pending` — `Status` é sempre um estado só, e ganha do booleano |
+
+Peça o mês **uma vez** com `IncludeCanceled=true` e aplique os filtros de tela sobre essa lista: uma chave de cache por mês, em vez de uma por combinação de filtro.
 
 **Resposta** — sem pernas, rateio ou tags (a lista de mês não os mostra):
 
@@ -771,7 +801,7 @@ A mesma linha **mais os três filhos**:
 
 **`ClosingDate`/`DueDate` vivem na perna, não no gasto** — cada parcela cai numa fatura. São `null` fora de `credit_card`, **exceto** que uma parcela sempre ganha `DueDate` de mês em mês: parcelamento não é privilégio de cartão (crediário, dividir uma compra com um amigo no pix).
 
-> Em cartão, um dia de diferença na compra vira **um mês** de diferença no caixa: comprou até o dia do fechamento, cai na fatura deste mês; depois dele, na do mês seguinte.
+> Em cartão, um dia de diferença na compra vira **um mês** de diferença no caixa: a compra entra na **primeira fatura que ainda não fechou**. O fechamento sai do cartão como `DueDay − ClosingOffsetDays` (seção 6), então ele é uma data que muda de mês para mês — não um dia fixo do calendário.
 
 ### `POST /Expenses`
 
@@ -1050,3 +1080,88 @@ Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de
 | GET | `/Utils/Health` | público |
 | GET | `/Utils/Reload` | 🔒 |
 | POST | `/Utils/Logs` | 🔒 |
+
+---
+
+## 18. Changelog
+
+Toda mudança da API que o front enxerga entra aqui, **da mais recente para a mais antiga**. O
+resto do documento descreve sempre o estado *atual*; esta seção é o que diz **o que mudou desde
+a última vez que você leu** e o que precisa mudar do seu lado.
+
+Uma entrada tem sempre as mesmas quatro partes: a data, a rota afetada, **se quebra ou não** o
+que já está escrito, e a ação do front. Mudança que não afeta o front (refatoração interna,
+teste, índice de banco) **não** entra aqui.
+
+| Marcador | Significado |
+|---|---|
+| 🔴 **Quebra** | Código do front que funcionava para de funcionar, ou passa a mostrar número errado. Exige ação |
+| 🟡 **Comportamento** | Nada quebra na chamada, mas a resposta mudou de significado. Confira antes de ignorar |
+| 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
+
+---
+
+### 2026-09-03 — `GET /Expenses`: `IncludeCanceled` traz os cancelados junto com o resto
+
+🟢 **Adição** — ver a seção 11, `/Expenses`.
+
+**O que entrou.** Um booleano opcional na query, `IncludeCanceled`, default `false`. Com ele em `true` a lista vem completa, cancelados incluídos.
+
+**Nada do que já existe muda.** `IncludeCanceled` ausente ou `false` devolve exatamente a resposta de hoje, e `Status=canceled` continua trazendo só os cancelados. `Status` e `IncludeCanceled` podem vir juntos, e **`Status` ganha**: ele é sempre o recorte de um estado só.
+
+**Ação do front:** para o filtro de status multi-seleção, pare de mandar `Status` e mande `IncludeCanceled=true`, separando por `Status` no cliente. Quem não usa o filtro não muda nada.
+
+**Por que um booleano e não `Status` aceitando lista** — com o booleano o app pede **o mês uma vez** e aplica os cinco filtros de tela sobre a lista em cache: uma chave de cache por mês, reaproveitada entre Início, Gastos e Relatório. Com `Status` em lista, cada combinação de filtro vira uma consulta e uma chave nova. A alternativa do lado do cliente — disparar as duas consultas e fundir por id — dobrava a requisição do mês e mudava de lugar uma regra ("o que a lista contém") que é do servidor.
+
+### 2026-09-03 — `/PaymentMethods`: o cartão passa a ser descrito pelo **vencimento e uma folga**, não por um dia de fechamento
+
+🔴 **Quebra** — ver as seções 6, `/PaymentMethods`, e 11, `/Expenses`.
+
+**`ClosingDay` deixou de existir.** No lugar entrou **`ClosingOffsetDays`**: quantos dias antes do vencimento a fatura fecha, default `7`, aceito de 1 a 28. `DueDay` continua igual e passa a ser o único campo obrigatório dos dois.
+
+**Ação do front:**
+
+- **`POST` e `PUT /PaymentMethods`:** trocar `ClosingDay` por `ClosingOffsetDays`. Mandar `ClosingDay` agora é `406`. Se o formulário só pedir o vencimento, **omita a folga** e deixe o default de 7 valer.
+- **Ler a linha da forma de pagamento** (dentro de `GET /Accounts`): `ClosingDay` sumiu da resposta. Quem mostrava "fecha dia 20" tem que calcular a data a partir de `DueDay − ClosingOffsetDays`, lembrando que ela **muda de mês para mês**.
+- **Tela de cadastro:** pergunte o **vencimento**, que é o que o usuário sabe de cabeça, e deixe a folga num campo avançado já preenchido com 7.
+
+**Por que mudou** — o modelo pedia um dado que o usuário não tem: nenhum emissor brasileiro deixa escolher o dia do fechamento, todos pedem o vencimento e fecham N dias antes. Pior, um fechamento guardado como dia do mês precisava ser grampeado onde o dia não existe (dia 30 em fevereiro) enquanto a comparação que decide a fatura seguia usando o número original — as duas metades da regra passavam a falar de datas diferentes. E a rolagem do vencimento tinha que ser inferida de dois números soltos, em vez de ser a própria subtração.
+
+**Os cálculos de `ClosingDate`/`DueDate` das pernas mudam junto** (seção 11), mesmo para cartões cujo cadastro não for tocado, porque a regra de qual fatura recebe a compra é outra. Um cartão que vence dia 10 com folga de 7 agora fecha dia 3: a compra do dia 2 vence **no mesmo mês**, onde antes o par `fecha 30 / vence 10` sempre a jogava para o mês seguinte. Confira as datas que a sua tela mostra depois de subir.
+
+**Gastos já lançados não são recalculados pela API.** As pernas guardam as datas do momento do lançamento; nada as revisita.
+
+### 2026-08-31 — `GET /Accounts`: o saldo agora é sempre o saldo **de um mês**
+
+🟡 **Comportamento** · 🟢 **Adição** — ver a seção 5, `/Accounts`.
+
+**O que estava errado.** O `Balance` filtrava só por *estado* (`Status='received'` na entrada,
+`Paid=true` na perna de gasto) e por **data nenhuma**. Estado não é data: uma entrada com
+`CompetenceDate` em setembro que já tivesse sido marcada como recebida entrava no saldo exibido
+em agosto, e quitar hoje uma parcela que vence em novembro tirava o dinheiro do saldo de agosto.
+O saldo ficava plausível e errado.
+
+**O que mudou.**
+
+- `GET /Accounts` passou a aceitar `?ReferenceMonth=YYYY-MM` (**opcional**, default o mês
+  corrente). Ele recorta **o `Balance`, não a lista** — as contas são as mesmas em qualquer mês.
+- O corte vai até o **último dia** do mês pedido e lê **a data do lançamento**: `CompetenceDate`
+  na entrada, `DueDate` (ou a data do gasto, fora de cartão) na perna. **Não** a data em que se
+  clicou em receber/quitar.
+- O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDate`: conta
+  aberta em agosto vem com `Balance: 0` em março. Sem `InitialBalanceDate` a abertura conta em
+  qualquer mês, como antes.
+- `ReferenceMonth` fora do formato `YYYY-MM` responde `406` (`"Parâmetros inválidos na Query."`).
+
+**Ação do front.**
+
+1. Na tela que tem seletor de mês, **mande o mês exibido**: `GET /Accounts?ReferenceMonth=2026-08`.
+   Sem o parâmetro você recebe o mês corrente, que é o comportamento certo para quem abre o app.
+2. Se você exibe saldo junto de uma lista filtrada por `From`/`To`, os dois recortes são
+   diferentes de propósito — saldo é **posição** (mês fechado), lista é **fatia** (intervalo
+   livre). Não tente derivar um do outro.
+3. Números que pareciam certos podem mudar: um saldo que incluía lançamento de mês futuro agora
+   não inclui mais. Isso é a correção, não uma regressão.
+
+**Não mudou:** a forma da linha de `Accounts`, o `POST`/`PUT`/`DELETE`, nem a regra de que
+pendente é previsão e não entra no saldo.
