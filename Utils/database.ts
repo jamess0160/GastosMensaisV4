@@ -166,7 +166,17 @@ export namespace Database {
         IdBudget: number
         IdWorkspace: number
         IdUser: number | null
-        IdCategory: number
+        /**
+         * O alvo do teto: IdCategory OU IdPerson, nunca os dois e nunca nenhum - um CHECK
+         * garante o xor, e dois indices parciais garantem a unicidade dentro de cada tipo.
+         *
+         * Sao duas perguntas diferentes sobre o mesmo dinheiro ("quanto foi de mercado" e
+         * "quanto foi da Maria"), entao um gasto conta nos dois. O que nao se pode e somar
+         * os dois num total.
+         */
+        IdCategory: number | null
+        /** O outro alvo possivel: o eixo ANALITICO (ExpensePersons), nao o financeiro. */
+        IdPerson: number | null
         LimitValue: number
         AlertPercent: number
         Active: boolean

@@ -12,7 +12,10 @@ import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tes
 //     novo; o mês é congelado e não se mexe sozinho. É o que faz "em agosto meu teto era 800"
 //     continuar tendo resposta depois do reajuste de setembro;
 //  2. **o comprometido** — a parcela conta no mês em que vence, não no mês da compra, e o
-//     pendente conta junto com o pago, ao contrário do saldo.
+//     pendente conta junto com o pago, ao contrário do saldo;
+//  3. **o alvo é uma categoria OU uma pessoa** — a mesma tabela, o mesmo POST e a mesma lista,
+//     com o `Spent` da pessoa **rateado pelas parcelas** para dar o mesmo número que a
+//     categoria enxerga. Um gasto conta nos dois, e isso não é dupla contagem.
 
 describe("Budgets", () => {
 
@@ -173,6 +176,145 @@ describe("Budgets", () => {
             expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-09`)).body[0].Spent).toBe(100)
         })
 
+        //  **O teste que sustenta a decisão do rateio.** Sem ele, o mesmo gasto contaria 600
+        //  no orçamento da pessoa e 100 no da categoria, e "quanto a Maria comprometeu em
+        //  agosto" não teria resposta certa.
+        it("rateia a parcela pelo rateio do gasto: 600 em 6x da Maria dão 100 no mês", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createPersonBudget(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            await createExpense(workspace, {
+                TotalValue: 600,
+                Kind: "installment",
+                InstallmentTotal: 6,
+                ExpenseDate: "2026-08-10",
+                Persons: [{ IdPerson, Value: 600 }],
+            })
+
+            let response = await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toHaveLength(1)
+            //  100, não 600: o rateio é do gasto e a parcela é da perna
+            expect(response.body[0].Spent).toBe(100)
+        })
+
+        //  São duas perguntas diferentes sobre o mesmo dinheiro, e as duas respondem o mesmo
+        //  número quando o gasto é todo de uma pessoa só. Somar as duas é que seria errado.
+        it("conta a mesma compra no orçamento da categoria e no da pessoa", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createBudget(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPersonBudget(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            await createExpense(workspace, {
+                TotalValue: 250,
+                ExpenseDate: "2026-08-10",
+                Persons: [{ IdPerson, Value: 250 }],
+            })
+
+            let response = await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)
+
+            expect(response.body).toHaveLength(2)
+
+            let byScope = new Map(response.body.map((item: { Scope: string }) => [item.Scope, item]))
+
+            expect((byScope.get("category") as { Spent: number }).Spent).toBe(250)
+            expect((byScope.get("person") as { Spent: number }).Spent).toBe(250)
+        })
+
+        //  Arredonda **uma vez, no fim**: 400/600 da parcela de 100 é 66,666..., e arredondar
+        //  por parcela espalharia o erro. As duas partes ainda fecham com a parcela.
+        it("arredonda o rateio uma vez, no fim", async () => {
+            let workspace = await buildWorkspace()
+            let maria = await createPerson(workspace, "Maria")
+            let joao = await createPerson(workspace, "João")
+
+            await createPersonBudget(workspace, maria, { ReferenceMonth: "2026-08", LimitValue: 500 })
+            await createPersonBudget(workspace, joao, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            await createExpense(workspace, {
+                TotalValue: 600,
+                Kind: "installment",
+                InstallmentTotal: 6,
+                ExpenseDate: "2026-08-10",
+                Persons: [{ IdPerson: maria, Value: 400 }, { IdPerson: joao, Value: 200 }],
+            })
+
+            let response = await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)
+
+            let byPerson = new Map(response.body.map((item: { IdPerson: number }) => [item.IdPerson, item]))
+
+            expect((byPerson.get(maria) as { Spent: number }).Spent).toBe(66.67)
+            expect((byPerson.get(joao) as { Spent: number }).Spent).toBe(33.33)
+        })
+
+        //  **Parece bug e não é.** Persons é opcional no gasto, então a soma dos orçamentos de
+        //  pessoa não fecha com o total gasto do mês — está escrito no contrato por isso.
+        it("não conta no orçamento de pessoa o gasto sem rateio", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createBudget(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPersonBudget(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            await createExpense(workspace, { TotalValue: 250, ExpenseDate: "2026-08-10" })
+
+            let response = await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)
+
+            let byScope = new Map(response.body.map((item: { Scope: string }) => [item.Scope, item]))
+
+            //  A categoria enxerga o gasto inteiro; a pessoa não enxerga nada
+            expect((byScope.get("category") as { Spent: number }).Spent).toBe(250)
+            expect((byScope.get("person") as { Spent: number }).Spent).toBe(0)
+        })
+
+        //  O Scope vem derivado para o cliente não ter que deduzir o tipo pelo id que veio nulo
+        it("devolve os dois tipos na mesma lista, com o alvo inteiro e o Scope derivado", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createBudget(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPersonBudget(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            let response = await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)
+
+            expect(response.body).toHaveLength(2)
+
+            let byScope = new Map(response.body.map((item: { Scope: string }) => [item.Scope, item]))
+
+            expect(byScope.get("category")).toMatchObject({
+                IdCategory: workspace.IdCategory,
+                IdPerson: null,
+                Person: null,
+                Category: { Description: "Mercado" },
+            })
+
+            expect(byScope.get("person")).toMatchObject({
+                IdPerson,
+                IdCategory: null,
+                Category: null,
+                Person: { Name: "Maria" },
+            })
+        })
+
+        //  Mesma regra da categoria arquivada: o teto perde o que mostrar e sai da tela, mas a
+        //  linha continua no banco — arquivar não é apagar, e o mês é histórico
+        it("esconde do mês o orçamento de pessoa arquivada", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            let budget = await createPersonBudget(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            await workspace.client.delete(`/Persons/IdPerson=${IdPerson}`)
+
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body).toHaveLength(0)
+            expect(await findPeriods(budget.IdBudget)).toHaveLength(1)
+        })
+
         //  No cartão, o que pesa no mês é a fatura que vence nele — a compra do dia 21 num
         //  cartão que fecha no 20 já é do mês seguinte
         it("usa o vencimento da fatura no gasto de cartão", async () => {
@@ -318,6 +460,88 @@ describe("Budgets", () => {
 
             expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body).toHaveLength(2)
         })
+
+        //  **Exatamente um alvo.** O `xor` do Joi barra os dois casos, e o CHECK do banco
+        //  garantiria o mesmo — mas como 500.
+        it("recusa corpo com os dois alvos", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            let response = await workspace.client.post(`/Budgets`, {
+                IdCategory: workspace.IdCategory,
+                IdPerson,
+                ReferenceMonth: "2026-08",
+                LimitValue: 800,
+            })
+
+            expect(response.status).toBe(406)
+            expect(await findBudgets(workspace.user.workspace.IdWorkspace)).toHaveLength(0)
+        })
+
+        it("recusa corpo sem alvo nenhum", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/Budgets`, {
+                ReferenceMonth: "2026-08",
+                LimitValue: 800,
+            })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  O IdPerson chega do cliente e é sequencial, como todo id: sem o escopo daria para
+        //  orçar a pessoa do vizinho
+        it("recusa pessoa de outro workspace", async () => {
+            let workspace = await buildWorkspace()
+            let outro = await buildWorkspace()
+            let IdPerson = await createPerson(outro, "Maria do vizinho")
+
+            let response = await workspace.client.post(`/Budgets`, {
+                IdPerson,
+                ReferenceMonth: "2026-08",
+                LimitValue: 500,
+            })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  O índice parcial unique(IdWorkspace, IdPerson) é a garantia; esta é a resposta que
+        //  diz que o conserto é editar o mês que existe
+        it("recusa orçar a mesma pessoa duas vezes no mesmo mês", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createPersonBudget(workspace, IdPerson)
+
+            let response = await workspace.client.post(`/Budgets`, {
+                IdPerson,
+                ReferenceMonth: "2026-08",
+                LimitValue: 900,
+            })
+
+            expect(response.status).toBe(406)
+            expect(await findBudgets(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
+        })
+
+        //  A definição é única por alvo, e as duas colunas têm índice próprio: a mesma pessoa e
+        //  a mesma categoria convivem, e o mês seguinte reencontra a definição em vez de criar
+        //  outra
+        it("grava a definição de pessoa com a categoria nula, e a reencontra no mês seguinte", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            let first = await createPersonBudget(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
+            let second = await createPersonBudget(workspace, IdPerson, { ReferenceMonth: "2026-09", LimitValue: 700 })
+
+            expect(second.IdBudget).toBe(first.IdBudget)
+
+            let [budget] = await findBudgets(workspace.user.workspace.IdWorkspace)
+
+            expect(budget).toMatchObject({ IdPerson, IdCategory: null, LimitValue: 700 })
+
+            //  O mês já cadastrado não se mexe: ele está congelado
+            expect((await findPeriods(first.IdBudget)).map(limit)).toEqual([500, 700])
+        })
     })
 
     describe("Fluxo end to end", () => {
@@ -420,6 +644,25 @@ async function buildWorkspace(): Promise<TestWorkspace> {
         IdCategory: category.body.IdCategory,
         IdDebit: methods.find((item: { Kind: string }) => item.Kind === "debit").IdPaymentMethod,
     }
+}
+
+function createPerson(workspace: TestWorkspace, Name: string) {
+    return workspace.client.post(`/Persons`, { Name }).then((response) => response.body.IdPerson as number)
+}
+
+//  O corpo do orçamento de pessoa NÃO passa pelo buildBody: ele carrega o IdCategory, e mandar
+//  os dois é exatamente o 406 do xor.
+async function createPersonBudget(workspace: TestWorkspace, IdPerson: number, overrides: Record<string, unknown> = {}) {
+    let response = await workspace.client.post(`/Budgets`, {
+        IdPerson,
+        ReferenceMonth: "2026-08",
+        LimitValue: 500,
+        ...overrides,
+    })
+
+    expect(response.status).toBe(200)
+
+    return response.body as { IdBudget: number, IdBudgetPeriod: number }
 }
 
 function createCategory(workspace: TestWorkspace, Description: string) {

@@ -24,7 +24,9 @@ export class CreateForMonth {
 
         if (existing) {
             throw new APIError({
-                msg: "Esta categoria já tem orçamento neste mês.",
+                //  Genérica desde que o alvo pode ser uma pessoa: esta section não sabe (nem
+                //  precisa saber) de qual dos dois tipos é o IdBudget que recebeu.
+                msg: "Este orçamento já existe neste mês.",
                 status: 406,
                 data: { IdBudgetPeriod: existing.IdBudgetPeriod, ReferenceMonth },
             })

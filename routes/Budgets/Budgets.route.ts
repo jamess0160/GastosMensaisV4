@@ -5,7 +5,7 @@ import { Budgets_schema } from "./Budgets.schema"
 
 export const Budgets_route = express()
 
-//  Orçamento: o teto de gasto de uma categoria em um mês.
+//  Orçamento: o teto de gasto de uma **categoria ou de uma pessoa** em um mês.
 //
 //  **Entrega reduzida de propósito: o cadastro é mensal e manual.** O modelo é definição
 //  (`Budgets`, uma linha por categoria) + mês congelado (`BudgetPeriods`, uma linha por mês), e
@@ -14,9 +14,15 @@ export const Budgets_route = express()
 //  chegar, ela reusa a mesma section do segundo passo (BudgetPeriods/sections/POST).
 //
 //  Orçamento é **só de gasto**: entrada não tem categoria, então não tem teto.
+//
+//  **O alvo é uma categoria OU uma pessoa**, na mesma tabela e no mesmo POST — o `Budgets` tem
+//  as duas colunas e um CHECK garantindo o xor. Uma tabela só porque `BudgetPeriods` aponta
+//  para `IdBudget`: a máquina do mês serve aos dois sem uma linha nova. São duas perguntas
+//  sobre o mesmo dinheiro ("quanto foi de mercado" e "quanto foi da Maria"), então um gasto
+//  conta nos dois — o que não se pode é somar os dois num total.
 
 //  O mês inteiro, com quanto já foi comprometido em cada teto: ?ReferenceMonth=YYYY-MM
 Budgets_route.get("/Budgets", Budgets_schema.getByMonth, AsyncHandler(Budgets_controller.getByMonth))
 
-//  Orça uma categoria em um mês: resolve a definição vigente e cria o mês.
+//  Orça uma categoria ou uma pessoa em um mês: resolve a definição vigente e cria o mês.
 Budgets_route.post("/Budgets", Budgets_schema.create, AsyncHandler(Budgets_controller.create))

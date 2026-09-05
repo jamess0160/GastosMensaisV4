@@ -1136,7 +1136,18 @@ Desquita. Existe porque um clique errado, sem ele, tiraria dinheiro da conta sem
 
 > **Entrega reduzida de propósito: o cadastro do mês é manual.** A rotina que materializaria o mês a partir da definição ainda não existe, então hoje é o usuário que informa o mês.
 
-**Modelo:** `Budgets` é a **definição vigente** (uma linha por categoria, sem mês); `BudgetPeriods` é o **mês congelado**. Editar a definição muda **o futuro**; mês passado guarda o teto que realmente valeu. Nunca leia o limite de um mês passado da definição.
+**Modelo:** `Budgets` é a **definição vigente** (uma linha por alvo, sem mês); `BudgetPeriods` é o **mês congelado**. Editar a definição muda **o futuro**; mês passado guarda o teto que realmente valeu. Nunca leia o limite de um mês passado da definição.
+
+**O alvo de um teto é uma categoria OU uma pessoa**, nunca os dois — mesma tabela, mesmo `POST`, mesma lista. O `Scope` da resposta diz qual é.
+
+| `Scope` | O que soma | Eixo |
+|---|---|---|
+| `category` | tudo que caiu naquela categoria | o gasto inteiro |
+| `person` | tudo que foi **atribuído** àquela pessoa | o eixo **analítico** (`ExpensePersons`), nunca o financeiro |
+
+**Um gasto conta nos dois orçamentos, e isso não é dupla contagem** — são duas perguntas diferentes sobre o mesmo dinheiro ("quanto foi de mercado" e "quanto foi da Maria"). O que **não** se pode é somar os dois num total.
+
+> **A soma dos orçamentos de pessoa não fecha com o total gasto do mês, e isso não é bug.** O rateio entre pessoas é **opcional** no gasto: um gasto sem `Persons` não entra em orçamento de pessoa nenhum. Escreva isso na tela, ou a primeira conferência que alguém fizer vira chamado.
 
 Orçamento é **só de gasto** — entrada não tem categoria, então não tem teto.
 
@@ -1156,11 +1167,18 @@ Orçamento é **só de gasto** — entrada não tem categoria, então não tem t
   "ClosedAt": null,
   "CreatedAt": "...",
   "UpdatedAt": "...",
+  "Scope": "category",
   "IdCategory": 1,
   "Category": { "IdCategory": 1, "Description": "Alimentação", "Color": "#FF5722", "...": "linha completa" },
+  "IdPerson": null,
+  "Person": null,
   "Spent": 645.9
 }]
 ```
+
+**`Scope`, `IdCategory`/`Category` e `IdPerson`/`Person` andam em par:** num orçamento de categoria os dois campos de pessoa são `null`, e num de pessoa os dois de categoria são `null`. Use o `Scope` para decidir qual par ler — ele existe para o cliente não ter que deduzir o tipo pelo id que veio nulo. `Category` e `Person` vêm **inteiras**, porque é o nome (e a cor) que a tela desenha.
+
+Um orçamento cujo alvo foi **arquivado** some da lista do mês — ele não tem mais o que mostrar. A linha continua no banco: arquivar não é apagar, e o mês é histórico.
 
 Note que `ReferenceMonth` **volta como `YYYY-MM-01`** (a coluna guarda o dia 1), embora seja enviado como `YYYY-MM`.
 
@@ -1170,6 +1188,14 @@ Note que `ReferenceMonth` **volta como `YYYY-MM-01`** (a coluna guarda o dia 1),
 2. **A data que conta é `coalesce(DueDate, ExpenseDate)`**, então uma compra no cartão cai no mês em que a fatura vence.
 3. **Conta pendente junto com pago** — ao contrário do saldo da conta. Orçamento é o que você **comprometeu**; saldo é o que você **realizou**. Só o cancelado sai.
 
+**No `Scope: "person"` vale uma quarta regra: o comprometido é rateado pelas parcelas.**
+
+```
+Spent = Σ ( ExpensePersons.Value × ExpensePayments.Value ÷ Expenses.TotalValue )
+```
+
+600 em 6× todos da Maria dão **100 por mês** no orçamento dela — o mesmo número que a categoria enxerga. Sem o rateio, o mesmo gasto contaria 600 num orçamento e 100 no outro, e "quanto a Maria comprometeu em agosto" não teria resposta certa. O arredondamento é feito **uma vez, no fim**: numa parcela de 100 dividida 400/200 entre duas pessoas, saem `66.67` e `33.33`.
+
 **O alerta é do cliente:** a resposta traz `LimitValue`, `Spent` e `AlertPercent`; comparar os três números é trabalho da tela.
 
 ### `POST /Budgets`
@@ -1178,10 +1204,15 @@ Numa transaction: resolve a definição vigente (cria, ou **atualiza** para o no
 
 | Campo | Tipo | Regra |
 |---|---|---|
-| `IdCategory` | number | obrigatório |
+| `IdCategory` | number | **exatamente um** dos dois |
+| `IdPerson` | number | **exatamente um** dos dois |
 | `ReferenceMonth` | `YYYY-MM` | obrigatório |
 | `LimitValue` | number | obrigatório, 2 casas, **> 0** (teto zero é não ter teto — apague o mês) |
 | `AlertPercent` | int 1–100 | default **80** |
+
+**`IdCategory` e `IdPerson` são mutuamente exclusivos:** mandar os dois, ou nenhum, é `406`. Um alvo que não existe no seu workspace (ou que está arquivado) também é `406`.
+
+Orçar o **mesmo alvo duas vezes no mesmo mês** responde `406` `"Este orçamento já existe neste mês."` — o conserto é editar o mês que já existe (seção 14), não cadastrar de novo. Só existe **uma definição por alvo**: cadastrar o mês seguinte reencontra a mesma e passa a valer o teto novo, sem reescrever os meses já congelados.
 
 `Status` **não é aceito**: o mês nasce `open`.
 
@@ -1340,6 +1371,27 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-05 — `/Budgets`: o teto agora pode ser **de uma pessoa**, não só de uma categoria
+
+🟢 **Adição** — ver a seção 13, `/Budgets`.
+
+**O que entrou.** O mesmo teto mensal que existia por categoria, agora somando tudo que é **atribuído a uma pessoa** — o eixo analítico (`ExpensePersons`), não o financeiro.
+
+- **`POST /Budgets`** passa a aceitar `IdPerson` **no lugar de** `IdCategory`. Os dois são **mutuamente exclusivos**: mandar os dois, ou nenhum, é `406`. O resto do corpo não muda.
+- **`GET /Budgets`** devolve os dois tipos **na mesma lista** e cada linha ganha três campos: **`Scope`** (`"category"` | `"person"`), **`IdPerson`** e **`Person`** (a linha inteira). `IdCategory` e `Category` passam a vir **`null`** nas linhas de `Scope: "person"`.
+
+**Ação do front:** ler o `Scope` antes de desenhar a linha, em vez de assumir que `Category` está sempre preenchida. Quem só quer o comportamento de hoje pode filtrar `Scope === "category"` e nada muda — nenhum orçamento de pessoa existe até alguém cadastrar o primeiro.
+
+**O `Spent` da pessoa é rateado pelas parcelas:** `ExpensePersons.Value × ExpensePayments.Value ÷ Expenses.TotalValue`. 600 em 6× todos da Maria dão **100 por mês**, o mesmo número que a categoria enxerga — sem o rateio o mesmo gasto contaria 600 num orçamento e 100 no outro. Arredondado uma vez, no fim.
+
+**Um gasto conta nos dois orçamentos, e isso não é dupla contagem** — são duas perguntas sobre o mesmo dinheiro. **Não some os dois num total.**
+
+> **⚠️ A soma dos orçamentos de pessoa não fecha com o total gasto do mês, e isso não é bug.** O rateio é **opcional** no gasto: um gasto sem `Persons` não entra em orçamento de pessoa nenhum. Deixe isso escrito na tela.
+
+🟡 **A `msg` do mês repetido mudou:** orçar o mesmo alvo duas vezes no mesmo mês respondia `"Esta categoria já tem orçamento neste mês."` e agora responde `"Este orçamento já existe neste mês."` — a mensagem não podia continuar falando em categoria. Continua `406`, no mesmo caso. Se você mostrava a `msg` do servidor, nada a fazer; se comparava o texto, ajuste.
+
+**Não mudou:** `PUT` e `DELETE /BudgetPeriods` servem aos dois tipos sem nenhuma diferença (é o motivo de o alvo novo ter entrado na mesma tabela), e o `Spent` de categoria continua contando exatamente como contava.
 
 ### 2026-09-05 — `/Accounts` e `/PaymentMethods`: conta "apenas cartão", e quem aceita cartão de crédito
 
