@@ -11,6 +11,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Migrations (Knex CLI, `development` environment only, config in `knexfile.ts`): `npx knex migrate:latest`, `npx knex migrate:rollback`, `npx knex migrate:make <name>`.
 - No lint script is configured.
 
+## Commits
+
+**Every commit made by an AI agent in this repository follows this convention. It overrides the
+default "branch before committing to the default branch" behaviour — the repository owner asked
+for it explicitly.**
+
+- **One commit per unit of work, straight onto `main`.** No branch, no merge, no branch cleanup.
+  The branch-per-stage flow was tried through leva 2 and paid for nothing: each branch was born
+  and died without ever existing in parallel with anything.
+- **The message is a single short line naming the work, and nothing else.** No body, no bullet
+  list of decisions, no rationale. When the work is a stage of a development plan
+  (`docs/levas/`), that line is exactly:
+
+  ```
+  Fase #2 | Etapa 2 — Convite para o workspace
+  ```
+
+  `Fase` is the leva, `Etapa` is the stage number inside it, and the title is the stage's own
+  heading in the plan. For work that is not a stage, use the same shape: one line, what changed,
+  no body.
+- **The "why" does not go in the commit message.** It already lives in three places that outlive
+  it — the comments in the code, the stage's section in `docs/levas/`, and the changelog in
+  `docs/API - Contrato Front-end.md`. A long commit body is a fourth copy that drifts from the
+  other three.
+- **Do not push.** The owner pushes when they want to; `main` sitting a few commits ahead of
+  `origin/main` is the normal state here.
+- Keep the `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` trailer — it is attribution,
+  not part of the message.
+
 ## Environment
 
 - Env vars load through `Utils.configEnv()` (`Utils/Utils.ts`), which reads `.env`, or `.env.test` when `NODE_ENV=test`. `exemple.env` documents the full var list (`PORT`, `SOCKETPORT`, `DB_CLIENT`, `DB_HOST`, `DB_LOGIN`, `DB_PASSWORD`, `DB_SCHEMA`, `DB_PORT`, `JWT_SECRET`, `CONSTANTS_PATH`, `WEBAUTHN_RP_ID`, `WEBAUTHN_RP_NAME`, `WEBAUTHN_ORIGIN`).
