@@ -910,6 +910,8 @@ Sem `Status` e sem `IncludeCanceled`, os cancelados ficam de fora.
 
 Peça o mês **uma vez** com `IncludeCanceled=true` e aplique os filtros de tela sobre essa lista: uma chave de cache por mês, em vez de uma por combinação de filtro.
 
+> **Esta lista é a das compras do mês, não a do que cai no mês.** O filtro é a `ExpenseDate`, então uma compra parcelada de março **não** aparece aqui em agosto — embora a 6ª parcela dela pese em agosto. Para o total do mês, e para as colunas de pessoa e forma de pagamento sem um `GET` por linha, use **`GET /ExpensePayments`** (seção 12).
+
 **Resposta** — sem pernas, rateio ou tags (a lista de mês não os mostra):
 
 ```json
@@ -1054,7 +1056,51 @@ Cancela desta ocorrência para a frente.
 
 ## 12. ExpensePayments — `/ExpensePayments` 🔒
 
-A perna não tem `GET` nem `POST` de cadastro: ela nasce com o gasto e sai embutida nele. O que existe aqui é **o verbo que move saldo**.
+A perna não tem `POST` de cadastro: ela nasce com o gasto. O que existe aqui é **a lista do que cai num período** e **o verbo que move saldo**.
+
+### `GET /ExpensePayments`
+
+**A lista do que *sai* no mês.** `GET /Expenses` é a lista do que foi **comprado** (filtra por `ExpenseDate`); esta é a lista do que **cai** — filtra por `coalesce(DueDate, ExpenseDate)`, a mesma data que o `Spent` do orçamento e o `Balance` da conta já usam.
+
+**É por isso que ela existe:** uma compra parcelada feita em **março** não aparece em `GET /Expenses?From=2026-08-01&To=2026-08-31`, mas a **6ª parcela dela pesa em agosto**. Quem monta o total do mês a partir da lista de gastos precisa varrer meses para trás atrás de parcelamentos abertos — e o contrato permite 120 parcelas, então acima de qualquer janela que você escolher a parcela **some do total**. Com esta rota a varredura inteira sai: uma requisição devolve tudo que cai no período, parcelas de compras antigas incluídas.
+
+| Query | Tipo | Regra |
+|---|---|---|
+| `From` | CalendarDate | opcional, inclusivo |
+| `To` | CalendarDate | opcional, inclusivo |
+| `IncludeCanceled` | boolean | default `false` |
+
+As duas pontas são opcionais (só `From` é "daqui para a frente", só `To` é "até aqui"), como em todas as listagens de movimento. `IncludeCanceled` segue a regra de `GET /Expenses`: sem ele, as pernas de gasto cancelado ficam de fora — **as duas listas do mesmo mês não podem discordar sobre o que contêm**.
+
+A lista vem ordenada pela data em que a perna pesa, não pela data da compra.
+
+**Resposta** — a perna, com o gasto de origem e o rateio dele:
+
+```json
+[{
+  "IdExpensePayment": 12,
+  "IdWorkspace": 1,
+  "IdExpense": 4,
+  "IdPaymentMethod": 3,
+  "Value": 100,
+  "InstallmentNumber": 6,
+  "InstallmentTotal": 6,
+  "ClosingDate": "2026-08-20",
+  "DueDate": "2026-08-28",
+  "Paid": false,
+  "PaidAt": null,
+  "CreatedAt": "...",
+  "UpdatedAt": "...",
+  "Expense": { "IdExpense": 4, "Description": "Notebook", "TotalValue": 600, "ExpenseDate": "2026-03-10", "...": "a linha inteira da seção 11" },
+  "Persons": [{ "IdExpensePerson": 7, "IdWorkspace": 1, "IdExpense": 4, "IdPerson": 2, "Value": 600, "CreatedAt": "...", "UpdatedAt": "..." }]
+}]
+```
+
+> **⚠️ O rateio que vem na perna é o do GASTO, não o da perna.** Numa compra de 600 em 6×, as **seis** pernas trazem o mesmo `Persons` de **600**. Somar pessoa a pessoa, perna a perna, dá **3600** — e nada estoura: o número só fica errado. Para "quanto é da Maria neste mês", rateie a perna pela proporção do gasto: `Persons[i].Value × Payment.Value ÷ Expense.TotalValue`.
+
+**A forma de pagamento vem como `IdPaymentMethod`, não inteira.** Ela já chega completa dentro de `GET /Accounts` — repeti-la em cada perna repetiria a mesma linha dezenas de vezes na resposta de um mês. Cruze pelo id com o que você já tem em cache. O mesmo vale para a pessoa: o nome sai de `GET /Persons`.
+
+**Sem tags.** Se a linha da sua tela mostra etiqueta, abra o gasto (`GET /Expenses/IdExpense=:IdExpense`).
 
 ### `POST /ExpensePayments/IdExpensePayment=:IdExpensePayment/pay`
 
@@ -1249,6 +1295,7 @@ Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de
 | PUT | `/Expenses/IdExpense=:IdExpense/series` | 🔒 |
 | DELETE | `/Expenses/IdExpense=:IdExpense` | 🔒 |
 | DELETE | `/Expenses/IdExpense=:IdExpense/series` | 🔒 |
+| GET | `/ExpensePayments` | 🔒 |
 | POST | `/ExpensePayments/IdExpensePayment=:Id/pay` | 🔒 |
 | POST | `/ExpensePayments/IdExpensePayment=:Id/unpay` | 🔒 |
 | GET | `/Budgets` | 🔒 |
@@ -1279,6 +1326,22 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-05 — `GET /ExpensePayments`: a lista do que **cai** no mês, com a parcela da compra antiga junto
+
+🟢 **Adição** — ver a seção 12, `/ExpensePayments`.
+
+**O que entrou.** `GET /ExpensePayments?From=&To=&IncludeCanceled=`. Devolve as **pernas** cuja `coalesce(DueDate, ExpenseDate)` cai no intervalo, cada uma com o **gasto de origem** (`Expense`) e o **rateio dele** (`Persons`). As duas pontas do período são opcionais e `IncludeCanceled` segue a mesma regra de `GET /Expenses`.
+
+**O furo que ela fecha — leia mesmo que você não vá usar a rota agora.** `GET /Expenses` filtra por `ExpenseDate`: uma compra parcelada de **março não aparece em agosto**, mas a 6ª parcela dela **pesa** em agosto. Quem monta o total do mês pela lista de gastos tem que varrer meses para trás atrás de parcelamentos abertos, e o contrato permite **120 parcelas** — acima da janela que você escolher, a parcela **some do total do mês**. É a única lacuna em que o número na tela fica *errado*, e não só ausente.
+
+**Ação do front:** trocar por esta rota a varredura de meses para trás (`INSTALLMENT_LOOKBACK_MONTHS`) **e** o `GET /Expenses/IdExpense=:IdExpense` por linha que preenchia as colunas de pessoa e forma de pagamento. Uma requisição resolve as duas coisas — inclusive no Relatório, que olha período e hoje paga esse custo por mês do intervalo.
+
+> **⚠️ O `Persons` que vem na perna é o do GASTO, não o da perna.** Numa compra de 600 em 6×, as seis pernas trazem o mesmo rateio de **600**. Somar pessoa a pessoa, perna a perna, dá **3600** — e **nada estoura**: o número só fica errado. Para "quanto é da Maria neste mês", rateie: `Persons[i].Value × Payment.Value ÷ Expense.TotalValue`.
+
+**A forma de pagamento vem como `IdPaymentMethod`**, não a linha inteira — ela já está em `GET /Accounts`. Idem a pessoa, que está em `GET /Persons`. **Não há tags** na resposta.
+
+**Não mudou nada:** `GET /Expenses` continua exatamente como estava — é a lista das **compras**, e as duas convivem. O `pay`/`unpay` também não muda.
 
 ### 2026-09-04 — `POST /Inflows/batch`: grava várias entradas de uma vez, tudo ou nada
 

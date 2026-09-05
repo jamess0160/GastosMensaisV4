@@ -1,5 +1,6 @@
 import { BaseModel, MaybeArray } from "root/Utils/Base"
 import { Database } from "root/Utils/database"
+import { ExpensePaymentsNamespace } from "./sections/types"
 
 //  **Eixo financeiro: é o que move saldo.** Uma linha por forma de pagamento **e por parcela**.
 //
@@ -12,10 +13,44 @@ import { Database } from "root/Utils/database"
 //  não têm rota e por isso ficam como model dentro de routes/Expenses.
 export class class_ExpensePayments_model extends BaseModel {
 
+    //  A data em que a perna **pesa**: o vencimento da fatura quando existe, senão o dia do
+    //  gasto. Escrita uma vez só porque ela aparece três vezes na mesma consulta (dois filtros
+    //  e a ordenação) e as três têm que ser a mesma expressão.
+    private static readonly competenceDate = 'coalesce("ExpensePayments"."DueDate", "Expenses"."ExpenseDate")'
+
     private readonly baseQuery = this.KnexConnection.select("*").from<Database.ExpensePayments>("ExpensePayments").orderBy("InstallmentNumber").orderBy("IdExpensePayment")
 
     getByExpense(IdExpense: number) {
         return this.baseQuery.clone().where("IdExpense", IdExpense)
+    }
+
+    //  **As pernas que caem num período** — a lista do que *sai* no mês, ao contrário de
+    //  GET /Expenses, que é a lista do que foi *comprado*.
+    //
+    //  A data comparada é `coalesce(DueDate, ExpenseDate)`, a mesma do BudgetSpent: no cartão
+    //  vale o vencimento da fatura em que a perna caiu, e fora dele o dia da compra, porque pix
+    //  e débito não têm fatura. É esse coalesce que faz a 6ª parcela de uma compra de março
+    //  aparecer em agosto — filtrando por ExpenseDate ela sumiria do mês em que pesa.
+    //
+    //  O join com Expenses é obrigatório e não é só pelo coalesce: é ele que deixa excluir o
+    //  gasto cancelado, que não pesa em mês nenhum. A ordenação sai pela mesma expressão do
+    //  filtro, senão a lista viria na ordem da compra e não na do desembolso.
+    getByPeriod(IdWorkspace: number, filters: ExpensePaymentsNamespace.ListFilters = {}) {
+        let query = this.KnexConnection
+            .select("ExpensePayments.*")
+            .from<Database.ExpensePayments>("ExpensePayments")
+            .innerJoin("Expenses", "Expenses.IdExpense", "ExpensePayments.IdExpense")
+            .where("ExpensePayments.IdWorkspace", IdWorkspace)
+            .orderByRaw(`${class_ExpensePayments_model.competenceDate} asc`)
+            .orderBy("ExpensePayments.IdExpensePayment")
+
+        //  Identificadores entre aspas: o Postgres dobra para minúsculo sem elas.
+        if (filters.From) query = query.whereRaw(`${class_ExpensePayments_model.competenceDate} >= ?`, [filters.From])
+        if (filters.To) query = query.whereRaw(`${class_ExpensePayments_model.competenceDate} <= ?`, [filters.To])
+
+        //  A mesma regra que GET /Expenses ganhou: as duas listas do mesmo mês não podem
+        //  discordar sobre o que contêm.
+        return filters.IncludeCanceled ? query : query.whereNot("Expenses.Status", "canceled")
     }
 
     //  Escopado por workspace pelo mesmo motivo de sempre: o id da perna chega do cliente na

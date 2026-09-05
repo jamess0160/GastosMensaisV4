@@ -33,6 +33,155 @@ describe("ExpensePayments", () => {
         otherClient = new TestClient(other.token)
     })
 
+    describe("GET /ExpensePayments", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().get(`/ExpensePayments`)
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/ExpensePayments`)
+
+            expect(response.status).toBe(406)
+        })
+
+        //  **O teste que justifica a rota.** A compra é de março e não aparece na lista de
+        //  gastos de agosto, que filtra por ExpenseDate — mas a 6ª parcela dela vence em agosto
+        //  e pesa lá. Era isso que o cliente compensava varrendo 24 meses para trás.
+        it("traz a 6ª parcela de uma compra de março na consulta de agosto", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createInstallment(workspace, { ExpenseDate: "2026-03-10" })
+
+            let response = await workspace.client.get(`/ExpensePayments?From=2026-08-01&To=2026-08-31`)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toHaveLength(1)
+
+            let leg = response.body[0]
+
+            expect(leg.IdExpense).toBe(created.IdExpense)
+            expect(leg.InstallmentNumber).toBe(6)
+            expect(leg.Value).toBe(100)
+            //  Compra em 10/03 num cartão que vence dia 28 com folga de 8 (fecha no dia 20):
+            //  a 1ª parcela vence em 28/03 e a 6ª em 28/08.
+            expect(leg.DueDate).toBe("2026-08-28")
+            //  O gasto de origem vem junto: é o que a tela mostra na linha
+            expect(leg.Expense.IdExpense).toBe(created.IdExpense)
+            expect(leg.Expense.TotalValue).toBe(600)
+            expect(leg.Expense.ExpenseDate).toBe("2026-03-10")
+
+            //  E a outra metade do furo: a lista de gastos de agosto não sabe desta compra
+            let expenses = await workspace.client.get(`/Expenses?From=2026-08-01&To=2026-08-31`)
+
+            expect(expenses.body.find((item: { IdExpense: number }) => item.IdExpense === created.IdExpense)).toBeUndefined()
+        })
+
+        //  Fora do cartão não há fatura, então DueDate é nula e quem responde pelo mês é a
+        //  ExpenseDate — é o coalesce inteiro exercitado pelo outro lado.
+        it("traz o gasto de débito pela data da compra, com DueDate nula", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createExpense(workspace, { ExpenseDate: "2026-08-10" })
+
+            let response = await workspace.client.get(`/ExpensePayments?From=2026-08-01&To=2026-08-31`)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toHaveLength(1)
+            expect(response.body[0].IdExpense).toBe(created.IdExpense)
+            expect(response.body[0].DueDate).toBeNull()
+            expect(response.body[0].ClosingDate).toBeNull()
+
+            //  E fora do intervalo ela não aparece: o recorte é da perna, não do workspace
+            expect((await workspace.client.get(`/ExpensePayments?From=2026-09-01&To=2026-09-30`)).body).toHaveLength(0)
+        })
+
+        //  A mesma regra que GET /Expenses tem: as duas listas do mesmo mês não podem discordar
+        //  sobre o que contêm.
+        it("esconde a perna de gasto cancelado, e a traz com IncludeCanceled=true", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createExpense(workspace, { ExpenseDate: "2026-08-10" })
+
+            await workspace.client.delete(`/Expenses/IdExpense=${created.IdExpense}`)
+
+            expect((await workspace.client.get(`/ExpensePayments?From=2026-08-01&To=2026-08-31`)).body).toHaveLength(0)
+
+            let withCanceled = await workspace.client.get(`/ExpensePayments?From=2026-08-01&To=2026-08-31&IncludeCanceled=true`)
+
+            expect(withCanceled.body).toHaveLength(1)
+            //  O gasto vem junto mesmo cancelado: sem isso a perna viria sem a linha de origem
+            expect(withCanceled.body[0].Expense.Status).toBe("canceled")
+        })
+
+        //  **O rateio que acompanha a perna é o do GASTO.** As seis parcelas trazem o mesmo
+        //  rateio de 600 — somar pessoa a pessoa, perna a perna, dá 3600. Nada estoura: o
+        //  número só fica errado, e é por isso que este teste existe.
+        it("repete o rateio do gasto em cada parcela, com o valor do total", async () => {
+            let workspace = await buildWorkspace()
+            let person = await workspace.client.post(`/Persons`, { Name: "Maria" })
+
+            await createInstallment(workspace, {
+                ExpenseDate: "2026-03-10",
+                Persons: [{ IdPerson: person.body.IdPerson, Value: 600 }],
+            })
+
+            let response = await workspace.client.get(`/ExpensePayments?From=2026-03-01&To=2026-08-31`)
+
+            expect(response.body).toHaveLength(6)
+
+            for (let leg of response.body) {
+                expect(leg.Value).toBe(100)
+                expect(leg.Persons).toHaveLength(1)
+                //  600, não 100: o rateio é do gasto e a proporção é conta de quem consome
+                expect(leg.Persons[0].Value).toBe(600)
+                expect(leg.Persons[0].IdPerson).toBe(person.body.IdPerson)
+            }
+        })
+
+        //  O gasto sem rateio devolve a lista vazia, e não a chave ausente: a tela que itera
+        //  não pode ter que checar undefined antes.
+        it("devolve rateio vazio quando o gasto não tem", async () => {
+            let workspace = await buildWorkspace()
+
+            await createExpense(workspace, { ExpenseDate: "2026-08-10" })
+
+            let response = await workspace.client.get(`/ExpensePayments?From=2026-08-01&To=2026-08-31`)
+
+            expect(response.body[0].Persons).toEqual([])
+        })
+
+        //  O recorte é por workspace, como toda leitura: sem ele a lista do mês traria as
+        //  parcelas do vizinho junto com as próprias.
+        it("nunca traz a perna de outro workspace", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createExpense(workspace, { ExpenseDate: "2026-08-10" })
+
+            let response = await otherClient.get(`/ExpensePayments?From=2026-08-01&To=2026-08-31`)
+
+            expect(response.status).toBe(200)
+            expect(response.body.find((item: { IdExpense: number }) => item.IdExpense === created.IdExpense)).toBeUndefined()
+        })
+
+        //  As duas pontas são opcionais, como em toda listagem de movimento
+        it("aceita o período sem pontas e devolve tudo, na ordem do desembolso", async () => {
+            let workspace = await buildWorkspace()
+
+            await createInstallment(workspace, { ExpenseDate: "2026-03-10" })
+            await createExpense(workspace, { ExpenseDate: "2026-01-05" })
+
+            let response = await workspace.client.get(`/ExpensePayments`)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toHaveLength(7)
+
+            //  Ordenado pela data em que a perna pesa, não pela data da compra: o gasto de
+            //  janeiro vem antes das parcelas da compra de março.
+            let dates = response.body.map((leg: { DueDate: string | null, Expense: { ExpenseDate: string } }) => leg.DueDate ?? leg.Expense.ExpenseDate)
+
+            expect(dates).toEqual(["2026-01-05", "2026-03-28", "2026-04-28", "2026-05-28", "2026-06-28", "2026-07-28", "2026-08-28"])
+        })
+    })
+
     describe("POST /ExpensePayments/IdExpensePayment=:IdExpensePayment/pay", () => {
 
         it("recusa sem token", async () => {
@@ -386,7 +535,7 @@ async function createExpense(workspace: TestWorkspace, overrides: Record<string,
 //  600 em 6x no cartão: seis pernas de 100, cada uma com a fatura dela. É o arranjo que mostra
 //  que quitar é por perna — parcelar não é privilégio do cartão, mas é nele que ele aparece
 //  com as datas de fatura junto.
-async function createInstallment(workspace: TestWorkspace) {
+async function createInstallment(workspace: TestWorkspace, overrides: Record<string, any> = {}) {
     let card = await createCard(workspace)
 
     let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
@@ -395,6 +544,7 @@ async function createInstallment(workspace: TestWorkspace) {
         Kind: "installment",
         InstallmentTotal: 6,
         IdPaymentMethod: card,
+        ...overrides,
     }))
 
     expect(response.status).toBe(200)

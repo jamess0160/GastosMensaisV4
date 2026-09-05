@@ -13,6 +13,11 @@ export const ExpensePayments_route = express()
 //  detalhe nunca vira status parcial no gasto: o Expenses.Status é recalculado a cada quitação
 //  e só chega a 'paid' quando todas as pernas estão pagas.
 
+//  A lista das pernas que caem no período: coalesce(DueDate, ExpenseDate) dentro do intervalo,
+//  com o gasto de origem e o rateio dele. É a lista do que **sai** no mês — GET /Expenses é a
+//  lista do que foi **comprado**, e uma compra parcelada de março não aparece lá em agosto.
+ExpensePayments_route.get("/ExpensePayments", ExpensePayments_schema.getByWorkspace, AsyncHandler(ExpensePayments_controller.getByWorkspace))
+
 ExpensePayments_route.post("/ExpensePayments/IdExpensePayment=:IdExpensePayment/pay", ExpensePayments_schema.pay, AsyncHandler(ExpensePayments_controller.pay))
 
 ExpensePayments_route.post("/ExpensePayments/IdExpensePayment=:IdExpensePayment/unpay", ExpensePayments_schema.unpay, AsyncHandler(ExpensePayments_controller.unpay))

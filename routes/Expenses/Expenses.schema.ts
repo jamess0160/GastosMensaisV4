@@ -20,7 +20,13 @@ const splitItem = Joi.object({
     Value: Joi.number().precision(2).positive().required(),
 })
 
-const expenseResponse = Joi.object({
+//  Exportado porque a lista de pernas do período (GET /ExpensePayments) devolve o gasto de
+//  origem dentro de cada linha, e a forma dele tem que ser descrita uma vez só.
+//
+//  A forma da perna (expensePaymentResponse) e a do rateio ficam **aqui**, e não na pasta de
+//  ExpensePayments, para não haver import circular: o gasto embute a perna e a perna embute o
+//  gasto, então um dos dois lados tem que ser a origem — e é este, que é o dono das duas filhas.
+export const expenseResponse = Joi.object({
     IdExpense: Joi.number().required(),
     IdWorkspace: Joi.number().required(),
     IdUser: Joi.number().allow(null).required(),
@@ -57,6 +63,19 @@ export const expensePaymentResponse = Joi.object({
     UpdatedAt: Joi.date().required(),
 })
 
+//  Uma linha do eixo analítico como ela sai na leitura. Sem a pessoa embutida: o cliente já
+//  tem a lista de Persons e o nome sai de lá — o mesmo argumento que deixa a forma de pagamento
+//  como id na lista de pernas.
+export const expensePersonResponse = Joi.object({
+    IdExpensePerson: Joi.number().required(),
+    IdWorkspace: Joi.number().required(),
+    IdExpense: Joi.number().required(),
+    IdPerson: Joi.number().required(),
+    Value: Joi.number().required(),
+    CreatedAt: Joi.date().required(),
+    UpdatedAt: Joi.date().required(),
+})
+
 class Schema {
 
     public readonly getByWorkspace = [
@@ -82,15 +101,7 @@ class Schema {
         //  duas formas de pagamento e duas pessoas são 2 + 2 linhas, nunca 4.
         joiController.validateResponse(expenseResponse.keys({
             Payments: Joi.array().items(expensePaymentResponse).required(),
-            Persons: Joi.array().items(Joi.object({
-                IdExpensePerson: Joi.number().required(),
-                IdWorkspace: Joi.number().required(),
-                IdExpense: Joi.number().required(),
-                IdPerson: Joi.number().required(),
-                Value: Joi.number().required(),
-                CreatedAt: Joi.date().required(),
-                UpdatedAt: Joi.date().required(),
-            })).required(),
+            Persons: Joi.array().items(expensePersonResponse).required(),
             //  A tag inteira, não a linha de vínculo: o cliente precisa do nome para desenhar
             //  a etiqueta, e o IdExpenseTag não serve para nada — não há rota que o receba.
             Tags: Joi.array().items(tagResponse).required(),

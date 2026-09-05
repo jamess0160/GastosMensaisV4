@@ -14,6 +14,13 @@ export class class_ExpensePersons_model extends BaseModel {
         return this.KnexConnection.select("*").from<Database.ExpensePersons>("ExpensePersons").where("IdExpense", IdExpense).orderBy("IdExpensePerson")
     }
 
+    //  O rateio de vários gastos de uma vez: uma consulta para a lista inteira, não uma por
+    //  linha. É o que a lista de pernas do período (GET /ExpensePayments) precisa — sem ela a
+    //  rota que existe para matar o N+1 abriria outro.
+    getByExpenses(ids: number[]) {
+        return this.KnexConnection.select("*").from<Database.ExpensePersons>("ExpensePersons").whereIn("IdExpense", ids).orderBy("IdExpensePerson")
+    }
+
     create(records: MaybeArray<Partial<Database.ExpensePersons>>) {
         return this.KnexConnection.insert(records).into("ExpensePersons")
     }
