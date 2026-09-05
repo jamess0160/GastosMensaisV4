@@ -10,6 +10,7 @@ import {
     useCategoryIndex,
     usePaymentMethodIndex,
     usePersonIndex,
+    usePersons,
 } from "@/data/catalogs";
 import {
     useInvalidateMovement,
@@ -20,7 +21,7 @@ import {
 import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { HideOnMobile, Topbar } from "@/ui/topbar";
 import { BreakdownRow, BudgetBar, DeltaPill, KpiCard, ProgressMeter } from "@/ui/budget";
-import { FormError, FormField, FormGrid, Input, MoneyInput } from "@/ui/form";
+import { FormError, FormField, FormGrid, Input, MoneyInput, SegmentedControl } from "@/ui/form";
 import { Select } from "@/ui/select";
 import { CategoryIcon } from "@/ui/iconCatalog";
 import { ConfirmDialog, FooterSpacer, Modal } from "@/ui/overlay";
@@ -28,6 +29,7 @@ import { IconAlert, IconArrowDown, IconArrowUp, IconPlus } from "@/ui/icons";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import {
     budgetState,
+    budgetTargetName,
     legsOfKind,
     spentByCategory,
     spentByPaymentMethod,
@@ -45,7 +47,9 @@ import { formatMonthLabel } from "@/lib/date";
 
 const newBudgetDraft = (month: string): BudgetDraft => ({
     IdBudgetPeriod: null,
+    Scope: "category",
     IdCategory: null,
+    IdPerson: null,
     ReferenceMonth: month,
     LimitValue: null,
     AlertPercent: 80,
@@ -116,6 +120,7 @@ export function Dashboard() {
     const accounts = useAccounts();
     const categories = useCategories();
     const categoryIndex = useCategoryIndex();
+    const persons = usePersons();
     const personIndex = usePersonIndex();
     const methodIndex = usePaymentMethodIndex();
     const invalidateMovement = useInvalidateMovement();
@@ -162,7 +167,17 @@ export function Dashboard() {
     const overBudget = periods.filter((period) => budgetState(period) === "over");
     const alerting = periods.filter((period) => budgetState(period) === "alert");
     const activeCategories = (categories.data ?? []).filter((category) => category.Active);
-    const budgeted = new Set(periods.map((period) => period.IdCategory));
+    const activePersons = (persons.data ?? []).filter((person) => person.Active);
+    /* Só existe UM teto por alvo em cada mês: orçar o mesmo duas vezes é
+       406. Os dois conjuntos são separados porque o alvo é de um tipo ou
+       do outro — categoria 4 e pessoa 4 não são o mesmo alvo. */
+    const budgetedCategories = new Set(
+        periods.filter((period) => period.Scope === "category").map((period) => period.IdCategory),
+    );
+    const budgetedPersons = new Set(
+        periods.filter((period) => period.Scope === "person").map((period) => period.IdPerson),
+    );
+    const hasPersonBudget = periods.some((period) => period.Scope === "person");
 
     /* A régua do cartão principal. Com teto cadastrado ela mede o
        consumo do teto; sem teto nenhum, mede o quanto do que entrou já
@@ -343,13 +358,11 @@ export function Dashboard() {
                             </span>
                             <div>
                                 <div className={styles.alertTitle}>
-                                    {overBudget.length} categoria
+                                    {overBudget.length} orçamento
                                     {overBudget.length === 1 ? "" : "s"} estourou o teto
                                 </div>
                                 <div className={styles.alertText}>
-                                    {overBudget
-                                        .map((period) => period.Category.Description)
-                                        .join(" · ")}
+                                    {overBudget.map(budgetTargetName).join(" · ")}
                                 </div>
                             </div>
                         </div>
@@ -362,13 +375,11 @@ export function Dashboard() {
                             </span>
                             <div>
                                 <div className={styles.alertTitle}>
-                                    {alerting.length} categoria{alerting.length === 1 ? "" : "s"}{" "}
+                                    {alerting.length} orçamento{alerting.length === 1 ? "" : "s"}{" "}
                                     perto do teto
                                 </div>
                                 <div className={styles.alertText}>
-                                    {alerting
-                                        .map((period) => period.Category.Description)
-                                        .join(" · ")}
+                                    {alerting.map(budgetTargetName).join(" · ")}
                                 </div>
                             </div>
                         </div>
@@ -398,23 +409,44 @@ export function Dashboard() {
                             }
                         />
                     ) : (
-                        <div className={styles.budgets}>
-                            {periods.map((period) => (
-                                <BudgetBar
-                                    key={period.IdBudgetPeriod}
-                                    period={period}
-                                    onClick={() =>
-                                        setBudgetDraft({
-                                            IdBudgetPeriod: period.IdBudgetPeriod,
-                                            IdCategory: period.IdCategory,
-                                            ReferenceMonth: month,
-                                            LimitValue: period.LimitValue,
-                                            AlertPercent: period.AlertPercent,
-                                        })
-                                    }
-                                />
-                            ))}
-                        </div>
+                        <>
+                            <div className={styles.budgets}>
+                                {periods.map((period) => (
+                                    <BudgetBar
+                                        key={period.IdBudgetPeriod}
+                                        period={period}
+                                        onClick={() =>
+                                            setBudgetDraft({
+                                                IdBudgetPeriod: period.IdBudgetPeriod,
+                                                Scope: period.Scope,
+                                                IdCategory: period.IdCategory,
+                                                IdPerson: period.IdPerson,
+                                                ReferenceMonth: month,
+                                                LimitValue: period.LimitValue,
+                                                AlertPercent: period.AlertPercent,
+                                            })
+                                        }
+                                    />
+                                ))}
+                            </div>
+
+                            {/* A conferência que vira chamado se não estiver
+                                escrita: o rateio por pessoa é OPCIONAL no
+                                gasto, então um gasto sem `Persons` não entra
+                                em orçamento de pessoa nenhum. E o mesmo gasto
+                                conta nos dois tipos de teto sem ser dupla
+                                contagem — são duas perguntas sobre o mesmo
+                                dinheiro. O que não se pode é somar os dois. */}
+                            {hasPersonBudget && (
+                                <div className={styles.budgetNote}>
+                                    Os tetos de pessoa somam só o que foi <b>atribuído</b> a alguém,
+                                    e o rateio é opcional no gasto — por isso eles não fecham com o
+                                    total gasto do mês. Um mesmo gasto conta no teto da categoria e
+                                    no da pessoa: são duas perguntas sobre o mesmo dinheiro, e somar
+                                    os dois é que seria contar duas vezes.
+                                </div>
+                            )}
+                        </>
                     )}
                 </Card>
 
@@ -529,34 +561,92 @@ export function Dashboard() {
                         >
                             <FormError>{error}</FormError>
 
-                            <FormField label="Categoria" required>
-                                {(field) => (
-                                    <Select
-                                        {...field}
-                                        /* A categoria não se muda num mês já
-                                           congelado: mover o teto de lugar é
-                                           apagar este e cadastrar outro. */
-                                        disabled={budgetDraft.IdBudgetPeriod !== null}
-                                        value={budgetDraft.IdCategory}
-                                        onChange={(IdCategory) =>
-                                            setBudgetDraft((c) => (c ? { ...c, IdCategory } : c))
-                                        }
-                                        options={activeCategories
-                                            .filter(
-                                                (category) =>
-                                                    budgetDraft.IdBudgetPeriod !== null ||
-                                                    !budgeted.has(category.IdCategory),
-                                            )
-                                            .map((category) => ({
-                                                value: category.IdCategory,
-                                                label: category.Description,
-                                                icon: <CategoryIcon iconKey={category.IconKey} />,
-                                                color: categoryColor(category),
-                                            }))}
-                                        emptyLabel="Toda categoria já tem teto neste mês"
-                                    />
-                                )}
-                            </FormField>
+                            {/* O alvo é uma categoria OU uma pessoa, e os dois
+                                são exclusivos: mandar os dois, ou nenhum, é
+                                406. Como o teto do mês já congelado não muda
+                                de alvo, o seletor some na edição. */}
+                            {budgetDraft.IdBudgetPeriod === null && (
+                                <FormField
+                                    label="O teto é de"
+                                    help="Categoria soma o gasto inteiro; pessoa soma só o que foi atribuído a ela, rateado pela parcela."
+                                >
+                                    {() => (
+                                        <SegmentedControl
+                                            value={budgetDraft.Scope}
+                                            ariaLabel="Alvo do orçamento"
+                                            onChange={(Scope) =>
+                                                setBudgetDraft((c) => (c ? { ...c, Scope } : c))
+                                            }
+                                            options={[
+                                                { value: "category", label: "Uma categoria" },
+                                                { value: "person", label: "Uma pessoa" },
+                                            ]}
+                                        />
+                                    )}
+                                </FormField>
+                            )}
+
+                            {budgetDraft.Scope === "person" ? (
+                                <FormField label="Pessoa" required>
+                                    {(field) => (
+                                        <Select
+                                            {...field}
+                                            /* O alvo não se muda num mês já
+                                               congelado: mover o teto de lugar
+                                               é apagar este e cadastrar outro. */
+                                            disabled={budgetDraft.IdBudgetPeriod !== null}
+                                            value={budgetDraft.IdPerson}
+                                            onChange={(IdPerson) =>
+                                                setBudgetDraft((c) => (c ? { ...c, IdPerson } : c))
+                                            }
+                                            options={activePersons
+                                                .filter(
+                                                    (person) =>
+                                                        budgetDraft.IdBudgetPeriod !== null ||
+                                                        !budgetedPersons.has(person.IdPerson),
+                                                )
+                                                .map((person) => ({
+                                                    value: person.IdPerson,
+                                                    label: person.Name,
+                                                    color: paletteColor(person.IdPerson),
+                                                }))}
+                                            emptyLabel="Toda pessoa já tem teto neste mês"
+                                        />
+                                    )}
+                                </FormField>
+                            ) : (
+                                <FormField label="Categoria" required>
+                                    {(field) => (
+                                        <Select
+                                            {...field}
+                                            disabled={budgetDraft.IdBudgetPeriod !== null}
+                                            value={budgetDraft.IdCategory}
+                                            onChange={(IdCategory) =>
+                                                setBudgetDraft((c) =>
+                                                    c ? { ...c, IdCategory } : c,
+                                                )
+                                            }
+                                            options={activeCategories
+                                                .filter(
+                                                    (category) =>
+                                                        budgetDraft.IdBudgetPeriod !== null ||
+                                                        !budgetedCategories.has(
+                                                            category.IdCategory,
+                                                        ),
+                                                )
+                                                .map((category) => ({
+                                                    value: category.IdCategory,
+                                                    label: category.Description,
+                                                    icon: (
+                                                        <CategoryIcon iconKey={category.IconKey} />
+                                                    ),
+                                                    color: categoryColor(category),
+                                                }))}
+                                            emptyLabel="Toda categoria já tem teto neste mês"
+                                        />
+                                    )}
+                                </FormField>
+                            )}
 
                             <FormGrid columns={2}>
                                 <FormField label="Teto do mês" required>

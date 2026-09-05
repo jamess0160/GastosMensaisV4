@@ -263,8 +263,22 @@ export function spentByMonthCategory(
 export const totalBalance = (accounts: readonly ApiTypes.Account[]): ApiTypes.Money =>
     sumMoney(accounts.filter((account) => account.Active).map((account) => account.Balance));
 
+/** O nome do alvo de um teto — categoria OU pessoa.
+ *
+ *  Quem decide qual par ler é o `Scope`, nunca o id que veio nulo: é
+ *  para isso que ele existe. O alvo ARQUIVADO some da lista do mês, e
+ *  por isso o fallback aqui é um caso que não deveria acontecer — e não
+ *  o normal. */
+export const budgetTargetName = (period: ApiTypes.BudgetPeriod): string =>
+    period.Scope === "person"
+        ? (period.Person?.Name ?? "Pessoa arquivada")
+        : (period.Category?.Description ?? "Categoria arquivada");
+
 /** Estado de um teto de orçamento. A API devolve `LimitValue`, `Spent` e
- *  `AlertPercent`; COMPARAR É TRABALHO DA TELA — é isto. */
+ *  `AlertPercent`; COMPARAR É TRABALHO DA TELA — é isto.
+ *
+ *  `Spent` NEGATIVO (mês em que os estornos superam as compras) cai em
+ *  `ok` sozinho, e é a leitura certa: não se estourou nada. */
 export type BudgetState = "ok" | "alert" | "over";
 
 export function budgetState(period: ApiTypes.BudgetPeriod): BudgetState {
@@ -275,10 +289,13 @@ export function budgetState(period: ApiTypes.BudgetPeriod): BudgetState {
     return "ok";
 }
 
-/** Quanto do teto foi consumido, em porcentagem. Pode passar de 100 — o
- *  estouro é informação, não erro; quem apara na régua é a barra. */
+/** Quanto do teto foi consumido, em porcentagem.
+ *
+ *  Passa de 100 sem problema — o estouro é informação, não erro, e quem
+ *  apara na régua é a barra. Abaixo de zero, não: um mês em que os
+ *  estornos superam as compras consumiu **0%** do teto, e não −12%. */
 export const budgetPercent = (period: ApiTypes.BudgetPeriod): number =>
-    period.LimitValue > 0 ? (period.Spent / period.LimitValue) * 100 : 0;
+    period.LimitValue > 0 ? Math.max(0, (period.Spent / period.LimitValue) * 100) : 0;
 
 /** O que sobra do teto. Negativo é estouro. */
 export const budgetRemaining = (period: ApiTypes.BudgetPeriod): ApiTypes.Money =>

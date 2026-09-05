@@ -24,6 +24,43 @@ describe("saveBudget · definir (POST /Budgets)", () => {
         expect(body?.AlertPercent).toBe(80);
     });
 
+    it("manda IdCategory, e NUNCA IdPerson junto — os dois são exclusivos", async () => {
+        let body: Record<string, unknown> | undefined;
+        server.use(
+            msw.post("*/api/Budgets", async ({ request }) => {
+                body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ IdBudget: 1, IdBudgetPeriod: 1 });
+            }),
+        );
+
+        await saveBudget(fakeDashboardContext());
+
+        expect(body?.IdCategory).toBe(1);
+        expect(body).not.toHaveProperty("IdPerson");
+    });
+
+    it("no teto de PESSOA manda IdPerson, e nenhuma categoria", async () => {
+        let body: Record<string, unknown> | undefined;
+        server.use(
+            msw.post("*/api/Budgets", async ({ request }) => {
+                body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ IdBudget: 2, IdBudgetPeriod: 2 });
+            }),
+        );
+
+        // O rascunho guarda os dois ids para o usuário poder trocar de
+        // alvo sem perder o que escolheu; quem decide o que vai no corpo
+        // é o `Scope`. Mandar os dois é 406.
+        await saveBudget(
+            fakeDashboardContext({
+                budgetDraft: aBudgetDraft({ Scope: "person", IdPerson: 4, IdCategory: 1 }),
+            }),
+        );
+
+        expect(body?.IdPerson).toBe(4);
+        expect(body).not.toHaveProperty("IdCategory");
+    });
+
     it("nunca manda Status — o mês nasce aberto", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
@@ -107,6 +144,17 @@ describe("saveBudget · validação local", () => {
         await saveBudget(context);
 
         expect(context.failSubmit).toHaveBeenCalledWith("O alerta vai de 1% a 100%.");
+    });
+
+    it("cobra o alvo do escopo escolhido, e não a categoria sempre", async () => {
+        const context = fakeDashboardContext({
+            budgetDraft: aBudgetDraft({ Scope: "person", IdPerson: null }),
+        });
+
+        await saveBudget(context);
+
+        expect(context.failSubmit).toHaveBeenCalledWith("Escolha a pessoa.");
+        expect(context.beginSubmit).not.toHaveBeenCalled();
     });
 });
 

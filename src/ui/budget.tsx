@@ -3,8 +3,14 @@ import styles from "./budget.module.css";
 import { cx } from "./form";
 import { CategoryIcon } from "./iconCatalog";
 import { IconArrowDown, IconArrowUp } from "./icons";
-import { budgetPercent, budgetRemaining, budgetState, type BudgetState } from "@/lib/aggregate";
-import { categoryColor } from "@/lib/categoryColor";
+import {
+    budgetPercent,
+    budgetRemaining,
+    budgetState,
+    budgetTargetName,
+    type BudgetState,
+} from "@/lib/aggregate";
+import { categoryColor, paletteColor } from "@/lib/categoryColor";
 import { formatMoney } from "@/lib/money";
 import type { ApiTypes } from "@/types/api";
 
@@ -57,7 +63,11 @@ const STATE_LABEL: Record<BudgetState, string> = {
     over: "Estourou",
 };
 
-/** O cartão de um teto de categoria no mês. */
+/** O cartão de um teto no mês — de CATEGORIA ou de PESSOA.
+ *
+ *  Quem decide qual par ler (`Category` ou `Person`) é o `Scope`: os dois
+ *  convivem na mesma lista, e deduzir o tipo pelo id que veio nulo é
+ *  justamente o que o campo existe para evitar. */
 export function BudgetBar({
     period,
     onClick,
@@ -68,7 +78,15 @@ export function BudgetBar({
     const state = budgetState(period);
     const percent = budgetPercent(period);
     const remaining = budgetRemaining(period);
-    const color = categoryColor(period.Category);
+    const name = budgetTargetName(period);
+    /* Pessoa não tem cor cadastrada; a paleta dá uma estável pelo id, a
+       mesma que a quebra "Por destino" do Início usa. */
+    const color =
+        period.Scope === "person"
+            ? paletteColor(period.IdPerson ?? 0)
+            : period.Category
+              ? categoryColor(period.Category)
+              : "var(--ink-3)";
 
     const content = (
         <>
@@ -78,7 +96,7 @@ export function BudgetBar({
                         className={styles.dot}
                         style={{ background: state === "over" ? "#fff" : color }}
                     />
-                    <span className={styles.nameText}>{period.Category.Description}</span>
+                    <span className={styles.nameText}>{name}</span>
                 </span>
                 <span
                     className={cx(
@@ -125,7 +143,7 @@ export function BudgetBar({
             type="button"
             className={cx(styles.budget, state === "over" && styles.over)}
             onClick={onClick}
-            aria-label={`Editar o teto de ${period.Category.Description}`}
+            aria-label={`Editar o teto de ${name}`}
         >
             {content}
         </button>

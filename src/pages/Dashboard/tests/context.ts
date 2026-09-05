@@ -3,7 +3,9 @@ import type { BudgetDraft, DashboardContext } from "../controller";
 
 export const aBudgetDraft = (overrides: Partial<BudgetDraft> = {}): BudgetDraft => ({
     IdBudgetPeriod: null,
+    Scope: "category",
     IdCategory: 1,
+    IdPerson: null,
     ReferenceMonth: "2026-08",
     LimitValue: 800,
     AlertPercent: 80,

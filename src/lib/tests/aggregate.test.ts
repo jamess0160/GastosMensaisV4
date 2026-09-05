@@ -3,6 +3,7 @@ import {
     budgetPercent,
     budgetRemaining,
     budgetState,
+    budgetTargetName,
     legsOfKind,
     paymentLegs,
     spentByCategory,
@@ -19,6 +20,7 @@ import {
 import {
     aBudgetPeriod,
     aLegRow,
+    aPersonBudgetPeriod,
     anAccount,
     anExpense,
     anInflow,
@@ -317,5 +319,30 @@ describe("budgetPercent e budgetRemaining", () => {
 
         expect(budgetPercent(period)).toBeCloseTo(112.5);
         expect(budgetRemaining(period)).toBe(-100);
+    });
+});
+
+describe("budgetTargetName", () => {
+    it("lê o par que o Scope manda ler, e não o id que veio nulo", () => {
+        expect(budgetTargetName(aBudgetPeriod())).toBe("Alimentação");
+        expect(budgetTargetName(aPersonBudgetPeriod())).toBe("Maria");
+    });
+});
+
+describe("orçamento com Spent negativo", () => {
+    /* Um mês em que os estornos superam as compras fecha abaixo de zero.
+       Não é bug — o crédito volta no mês de competência do estorno, que
+       costuma ser outro mês. */
+
+    it("não estoura nem alerta", () => {
+        expect(budgetState(aBudgetPeriod({ LimitValue: 800, Spent: -120 }))).toBe("ok");
+    });
+
+    it("consumiu 0% do teto, e não −15%", () => {
+        expect(budgetPercent(aBudgetPeriod({ LimitValue: 800, Spent: -120 }))).toBe(0);
+    });
+
+    it("sobra MAIS do que o teto, que é a leitura certa", () => {
+        expect(budgetRemaining(aBudgetPeriod({ LimitValue: 800, Spent: -120 }))).toBe(920);
     });
 });

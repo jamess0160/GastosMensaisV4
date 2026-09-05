@@ -564,6 +564,18 @@ export namespace ApiTypes {
 
     export type BudgetPeriodStatus = "open" | "closed";
 
+    /** O alvo de um teto é uma CATEGORIA ou uma PESSOA, nunca os dois.
+     *
+     *  | `Scope`    | o que soma                          | eixo               |
+     *  |------------|-------------------------------------|--------------------|
+     *  | `category` | tudo que caiu naquela categoria     | o gasto inteiro    |
+     *  | `person`   | tudo ATRIBUÍDO àquela pessoa        | o eixo ANALÍTICO   |
+     *
+     *  Um gasto conta nos dois orçamentos, e isso NÃO é dupla contagem —
+     *  são duas perguntas diferentes sobre o mesmo dinheiro. O que não se
+     *  pode é somar os dois num total. */
+    export type BudgetScope = "category" | "person";
+
     /** O mês congelado. Nunca leia o limite de um mês passado da definição. */
     export interface BudgetPeriod {
         IdBudgetPeriod: number;
@@ -577,21 +589,41 @@ export namespace ApiTypes {
         ClosedAt: DateTime | null;
         CreatedAt: DateTime;
         UpdatedAt: DateTime;
-        IdCategory: number;
-        Category: Category;
-        /** Soma PERNAS por coalesce(DueDate, ExpenseDate), e conta pendente
-         *  junto com pago — ao contrário do saldo da conta. */
+        /** Quem decide qual PAR ler. Não deduza o tipo pelo id que veio
+         *  nulo: o `Scope` existe exatamente para isso. */
+        Scope: BudgetScope;
+        /** Preenchidos em `Scope: "category"`, `null` no outro. */
+        IdCategory: number | null;
+        Category: Category | null;
+        /** Preenchidos em `Scope: "person"`, `null` no outro. */
+        IdPerson: number | null;
+        Person: Person | null;
+        /** Soma PERNAS por `CompetenceDate`, e conta pendente junto com
+         *  pago — ao contrário do saldo da conta.
+         *
+         *  Em `Scope: "person"` vale uma quarta regra: o comprometido é
+         *  RATEADO pelas parcelas —
+         *  `ExpensePersons.Value × ExpensePayments.Value ÷ Expenses.TotalValue`.
+         *
+         *  PODE VIR NEGATIVO num mês em que os estornos superam as
+         *  compras. Não é bug, e a barra de progresso trata o caso. */
         Spent: Money;
     }
 
-    export interface BudgetCreateBody {
-        IdCategory: number;
+    interface BudgetCreateCommon {
         ReferenceMonth: ReferenceMonth;
         /** > 0. Teto zero é não ter teto: apague o mês. */
         LimitValue: Money;
         /** 1-100, default 80. */
         AlertPercent?: number;
     }
+
+    /** `IdCategory` e `IdPerson` são MUTUAMENTE EXCLUSIVOS: mandar os
+     *  dois, ou nenhum, é 406. A união expressa isso no tipo, em vez de
+     *  dois opcionais que compilariam nas duas formas erradas. */
+    export type BudgetCreateBody =
+        | (BudgetCreateCommon & { IdCategory: number; IdPerson?: never })
+        | (BudgetCreateCommon & { IdPerson: number; IdCategory?: never });
 
     export interface BudgetPeriodUpdateBody {
         LimitValue: Money;

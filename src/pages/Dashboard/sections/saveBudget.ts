@@ -3,12 +3,18 @@ import { BudgetPeriodsConnection } from "@/api/BudgetPeriods.connection";
 import { BudgetsConnection } from "@/api/Budgets.connection";
 import type { DashboardContext } from "../controller";
 
-/** Definir ou corrigir o teto de uma categoria no mês.
+/** Definir ou corrigir o teto de um ALVO no mês.
+ *
+ *  O alvo é uma CATEGORIA ou uma PESSOA, nunca os dois — mesma tabela,
+ *  mesmo POST, mesma lista, e `IdCategory`/`IdPerson` são mutuamente
+ *  exclusivos: mandar os dois, ou nenhum, é 406. Os dois somam coisas
+ *  diferentes: a categoria soma o gasto inteiro, a pessoa soma o eixo
+ *  ANALÍTICO (`ExpensePersons`), rateado pela parcela.
  *
  *  São DUAS rotas, e a diferença não é técnica:
  *
  *  - `POST /Budgets` resolve a DEFINIÇÃO vigente (cria, ou atualiza — só
- *    existe uma por categoria) e materializa o mês. Isso muda o FUTURO.
+ *    existe uma por alvo) e materializa o mês. Isso muda o FUTURO.
  *  - `PUT /BudgetPeriods` mexe em UM mês só, e a definição segue como
  *    estava. É a correção de um mês que já foi congelado.
  *
@@ -23,8 +29,9 @@ export async function saveBudget(context: DashboardContext): Promise<void> {
     const draft = context.budgetDraft;
     if (!draft) return;
 
-    if (draft.IdCategory === null) {
-        context.failSubmit("Escolha a categoria.");
+    const target = draft.Scope === "person" ? draft.IdPerson : draft.IdCategory;
+    if (target === null) {
+        context.failSubmit(draft.Scope === "person" ? "Escolha a pessoa." : "Escolha a categoria.");
         return;
     }
     if (draft.LimitValue === null || draft.LimitValue <= 0) {
@@ -42,7 +49,9 @@ export async function saveBudget(context: DashboardContext): Promise<void> {
     try {
         if (draft.IdBudgetPeriod === null) {
             await BudgetsConnection.upsert({
-                IdCategory: draft.IdCategory,
+                // Exatamente UM dos dois — a união do tipo é o que impede
+                // montar aqui um corpo que a API recusaria.
+                ...(draft.Scope === "person" ? { IdPerson: target } : { IdCategory: target }),
                 ReferenceMonth: draft.ReferenceMonth,
                 LimitValue: draft.LimitValue,
                 AlertPercent: draft.AlertPercent,

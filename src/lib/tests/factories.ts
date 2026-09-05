@@ -222,9 +222,35 @@ export function aBudgetPeriod(
         ClosedAt: null,
         CreatedAt: NOW,
         UpdatedAt: NOW,
+        Scope: "category",
         IdCategory: 1,
         Category: aCategory(),
+        IdPerson: null,
+        Person: null,
         Spent: 0,
         ...overrides,
     };
+}
+
+/** Um teto de PESSOA: mesma tabela, mesma lista, `Scope` diferente — e
+ *  os dois campos de categoria nulos. */
+export function aPersonBudgetPeriod(
+    overrides: Partial<ApiTypes.BudgetPeriod> = {},
+): ApiTypes.BudgetPeriod {
+    return aBudgetPeriod({
+        Scope: "person",
+        IdCategory: null,
+        Category: null,
+        IdPerson: 4,
+        Person: {
+            IdPerson: 4,
+            IdWorkspace: 1,
+            Name: "Maria",
+            IdUser: null,
+            Active: true,
+            CreatedAt: NOW,
+            UpdatedAt: NOW,
+        },
+        ...overrides,
+    });
 }
