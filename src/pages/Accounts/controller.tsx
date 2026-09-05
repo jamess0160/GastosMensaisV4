@@ -1,5 +1,6 @@
 import { archiveAccount } from "./sections/archiveAccount";
 import { archiveCard } from "./sections/archiveCard";
+import { payInvoice } from "./sections/payInvoice";
 import { saveAccount } from "./sections/saveAccount";
 import { saveCard } from "./sections/saveCard";
 import type { ApiTypes } from "@/types/api";
@@ -39,6 +40,13 @@ export interface AccountsContext {
     beginSubmit(): void;
     failSubmit(message: string): void;
     finishSubmit(message: string): void;
+    /** O fim de uma quitação de fatura, e ele é diferente do
+     *  `finishSubmit` em duas coisas: o cache invalidado é o do
+     *  MOVIMENTO (uma fatura mexe em dezenas de pernas, no `Status` de
+     *  dezenas de gastos e no saldo da conta, que é somado a cada
+     *  leitura), e a mensagem é para ser LIDA — "12 lançamentos saíram
+     *  do saldo" é o número que o usuário confere. */
+    finishInvoice(message: string): void;
     closeAccountForm(): void;
     closeCardForm(): void;
 }
@@ -48,6 +56,7 @@ class Controller {
     readonly archiveAccount = archiveAccount;
     readonly saveCard = saveCard;
     readonly archiveCard = archiveCard;
+    readonly payInvoice = payInvoice;
 }
 
 export const AccountsController = new Controller();

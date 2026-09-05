@@ -31,6 +31,7 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | ~~14~~ | [Desfazer recebimento de entrada](#14-desfazer-recebimento-de-entrada) | Produto | ✅ **Entregue** em 04/09 |
 | ~~15~~ | [Criação de entradas em lote](#15-criação-de-entradas-em-lote) | Produto | ✅ **Entregue** em 04/09 |
 | ~~16~~ | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | ✅ **Entregue** em 04/09 |
+| 17 | [`Charged` e `CompetenceDate` em `GET /ExpensePayments`](#17-charged-e-competencedate-em-get-expensepayments) | Contrato | Botão "entrou na fatura" na lista |
 
 **Seis itens saíram da fila.** Os de número **10, 13, 14, 15 e 16**
 subiram na virada de setembro exatamente na forma proposta aqui — e em
@@ -664,6 +665,39 @@ dos tipos em `src/types/api.ts` — dos dois corpos
 `PaymentMethod`**, o tipo de leitura: enquanto a resposta ainda os
 trouxer, eles são campo extra que o cliente nem declara. Como no item 10, cliente e contrato divergem até o
 documento ser atualizado — a fonte da verdade é este item.
+
+---
+
+## 17. `Charged` e `CompetenceDate` em `GET /ExpensePayments`
+
+**O problema.** A entrada de 06/09 do changelog diz que a perna ganhou
+**três campos novos** na resposta — `Charged`, `ChargedAt` e
+`CompetenceDate` —, mas o **exemplo de resposta da seção 12**
+(`GET /ExpensePayments`) não lista nenhum dos três. As duas coisas não
+podem estar certas ao mesmo tempo, e a diferença entre elas é grande.
+
+**Por que importa, e não é detalhe de documentação.**
+
+- **`Charged` é o que desenha o botão.** Ele é `null` fora do cartão, e é
+  essa nulidade — não o `Kind` da forma de pagamento, que a perna não
+  carrega — que diz se a linha tem "entrou na fatura" ou "quitar". Sem
+  ele na lista, a tela de Gastos não sabe qual dos dois oferecer sem
+  abrir um `GET /Expenses/IdExpense=:id` por linha, que é exatamente o
+  N+1 que a rota nova acabou de matar.
+- **`CompetenceDate` é o que decide o mês.** É por ela que o cliente
+  sabe em que mês a perna pesa. Sem ela, o cliente volta a calcular
+  `coalesce(DueDate, ExpenseDate)` por conta própria — o mesmo número,
+  mas a regra deixa de ter um dono só.
+
+**O que o frontend assumiu.** Que os três **vêm**, porque é o que a
+entrada do changelog afirma e porque a alternativa seria desfazer a
+entrega da rota. `ApiTypes.ExpensePaymentRow` os declara, `isCardLeg`
+lê o `Charged` e `paymentLegs` recorta o mês pela `CompetenceDate`.
+
+**O que precisamos de vocês:** confirmar que os três saem em
+`GET /ExpensePayments` (e não só no `GET /Expenses/IdExpense=:id`) e
+**atualizar o exemplo da seção 12**. Se algum deles não sair ali, digam
+qual — a tela muda, e muda para pior.
 
 ---
 

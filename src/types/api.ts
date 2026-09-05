@@ -370,10 +370,33 @@ export namespace ApiTypes {
          *  `GET /ExpensePayments` recortam o mês. Não é aceita em corpo
          *  nenhum — o servidor a escreve. */
         CompetenceDate: CalendarDate;
+        /** "A cobrança entrou na fatura" — a conferência de assinatura,
+         *  afirmada pelo usuário olhando o app do cartão. NÃO move saldo
+         *  e não mexe no `Status` do gasto.
+         *
+         *  `null` FORA do cartão, e é essa nulidade que diz se a linha
+         *  tem botão de conferência. Nunca derive de "a data já passou":
+         *  a lista é olhada justamente para achar onde a realidade
+         *  discordou da previsão. */
+        Charged: boolean | null;
+        ChargedAt: DateTime | null;
+        /** "O dinheiro saiu da conta". Fora do cartão é o `pay` da
+         *  perna; no cartão, só o `payInvoice` escreve aqui — marcar uma
+         *  compra isolada como paga não tira dinheiro de conta nenhuma,
+         *  e era esse duplo sentido que deixava o saldo errado. */
         Paid: boolean;
         PaidAt: DateTime | null;
         CreatedAt: DateTime;
         UpdatedAt: DateTime;
+    }
+
+    /** O corpo de `payInvoice`/`unpayInvoice`.
+     *
+     *  A fatura NÃO é um cadastro, é uma consulta: não há tabela nem id
+     *  de fatura. Todas as pernas de um ciclo compartilham o mesmo
+     *  `DueDate` exato, então uma fatura é `(IdPaymentMethod, DueDate)`. */
+    export interface InvoicePaymentBody {
+        DueDate: CalendarDate;
     }
 
     /** A perna como `GET /ExpensePayments` a devolve: com o gasto de

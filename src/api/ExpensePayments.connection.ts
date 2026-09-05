@@ -2,8 +2,17 @@ import { http } from "./client";
 import type { ApiTypes } from "@/types/api";
 
 /** `/ExpensePayments` — a perna não tem POST de cadastro: ela nasce com
- *  o gasto. O que existe aqui é a LISTA do que cai num período e o verbo
- *  que move saldo. */
+ *  o gasto. O que existe aqui é a LISTA do que cai num período e os
+ *  verbos de estado.
+ *
+ *  DOIS FATOS, DOIS VERBOS, e só um deles mexe em dinheiro:
+ *
+ *  | verbo               | afirma                    | move saldo? |
+ *  |---------------------|---------------------------|-------------|
+ *  | `charge`/`uncharge` | entrou na fatura — SÓ cartão | não      |
+ *  | `pay`/`unpay`       | saiu da conta — NUNCA cartão | sim      |
+ *
+ *  A fatura inteira é quitada em `PaymentMethodsConnection.payInvoice`. */
 class Connection {
     private readonly route = "/ExpensePayments";
 
@@ -43,10 +52,35 @@ class Connection {
     }
 
     /** Desquita. Existe porque um clique errado, sem ele, tiraria dinheiro
-     *  da conta sem volta. */
+     *  da conta sem volta. Mesma recusa para perna de cartão. */
     async unpay(idExpensePayment: number): Promise<{ msg: string }> {
         const { data } = await http.post<{ msg: string }>(
             `${this.route}/IdExpensePayment=${idExpensePayment}/unpay`,
+        );
+        return data;
+    }
+
+    /** Marca que a COBRANÇA ENTROU NA FATURA — `Charged: true` e o
+     *  instante em `ChargedAt`. Sem body, **só em perna de cartão**.
+     *
+     *  Não move saldo nenhum, não mexe no `Status` do gasto e não é
+     *  pré-requisito de nada: é a conferência de assinatura ("a Netflix
+     *  cobrou mesmo este mês? veio no valor certo?"), e quem responde é
+     *  o usuário olhando o app do cartão.
+     *
+     *  406 se a perna não existe, NÃO é de cartão (`Charged` é `null`
+     *  ali), o gasto está cancelado, ou já está marcada. */
+    async charge(idExpensePayment: number): Promise<{ msg: string }> {
+        const { data } = await http.post<{ msg: string }>(
+            `${this.route}/IdExpensePayment=${idExpensePayment}/charge`,
+        );
+        return data;
+    }
+
+    /** Desmarca, e apaga o `ChargedAt` junto. */
+    async uncharge(idExpensePayment: number): Promise<{ msg: string }> {
+        const { data } = await http.post<{ msg: string }>(
+            `${this.route}/IdExpensePayment=${idExpensePayment}/uncharge`,
         );
         return data;
     }

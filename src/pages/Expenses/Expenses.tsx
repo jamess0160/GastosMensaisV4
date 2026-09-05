@@ -58,6 +58,7 @@ import {
     totalSpent,
     type ExpenseLeg,
 } from "@/lib/aggregate";
+import { isCardLeg } from "@/lib/card";
 import { accentColor, categoryColor } from "@/lib/categoryColor";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatMoney } from "@/lib/money";
@@ -356,26 +357,31 @@ export function Expenses() {
         );
     };
 
-    /** O botão de status, em TODA linha não cancelada. */
+    /** O botão de status, em TODA linha não cancelada.
+     *
+     *  Ele afirma coisas DIFERENTES conforme a forma de pagamento, e por
+     *  isso troca de rótulo: fora do cartão diz "quitar" e o dinheiro sai
+     *  da conta; no cartão diz "entrou na fatura" e não move saldo
+     *  nenhum — quem faz o saldo descer é "Quitar fatura", na tela de
+     *  Contas. O botão não some: ele para de mentir. */
     const payButtonOf = (row: ApiTypes.Expense, info: RowInfo) => {
         if (row.Status === "canceled") return null;
 
         const payment = info.payable?.payment ?? null;
+        const card = payment !== null && isCardLeg(payment);
 
         return (
             <span onClick={(event) => event.stopPropagation()}>
                 <PayButton
-                    paid={payment?.Paid ?? row.Status === "paid"}
+                    paid={(card ? payment.Charged : payment?.Paid) ?? row.Status === "paid"}
                     disabled={payment === null}
                     reason={info.payReason}
                     pending={pending}
+                    label={card ? "Entrou na fatura" : "Quitar"}
+                    doneLabel={card ? "Desmarcar da fatura" : "Desfazer quitação"}
                     onToggle={() => {
                         if (!payment) return;
-                        void ExpensesController.toggleLegPayment(
-                            context,
-                            payment.IdExpensePayment,
-                            payment.Paid,
-                        );
+                        void ExpensesController.toggleLegPayment(context, payment);
                     }}
                 />
             </span>
@@ -898,6 +904,7 @@ export function Expenses() {
                                 <div className={styles.legs}>
                                     {expense.Payments.map((leg) => {
                                         const method = methodIndex.get(leg.IdPaymentMethod);
+                                        const card = isCardLeg(leg);
                                         const overdue =
                                             !leg.Paid &&
                                             leg.DueDate !== null &&
@@ -920,8 +927,17 @@ export function Expenses() {
                                                         {leg.DueDate
                                                             ? `Vence ${formatDate(leg.DueDate)}`
                                                             : "Sem vencimento próprio"}
+                                                        {/* No cartão, `Charged` e `Paid` são
+                                                            fatos diferentes: um diz que a
+                                                            cobrança entrou na fatura, o outro
+                                                            que a fatura foi paga. */}
+                                                        {card &&
+                                                            leg.ChargedAt &&
+                                                            ` · na fatura desde ${formatDateTime(leg.ChargedAt)}`}
                                                         {leg.PaidAt &&
-                                                            ` · pago ${formatDateTime(leg.PaidAt)}`}
+                                                            (card
+                                                                ? ` · fatura quitada ${formatDateTime(leg.PaidAt)}`
+                                                                : ` · pago ${formatDateTime(leg.PaidAt)}`)}
                                                         {overdue && " · vencida"}
                                                     </div>
                                                 </div>
@@ -929,14 +945,19 @@ export function Expenses() {
                                                     {formatMoney(leg.Value)}
                                                 </span>
                                                 <PayButton
-                                                    paid={leg.Paid}
+                                                    paid={card ? leg.Charged === true : leg.Paid}
                                                     disabled={expense.Status === "canceled"}
                                                     pending={pending}
+                                                    label={card ? "Entrou na fatura" : "Quitar"}
+                                                    doneLabel={
+                                                        card
+                                                            ? "Desmarcar da fatura"
+                                                            : "Desfazer quitação"
+                                                    }
                                                     onToggle={() =>
                                                         void ExpensesController.toggleLegPayment(
                                                             context,
-                                                            leg.IdExpensePayment,
-                                                            leg.Paid,
+                                                            leg,
                                                         )
                                                     }
                                                 />

@@ -219,6 +219,11 @@ export function AddExpense() {
 
     const category = activeCategories.find((item) => item.IdCategory === draft.IdCategory);
     const chosenMethod = methods.find(({ method }) => method.IdPaymentMethod === singlePayment.id);
+    /* `Paid: true` com forma `credit_card` é 406: no cartão, marcar a
+       compra como paga não tira dinheiro de conta nenhuma — quem tira é
+       o pagamento da fatura, semanas depois. O checkbox some em vez de
+       levar a uma recusa previsível. */
+    const acceptsPaid = chosenMethod?.method.Kind !== "credit_card";
 
     const personsUsed = usableLines(draft.persons).length;
     const blocking = validateExpense(draft, isEdit);
@@ -474,7 +479,20 @@ export function AddExpense() {
                                 onChange={(id) =>
                                     patch({
                                         payments: [
-                                            { ...singlePayment, id, value: draft.TotalValue },
+                                            {
+                                                ...singlePayment,
+                                                id,
+                                                value: draft.TotalValue,
+                                                // Ver `acceptsPaid`: no cartão,
+                                                // `Paid` é 406.
+                                                paid:
+                                                    methods.find(
+                                                        ({ method }) =>
+                                                            method.IdPaymentMethod === id,
+                                                    )?.method.Kind === "credit_card"
+                                                        ? false
+                                                        : singlePayment.paid,
+                                            },
                                         ],
                                     })
                                 }
@@ -486,22 +504,31 @@ export function AddExpense() {
                                 }))}
                                 emptyLabel="Nenhuma forma cadastrada"
                             />
-                            <div className={styles.paidRow}>
-                                {/* `Paid: true` é o caso do débito e do pix,
-                                    que saem pagos no ato; no cartão a perna
-                                    fica em aberto até a fatura vencer. */}
-                                <Checkbox
-                                    label="Já foi pago"
-                                    checked={singlePayment.paid ?? false}
-                                    onChange={(event) =>
-                                        patch({
-                                            payments: [
-                                                { ...singlePayment, paid: event.target.checked },
-                                            ],
-                                        })
-                                    }
-                                />
-                            </div>
+                            {acceptsPaid ? (
+                                <div className={styles.paidRow}>
+                                    {/* `Paid: true` é o caso do débito e do
+                                        pix, que saem pagos no ato. */}
+                                    <Checkbox
+                                        label="Já foi pago"
+                                        checked={singlePayment.paid ?? false}
+                                        onChange={(event) =>
+                                            patch({
+                                                payments: [
+                                                    {
+                                                        ...singlePayment,
+                                                        paid: event.target.checked,
+                                                    },
+                                                ],
+                                            })
+                                        }
+                                    />
+                                </div>
+                            ) : (
+                                <div className={styles.paidNote}>
+                                    Compra no cartão não se marca como paga: quem tira o dinheiro da
+                                    conta é a fatura, quitada em Contas.
+                                </div>
+                            )}
                         </Box>
                     )}
                 </div>
@@ -548,6 +575,7 @@ export function AddExpense() {
                                     group: account.Name,
                                     icon: METHOD_ICON[method.Kind],
                                     color: accentColor(method.Color ?? account.Color),
+                                    acceptsPaid: method.Kind !== "credit_card",
                                 }))}
                                 lines={draft.payments}
                                 onChange={(payments) => patch({ payments })}

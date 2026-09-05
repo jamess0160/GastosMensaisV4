@@ -1,4 +1,5 @@
 import { addDaysToDate, dayInMonth, daysApart, parts } from "./date";
+import { sumMoney, type ExpenseLeg } from "./aggregate";
 import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
@@ -52,4 +53,63 @@ export function cardCycleFromDates(
     due: ApiTypes.CalendarDate,
 ): { DueDay: number; ClosingOffsetDays: number } {
     return { DueDay: parts(due).day, ClosingOffsetDays: daysApart(closing, due) };
+}
+
+/* ── A fatura ─────────────────────────────────────────────── */
+
+/** A perna é de cartão de crédito?
+ *
+ *  `Charged` é `null` fora do cartão, e é essa nulidade — e não o `Kind`
+ *  da forma de pagamento, que a perna não carrega — que diz se a linha
+ *  tem botão de conferência em vez de botão de quitação. */
+export const isCardLeg = (payment: ApiTypes.ExpensePayment): boolean => payment.Charged !== null;
+
+/** A fatura de um cartão num ciclo.
+ *
+ *  Ela não é um cadastro: não há tabela nem id de fatura. Todas as
+ *  pernas de um ciclo compartilham o MESMO `DueDate` exato, então uma
+ *  fatura é `(IdPaymentMethod, DueDate)` — e é esse `DueDate` que o
+ *  `payInvoice` recebe de volta. */
+export interface Invoice {
+    closing: ApiTypes.CalendarDate;
+    due: ApiTypes.CalendarDate;
+    legs: ExpenseLeg[];
+    /** O que a fatura cobra — já com o sinal do estorno, que a reduz. */
+    total: ApiTypes.Money;
+    /** Quanto do total o usuário já conferiu como lançado na fatura. A
+     *  diferença para o total é o que ele esperava e o cartão ainda não
+     *  registrou. */
+    charged: ApiTypes.Money;
+    /** A fatura já saiu da conta? No cartão, quem escreve o `Paid` das
+     *  pernas é só o `payInvoice`. */
+    paid: boolean;
+}
+
+/** As pernas do cartão que caem na fatura que vence naquele mês.
+ *
+ *  O recorte é pelo `DueDate` exato do ciclo, e não pelo mês: duas
+ *  faturas do mesmo cartão nunca vencem no mesmo dia, e é o dia que o
+ *  servidor usa para achar as pernas. */
+export function invoiceOf(
+    legs: readonly ExpenseLeg[],
+    method: ApiTypes.PaymentMethod,
+    month: ApiTypes.ReferenceMonth,
+): Invoice {
+    const { closing, due } = invoiceDates(month, method.DueDay, method.ClosingOffsetDays);
+
+    const mine = legs.filter(
+        (leg) =>
+            leg.payment.IdPaymentMethod === method.IdPaymentMethod && leg.payment.DueDate === due,
+    );
+
+    return {
+        closing,
+        due,
+        legs: mine,
+        total: sumMoney(mine.map((leg) => leg.value)),
+        charged: sumMoney(
+            mine.filter((leg) => leg.payment.Charged === true).map((leg) => leg.value),
+        ),
+        paid: mine.length > 0 && mine.every((leg) => leg.paid),
+    };
 }

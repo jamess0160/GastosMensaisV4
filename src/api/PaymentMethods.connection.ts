@@ -41,6 +41,48 @@ class Connection {
         );
         return data;
     }
+
+    /** Quita a FATURA INTEIRA — é isto que tira o dinheiro do cartão da
+     *  conta. No crédito, a perna sozinha não quita: `pay` a recusa.
+     *
+     *  A fatura não é cadastro, é consulta. Não há tabela nem id de
+     *  fatura: todas as pernas de um ciclo compartilham o mesmo
+     *  `DueDate` exato, e é ele que a identifica.
+     *
+     *  `Payments` na resposta é QUANTAS PERNAS mudaram de estado.
+     *  Repetir a chamada é inofensivo — as já pagas são puladas e
+     *  `Payments: 0` é resposta legítima ("a fatura já estava assim"). É
+     *  isso que resolve lançar hoje uma compra esquecida que pertence a
+     *  uma fatura já paga: chame de novo e só a que faltava é quitada.
+     *  Pernas de gasto cancelado ficam de fora.
+     *
+     *  406 se a forma não existe no workspace, não é `credit_card`, ou
+     *  não há fatura com esse vencimento — fatura sem perna nenhuma não
+     *  é fatura paga, é fatura que não existe. */
+    async payInvoice(
+        idPaymentMethod: number,
+        body: ApiTypes.InvoicePaymentBody,
+    ): Promise<{ msg: string; Payments: number }> {
+        const { data } = await http.post<{ msg: string; Payments: number }>(
+            `${this.route}/IdPaymentMethod=${idPaymentMethod}/payInvoice`,
+            body,
+        );
+        return data;
+    }
+
+    /** O sentido inverso, e ele existe pelo mesmo motivo que o `unpay` —
+     *  e mais ainda: um clique errado aqui tira DEZENAS de pagamentos do
+     *  saldo de uma vez. */
+    async unpayInvoice(
+        idPaymentMethod: number,
+        body: ApiTypes.InvoicePaymentBody,
+    ): Promise<{ msg: string; Payments: number }> {
+        const { data } = await http.post<{ msg: string; Payments: number }>(
+            `${this.route}/IdPaymentMethod=${idPaymentMethod}/unpayInvoice`,
+            body,
+        );
+        return data;
+    }
 }
 
 export const PaymentMethodsConnection = new Connection();

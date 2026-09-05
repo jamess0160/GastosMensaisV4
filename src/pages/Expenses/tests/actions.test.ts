@@ -6,6 +6,7 @@ import { cancelExpense } from "../sections/cancelExpense";
 import { cancelSeries } from "../sections/cancelSeries";
 import { updateSeries } from "../sections/updateSeries";
 import { aSeriesDraft, fakeExpensesContext } from "./context";
+import { aPayment } from "@/lib/tests/factories";
 
 describe("toggleLegPayment", () => {
     it("quita a perna pela rota /pay, sem corpo", async () => {
@@ -18,7 +19,7 @@ describe("toggleLegPayment", () => {
         );
         const context = fakeExpensesContext();
 
-        await toggleLegPayment(context, 4, false);
+        await toggleLegPayment(context, aPayment({ IdExpensePayment: 4 }));
 
         // O instante do pagamento quem grava é o servidor.
         expect(body).toBe("");
@@ -33,11 +34,47 @@ describe("toggleLegPayment", () => {
         );
         const context = fakeExpensesContext();
 
-        await toggleLegPayment(context, 4, true);
+        await toggleLegPayment(context, aPayment({ IdExpensePayment: 4, Paid: true }));
 
         expect(context.finishSubmit).toHaveBeenCalledWith(
             "Parcela desquitada — o dinheiro voltou ao saldo.",
         );
+    });
+
+    it("na perna de CARTÃO chama charge, não pay — pay ali é 406", async () => {
+        // Sem handler de /pay declarado: se ele fosse chamado, a
+        // requisição quebraria o teste. É essa a garantia.
+        let called = false;
+        server.use(
+            msw.post("*/api/ExpensePayments/IdExpensePayment=9/charge", () => {
+                called = true;
+                return HttpResponse.json({ msg: "Cobrança marcada como lançada na fatura" });
+            }),
+        );
+        const context = fakeExpensesContext();
+
+        await toggleLegPayment(context, aPayment({ IdExpensePayment: 9, Charged: false }));
+
+        expect(called).toBe(true);
+        expect(context.finishSubmit).toHaveBeenCalledWith(
+            "Marcada como lançada na fatura — o saldo só desce quando a fatura for quitada.",
+        );
+    });
+
+    it("desmarca a cobrança pelo uncharge", async () => {
+        server.use(
+            msw.post("*/api/ExpensePayments/IdExpensePayment=9/uncharge", () =>
+                HttpResponse.json({ msg: "ok" }),
+            ),
+        );
+        const context = fakeExpensesContext();
+
+        await toggleLegPayment(
+            context,
+            aPayment({ IdExpensePayment: 9, Charged: true, ChargedAt: "2026-09-01T10:00:00Z" }),
+        );
+
+        expect(context.finishSubmit).toHaveBeenCalledWith("Cobrança desmarcada da fatura.");
     });
 
     it("mostra a msg da API quando a parcela já está quitada", async () => {
@@ -48,7 +85,7 @@ describe("toggleLegPayment", () => {
         );
         const context = fakeExpensesContext();
 
-        await toggleLegPayment(context, 4, false);
+        await toggleLegPayment(context, aPayment({ IdExpensePayment: 4 }));
 
         expect(context.failSubmit).toHaveBeenCalledWith("Esta parcela já está quitada!");
     });

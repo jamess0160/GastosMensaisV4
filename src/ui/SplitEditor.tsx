@@ -45,6 +45,10 @@ export interface SplitOption {
     group?: string;
     icon?: ReactNode;
     color?: string;
+    /** A linha pode nascer paga? `false` no CARTÃO DE CRÉDITO: `Paid`
+     *  ali é 406, porque no cartão quem tira o dinheiro da conta é o
+     *  pagamento da FATURA, e não a compra. Default `true`. */
+    acceptsPaid?: boolean;
 }
 
 /** Uma linha em branco — o estado inicial de qualquer rateio. */
@@ -110,6 +114,8 @@ export function SplitEditor({
     const patch = (index: number, change: Partial<SplitLine>) =>
         onChange(lines.map((line, at) => (at === index ? { ...line, ...change } : line)));
 
+    const optionOf = (id: number | null) => options.find((option) => option.id === id);
+
     const distribute = () => {
         if (total === null || lines.length === 0) return;
         // O centavo que sobra vai na PRIMEIRA linha — a mesma regra que
@@ -144,7 +150,18 @@ export function SplitEditor({
                                     icon: option.icon,
                                     color: option.color,
                                 }))}
-                                onChange={(id) => patch(index, { id })}
+                                /* Trocar para uma forma que não aceita
+                                   "já pago" precisa LIMPAR a marca: um
+                                   `Paid: true` esquecido numa linha de
+                                   cartão é 406 na gravação. */
+                                onChange={(id) =>
+                                    patch(index, {
+                                        id,
+                                        ...(optionOf(id)?.acceptsPaid === false
+                                            ? { paid: false }
+                                            : {}),
+                                    })
+                                }
                             />
                         </span>
 
@@ -177,7 +194,7 @@ export function SplitEditor({
                             />
                         </span>
 
-                        {withPaid && (
+                        {withPaid && optionOf(line.id)?.acceptsPaid !== false && (
                             <label className={styles.paidToggle}>
                                 <input
                                     type="checkbox"

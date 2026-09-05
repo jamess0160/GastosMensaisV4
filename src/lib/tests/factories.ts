@@ -44,6 +44,10 @@ export function aPayment(
         ClosingDate: null,
         DueDate: null,
         CompetenceDate: overrides.DueDate ?? "2026-08-10",
+        // `null` é o padrão porque a maioria das pernas não é de cartão:
+        // é a nulidade que diz que a linha não tem conferência de fatura.
+        Charged: null,
+        ChargedAt: null,
         Paid: false,
         PaidAt: null,
         CreatedAt: NOW,

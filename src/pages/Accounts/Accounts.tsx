@@ -9,12 +9,14 @@ import {
 import { useMonthScope } from "@/app/monthScope";
 import { useSession } from "@/app/session";
 import { useAccounts, useInvalidateCatalogs } from "@/data/catalogs";
+import { useInvalidateMovement, useMonthLegs } from "@/data/month";
 import { Badge, Button, Card, Overline, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
 import {
     FormError,
     FormField,
     FormGrid,
+    FormNotice,
     Input,
     MoneyInput,
     DateInput,
@@ -40,6 +42,7 @@ import { totalBalance } from "@/lib/aggregate";
 import {
     cardCycleFromDates,
     invoiceDates,
+    invoiceOf,
     MAX_CLOSING_OFFSET_DAYS,
     MIN_CLOSING_OFFSET_DAYS,
 } from "@/lib/card";
@@ -193,13 +196,26 @@ export function Accounts() {
        total de Contas divergiria do de Início a cada troca de mês. */
     const [month, setMonth] = useMonthScope();
     const accounts = useAccounts();
+    /* As pernas do mês, sob a mesma chave de cache que Início e Gastos
+       já buscaram: é delas que sai a fatura de cada cartão — quanto
+       vence e quanto já foi conferido. */
+    const monthLegs = useMonthLegs(month);
     const invalidateCatalogs = useInvalidateCatalogs();
+    const invalidateMovement = useInvalidateMovement();
 
     const [accountDraft, setAccountDraft] = useState<AccountDraft | null>(null);
     const [cardDraft, setCardDraft] = useState<CardDraft | null>(null);
     const [openAccount, setOpenAccount] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
+    /* A confirmação de "Desfazer quitação": um clique errado ali tira
+       dezenas de pagamentos do saldo de uma vez. */
+    const [unpaying, setUnpaying] = useState<{
+        idPaymentMethod: number;
+        name: string;
+        due: ApiTypes.CalendarDate;
+    } | null>(null);
     const [archiving, setArchiving] = useState<{
         kind: "account" | "card";
         id: number;
@@ -213,6 +229,7 @@ export function Accounts() {
             beginSubmit() {
                 setPending(true);
                 setError(null);
+                setNotice(null);
             },
             failSubmit(message) {
                 setPending(false);
@@ -222,10 +239,18 @@ export function Accounts() {
                 setPending(false);
                 invalidateCatalogs();
             },
+            finishInvoice(message) {
+                setPending(false);
+                setNotice(message);
+                // Uma fatura mexe em dezenas de pernas, no `Status` de
+                // dezenas de gastos e no saldo da conta — que é somado a
+                // cada leitura, em todos os meses em cache.
+                invalidateMovement();
+            },
             closeAccountForm: () => setAccountDraft(null),
             closeCardForm: () => setCardDraft(null),
         }),
-        [accountDraft, cardDraft, invalidateCatalogs],
+        [accountDraft, cardDraft, invalidateCatalogs, invalidateMovement],
     );
 
     const active = (accounts.data ?? []).filter((account) => account.Active);
@@ -502,6 +527,7 @@ export function Accounts() {
                     {detail && (
                         <>
                             <FormError>{error}</FormError>
+                            <FormNotice>{notice}</FormNotice>
 
                             <div className={styles.sectionLabel}>
                                 <span>Formas que nasceram com a conta</span>
@@ -542,59 +568,137 @@ export function Accounts() {
                                 <div className={styles.cards}>
                                     {detail.PaymentMethods.filter(
                                         (method) => method.Active && method.Kind === "credit_card",
-                                    ).map((method) => (
-                                        <div className={styles.card} key={method.IdPaymentMethod}>
-                                            <span
-                                                className={styles.cardMark}
-                                                style={
-                                                    method.Color
-                                                        ? {
-                                                              background: `${method.Color}1f`,
-                                                              color: method.Color,
-                                                          }
-                                                        : undefined
-                                                }
+                                    ).map((method) => {
+                                        const invoice = invoiceOf(monthLegs.legs, method, month);
+
+                                        return (
+                                            <div
+                                                className={styles.cardStack}
+                                                key={method.IdPaymentMethod}
                                             >
-                                                <IconCard />
-                                            </span>
-                                            <div className={styles.cardBody}>
-                                                <div className={styles.cardName}>{method.Name}</div>
-                                                {/* Não existe "dia do fechamento": ele é
-                                                `DueDay − ClosingOffsetDays` e muda de mês
-                                                para mês — então o que se mostra é a fatura
-                                                deste mês, com data. */}
-                                                <div className={styles.cardSub}>
-                                                    {cardCycle(method, month)}
+                                                <div className={styles.card}>
+                                                    <span
+                                                        className={styles.cardMark}
+                                                        style={
+                                                            method.Color
+                                                                ? {
+                                                                      background: `${method.Color}1f`,
+                                                                      color: method.Color,
+                                                                  }
+                                                                : undefined
+                                                        }
+                                                    >
+                                                        <IconCard />
+                                                    </span>
+                                                    <div className={styles.cardBody}>
+                                                        <div className={styles.cardName}>
+                                                            {method.Name}
+                                                        </div>
+                                                        {/* Não existe "dia do fechamento": ele é
+                                                        `DueDay − ClosingOffsetDays` e muda de mês para
+                                                        mês — então o que se mostra é a fatura deste
+                                                        mês, com data. */}
+                                                        <div className={styles.cardSub}>
+                                                            {cardCycle(method, month)}
+                                                        </div>
+                                                    </div>
+                                                    <IconButton
+                                                        label="Editar cartão"
+                                                        onClick={() =>
+                                                            setCardDraft(
+                                                                editCardDraft(
+                                                                    method,
+                                                                    detail.IdAccount,
+                                                                    month,
+                                                                ),
+                                                            )
+                                                        }
+                                                    >
+                                                        <IconEdit />
+                                                    </IconButton>
+                                                    <IconButton
+                                                        label="Arquivar cartão"
+                                                        onClick={() =>
+                                                            setArchiving({
+                                                                kind: "card",
+                                                                id: method.IdPaymentMethod,
+                                                                name: method.Name,
+                                                            })
+                                                        }
+                                                    >
+                                                        <IconArchive />
+                                                    </IconButton>
+                                                </div>
+
+                                                {/* A FATURA, e é ela que faz o saldo descer. No cartão,
+                                                marcar uma compra como paga não tira dinheiro de conta
+                                                nenhuma — quem tira é este botão. A fatura não tem id:
+                                                ela é (cartão, vencimento), e é esse vencimento que vai
+                                                no corpo. */}
+                                                <div className={styles.invoice}>
+                                                    <div className={styles.invoiceBody}>
+                                                        <div className={styles.invoiceLabel}>
+                                                            Fatura que vence{" "}
+                                                            {formatShort(invoice.due)}
+                                                        </div>
+                                                        <div className={styles.invoiceValue}>
+                                                            {formatMoney(invoice.total)}
+                                                        </div>
+                                                        <div className={styles.invoiceCaption}>
+                                                            {monthLegs.isPending
+                                                                ? "Carregando os lançamentos do mês…"
+                                                                : invoice.legs.length === 0
+                                                                  ? "Nenhum lançamento nesta fatura"
+                                                                  : invoice.paid
+                                                                    ? `Quitada · ${invoice.legs.length} lançamento${invoice.legs.length === 1 ? "" : "s"}`
+                                                                    : `${formatMoney(invoice.charged)} já conferidos · ${invoice.legs.length} lançamento${invoice.legs.length === 1 ? "" : "s"}`}
+                                                        </div>
+                                                    </div>
+                                                    <span className={styles.invoiceActions}>
+                                                        {invoice.paid ? (
+                                                            <Button
+                                                                size="sm"
+                                                                disabled={pending}
+                                                                onClick={() =>
+                                                                    setUnpaying({
+                                                                        idPaymentMethod:
+                                                                            method.IdPaymentMethod,
+                                                                        name: method.Name,
+                                                                        due: invoice.due,
+                                                                    })
+                                                                }
+                                                            >
+                                                                Desfazer quitação
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="primary"
+                                                                disabled={
+                                                                    pending ||
+                                                                    invoice.legs.length === 0
+                                                                }
+                                                                title={
+                                                                    invoice.legs.length === 0
+                                                                        ? "Fatura sem lançamento nenhum não é fatura"
+                                                                        : undefined
+                                                                }
+                                                                onClick={() =>
+                                                                    void AccountsController.payInvoice(
+                                                                        context,
+                                                                        method.IdPaymentMethod,
+                                                                        invoice.due,
+                                                                    )
+                                                                }
+                                                            >
+                                                                Quitar fatura
+                                                            </Button>
+                                                        )}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <IconButton
-                                                label="Editar cartão"
-                                                onClick={() =>
-                                                    setCardDraft(
-                                                        editCardDraft(
-                                                            method,
-                                                            detail.IdAccount,
-                                                            month,
-                                                        ),
-                                                    )
-                                                }
-                                            >
-                                                <IconEdit />
-                                            </IconButton>
-                                            <IconButton
-                                                label="Arquivar cartão"
-                                                onClick={() =>
-                                                    setArchiving({
-                                                        kind: "card",
-                                                        id: method.IdPaymentMethod,
-                                                        name: method.Name,
-                                                    })
-                                                }
-                                            >
-                                                <IconArchive />
-                                            </IconButton>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </>
@@ -817,6 +921,27 @@ export function Accounts() {
                         </form>
                     )}
                 </SlideOver>
+
+                <ConfirmDialog
+                    open={unpaying !== null}
+                    onClose={() => setUnpaying(null)}
+                    onConfirm={() => {
+                        const target = unpaying;
+                        setUnpaying(null);
+                        if (!target) return;
+                        void AccountsController.payInvoice(
+                            context,
+                            target.idPaymentMethod,
+                            target.due,
+                            true,
+                        );
+                    }}
+                    title={`Desfazer a quitação da fatura de ${unpaying?.name ?? ""}?`}
+                    description="Todos os lançamentos dessa fatura voltam a pesar no saldo da conta — podem ser dezenas de uma vez. Nenhum gasto é apagado: o que muda é só o estado da fatura."
+                    confirmLabel="Desfazer quitação"
+                    danger
+                    pending={pending}
+                />
 
                 <ConfirmDialog
                     open={archiving !== null}

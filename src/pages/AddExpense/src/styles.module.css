@@ -236,6 +236,15 @@
     margin-top: 8px;
 }
 
+/* No cartão não há "já foi pago": a linha explica por quê, no lugar
+   exato onde o checkbox estaria. */
+.paidNote {
+    margin-top: 8px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+}
+
 @media (max-width: 720px) {
     .rowValue,
     .rowKind,
