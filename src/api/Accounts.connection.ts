@@ -6,14 +6,20 @@ import type { ApiTypes } from "@/types/api";
 class Connection {
     private readonly route = "/Accounts";
 
-    /** Sem query. As formas de pagamento vêm embutidas — não há GET
-     *  próprio de PaymentMethods.
+    /** As formas de pagamento vêm embutidas — não há GET próprio de
+     *  PaymentMethods.
      *
      *  `Balance` = InitialBalance + entradas recebidas − transferências
-     *  que saíram − pernas de gasto pagas. Pendente é previsão e não
-     *  entra. Não é coluna: não recalcule somando lançamentos no cliente. */
-    async list(): Promise<ApiTypes.Account[]> {
-        const { data } = await http.get<ApiTypes.Account[]>(this.route);
+     *  que saíram − pernas de gasto pagas, tudo **com data até o último
+     *  dia do `ReferenceMonth`**. Pendente é previsão e não entra. Não é
+     *  coluna: não recalcule somando lançamentos no cliente.
+     *
+     *  O `ReferenceMonth` recorta o SALDO, não a lista: as contas são as
+     *  mesmas em qualquer mês. Mande o mês que a tela está exibindo —
+     *  omitir devolve o mês corrente, que é o que fazia março mostrar o
+     *  saldo de setembro. */
+    async list(query: ApiTypes.AccountListQuery = {}): Promise<ApiTypes.Account[]> {
+        const { data } = await http.get<ApiTypes.Account[]>(this.route, { params: query });
         return data;
     }
 

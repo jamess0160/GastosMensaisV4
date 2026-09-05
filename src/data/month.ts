@@ -426,7 +426,9 @@ export function useInvalidateMovement() {
         void queryClient.invalidateQueries({ queryKey: ["expense"] });
         void queryClient.invalidateQueries({ queryKey: ["inflow"] });
         // O saldo é calculado na leitura: toda quitação e todo
-        // recebimento mudam o número que a tela de Contas mostra.
-        void queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
+        // recebimento mudam o número que a tela de Contas mostra — e em
+        // TODOS os meses em cache, não só no visível, porque quitar hoje
+        // uma parcela de novembro sai do saldo de novembro.
+        void queryClient.invalidateQueries({ queryKey: queryKeys.allAccounts });
     };
 }

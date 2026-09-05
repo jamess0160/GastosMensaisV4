@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { queryKeys } from "./keys";
+import { useMonthScope } from "@/app/monthScope";
 import { AccountsConnection } from "@/api/Accounts.connection";
 import { CategoriesConnection } from "@/api/Categories.connection";
 import { PersonsConnection } from "@/api/Persons.connection";
@@ -29,11 +30,20 @@ export function usePersons(): UseQueryResult<ApiTypes.Person[]> {
 
 /** As contas trazem as formas de pagamento embutidas — não existe `GET`
  *  de PaymentMethods, e é daqui que sai o seletor de forma dos
- *  formulários. */
-export function useAccounts(): UseQueryResult<ApiTypes.Account[]> {
+ *  formulários.
+ *
+ *  O MÊS não recorta a lista, e sim o `Balance`: as contas são as mesmas
+ *  em qualquer mês, mas o saldo é somado até o último dia do mês pedido.
+ *  Sem argumento, o mês é o do chassi — é o que faz Início e Contas
+ *  lerem a MESMA entrada de cache em vez de pedirem duas vezes. Passar
+ *  um mês explícito é para quem precisa de outro que não o exibido. */
+export function useAccounts(month?: ApiTypes.ReferenceMonth): UseQueryResult<ApiTypes.Account[]> {
+    const [scopeMonth] = useMonthScope();
+    const referenceMonth = month ?? scopeMonth;
+
     return useQuery({
-        queryKey: queryKeys.accounts,
-        queryFn: () => AccountsConnection.list(),
+        queryKey: queryKeys.accounts(referenceMonth),
+        queryFn: () => AccountsConnection.list({ ReferenceMonth: referenceMonth }),
         staleTime: CATALOG_STALE_TIME,
     });
 }
@@ -72,6 +82,9 @@ export interface PaymentMethodOption {
     account: ApiTypes.Account;
 }
 
+/** NÃO recebe mês, de propósito: a forma de pagamento é a mesma em
+ *  qualquer mês, e herdando o mês do chassi ela lê a entrada de cache
+ *  que as telas de saldo já buscaram — sem requisição extra. */
 export function usePaymentMethods(): PaymentMethodOption[] {
     const { data } = useAccounts();
     return useMemo(
@@ -99,12 +112,14 @@ export function usePaymentMethodIndex(): Map<number, PaymentMethodOption> {
 /** Invalida os cadastros depois de uma escrita neles.
  *
  *  As contas entram junto porque criar um cartão muda a lista de formas
- *  de pagamento, que vive dentro de `GET /Accounts`. */
+ *  de pagamento, que vive dentro de `GET /Accounts`. Invalida a RAIZ:
+ *  há uma entrada por mês em cache, e o cartão novo aparece em todas
+ *  elas — a mesma razão já escrita em `useInvalidateMovement`. */
 export function useInvalidateCatalogs() {
     const queryClient = useQueryClient();
     return () => {
         void queryClient.invalidateQueries({ queryKey: queryKeys.categories });
         void queryClient.invalidateQueries({ queryKey: queryKeys.persons });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.allAccounts });
     };
 }

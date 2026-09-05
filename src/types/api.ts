@@ -142,6 +142,12 @@ export namespace ApiTypes {
         UpdatedAt: DateTime;
     }
 
+    /** O mês recorta o `Balance`, NÃO a lista — as contas são as mesmas
+     *  em qualquer mês. Omitido, a API devolve o mês corrente. */
+    export interface AccountListQuery {
+        ReferenceMonth?: ReferenceMonth;
+    }
+
     export interface AccountCreateBody {
         Name: string;
         Type?: AccountType;

@@ -278,7 +278,7 @@ export function Dashboard() {
                         <KpiCard
                             label="Saldo nas contas"
                             value={balance}
-                            caption="Já descontado o que foi pago. O que está em aberto não entra."
+                            caption={`Posição em ${formatMonthLabel(month)} — por isso ele muda ao trocar de mês. O que está em aberto não entra.`}
                         />
                         <KpiCard
                             label="Ainda a pagar"

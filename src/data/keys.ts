@@ -13,7 +13,11 @@ export const queryKeys = {
     /* Cadastros — mudam pouco e são lidos por quase toda tela. */
     categories: ["categories"] as const,
     persons: ["persons"] as const,
-    accounts: ["accounts"] as const,
+    /** As contas NÃO são o mesmo em todo mês: a lista é, o `Balance`
+     *  não. Ele é recortado pelo `ReferenceMonth` a cada leitura, então
+     *  o mês faz parte da chave — sem isso, olhar março mostraria o
+     *  saldo de setembro. */
+    accounts: (month: ApiTypes.ReferenceMonth) => ["accounts", month] as const,
 
     /* Movimento — a unidade do cache é o MÊS, que é a unidade de
        navegação das telas. Assim a lista de Gastos e o Dashboard do
@@ -29,6 +33,7 @@ export const queryKeys = {
 
     /* Raízes, para invalidar tudo de um domínio depois de uma escrita
        que atravessa meses (parcelado, série de fixo, estorno). */
+    allAccounts: ["accounts"] as const,
     allExpenses: ["expenses"] as const,
     allInflows: ["inflows"] as const,
     allBudgets: ["budgets"] as const,
