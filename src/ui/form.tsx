@@ -157,9 +157,15 @@ export function PasswordInput({ className, ...rest }: InputProps) {
  *  mais de um visual de campo de dinheiro no sistema (o do formulário e
  *  o campo grande do painel de gasto) e o cuidado acima é o mesmo nos
  *  dois. */
+/** `allowNegative` é o estorno, e ele é a EXCEÇÃO: um gasto negativo só
+ *  existe no cartão de crédito, porque fora dele dinheiro que volta
+ *  entra na conta de verdade e isso é `POST /Inflows`. Fora do cartão o
+ *  sinal nem chega a ser digitado — é apagado do texto antes de virar
+ *  número, para o campo nunca mostrar algo que a gravação vai desfazer. */
 export function useMoneyField(
     value: ApiTypes.Money | null,
     onValueChange: (value: ApiTypes.Money | null) => void,
+    allowNegative = true,
 ): {
     value: string;
     inputMode: "decimal";
@@ -174,8 +180,9 @@ export function useMoneyField(
         inputMode: "decimal",
         placeholder: "0,00",
         onChange: (event) => {
-            setDraft(event.target.value);
-            onValueChange(parseMoneyInput(event.target.value));
+            const text = allowNegative ? event.target.value : event.target.value.replace(/-/g, "");
+            setDraft(text);
+            onValueChange(parseMoneyInput(text));
         },
         onBlur: () => setDraft(null),
     };

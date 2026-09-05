@@ -272,14 +272,14 @@ describe("submitExpense · validação local", () => {
         );
     });
 
-    it("exige valor maior que zero", async () => {
+    it("recusa o zero — o negativo é que passou a ser aceito", async () => {
         const context = fakeAddExpenseContext({
             draft: aDraft({ TotalValue: 0, payments: [{ id: 3, value: 0 }] }),
         });
 
         await submitExpense(context);
 
-        expect(context.failSubmit).toHaveBeenCalledWith("Informe um valor maior que zero.");
+        expect(context.failSubmit).toHaveBeenCalledWith("Informe um valor diferente de zero.");
     });
 
     it("recusa parcelas fora de 2 a 120", async () => {
@@ -342,6 +342,89 @@ describe("submitExpense · erro da API", () => {
 
         expect(context.failSubmit).toHaveBeenCalledWith(
             "A soma do rateio não bate com o valor total!",
+        );
+    });
+});
+
+describe("submitExpense · estorno", () => {
+    /* O estorno é um gasto de valor NEGATIVO. Não é entrada: se fosse um
+       `Inflow`, o saldo subiria no mês do estorno E a fatura continuaria
+       sendo paga cheia — errado dos dois lados. Nenhum dinheiro entra na
+       conta: a FATURA é que encolhe. */
+
+    const refund = (overrides = {}) =>
+        aDraft({
+            Description: "Estorno da passagem",
+            TotalValue: -150,
+            payments: [{ id: 3, value: -150 }],
+            ...overrides,
+        });
+
+    it("grava o negativo no cartão, com as linhas no mesmo sinal", async () => {
+        const seen = capture();
+
+        await submitExpense(fakeAddExpenseContext({ draft: refund() }));
+
+        expect(seen.body?.TotalValue).toBe(-150);
+        expect(seen.body?.Payments).toEqual([{ IdPaymentMethod: 3, Value: -150, Paid: false }]);
+    });
+
+    it("leva o rateio por pessoa também negativo", async () => {
+        const seen = capture();
+
+        await submitExpense(
+            fakeAddExpenseContext({
+                draft: refund({ persons: [{ id: 7, value: -150 }] }),
+            }),
+        );
+
+        expect(seen.body?.Persons).toEqual([{ IdPerson: 7, Value: -150 }]);
+    });
+
+    it("barra o negativo fora do cartão, sem gastar requisição", async () => {
+        // A forma 9 não está em `creditCardMethods`. Sem handler de POST
+        // declarado: se a requisição saísse, o teste quebraria.
+        const context = fakeAddExpenseContext({
+            draft: refund({ payments: [{ id: 9, value: -150 }] }),
+        });
+
+        await submitExpense(context);
+
+        expect(context.beginSubmit).not.toHaveBeenCalled();
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "Valor negativo é estorno de fatura, e só existe no cartão de crédito. Dinheiro que volta fora do cartão é uma entrada.",
+        );
+    });
+
+    it("barra o estorno parcelado — ele se lança um por parcela", async () => {
+        const context = fakeAddExpenseContext({
+            draft: refund({ Kind: "installment", InstallmentTotal: 3 }),
+        });
+
+        await submitExpense(context);
+
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "Estorno só se lança como gasto avulso: num parcelado, lance um por parcela.",
+        );
+    });
+
+    it("barra a mistura de sinais entre as linhas", async () => {
+        // +200 numa perna e −50 na outra fecham em 150: não é compra nem
+        // estorno, e é exatamente o que a regra de sinal único impede.
+        const context = fakeAddExpenseContext({
+            draft: aDraft({
+                TotalValue: 150,
+                payments: [
+                    { id: 3, value: 200 },
+                    { id: 3, value: -50 },
+                ],
+            }),
+        });
+
+        await submitExpense(context);
+
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "Um gasto é inteiro positivo ou inteiro negativo: cada linha precisa ter o sinal do total, e nenhuma pode ser zero.",
         );
     });
 });

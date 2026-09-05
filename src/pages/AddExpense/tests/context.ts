@@ -24,6 +24,9 @@ export function fakeAddExpenseContext(
     return {
         draft: aDraft(),
         idExpense: null,
+        // A forma 3 do `aDraft` é cartão: é ela que os testes de estorno
+        // usam, e a de sinal proibido troca por outra.
+        creditCardMethods: new Set([3]),
         beginSubmit: vi.fn(),
         failSubmit: vi.fn(),
         finishSubmit: vi.fn(),

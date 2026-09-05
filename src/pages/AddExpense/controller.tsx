@@ -36,6 +36,13 @@ export interface AddExpenseContext {
     draft: ExpenseDraft;
     /** Preenchido = edição de um gasto existente. */
     idExpense: number | null;
+    /** Os `IdPaymentMethod` que são cartão de crédito.
+     *
+     *  A conferência do ESTORNO precisa deles: valor negativo só é aceito
+     *  em `credit_card`, e a perna não carrega o `Kind` da forma. Vem por
+     *  contexto, e não do cache, para a section continuar sendo função
+     *  pura de entrada — é o que a mantém testável sem servidor. */
+    creditCardMethods: ReadonlySet<number>;
     beginSubmit(): void;
     failSubmit(message: string): void;
     /** Gravou. `occurrences` é quantas linhas nasceram — 1, ou a série

@@ -20,7 +20,7 @@ import {
     cx,
     useMoneyField,
 } from "@/ui/form";
-import { SplitEditor, emptyLine, usableLines } from "@/ui/SplitEditor";
+import { SplitEditor, emptyLine, usableLines, type SplitLine } from "@/ui/SplitEditor";
 import { Select } from "@/ui/select";
 import { InstallmentTimeline } from "@/ui/InstallmentTimeline";
 import { TagInput } from "@/ui/TagInput";
@@ -28,7 +28,7 @@ import { CategoryIcon } from "@/ui/iconCatalog";
 import { IconAlert, METHOD_ICON } from "@/ui/icons";
 import { EmptyState, LoadingRows } from "@/ui/states";
 import { accentColor, categoryColor } from "@/lib/categoryColor";
-import { formatMoney, splitEvenly } from "@/lib/money";
+import { formatMoney, splitEvenly, withSignOf } from "@/lib/money";
 import { addMonths, formatDate, formatMonthLabel, today, toReferenceMonth } from "@/lib/date";
 import { clearDraft, readDraft, writeDraft } from "@/lib/draftStorage";
 import type { ApiTypes } from "@/types/api";
@@ -127,10 +127,24 @@ export function AddExpense() {
     const cameFrom = (location.state as { background?: string } | null)?.background ?? null;
     const close = () => (cameFrom ? navigate(-1) : navigate("/gastos"));
 
+    /* Quais formas são cartão de crédito — a pergunta que o ESTORNO faz.
+       Valor negativo só é aceito ali: fora do cartão, dinheiro que volta
+       entra na conta de verdade, e para isso existe `POST /Inflows`. */
+    const creditCardMethods = useMemo(
+        () =>
+            new Set(
+                methods
+                    .filter(({ method }) => method.Kind === "credit_card")
+                    .map(({ method }) => method.IdPaymentMethod),
+            ),
+        [methods],
+    );
+
     const context = useMemo<AddExpenseContext>(
         () => ({
             draft,
             idExpense,
+            creditCardMethods,
             beginSubmit() {
                 setPending(true);
                 setError(null);
@@ -178,7 +192,7 @@ export function AddExpense() {
                 setSplitPayments(usableLines(loaded.payments).length > 1);
             },
         }),
-        [draft, idExpense, draftKey, navigate, invalidateMovement],
+        [draft, idExpense, creditCardMethods, draftKey, navigate, invalidateMovement],
     );
 
     useEffect(() => {
@@ -188,12 +202,49 @@ export function AddExpense() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [idExpense]);
 
+    /** O rascunho aceita o sinal negativo?
+     *
+     *  Só quando TODA forma escolhida é cartão de crédito e o formato é
+     *  avulso — as duas regras que a API cobra no estorno. Fora disso o
+     *  gasto é positivo, e o `-` nem chega a ser digitado. */
+    const acceptsRefund = (candidate: ExpenseDraft): boolean => {
+        const lines = usableLines(candidate.payments);
+        return (
+            candidate.Kind === "single" &&
+            lines.length > 0 &&
+            lines.every((line) => creditCardMethods.has(line.id))
+        );
+    };
+
+    /** Repõe o sinal quando o rascunho deixa de aceitar o negativo.
+     *
+     *  Trocar a forma para pix com −150 na tela deixaria um corpo que a
+     *  API recusa, e o usuário só descobriria ao salvar. A reposição
+     *  mora aqui, num lugar só, porque são três caminhos que levam ao
+     *  mesmo estado: trocar a forma, trocar o formato e mexer no rateio.
+     *
+     *  Enquanto as formas não chegaram do servidor não há o que decidir:
+     *  mexer no sinal ali apagaria o rascunho resgatado do storage. */
+    const normalizeSign = (candidate: ExpenseDraft): ExpenseDraft => {
+        const negative = (candidate.TotalValue ?? 0) < 0;
+        if (!negative || methods.length === 0 || acceptsRefund(candidate)) return candidate;
+
+        const positive = (line: SplitLine) => ({ ...line, value: withSignOf(line.value, 1) });
+
+        return {
+            ...candidate,
+            TotalValue: Math.abs(candidate.TotalValue as number),
+            payments: candidate.payments.map(positive),
+            persons: candidate.persons.map(positive),
+        };
+    };
+
     const patch = (change: Partial<ExpenseDraft>) => {
         // O aviso é do que ACABOU de ser gravado: à primeira tecla do
         // próximo lançamento ele já não fala do que está na tela.
         setNotice(null);
         setDraft((current) => {
-            const next = { ...current, ...change };
+            const next = normalizeSign({ ...current, ...change });
             if (draftKey) writeDraft(draftKey, next);
             return next;
         });
@@ -202,17 +253,30 @@ export function AddExpense() {
     const singlePayment = draft.payments[0] ?? emptyLine();
 
     /** Com uma forma só, ela carrega o total inteiro: pedir o mesmo
-     *  número duas vezes é o jeito mais fácil de o rateio não fechar. */
+     *  número duas vezes é o jeito mais fácil de o rateio não fechar.
+     *
+     *  O SINAL do total é reposto nas linhas dos dois eixos: um gasto é
+     *  inteiro positivo ou inteiro negativo, e a API recusa a mistura. */
     const setTotal = (TotalValue: ApiTypes.Money | null) =>
         patch({
             TotalValue,
-            payments: splitPayments ? draft.payments : [{ ...singlePayment, value: TotalValue }],
+            payments: splitPayments
+                ? draft.payments.map((line) => ({
+                      ...line,
+                      value: withSignOf(line.value, TotalValue),
+                  }))
+                : [{ ...singlePayment, value: TotalValue }],
+            persons: draft.persons.map((line) => ({
+                ...line,
+                value: withSignOf(line.value, TotalValue),
+            })),
         });
 
     /* O campo grande de valor é um `<input>` cru, para caber o tipo do
        layout — mas o cuidado do texto cru enquanto se digita é o mesmo
-       do `MoneyInput`, e vem do mesmo hook. */
-    const amountField = useMoneyField(draft.TotalValue, setTotal);
+       do `MoneyInput`, e vem do mesmo hook. O sinal só é liberado no
+       cartão: ver `acceptsRefund`. */
+    const amountField = useMoneyField(draft.TotalValue, setTotal, acceptsRefund(draft));
 
     const activeCategories = (categories.data ?? []).filter((item) => item.Active);
     const activePersons = (persons.data ?? []).filter((person) => person.Active);
@@ -226,7 +290,8 @@ export function AddExpense() {
     const acceptsPaid = chosenMethod?.method.Kind !== "credit_card";
 
     const personsUsed = usableLines(draft.persons).length;
-    const blocking = validateExpense(draft, isEdit);
+    const blocking = validateExpense(draft, isEdit, creditCardMethods);
+    const isRefund = (draft.TotalValue ?? 0) < 0;
 
     const installmentValues =
         draft.Kind === "installment" && draft.TotalValue !== null && draft.TotalValue > 0
@@ -271,7 +336,11 @@ export function AddExpense() {
 
                 {/* ── Valor e descrição ──────────────────────── */}
                 <div className={styles.rowValue}>
-                    <Box label="Valor" htmlFor="expense-total">
+                    <Box
+                        label="Valor"
+                        hint={acceptsRefund(draft) ? "negativo = estorno" : undefined}
+                        htmlFor="expense-total"
+                    >
                         <div className={styles.amountField}>
                             <span className={styles.amountPrefix}>R$</span>
                             <input
@@ -280,6 +349,17 @@ export function AddExpense() {
                                 {...amountField}
                             />
                         </div>
+                        {/* O erro previsível: juros, anuidade e IOF NÃO são
+                            estorno — são gastos positivos numa categoria de
+                            tarifas. Só o estorno tem sinal invertido, porque
+                            só ele REDUZ o que se vai pagar. */}
+                        {isRefund && (
+                            <div className={styles.refundNote}>
+                                Estorno: a fatura encolhe, e nenhum dinheiro entra na conta. Juros,
+                                anuidade e IOF não são estorno — são gastos positivos numa categoria
+                                de tarifas.
+                            </div>
+                        )}
                     </Box>
                     <Box label="Descrição" htmlFor="expense-description">
                         <input

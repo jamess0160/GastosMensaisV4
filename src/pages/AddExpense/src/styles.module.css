@@ -236,6 +236,16 @@
     margin-top: 8px;
 }
 
+/* O aviso do estorno, sob o campo de valor: ele muda o significado do
+   lançamento inteiro e o erro previsível (juros e anuidade lançados
+   como negativo) só se evita dizendo o que é. */
+.refundNote {
+    margin-top: 8px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+}
+
 /* No cartão não há "já foi pago": a linha explica por quê, no lugar
    exato onde o checkbox estaria. */
 .paidNote {

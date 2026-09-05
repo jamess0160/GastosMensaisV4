@@ -63,9 +63,12 @@ export const usableLines = (lines: readonly SplitLine[]) =>
             line.id !== null && line.value !== null,
     );
 
-/** O rateio fecha? É a pergunta que habilita o botão de salvar. */
+/** O rateio fecha? É a pergunta que habilita o botão de salvar.
+ *
+ *  O total NEGATIVO é válido: é o estorno de fatura (só no cartão, e só
+ *  em gasto avulso). O que continua proibido é o zero. */
 export function splitIsClosed(lines: readonly SplitLine[], total: ApiTypes.Money | null): boolean {
-    if (total === null || total <= 0) return false;
+    if (total === null || total === 0) return false;
     const usable = usableLines(lines);
     if (usable.length === 0) return false;
     return splitClosesTotal(
@@ -109,6 +112,10 @@ export function SplitEditor({
     const values = usable.map((line) => line.value);
     const closes = splitIsClosed(lines, total);
     const remainder = total === null ? 0 : splitRemainder(values, total);
+    /* "Falta" e "passou" trocam de lado quando o total é negativo: num
+       estorno de −150, faltar é o que sobra do lado de baixo de zero. É
+       o sinal do TOTAL que decide, não o do resto. */
+    const missing = total === null ? 0 : remainder * Math.sign(total);
     const empty = usable.length === 0;
 
     const patch = (index: number, change: Partial<SplitLine>) =>
@@ -257,7 +264,7 @@ export function SplitEditor({
                             </>
                         ) : total === null ? (
                             "Informe o valor total primeiro"
-                        ) : remainder > 0 ? (
+                        ) : missing > 0 ? (
                             "Ainda falta distribuir"
                         ) : (
                             "Passou do total"
@@ -265,7 +272,7 @@ export function SplitEditor({
                     </span>
                     {total !== null && !closes && (
                         <span className={styles.statusValue}>
-                            {remainder > 0 ? formatMoney(remainder) : `+${formatMoney(-remainder)}`}
+                            {missing > 0 ? formatMoney(remainder) : `+${formatMoney(-remainder)}`}
                         </span>
                     )}
                 </div>

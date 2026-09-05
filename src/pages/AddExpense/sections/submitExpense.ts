@@ -21,6 +21,8 @@ import type { ApiTypes } from "@/types/api";
       `RecurrenceDay`/`RecurrenceEndDate` só existem em `fixed`. Não é
       "campo ignorado" — é recusa. `Occurrences` saiu: a API não recebe
       mais o campo, e a série é limitada por `RecurrenceEndDate`.
+   4. O ESTORNO é um gasto de valor NEGATIVO, e ele tem quatro regras
+      próprias — todas 406. Ver `validateExpense`.
    ════════════════════════════════════════════════════════════ */
 
 /** O que a tela confere antes de gastar a requisição.
@@ -28,10 +30,15 @@ import type { ApiTypes } from "@/types/api";
  *  Devolve `null` quando está tudo certo. É a mesma conferência que
  *  habilita o botão de salvar, para que o botão nunca esteja aceso
  *  levando a uma recusa previsível. */
-export function validateExpense(draft: ExpenseDraft, isEdit: boolean): string | null {
+export function validateExpense(
+    draft: ExpenseDraft,
+    isEdit: boolean,
+    creditCardMethods: ReadonlySet<number>,
+): string | null {
     if (!draft.Description.trim()) return "Informe a descrição do gasto.";
-    if (draft.TotalValue === null || draft.TotalValue <= 0) {
-        return "Informe um valor maior que zero.";
+    // Zero continua proibido — o que passou a ser aceito é o NEGATIVO.
+    if (draft.TotalValue === null || draft.TotalValue === 0) {
+        return "Informe um valor diferente de zero.";
     }
     if (draft.IdCategory === null) return "Escolha uma categoria — ela é obrigatória.";
     if (!draft.ExpenseDate) return "Informe a data do gasto.";
@@ -39,6 +46,35 @@ export function validateExpense(draft: ExpenseDraft, isEdit: boolean): string | 
     // `Payments` é obrigatório (mín. 1) e fecha com o total.
     const payments = usableLines(draft.payments);
     if (payments.length === 0) return "Escolha ao menos uma forma de pagamento.";
+
+    /* ── O ESTORNO ──────────────────────────────────────────────
+       Aquilo que volta na fatura se lança como um gasto com o sinal
+       trocado. Não é entrada: se fosse um `Inflow`, o saldo subiria no
+       mês do estorno E a fatura continuaria sendo paga cheia — errado
+       dos dois lados. Nenhum dinheiro entra na conta num estorno: a
+       FATURA é que encolhe.
+
+       Juros, anuidade e IOF NÃO são estorno — são gastos positivos
+       comuns, no cartão, numa categoria de tarifas. Só o estorno tem
+       sinal invertido, porque só ele reduz o que se vai pagar. */
+    const refund = draft.TotalValue < 0;
+
+    if (refund && draft.Kind !== "single") {
+        return "Estorno só se lança como gasto avulso: num parcelado, lance um por parcela.";
+    }
+    if (refund && !payments.every((line) => creditCardMethods.has(line.id))) {
+        return "Valor negativo é estorno de fatura, e só existe no cartão de crédito. Dinheiro que volta fora do cartão é uma entrada.";
+    }
+
+    // Um gasto é INTEIRO positivo ou INTEIRO negativo — todas as partes,
+    // nos DOIS eixos, com o sinal do total. E nenhuma delas é zero.
+    const mixed = [...payments, ...usableLines(draft.persons)].some(
+        (line) => line.value === 0 || line.value < 0 !== refund,
+    );
+    if (mixed) {
+        return "Um gasto é inteiro positivo ou inteiro negativo: cada linha precisa ter o sinal do total, e nenhuma pode ser zero.";
+    }
+
     if (!splitIsClosed(draft.payments, draft.TotalValue)) {
         return "A soma das formas de pagamento precisa fechar com o total.";
     }
@@ -85,7 +121,7 @@ const toPersons = (draft: ExpenseDraft): ApiTypes.SplitInput[] =>
 export async function submitExpense(context: AddExpenseContext): Promise<void> {
     const { draft, idExpense } = context;
 
-    const invalid = validateExpense(draft, idExpense !== null);
+    const invalid = validateExpense(draft, idExpense !== null, context.creditCardMethods);
     if (invalid) {
         context.failSubmit(invalid);
         return;

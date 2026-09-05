@@ -40,8 +40,21 @@ export const splitRemainder = (
 ): ApiTypes.Money =>
     fromCents(toCents(total) - parts.reduce((sum, part) => sum + toCents(part), 0));
 
+/** Repõe num valor o sinal de outro.
+ *
+ *  Um gasto é INTEIRO positivo ou INTEIRO negativo: todas as partes, nos
+ *  dois eixos, com o sinal do total. Senão dá para montar uma perna de
+ *  +200 e outra de −50 fechando em 150, que não é compra nem estorno — e
+ *  a API recusa a mistura. */
+export const withSignOf = (
+    value: ApiTypes.Money | null,
+    total: ApiTypes.Money | null,
+): ApiTypes.Money | null =>
+    value === null ? null : (total ?? 0) < 0 ? -Math.abs(value) : Math.abs(value);
+
 /** Divide em N partes iguais; o centavo que sobra vai na PRIMEIRA parte,
- *  como a API faz no parcelamento. */
+ *  como a API faz no parcelamento. Serve ao estorno sem mudança: com o
+ *  total negativo as N partes saem negativas. */
 export function splitEvenly(total: ApiTypes.Money, parts: number): ApiTypes.Money[] {
     const totalCents = toCents(total);
     const base = Math.floor(totalCents / parts);
