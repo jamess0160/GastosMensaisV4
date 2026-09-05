@@ -17,6 +17,10 @@ import { ExpensesNamespace } from "./types"
 //  Cada eixo fecha com o TotalValue por conta própria, e **o banco não garante nenhum dos
 //  dois**. O eixo financeiro que não fecha faz o saldo divergir; o analítico que não fecha faz
 //  todo relatório por pessoa mentir. Nenhum dos dois quebra nada na hora.
+//
+//  **As regras do sinal moram aqui pela mesma razão.** O gasto negativo é o estorno, e o banco
+//  não consegue impor o recorte que ele exige: o CHECK de ExpensePayments não enxerga
+//  PaymentMethods, então ele garante só `<> 0` e o "só no crédito" fica com esta section.
 class Controller {
 
     //  Devolve as formas de pagamento conferidas, indexadas: quem chama precisa delas para
@@ -51,6 +55,9 @@ class Controller {
         }
 
         this.assertPaidOnlyOffCreditCard(payments, byId)
+
+        this.assertSameSign(TotalValue, payments.map((payment) => payment.Value), "das formas de pagamento")
+        this.assertNegativeOnlyOnCreditCard(TotalValue, payments, byId)
 
         this.assertClosesWithTotal(TotalValue, payments.map((payment) => payment.Value), "das formas de pagamento")
 
@@ -107,7 +114,73 @@ class Controller {
             })
         }
 
+        this.assertSameSign(TotalValue, persons.map((person) => person.Value), "do rateio entre pessoas")
+
         this.assertClosesWithTotal(TotalValue, persons.map((person) => person.Value), "do rateio entre pessoas")
+    }
+
+    //  **Um gasto é inteiro positivo ou inteiro negativo.**
+    //
+    //  Sem esta regra dá para montar uma perna de +200 e outra de −50 fechando em 150: não é
+    //  compra nem estorno, é um número sem significado que passa em todas as outras validações.
+    //  Vale nos dois eixos, e nos dois sentidos — o Joi sozinho não alcança, porque ele não vê
+    //  o total quando valida o item.
+    private assertSameSign(TotalValue: number, values: number[], what: string) {
+        let expected = Math.sign(TotalValue)
+
+        if (values.every((value) => Math.sign(value) === expected)) return
+
+        throw new APIError({
+            msg: expected < 0
+                ? `Num estorno, todos os valores ${what} são negativos.`
+                : `Só um estorno tem valor negativo, e aí o gasto inteiro é negativo.`,
+            status: 406,
+            data: { TotalValue, values },
+        })
+    }
+
+    //  **Estorno só existe no cartão de crédito.**
+    //
+    //  Fora do cartão, dinheiro que volta entra na conta de verdade — e para isso já existe
+    //  Inflows. É no crédito que o estorno não é entrada nenhuma: ele volta na fatura, e o que
+    //  acontece é a fatura encolher.
+    //
+    //  É a regra que o banco não consegue impor, porque o CHECK de ExpensePayments não enxerga
+    //  a PaymentMethods.
+    private assertNegativeOnlyOnCreditCard(TotalValue: number, payments: ExpensesNamespace.PaymentPayload[], byId: Map<number, Database.PaymentMethods>) {
+
+        if (TotalValue > 0) return
+
+        let invalid = payments.filter((payment) => byId.get(payment.IdPaymentMethod)?.Kind !== "credit_card")
+
+        if (!invalid.length) return
+
+        throw new APIError({
+            msg: "Estorno só existe no cartão de crédito: fora dele, o dinheiro que volta é uma entrada.",
+            status: 406,
+            data: { invalid: invalid.map((payment) => payment.IdPaymentMethod) },
+        })
+    }
+
+    /**
+     * **Estorno é sempre `Kind='single'`.**
+     *
+     * Estorno de parcelado existe, mas cada regra do parcelamento — o centavo que sobra na
+     * primeira parcela, as datas mês a mês — teria que ser reexaminada com o sinal invertido.
+     * Quem for estornado numa compra em 6× lança um estorno por parcela; se doer, vira etapa.
+     *
+     * Fica fora do assertPayments porque o Kind não chega até lá, e porque a regra vale também
+     * onde não há perna nenhuma no corpo (a edição de série).
+     */
+    public assertSignAllowedForKind(Kind: Database.Expenses["Kind"], TotalValue: number) {
+
+        if (TotalValue > 0 || Kind === "single") return
+
+        throw new APIError({
+            msg: "Estorno é lançado como gasto avulso: numa compra parcelada ou fixa, lance um estorno por ocorrência.",
+            status: 406,
+            data: { Kind, TotalValue },
+        })
     }
 
     //  Em centavos: 0.1 + 0.2 em ponto flutuante não dá 0.3, e este `===` é o invariante.

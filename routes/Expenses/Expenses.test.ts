@@ -714,6 +714,188 @@ describe("Expenses", () => {
         })
     })
 
+    describe("POST /Expenses — estorno", () => {
+
+        //  **Estorno é gasto com o sinal trocado, e é o lugar certo dele:** ele tem categoria
+        //  (é assim que o crédito volta ao orçamento certo), datas de fatura, competência,
+        //  rateio por pessoa e linha da fatura. Modelar como qualquer outra coisa significa
+        //  reimplementar as cinco.
+        it("cria gasto e perna negativos no cartão", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            let created = await createExpense(workspace, {
+                Description: "Estorno da compra",
+                TotalValue: -150,
+                Payments: [{ IdPaymentMethod: card, Value: -150 }],
+            })
+
+            expect((await findExpense(created.IdExpense)).TotalValue).toBe(-150)
+
+            let [leg] = await findPayments(created.IdExpense)
+
+            expect(leg.Value).toBe(-150)
+            //  O estorno cai numa fatura como qualquer compra: as datas saem do mesmo cálculo
+            expect(leg.DueDate).toBe("2026-08-28")
+            expect(leg.Charged).toBe(false)
+        })
+
+        //  **A fatura é que encolhe.** Nenhum dinheiro entra na conta num estorno: o que muda é
+        //  o que vai sair dela quando a fatura for paga.
+        it("faz a fatura do vencimento sair 150 menor", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            await createExpense(workspace, {
+                Description: "Compra",
+                TotalValue: 500,
+                Payments: [{ IdPaymentMethod: card, Value: 500 }],
+            })
+
+            await createExpense(workspace, {
+                Description: "Estorno",
+                TotalValue: -150,
+                Payments: [{ IdPaymentMethod: card, Value: -150 }],
+            })
+
+            let invoice = await workspace.client.post(`/PaymentMethods/IdPaymentMethod=${card}/payInvoice`, { DueDate: "2026-08-28" })
+
+            expect(invoice.status).toBe(200)
+            //  As duas linhas são da mesma fatura, e o estorno é quitado com ela
+            expect(invoice.body.Payments).toBe(2)
+            //  1000 − (500 − 150): saiu da conta o líquido da fatura
+            expect(await accountBalance(workspace)).toBe(650)
+        })
+
+        //  Fora do cartão, dinheiro que volta entra na conta de verdade — e para isso já existe
+        //  Inflows. É no crédito que o estorno não é entrada nenhuma.
+        it("recusa estorno no débito", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
+                TotalValue: -150,
+                Payments: [{ IdPaymentMethod: workspace.IdDebit, Value: -150 }],
+            }))
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Cada regra do parcelamento (o centavo que sobra na primeira parcela, as datas mês a
+        //  mês) teria que ser reexaminada com o sinal invertido: quem for estornado numa compra
+        //  em 6x lança um estorno por parcela.
+        it("recusa estorno parcelado", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
+                TotalValue: -600,
+                Kind: "installment",
+                InstallmentTotal: 6,
+                Payments: [{ IdPaymentMethod: card, Value: -600 }],
+            }))
+
+            expect(response.status).toBe(406)
+        })
+
+        it("recusa estorno fixo", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
+                TotalValue: -150,
+                Kind: "fixed",
+                Payments: [{ IdPaymentMethod: card, Value: -150 }],
+            }))
+
+            expect(response.status).toBe(406)
+        })
+
+        //  **Um gasto é inteiro positivo ou inteiro negativo.** Sem esta regra dá para montar
+        //  uma perna de +200 e outra de −50 fechando em 150: não é compra nem estorno, é um
+        //  número sem significado que passa em todas as outras validações.
+        it("recusa sinais misturados no eixo financeiro", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
+                TotalValue: 150,
+                Payments: [
+                    { IdPaymentMethod: card, Value: 200 },
+                    { IdPaymentMethod: workspace.IdDebit, Value: -50 },
+                ],
+            }))
+
+            expect(response.status).toBe(406)
+        })
+
+        it("recusa sinais misturados no rateio", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+            let maria = await createPerson(workspace, "Maria")
+            let joao = await createPerson(workspace, "João")
+
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
+                TotalValue: -150,
+                Payments: [{ IdPaymentMethod: card, Value: -150 }],
+                Persons: [
+                    { IdPerson: maria, Value: -200 },
+                    { IdPerson: joao, Value: 50 },
+                ],
+            }))
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Zero continua proibido, aqui e no CHECK do banco: gasto de zero não é lançamento
+        it("recusa TotalValue zero", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
+                TotalValue: 0,
+                Payments: [{ IdPaymentMethod: card, Value: 0 }],
+            }))
+
+            expect(response.status).toBe(406)
+        })
+
+        //  O rateio sobrevive ao sinal sem tocar na fórmula: os valores fecham com o total
+        //  negativo do mesmo jeito
+        it("aceita rateio negativo fechando com o total", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+            let maria = await createPerson(workspace, "Maria")
+
+            let created = await createExpense(workspace, {
+                TotalValue: -150,
+                Payments: [{ IdPaymentMethod: card, Value: -150 }],
+                Persons: [{ IdPerson: maria, Value: -150 }],
+            })
+
+            expect((await findPersons(created.IdExpense))[0].Value).toBe(-150)
+        })
+
+        //  O PUT não muda o Kind, então quem manda é o gravado: virar estorno uma compra
+        //  parcelada é a mesma recusa do cadastro
+        it("recusa transformar em estorno pelo PUT de uma compra parcelada", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            let created = await createExpense(workspace, {
+                TotalValue: 600,
+                Kind: "installment",
+                InstallmentTotal: 6,
+                Payments: [{ IdPaymentMethod: card, Value: 600 }],
+            })
+
+            let response = await workspace.client.put(`/Expenses/IdExpense=${created.IdExpense}`, buildUpdateBody(workspace.IdCategory, {
+                TotalValue: -600,
+            }))
+
+            expect(response.status).toBe(406)
+        })
+    })
+
     describe("PUT /Expenses/IdExpense=:IdExpense", () => {
 
         it("recusa sem token", async () => {

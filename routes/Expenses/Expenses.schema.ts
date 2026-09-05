@@ -6,18 +6,32 @@ import { tagResponse } from "root/routes/Tags/Tags.schema"
 const status = Joi.string().valid("pending", "paid", "canceled")
 const kind = Joi.string().valid("single", "installment", "fixed")
 
+//  **Valor de gasto: negativo é válido, zero não.**
+//
+//  O negativo é o **estorno** — a compra que volta na fatura. Ele não é uma entrada: se fosse
+//  um `Inflow`, o saldo da conta subiria no mês do estorno e a fatura continuaria sendo paga
+//  cheia, errado dos dois lados. Nenhum dinheiro entra na conta num estorno; **a fatura é que
+//  encolhe**, e é por isso que ele é um gasto com o sinal trocado.
+//
+//  Zero continua proibido, aqui e nos CHECKs do banco: gasto de zero não é lançamento nenhum.
+//
+//  As regras que o sinal exige — só no cartão, um sinal por gasto, só em `single` — não cabem
+//  no Joi porque dependem da forma de pagamento e do Kind ao mesmo tempo. Moram no
+//  sections/ExpenseAxes.section.ts.
+const money = Joi.number().precision(2).invalid(0)
+
 //  Uma perna do eixo financeiro. O Paid nasce do cliente porque o gasto no débito costuma já
 //  estar pago no ato; no cartão ele fica em aberto e se quita pela rota da perna.
 const paymentItem = Joi.object({
     IdPaymentMethod: Joi.number().required(),
-    Value: Joi.number().precision(2).positive().required(),
+    Value: money.required(),
     Paid: Joi.boolean().default(false),
 })
 
 //  Uma linha do eixo analítico. Valor absoluto, nunca porcentagem.
 const splitItem = Joi.object({
     IdPerson: Joi.number().required(),
-    Value: Joi.number().precision(2).positive().required(),
+    Value: money.required(),
 })
 
 //  Exportado porque a lista de pernas do período (GET /ExpensePayments) devolve o gasto de
@@ -119,9 +133,9 @@ class Schema {
     public readonly create = [
         joiController.validateBody(Joi.object({
             Description: Joi.string().trim().max(255).required(),
-            //  O CHECK do banco garante > 0. Em compra parcelada este é o total da compra,
-            //  nunca o valor da parcela.
-            TotalValue: Joi.number().precision(2).positive().required(),
+            //  O CHECK do banco garante <> 0. Em compra parcelada este é o total da compra,
+            //  nunca o valor da parcela. **Negativo é estorno** — ver o `money` acima.
+            TotalValue: money.required(),
             //  Obrigatória: é ela que responde "com o que eu gasto". A coluna continua nullable
             //  no banco por causa do ON DELETE SET NULL, mas nenhuma rota aceita gasto sem.
             IdCategory: Joi.number().required(),
@@ -175,7 +189,7 @@ class Schema {
         })),
         joiController.validateBody(Joi.object({
             Description: Joi.string().trim().max(255).required(),
-            TotalValue: Joi.number().precision(2).positive().required(),
+            TotalValue: money.required(),
             IdCategory: Joi.number().required(),
             ExpenseDate: isoDate.required(),
             Notes: Joi.string().trim().allow(null).optional(),
@@ -195,7 +209,7 @@ class Schema {
         })),
         joiController.validateBody(Joi.object({
             Description: Joi.string().trim().max(255).required(),
-            TotalValue: Joi.number().precision(2).positive().required(),
+            TotalValue: money.required(),
             IdCategory: Joi.number().required(),
             Notes: Joi.string().trim().allow(null).optional(),
             Persons: Joi.array().items(splitItem).optional(),

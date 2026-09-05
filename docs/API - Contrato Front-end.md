@@ -929,7 +929,30 @@ Um gasto tem **dois rateios independentes que nunca se cruzam**:
 
 **Quantas nascem é decisão do servidor:** a janela é de **12 ocorrências**, contando a raiz, e não há campo para mudá-la. O que limita a série é essa janela **ou** o `RecurrenceEndDate` — o que vier primeiro. A recorrência nunca fica aberta. Você não precisa saber esse número antes de salvar: o `POST` responde `Occurrences` com quantas nasceram.
 
-### 11.3 `Status` é derivado — nunca envie
+### 11.3 Estorno — o gasto de valor **negativo**
+
+Um estorno de compra volta na fatura, às vezes na seguinte. Ele se lança como um **gasto com o sinal trocado**: `TotalValue` negativo, e os valores dos dois eixos negativos junto.
+
+**Estorno não é entrada.** Se fosse um `Inflow`, o saldo da conta subiria no mês do estorno **e** a fatura continuaria sendo paga cheia — errado dos dois lados. Nenhum dinheiro entra na conta num estorno: **a fatura é que encolhe**.
+
+E o gasto negativo é o lugar certo porque o estorno tem todas as propriedades de um gasto com o sinal invertido: **categoria** (é assim que o crédito volta ao orçamento certo), **datas de fatura**, **competência**, **rateio por pessoa** e **linha da fatura**.
+
+**As quatro regras que o sinal exige** — todas `406`:
+
+| Regra | Por quê |
+|---|---|
+| **Só com forma de pagamento `credit_card`** | fora do cartão, dinheiro que volta entra na conta de verdade — e para isso existe `POST /Inflows` |
+| **Um gasto é inteiro positivo ou inteiro negativo** | todas as partes, **nos dois eixos**, com o sinal do total. Senão dá para montar uma perna de +200 e outra de −50 fechando em 150: não é compra nem estorno |
+| **`Kind='single'` apenas** | estorno de parcelado se lança **um por parcela**: as regras do parcelamento (o centavo que sobra na primeira, as datas mês a mês) não foram reexaminadas com o sinal invertido |
+| **Zero continua proibido** | em `TotalValue` e em cada valor dos dois eixos |
+
+**Juros, anuidade e IOF não são estorno:** são gastos **positivos** comuns, lançados no cartão numa categoria de tarifas. Só o estorno tem sinal invertido, porque só ele **reduz** o que você vai pagar.
+
+O estorno é quitado **com a fatura em que caiu** (`payInvoice`, seção 6), como qualquer linha de cartão, e o `charge` funciona igual. O efeito no saldo é o líquido: uma fatura com 500 de compra e 150 de estorno tira **350** da conta.
+
+> **O crédito volta no mês de competência do estorno, que costuma ser outro mês.** Agosto fica com a compra cheia e outubro recebe o crédito — corrigir agosto seria reescrever mês fechado. Consequência: **`Spent` pode vir negativo** num mês em que os estornos superam as compras (seção 13). Não é bug.
+
+### 11.4 `Status` é derivado — nunca envie
 
 `Status` ∈ `pending` | `paid` | `canceled`, calculado num único lugar e recalculado a cada quitação. **Só chega a `paid` quando TODAS as pernas estão pagas** — quitar 1 de 6 parcelas deixa a compra `pending`.
 
@@ -1034,7 +1057,7 @@ A mesma linha **mais os três filhos**:
 | Campo | Tipo | Regra |
 |---|---|---|
 | `Description` | string | obrigatório, ≤255 |
-| `TotalValue` | number | obrigatório, 2 casas, **> 0**. Em parcelado, o **total da compra** |
+| `TotalValue` | number | obrigatório, 2 casas, **≠ 0**. Negativo é **estorno** (seção 11.3). Em parcelado, o **total da compra** |
 | `IdCategory` | number | **obrigatório** |
 | `ExpenseDate` | CalendarDate | obrigatório |
 | `Kind` | `single` \| `installment` \| `fixed` | default `single` |
@@ -1264,6 +1287,8 @@ Spent = Σ ( ExpensePersons.Value × ExpensePayments.Value ÷ Expenses.TotalValu
 
 600 em 6× todos da Maria dão **100 por mês** no orçamento dela — o mesmo número que a categoria enxerga. Sem o rateio, o mesmo gasto contaria 600 num orçamento e 100 no outro, e "quanto a Maria comprometeu em agosto" não teria resposta certa. O arredondamento é feito **uma vez, no fim**: numa parcela de 100 dividida 400/200 entre duas pessoas, saem `66.67` e `33.33`.
 
+**`Spent` pode vir negativo.** Um mês em que os estornos (seção 11.3) superam as compras da categoria fecha abaixo de zero. Não quebra nada e não é bug — mas trate o caso na barra de progresso.
+
 **O alerta é do cliente:** a resposta traz `LimitValue`, `Spent` e `AlertPercent`; comparar os três números é trabalho da tela.
 
 ### `POST /Budgets`
@@ -1443,6 +1468,24 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-06 — `POST /Expenses`: estorno, o gasto de valor **negativo**
+
+🟢 **Adição** — ver a seção 11, e a subseção **11.3** que nasceu com ela.
+
+**O que entrou.** `TotalValue` e os valores dos dois eixos passam a aceitar **negativo**. É como se lança um **estorno de compra** — aquilo que volta na fatura, às vezes na seguinte. Antes não havia como lançá-lo: a parede era tripla (o `.positive()` da validação e três `CHECK` do banco).
+
+**Estorno não é entrada, e é por isso que ele é um gasto.** Se virasse um `Inflow`, o saldo da conta subiria no mês do estorno **e** a fatura continuaria sendo paga cheia — errado dos dois lados. Nenhum dinheiro entra na conta: **a fatura é que encolhe**. E o gasto negativo carrega de graça as cinco coisas que o estorno precisa — categoria, datas de fatura, competência, rateio por pessoa e linha da fatura.
+
+**Quatro regras, todas `406`:** só em forma de pagamento `credit_card`; **um gasto é inteiro positivo ou inteiro negativo** (todas as partes, nos dois eixos, com o sinal do total); **`Kind='single'` apenas** — estorno de parcelado se lança um por parcela; e **zero continua proibido**, em `TotalValue` e em cada valor.
+
+**Ação do front:** liberar o sinal no campo de valor **quando a forma escolhida for cartão de crédito**, e propagar o sinal para as linhas dos dois eixos que você montar. Em qualquer outra forma, mantenha o campo positivo — dinheiro que volta fora do cartão é `POST /Inflows`.
+
+**Juros, anuidade e IOF não entram aqui:** são gastos **positivos** comuns, no cartão, numa categoria de tarifas. Só o estorno tem sinal invertido, porque só ele **reduz** o que você vai pagar.
+
+🟡 **`Spent` pode vir negativo** em `GET /Budgets` (seção 13), num mês em que os estornos superam as compras. Não quebra nada, mas a barra de progresso precisa tratar o caso. **O crédito cai no mês de competência do estorno**, que costuma ser outro mês: agosto fica com a compra cheia e outubro recebe o crédito — corrigir agosto seria reescrever mês fechado.
+
+**Não mudou nada para quem não lança estorno:** compra positiva segue idêntica em toda regra, e o estorno é quitado com a fatura (`payInvoice`) como qualquer linha de cartão.
 
 ### 2026-09-06 — O cartão de crédito ganha fatura, e `Paid` para de mentir
 

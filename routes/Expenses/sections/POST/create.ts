@@ -30,6 +30,9 @@ export class Create {
 
         this.assertKindRules(body)
 
+        //  O sinal e o formato: estorno é sempre avulso.
+        ExpenseAxes.assertSignAllowedForKind(body.Kind, body.TotalValue)
+
         return await KnexTransaction(async (tx) => {
             //  As tags chegam como texto e viram linhas aqui dentro, uma vez só: a série
             //  inteira compartilha os mesmos ids, e uma tag criada não pode sobreviver a um

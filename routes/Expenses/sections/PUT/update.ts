@@ -48,6 +48,10 @@ export class Update {
             })
         }
 
+        //  O Kind não muda no PUT, então quem manda é o gravado: virar estorno uma ocorrência
+        //  de série ou uma compra parcelada é a mesma recusa do cadastro.
+        ExpenseAxes.assertSignAllowedForKind(expense.Kind, body.TotalValue)
+
         await ExpenseCategory.assertCategory(IdWorkspace, body.IdCategory)
 
         //  Os dois eixos são conferidos contra o **novo** total, com o que veio no corpo ou com

@@ -315,6 +315,52 @@ describe("Budgets", () => {
             expect(await findPeriods(budget.IdBudget)).toHaveLength(1)
         })
 
+        //  **O crédito volta ao orçamento no mês de competência do ESTORNO**, que costuma ser
+        //  outro mês. Agosto fica com a compra cheia e setembro recebe o crédito — corrigir
+        //  agosto seria reescrever mês fechado, que o projeto recusa em todo lugar.
+        it("devolve o crédito do estorno no mês da competência dele", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            await createBudget(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createBudget(workspace, { ReferenceMonth: "2026-09", LimitValue: 800 })
+
+            //  Compra de 10/08 num cartão que fecha no 20: cai na fatura de agosto
+            await createExpense(workspace, { TotalValue: 500, ExpenseDate: "2026-08-10", IdPaymentMethod: card })
+
+            //  Estorno de 21/08: já é a fatura de setembro
+            await createExpense(workspace, { TotalValue: -150, ExpenseDate: "2026-08-21", IdPaymentMethod: card })
+
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(500)
+            //  **Spent negativo é resposta legítima:** o mês só teve o crédito
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-09`)).body[0].Spent).toBe(-150)
+        })
+
+        //  O rateio por pessoa sobrevive ao sinal sem tocar na fórmula: (−150 × −150) ÷ −150
+        it("desce o orçamento da pessoa com o sinal do estorno", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createPersonBudget(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            await createExpense(workspace, {
+                TotalValue: 400,
+                ExpenseDate: "2026-08-10",
+                IdPaymentMethod: card,
+                Persons: [{ IdPerson, Value: 400 }],
+            })
+
+            await createExpense(workspace, {
+                TotalValue: -150,
+                ExpenseDate: "2026-08-10",
+                IdPaymentMethod: card,
+                Persons: [{ IdPerson, Value: -150 }],
+            })
+
+            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(250)
+        })
+
         //  No cartão, o que pesa no mês é a fatura que vence nele — a compra do dia 21 num
         //  cartão que fecha no 20 já é do mês seguinte
         it("usa o vencimento da fatura no gasto de cartão", async () => {

@@ -31,6 +31,9 @@ export class UpdateSeries {
             })
         }
 
+        //  Série é sempre 'fixed', então o total negativo cai aqui: estorno é avulso.
+        ExpenseAxes.assertSignAllowedForKind("fixed", body.TotalValue)
+
         await ExpenseCategory.assertCategory(IdWorkspace, body.IdCategory)
 
         //  O eixo analítico vale para todas as ocorrências alcançadas, então é conferido uma
