@@ -13,6 +13,7 @@ import { Login } from "@/pages/Login/Login";
    AppShell, não por aqui: ver o cabeçalho de `modalRoute.tsx`. */
 
 const SignUp = lazy(() => import("@/pages/SignUp/SignUp").then((m) => ({ default: m.SignUp })));
+const Invite = lazy(() => import("@/pages/Invite/Invite").then((m) => ({ default: m.Invite })));
 
 const load = (screen: ReactNode) => (
     <Suspense fallback={<div className={styles.center}>Carregando…</div>}>{screen}</Suspense>
@@ -21,6 +22,10 @@ const load = (screen: ReactNode) => (
 export const router = createBrowserRouter([
     { path: "/login", element: <Login /> },
     { path: "/cadastro", element: load(<SignUp />) },
+    /* FORA do chassi, e é o ponto: quem recebeu o link do convite pode
+       não ter conta nenhuma. `GET /Workspaces/invite/Hash=` é a única
+       rota pública além das de entrar e cadastrar. */
+    { path: "/convite/:hash", element: load(<Invite />) },
     {
         path: "/",
         element: <AppShell />,

@@ -49,8 +49,16 @@ export namespace ApiTypes {
         /** Texto puro. NÃO pré-hasheie no cliente — o bcrypt roda no servidor. */
         Password: string;
         Phone: number;
-        /** Pendência conhecida de segurança no backend: não usar. */
-        IdWorkspace?: number;
+        /** O hash do convite, para quem chegou por um link e ainda não
+         *  tem conta. Sem ele, o cadastro cria um workspace novo.
+         *
+         *  Substituiu o `IdWorkspace`, que entrava direto como matrícula
+         *  `owner` sem convite nem conferência — com um id sequencial,
+         *  que se adivinhava contando. Mandar `IdWorkspace` agora é 406.
+         *
+         *  O E-MAIL TEM QUE BATER com o do convite: o link é
+         *  compartilhável por desenho, e é o e-mail que fecha a tranca. */
+        InviteHash?: string;
     }
 
     export interface LoginBody {
@@ -84,12 +92,79 @@ export namespace ApiTypes {
 
     /* ── 4. Workspaces ────────────────────────────────────────── */
 
+    /** Não há `POST`: um workspace nasce no cadastro, e a única forma de
+     *  entrar num que já existe é o convite. Um usuário pode ser membro
+     *  de vários — `getSelf` devolve todos, e é o `switch` que escolhe em
+     *  qual a sessão está.
+     *
+     *  ⚠️ A lista NÃO diz qual é o da sessão: o `IdWorkspace` vive dentro
+     *  do token e o cookie é `HttpOnly`. Ver `currentWorkspace` em
+     *  `src/app/session.tsx` e a pendência 19. */
     export interface Workspace {
         IdWorkspace: number;
         Name: string;
         IdOwnerUser: number;
         CreatedAt: DateTime;
         UpdatedAt: DateTime;
+    }
+
+    /* ── 4.1 Convites ─────────────────────────────────────────── */
+
+    /** `owner` NÃO se convida: propriedade não se transfere por convite,
+     *  e mandá-lo em `Role` responde 406. */
+    export type WorkspaceRole = "editor" | "viewer";
+
+    export type WorkspaceInviteStatus = "pending" | "accepted" | "revoked";
+
+    /** Um convite é UMA LINHA no banco, e o que viaja no link é o `Hash`:
+     *  32 bytes aleatórios em base64url (43 caracteres). Nunca o
+     *  `IdWorkspace`, que é sequencial e se adivinharia contando.
+     *
+     *  Uso único, vale 7 dias, revogável a qualquer momento. */
+    export interface WorkspaceInvite {
+        IdWorkspaceInvite: number;
+        IdWorkspace: number;
+        IdInviterUser: number;
+        Email: string;
+        Role: WorkspaceRole;
+        /** Volta na listagem para o dono conseguir REENVIAR o link sem
+         *  precisar revogar e criar outro. */
+        Hash: string;
+        Status: WorkspaceInviteStatus;
+        ExpiresAt: DateTime;
+        AcceptedAt: DateTime | null;
+        IdAcceptedUser: number | null;
+        CreatedAt: DateTime;
+        UpdatedAt: DateTime;
+    }
+
+    export interface WorkspaceInviteCreateBody {
+        /** Normalizado para minúsculas pela API. */
+        Email: string;
+        /** Default `editor`. `owner` é 406. */
+        Role?: WorkspaceRole;
+    }
+
+    /** A resposta do `POST /Workspaces/invite`. A API NÃO manda e-mail:
+     *  ela devolve o hash, e quem entrega o link é o usuário. */
+    export interface WorkspaceInviteCreated {
+        Hash: string;
+        ExpiresAt: DateTime;
+    }
+
+    /** O que a tela pública de aceite mostra ANTES de qualquer sessão —
+     *  quem recebeu o link ainda pode não ter conta.
+     *
+     *  NENHUM id na resposta, de propósito: a rota não pode virar sonda
+     *  para descobrir workspace por id. */
+    export interface WorkspaceInvitePreview {
+        WorkspaceName: string;
+        InviterName: string;
+        /** O e-mail convidado. MOSTRE-O: o aceite compara este e-mail com
+         *  o da conta, e diferente é 406. */
+        Email: string;
+        Role: WorkspaceRole;
+        ExpiresAt: DateTime;
     }
 
     /* ── 5-6. Accounts e PaymentMethods ───────────────────────── */

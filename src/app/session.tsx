@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useMemo,
+    useSyncExternalStore,
+    type ReactNode,
+} from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ApiUnauthorizedError, UNAUTHORIZED_EVENT } from "@/api/client";
@@ -11,6 +18,15 @@ import type { ApiTypes } from "@/types/api";
 interface Session {
     user: ApiTypes.User;
     workspaces: ApiTypes.Workspace[];
+    /** O espaço em que a sessão está — a raiz de tudo que a tela mostra.
+     *  `null` só no caso impossível de o usuário não ter nenhum. */
+    workspace: ApiTypes.Workspace | null;
+    /** Este usuário é `owner` do espaço ATUAL?
+     *
+     *  As três rotas de gestão (`PUT /Workspaces`, `POST
+     *  /Workspaces/invite`, `GET /Workspaces/invites`) respondem 403 para
+     *  quem não é — a tela usa isto para não oferecer o caminho. */
+    isOwner: boolean;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -25,6 +41,61 @@ export const sessionKeys = {
     user: ["session", "user"] as const,
     workspaces: ["session", "workspaces"] as const,
 };
+
+/** Em qual espaço a sessão está.
+ *
+ *  ⚠️ O CLIENTE NÃO TEM COMO SABER, e isto é o mais perto que se chega.
+ *  `GET /Workspaces/getSelf` devolve a lista sem marcar o atual, o
+ *  `IdWorkspace` vive dentro do token e o cookie é `HttpOnly`. É a
+ *  pendência 19, e ela importa desde que o chassi passou a AFIRMAR o
+ *  espaço em toda tela: um chute errado leva ao pior erro possível, que
+ *  é lançar o mês inteiro no lugar errado.
+ *
+ *  O que se sabe com certeza é o que o `switch` respondeu — e é só isso
+ *  que `remembered` carrega. Sem troca nenhuma nesta aba, sobra o
+ *  primeiro da lista, que é o chute de sempre. Guardar o valor no
+ *  navegador seria pior: ele pode discordar do cookie sem que nada
+ *  acuse, e é justamente o tipo de leitura defensiva que este projeto
+ *  não faz. */
+export function currentWorkspace(
+    workspaces: readonly ApiTypes.Workspace[],
+    remembered: number | null,
+): ApiTypes.Workspace | null {
+    return (
+        workspaces.find((workspace) => workspace.IdWorkspace === remembered) ??
+        workspaces[0] ??
+        null
+    );
+}
+
+/* O que o último `switch` respondeu.
+ *
+ *  Mora FORA do React, e não no estado do provider, por um motivo
+ *  concreto: a tela pública de aceite de convite troca de espaço com o
+ *  chassi ainda desmontado — ela chama `join` e depois `switch` antes de
+ *  navegar para dentro do app. Um estado do provider nasceria vazio
+ *  justamente aí, e o usuário cairia no espaço antigo depois de aceitar,
+ *  que é o bug mais provável desta entrega.
+ *
+ *  Some no reload, junto com a aba: um valor persistido pode discordar
+ *  do cookie sem que nada acuse. */
+let remembered: number | null = null;
+const listeners = new Set<() => void>();
+
+/** Só quem acabou de chamar `POST /Workspaces/switch` escreve aqui. */
+export function rememberWorkspace(idWorkspace: number): void {
+    remembered = idWorkspace;
+    for (const listener of listeners) listener();
+}
+
+function subscribeToWorkspace(listener: () => void): () => void {
+    listeners.add(listener);
+    return () => {
+        listeners.delete(listener);
+    };
+}
+
+const readRemembered = () => remembered;
 
 export function useSessionQuery(): UseQueryResult<ApiTypes.User> {
     return useQuery({
@@ -44,11 +115,23 @@ export function SessionProvider({ user, children }: { user: ApiTypes.User; child
         staleTime: 5 * 60 * 1000,
     });
 
-    return (
-        <SessionContext.Provider value={{ user, workspaces: workspaces.data ?? [] }}>
-            {children}
-        </SessionContext.Provider>
-    );
+    /* O `switch` limpa TODO o cache de query, então o espaço atual não
+       pode morar lá — ele mora fora do React. Ver `rememberWorkspace`. */
+    const rememberedId = useSyncExternalStore(subscribeToWorkspace, readRemembered, readRemembered);
+
+    const value = useMemo<Session>(() => {
+        const list = workspaces.data ?? [];
+        const workspace = currentWorkspace(list, rememberedId);
+
+        return {
+            user,
+            workspaces: list,
+            workspace,
+            isOwner: workspace?.IdOwnerUser === user.IdUser,
+        };
+    }, [user, workspaces.data, rememberedId]);
+
+    return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
 /** Um lugar só ouvindo o 401 do client: limpa o cache e manda ao login. */
@@ -97,5 +180,37 @@ export function useSignOut() {
             queryClient.clear();
             navigate("/login", { replace: true });
         })();
+    };
+}
+
+/** Trocar o espaço da sessão.
+ *
+ *  É a ÚNICA rota do contrato que recebe `IdWorkspace` do cliente — e o
+ *  motivo é que ela REEMITE O COOKIE: o workspace vive dentro do token,
+ *  não numa query string. Por isso ela mora aqui, ao lado do
+ *  `useSignOut`: as duas reescrevem a sessão, e nenhuma das duas é de
+ *  uma tela em particular.
+ *
+ *  A consequência é grande e fácil de esquecer: no instante em que o
+ *  cookie novo chega, TODO cache de query passa a falar de outro
+ *  workspace. Contas, categorias, gastos do mês, orçamentos — nada disso
+ *  vale mais, e por isso o cache é descartado inteiro em vez de
+ *  invalidado seletivamente. Aqui não há nada que se aproveite.
+ *
+ *  O erro sobe para quem chamou: quem troca de espaço é uma tela, e é
+ *  ela que tem onde mostrar a `msg` do 406.
+ *
+ *  Não depende do `SessionProvider`, de propósito: a tela pública de
+ *  aceite de convite precisa dele com o chassi ainda desmontado. */
+export function useSwitchWorkspace() {
+    const queryClient = useQueryClient();
+
+    return async (idWorkspace: number): Promise<ApiTypes.Workspace> => {
+        const workspace = await WorkspacesConnection.switch(idWorkspace);
+        queryClient.clear();
+        // Depois do `clear`: isto vive fora do cache, e é o que o cliente
+        // sabe de mais confiável sobre onde a sessão está.
+        rememberWorkspace(workspace.IdWorkspace);
+        return workspace;
     };
 }

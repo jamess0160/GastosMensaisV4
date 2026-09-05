@@ -9,11 +9,12 @@ import {
     IconIncome,
     IconMore,
     IconProfile,
+    IconUsers,
     IconReport,
     IconSettings,
     IconSignOut,
 } from "./icons";
-import { useSignOut } from "./session";
+import { useSession, useSignOut } from "./session";
 import { useOpenModal } from "./modalRoute";
 import { SheetMenu, type SheetMenuItem } from "@/ui/overlay";
 import { IconPlus } from "@/ui/icons";
@@ -46,6 +47,7 @@ export function TabBar() {
     const navigate = useNavigate();
     const location = useLocation();
     const signOut = useSignOut();
+    const { workspace } = useSession();
     const openModal = useOpenModal();
     const [menuOpen, setMenuOpen] = useState(false);
 
@@ -91,6 +93,15 @@ export function TabBar() {
             description: "Categorias, pessoas e formas de pagamento",
             icon: <IconSettings />,
             onSelect: () => navigate("/personalizacao"),
+        },
+        {
+            /* No desktop o espaço tem seletor próprio na sidebar; aqui
+               ele entra pelo menu, com o nome do atual na descrição —
+               saber onde se está é a metade da informação. */
+            label: "Espaço",
+            description: workspace ? `${workspace.Name} · trocar e convidar` : "Trocar e convidar",
+            icon: <IconUsers />,
+            onSelect: () => navigate("/espaco"),
         },
         {
             label: "Perfil",

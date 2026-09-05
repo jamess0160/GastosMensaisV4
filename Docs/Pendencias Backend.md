@@ -16,7 +16,7 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | # | Pendência | Tipo | Bloqueia |
 |---|---|---|---|
 | ~~1~~ | [Logout](#1-logout) | Segurança | ✅ **Entregue** em 04/09 |
-| 2 | [`IdWorkspace` no cadastro](#2-idworkspace-no-cadastro-aceito-sem-convite) | Segurança | Convite / workspace compartilhado |
+| ~~2~~ | [`IdWorkspace` no cadastro](#2-idworkspace-no-cadastro-aceito-sem-convite) | Segurança | ✅ **Entregue** em 04/09 |
 | 3 | [Agregados do mês](#3-agregados-do-mês-para-o-dashboard) | Performance | Escala do Dashboard |
 | 4 | [Rotina mensal de orçamento](#4-rotina-mensal-de-orçamento) | Produto | Orçamento sem trabalho manual |
 | 5 | [Duração de sessão configurável](#5-duração-de-sessão-configurável) | Produto | "Lembrar deste navegador" |
@@ -32,6 +32,10 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | ~~15~~ | [Criação de entradas em lote](#15-criação-de-entradas-em-lote) | Produto | ✅ **Entregue** em 04/09 |
 | ~~16~~ | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | ✅ **Entregue** em 04/09 |
 | 17 | [`Charged` e `CompetenceDate` em `GET /ExpensePayments`](#17-charged-e-competencedate-em-get-expensepayments) | Contrato | Botão "entrou na fatura" na lista |
+| 18 | [Criar um workspace novo](#18-criar-um-workspace-novo) | Produto | Botão "Novo espaço" no seletor |
+| 19 | [Saber em qual workspace a sessão está](#19-saber-em-qual-workspace-a-sessão-está) | Contrato | O seletor de espaço do chassi |
+| 20 | [Gestão de membros](#20-gestão-de-membros) | Produto | Tirar alguém de um espaço |
+| 21 | [O `403` não está na tabela de erros](#21-o-403-não-está-na-tabela-de-erros) | Contrato | Mensagem de "não é o dono" |
 
 **Seis itens saíram da fila.** Os de número **10, 13, 14, 15 e 16**
 subiram na virada de setembro exatamente na forma proposta aqui — e em
@@ -41,15 +45,19 @@ chamada nova a fazer. O **12** subiu na forma preferida, `GET
 seções deles ficam abaixo como registro do que foi pedido e do que
 subiu; nada nelas é trabalho pendente.
 
-O **1** também subiu, na forma proposta e com a mesma idempotência: o
-contorno que o cliente mantinha no `localStorage` foi apagado junto. Do
-**2** falta a metade do cliente — o campo perigoso saiu do `POST /Users`
-e entrou o `InviteHash`, mas não há como convidar ninguém pela tela.
+O **1** e o **2** também subiram, na forma proposta: o contorno de
+logout que o cliente mantinha no `localStorage` foi apagado junto, e o
+`IdWorkspace` do cadastro virou `InviteHash`.
 
 Do 3 ao 9 são cortes conscientes do MVP — o frontend já está desenhado
 para viver sem eles —, e o 11 virou registro histórico quando o 15
-substituiu a forma dele. O **17** nasceu da leva 4 e é o único item novo:
-uma divergência entre o changelog e o exemplo de resposta da seção 12.
+substituiu a forma dele.
+
+**Os itens 17 a 21 nasceram da leva 4.** O 17 é uma divergência entre o
+changelog e o exemplo de resposta da seção 12; os outros três são o que a
+tela de espaços pediu e não encontrou — e o **19 é o mais incômodo**,
+porque o chassi passou a afirmar em toda tela uma coisa que o cliente não
+tem como saber.
 
 ---
 
@@ -110,6 +118,21 @@ travar a saída do usuário.
 ---
 
 ## 2. `IdWorkspace` no cadastro, aceito sem convite
+
+> ✅ **Entregue em 04/09, na opção 2** — a preferida das duas. O campo
+> saiu do `POST /Users` (mandá-lo agora é `406`) e no lugar entrou o
+> **`InviteHash`**. Um convite é linha no banco; o que viaja no link é um
+> hash de 32 bytes em base64url, nunca o `IdWorkspace` sequencial.
+>
+> As três perguntas que faltavam estão respondidas: convida **só o
+> `owner`**; o convite é de **uso único, vale 7 dias** e pode ser
+> revogado; e a matrícula criada é `editor` ou `viewer` — **`owner` não
+> se convida** (`406`). O e-mail do convite tem que bater com o da conta
+> que aceita, o que fecha o buraco de o link ser compartilhável.
+>
+> **Estado no frontend:** o seletor de espaço no chassi, a tela `/espaco`
+> (nome + convites) e a tela pública `/convite/:hash` são a leva 4,
+> etapa 10. O que ficou de fora é a gestão de membros — item **20**.
 
 **O problema.** `POST /Users` aceita um `IdWorkspace` opcional e,
 segundo o próprio contrato, "entra direto como matrícula `owner`, sem
@@ -719,6 +742,158 @@ lê o `Charged` e `paymentLegs` recorta o mês pela `CompetenceDate`.
 `GET /ExpensePayments` (e não só no `GET /Expenses/IdExpense=:id`) e
 **atualizar o exemplo da seção 12**. Se algum deles não sair ali, digam
 qual — a tela muda, e muda para pior.
+
+---
+
+## 18. Criar um workspace novo
+
+**O problema.** Não existe `POST /Workspaces`. O contrato é explícito —
+"um workspace nasce no cadastro, e a única forma de entrar num que já
+existe é o convite" — e isso resolve o *entrar*, mas não o *criar*.
+
+**Por que importa.** O caso é banal e aparece cedo: a mesma pessoa quer
+separar "Casa" de "Escritório", ou testar o sistema num espaço de
+brinquedo antes de lançar o mês de verdade. Hoje a única saída é criar
+**outra conta de usuário**, com outro e-mail — e aí os dois espaços nunca
+aparecem na mesma lista, porque a lista é dos espaços de um usuário.
+
+**Por que o frontend não resolve.** Não há rota. Criar workspace é criar
+matrícula, e matrícula é do servidor.
+
+**Proposta:**
+
+```
+POST /Workspaces        🔒
+```
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Name` | string | obrigatório, ≤255 |
+
+Cria o workspace e a matrícula do usuário da sessão como **`owner`**,
+numa transaction. Como no cadastro, faz sentido nascer com as categorias
+pré-definidas — e **não** trocar a sessão: quem quiser operar nele chama
+`POST /Workspaces/switch`, a mesma regra que o `join` já segue.
+
+**Resposta:** `{ "IdWorkspace": 4 }`.
+
+Vale um teto por usuário (sugestão: 10) para a rota não virar vetor de
+carga.
+
+**Estado no frontend.** O botão "Novo espaço" está no seletor da
+sidebar, **desabilitado e rotulado** "Ainda sem API" — como "Conciliar
+extrato" e "Exportar para Excel". No dia em que a rota subir, é uma
+section nova e nada mais muda de lugar.
+
+---
+
+## 19. Saber em qual workspace a sessão está
+
+**O problema.** `GET /Workspaces/getSelf` devolve os workspaces do
+usuário **sem marcar qual é o da sessão**. O `IdWorkspace` vive dentro do
+token, o cookie é `HttpOnly`, e `GET /Users/getSelf` não o devolve. Ou
+seja: **o cliente não tem como saber em qual espaço ele está.**
+
+**Por que virou problema agora.** Até a leva 4 isso passava despercebido,
+porque o único lugar que mostrava a informação era um bloco do Perfil que
+chutava o primeiro da lista. Nesta leva o espaço subiu para o chassi: a
+sidebar **afirma**, em toda tela, "você está em Casa". Um chute errado
+não é mais um detalhe de uma tela — é uma mentira permanente, e ela leva
+ao pior erro possível, que é lançar o mês inteiro no espaço errado.
+
+**O contorno atual, e por que ele não basta.** O cliente guarda o que o
+`POST /Workspaces/switch` respondeu, numa chave de cache em memória
+(`sessionKeys.currentWorkspace`), e só cai no primeiro da lista quando
+nenhuma troca aconteceu naquela aba. Funciona depois de uma troca;
+**não funciona no primeiro carregamento**, que é justamente quando o
+usuário abre o sistema e confia no que está escrito. E não dá para
+persistir: um valor guardado no navegador pode discordar do cookie sem
+que nada acuse.
+
+**Proposta.** Qualquer uma das duas resolve; a primeira é uma linha.
+
+1. **Um booleano na lista:**
+
+   ```json
+   [{ "IdWorkspace": 1, "Name": "Casa", "Current": true,  "...": "" },
+    { "IdWorkspace": 4, "Name": "Escritório", "Current": false, "...": "" }]
+   ```
+
+2. **`IdWorkspace` no `GET /Users/getSelf`**, junto com o resto da
+   sessão. Faz sentido porque o workspace É parte da sessão — é o que o
+   token diz.
+
+Não precisa das duas. O que **não** serve é ordenar a lista pelo atual
+sem dizer que é isso que se está fazendo: uma ordem combinada em silêncio
+quebra na primeira vez que alguém mexer no `ORDER BY`.
+
+---
+
+## 20. Gestão de membros
+
+**O problema.** Com o convite, entrar num workspace alheio passou a
+existir. **Sair dele, não** — e nem tirar alguém, trocar o papel de
+alguém ou transferir a propriedade. O contrato registra a ausência, e ela
+tem consequência prática imediata: revogar um convite **não desfaz
+matrícula já criada**, então um convite mandado ao e-mail errado e aceito
+não tem desfazimento nenhum.
+
+**Por que o frontend não resolve.** É matrícula: só o servidor.
+
+**Proposta**, na ordem em que fazem falta:
+
+```
+GET    /Workspaces/members                              🔒
+DELETE /Workspaces/members/IdUser=:IdUser               🔒 (só owner)
+PUT    /Workspaces/members/IdUser=:IdUser               🔒 (só owner)  { Role }
+POST   /Workspaces/leave                                🔒
+```
+
+Regras que o frontend assume (confirmem ou corrijam):
+
+- **O `owner` não sai nem se remove** enquanto for dono: antes é preciso
+  transferir a propriedade. Senão um workspace fica sem dono e ninguém
+  mais consegue convidar.
+- **Remover não apaga lançamento**: o histórico continua apontando para
+  a `Person` e para o `IdUser` que criou a linha. Membro removido perde
+  acesso, não existência.
+- `GET /Workspaces/members` precisa devolver **nome, e-mail e papel** —
+  sem isso a tela não tem o que desenhar numa lista de gente.
+
+**Estado no frontend.** Não implementado, e a tela do espaço não oferece
+o caminho. O que existe é a metade de entrada: convidar, listar
+pendentes e revogar.
+
+---
+
+## 21. O `403` não está na tabela de erros
+
+**O problema.** A seção **1.3** do contrato lista três status — `401`,
+`406` e `500` — e diz o que o front faz com cada um. Mas a seção **4.1**
+introduz um quarto: `POST /Workspaces/invite` e `GET /Workspaces/invites`
+respondem **`403`** para quem não é `owner` do workspace da sessão. A
+tabela não o menciona, e o texto não diz **se o corpo traz `msg`**.
+
+**Por que importa.** O `403` não é nenhum dos outros três disfarçado:
+
+- não é `406`, porque não há dado a corrigir — repetir a chamada com
+  outro corpo nunca vai passar;
+- não é `401`, porque a sessão está válida e mandar o usuário para o
+  login seria mentira;
+- não é `500`, e essa é a pior confusão: a mensagem genérica desse caso é
+  *"Não foi possível concluir. Tente de novo em instantes"*, que convida
+  a um retry que não leva a lugar nenhum.
+
+**O que o frontend fez.** `ApiForbiddenError` em `src/api/client.ts`, que
+**lê a `msg` quando ela vier** e cai numa frase própria ("Esta ação é só
+do dono do espaço") quando não vier. Na prática a tela raramente chega
+lá — o lápis e o formulário de convite só aparecem para o dono —, mas o
+caminho existe: alguém deixa de ser dono enquanto a tela está aberta.
+
+**O que precisamos de vocês:** acrescentar a linha do `403` à tabela da
+seção 1.3 e dizer se ele traz `{ msg }`. Se trouxer, é só documentar. Se
+não trouxer, vale trazer: a frase do servidor é sempre melhor que a
+nossa.
 
 ---
 

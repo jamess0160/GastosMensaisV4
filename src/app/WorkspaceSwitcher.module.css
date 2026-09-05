@@ -1,0 +1,211 @@
+/* O seletor de espaço, logo acima do usuário na sidebar.
+
+   O espaço é a RAIZ de tudo que a tela mostra — contas, categorias,
+   gastos, orçamentos, todos vivem dentro de um. Por isso ele tem lugar
+   fixo no chassi, e não um bloco perdido no Perfil: quem está com dois
+   espaços abertos no dia precisa ler onde está sem procurar. */
+
+.wrap {
+    position: relative;
+    padding: 10px 14px 12px;
+    margin: 0 4px;
+    border-top: 1px solid var(--border);
+}
+
+.trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    text-align: left;
+}
+
+.trigger:hover {
+    background: var(--surface-alt);
+}
+
+.mark {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--r-xs);
+    flex-shrink: 0;
+    background: var(--fill-soft);
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.body {
+    flex: 1;
+    min-width: 0;
+}
+
+.label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.name {
+    font-size: 13px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chevron {
+    color: var(--ink-2);
+    flex-shrink: 0;
+}
+
+.chevron svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* ── O painel ─────────────────────────────────────────────── */
+
+.panel {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: calc(100% - 4px);
+    z-index: 40;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    box-shadow: var(--sh-lg, 0 12px 32px rgb(0 0 0 / 14%));
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 60vh;
+    overflow: auto;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pick {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: var(--r-xs);
+    background: none;
+    text-align: left;
+}
+
+.pick:hover:not(:disabled) {
+    background: var(--surface-alt);
+}
+
+.pick:disabled {
+    cursor: default;
+}
+
+.pickName {
+    font-size: 12.5px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pickSub {
+    font-size: 10.5px;
+    color: var(--ink-2);
+    margin-top: 1px;
+}
+
+.on .pickName {
+    color: var(--brand);
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--border);
+}
+
+.on .dot {
+    background: var(--brand);
+}
+
+.edit {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: var(--r-xs);
+    background: var(--surface);
+    color: var(--ink-2);
+    flex-shrink: 0;
+}
+
+.edit:hover {
+    background: var(--surface-alt);
+    color: var(--ink);
+}
+
+.sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 2px;
+}
+
+.new {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: var(--r-xs);
+    background: none;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    text-align: left;
+}
+
+.new svg {
+    width: 15px;
+    height: 15px;
+}
+
+.new:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.note {
+    font-size: 10.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+    padding: 2px 8px 6px;
+}
+
+.error {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--neg);
+    padding: 4px 8px 6px;
+}

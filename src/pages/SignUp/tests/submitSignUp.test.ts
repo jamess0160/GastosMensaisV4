@@ -43,7 +43,7 @@ describe("submitSignUp", () => {
         expect(body?.Phone).toBe(11999998888);
     });
 
-    it("NÃO manda IdWorkspace — é pendência de segurança do backend", async () => {
+    it("NÃO manda IdWorkspace — ele saiu do contrato e agora é 406", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
             msw.post(signUp, async ({ request }) => {
@@ -55,10 +55,42 @@ describe("submitSignUp", () => {
 
         await submitSignUp(fakeSignUpContext());
 
-        // A API aceita, mas entra direto como matrícula `owner`, sem
-        // convite nem conferência. O cliente não usa até virar convite
-        // assinado.
+        // Ele entrava direto como matrícula `owner`, sem convite nem
+        // conferência, com um id sequencial que se adivinhava contando.
         expect(body).not.toHaveProperty("IdWorkspace");
+    });
+
+    it("sem convite, não manda a chave InviteHash", async () => {
+        // O caso comum: quem se cadastra sozinho ganha um espaço novo.
+        let body: Record<string, unknown> | undefined;
+        server.use(
+            msw.post(signUp, async ({ request }) => {
+                body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ IdUser: 1, IdWorkspace: 1 });
+            }),
+        );
+        server.use(msw.post(login, () => HttpResponse.json({ msg: "ok" })));
+
+        await submitSignUp(fakeSignUpContext());
+
+        expect(body).not.toHaveProperty("InviteHash");
+    });
+
+    it("com convite, manda o InviteHash que veio no link", async () => {
+        let body: Record<string, unknown> | undefined;
+        server.use(
+            msw.post(signUp, async ({ request }) => {
+                body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ IdUser: 1, IdWorkspace: 4 });
+            }),
+        );
+        server.use(msw.post(login, () => HttpResponse.json({ msg: "ok" })));
+
+        await submitSignUp(fakeSignUpContext({ inviteHash: "Yk3s" }));
+
+        // É ele que matricula no espaço de quem convidou — e o e-mail do
+        // cadastro tem que bater com o do convite, senão é 406.
+        expect(body?.InviteHash).toBe("Yk3s");
     });
 
     it("mostra a mensagem da API quando o e-mail já está em uso", async () => {

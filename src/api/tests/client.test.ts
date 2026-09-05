@@ -73,6 +73,36 @@ describe("interceptor de resposta", () => {
         window.removeEventListener(UNAUTHORIZED_EVENT, listener);
     });
 
+    it("transforma 403 na mensagem do servidor — não é 500 nem 406", async () => {
+        // Só as rotas de gestão do workspace respondem assim, e sempre
+        // pela mesma razão: quem chamou não é o dono. Cair na mensagem do
+        // 500 ("tente de novo em instantes") convidaria a um retry que
+        // nunca vai passar.
+        server.use(
+            msw.get("*/api/Workspaces/invites", () =>
+                HttpResponse.json({ msg: "Apenas o dono pode convidar!" }, { status: 403 }),
+            ),
+        );
+
+        await expect(http.get("/Workspaces/invites")).rejects.toMatchObject({
+            name: "ApiForbiddenError",
+            status: 403,
+            message: "Apenas o dono pode convidar!",
+        });
+    });
+
+    it("tem uma frase própria quando o 403 vier sem msg", async () => {
+        // A seção 1.3 do contrato não lista o 403 e não diz se ele traz
+        // corpo — ver a pendência 21.
+        server.use(
+            msw.get("*/api/Workspaces/invites", () => new HttpResponse(null, { status: 403 })),
+        );
+
+        await expect(http.get("/Workspaces/invites")).rejects.toMatchObject({
+            message: "Esta ação é só do dono do espaço.",
+        });
+    });
+
     it("transforma 500 em erro genérico, sem vazar detalhe do servidor", async () => {
         server.use(msw.get(route, () => new HttpResponse(null, { status: 500 })));
 

@@ -30,6 +30,22 @@ export class ApiUnauthorizedError extends Error {
     }
 }
 
+/** 403 — a rota existe, a sessão é válida, e mesmo assim não é sua.
+ *
+ *  Só as rotas de gestão do workspace respondem assim, e sempre pela
+ *  mesma razão: quem chamou não é `owner`. Ele NÃO é um 406 disfarçado —
+ *  não há dado a corrigir, e repetir a chamada nunca vai passar —, nem
+ *  um 500, cuja mensagem ("tente de novo em instantes") convida a um
+ *  retry que não leva a lugar nenhum. */
+export class ApiForbiddenError extends Error {
+    readonly status = 403;
+
+    constructor(message?: string) {
+        super(message ?? "Esta ação é só do dono do espaço.");
+        this.name = "ApiForbiddenError";
+    }
+}
+
 /** 500 e qualquer resposta não prevista. Corpo vazio. */
 export class ApiServerError extends Error {
     constructor(readonly status: number) {
@@ -75,6 +91,14 @@ http.interceptors.response.use(
             return Promise.reject(new ApiUnauthorizedError());
         }
 
+        if (status === 403) {
+            /* A seção 1.3 do contrato não lista o 403 — ele aparece só na
+               4.1, nas rotas de convite. Lemos a `msg` quando ela vier, e
+               temos uma frase própria quando não vier: ver a pendência 21. */
+            const msg = (data as ApiTypes.ApiError | undefined)?.msg;
+            return Promise.reject(new ApiForbiddenError(msg));
+        }
+
         if (status === 406) {
             const msg = (data as ApiTypes.ApiError | undefined)?.msg;
             return Promise.reject(new ApiBusinessError(msg ?? "Dados de entrada inválidos."));
@@ -88,6 +112,7 @@ http.interceptors.response.use(
 export function errorMessage(error: unknown): string {
     if (
         error instanceof ApiBusinessError ||
+        error instanceof ApiForbiddenError ||
         error instanceof ApiServerError ||
         error instanceof ApiNetworkError ||
         error instanceof ApiUnauthorizedError

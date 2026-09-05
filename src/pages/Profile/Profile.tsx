@@ -2,11 +2,12 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import styles from "./src/styles.module.css";
 import { ProfileController, type ProfileContext, type ProfileScope } from "./controller";
+import { Link } from "react-router-dom";
 import { useSession, sessionKeys } from "@/app/session";
 import { UsersAuthConnection } from "@/api/UsersAuth.connection";
 import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { FormError, FormField, FormGrid, Input, PasswordInput } from "@/ui/form";
-import { IconFingerprint, IconTransfer } from "@/ui/icons";
+import { IconFingerprint } from "@/ui/icons";
 import { ConfirmDialog } from "@/ui/overlay";
 import { EmptyState } from "@/ui/states";
 import { formatDateTime } from "@/lib/date";
@@ -21,7 +22,7 @@ const maskPhone = (digits: string): string => {
 };
 
 export function Profile() {
-    const { user, workspaces } = useSession();
+    const { user, workspace, workspaces, isOwner } = useSession();
     const queryClient = useQueryClient();
     const deviceKey = readDeviceKey();
 
@@ -318,7 +319,14 @@ export function Profile() {
                         </div>
                     </Card>
 
-                    {/* ── Workspace ─────────────────────────────── */}
+                    {/* ── Espaço ────────────────────────────────── */}
+                    {/* A LISTA saiu daqui. Trocar de espaço é gesto do
+                        chassi — o seletor acima do usuário, na barra
+                        lateral —, porque o espaço é a raiz de tudo que a
+                        tela mostra e repetir o gesto em cada página é
+                        como as telas acabam cada uma com o seu. O que
+                        fica é o endereço: onde você está, e por onde se
+                        gerencia. */}
                     <Card>
                         <div className={styles.section}>
                             <div className={styles.sectionHead}>
@@ -326,49 +334,32 @@ export function Profile() {
                                     <div className={styles.sectionTitle}>Seu espaço</div>
                                     <div className={styles.sectionSub}>
                                         Onde vivem suas contas, categorias e lançamentos.
+                                        {workspaces.length > 1 &&
+                                            ` Você participa de ${workspaces.length} — troque pelo seletor da barra lateral.`}
                                     </div>
                                 </div>
                             </div>
 
-                            <FormError>{errors.workspace}</FormError>
-
-                            {/* Hoje é um workspace por usuário e ele nasce
-                                no cadastro. A lista aparece mesmo com um só:
-                                o atual já vem desabilitado e rotulado
-                                "Espaço atual", e mostrá-lo diz mais do que
-                                uma seção vazia. */}
-                            {workspaces.length > 0 && (
-                                <div className={styles.workspaces}>
-                                    {workspaces.map((workspace, index) => (
-                                        <button
-                                            key={workspace.IdWorkspace}
-                                            type="button"
-                                            className={`${styles.workspace} ${index === 0 ? styles.workspaceOn : ""}`}
-                                            disabled={index === 0 || pending === "workspace"}
-                                            onClick={() =>
-                                                void ProfileController.switchWorkspace(
-                                                    context,
-                                                    workspace.IdWorkspace,
-                                                )
-                                            }
-                                        >
-                                            <span className={styles.itemMark}>
-                                                <IconTransfer />
-                                            </span>
-                                            <div className={styles.itemBody}>
-                                                <div className={styles.itemName}>
-                                                    {workspace.Name}
-                                                </div>
-                                                <div className={styles.itemSub}>
-                                                    {index === 0
-                                                        ? "Espaço atual"
-                                                        : "Trocar para este espaço"}
-                                                </div>
-                                            </div>
-                                        </button>
-                                    ))}
+                            <div className={styles.meta}>
+                                <div>
+                                    <div className={styles.metaLabel}>Espaço atual</div>
+                                    <div className={styles.metaValue}>{workspace?.Name ?? "—"}</div>
                                 </div>
-                            )}
+                                <div>
+                                    <div className={styles.metaLabel}>Seu papel</div>
+                                    <div className={styles.metaValue}>
+                                        {isOwner ? "Dono" : "Membro"}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <Link to="/espaco">
+                                    <Button>
+                                        {isOwner ? "Gerenciar e convidar" : "Ver o espaço"}
+                                    </Button>
+                                </Link>
+                            </div>
                         </div>
                     </Card>
 

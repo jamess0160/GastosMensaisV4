@@ -29,7 +29,6 @@ export function fakeProfileContext(overrides: Partial<ProfileContext> = {}): Pro
         failSubmit: vi.fn(),
         finishSubmit: vi.fn(),
         refresh: vi.fn(),
-        resetAllCaches: vi.fn(),
         clearPasswordForm: vi.fn(),
         ...overrides,
     };

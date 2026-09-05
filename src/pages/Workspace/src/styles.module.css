@@ -1,0 +1,136 @@
+/* A tela do espaço: o nome e os convites.
+
+   Dois blocos e nada mais, porque só existem duas coisas para fazer
+   aqui — e a segunda é a que importa, já que é a única forma de outra
+   pessoa entrar no espaço. */
+
+.grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 760px;
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.sectionHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.sectionTitle {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.sectionSub {
+    font-size: 11.5px;
+    color: var(--ink-2);
+    margin-top: 2px;
+    line-height: 1.5;
+}
+
+.row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.rowGrow {
+    flex: 1;
+    min-width: 200px;
+}
+
+.ok {
+    font-size: 11.5px;
+    color: var(--pos-ink, var(--ink-2));
+}
+
+/* ── A lista de convites ──────────────────────────────────── */
+
+.invites {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.invite {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.inviteBody {
+    flex: 1;
+    min-width: 180px;
+}
+
+.inviteEmail {
+    font-size: 13px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inviteSub {
+    font-size: 11.5px;
+    color: var(--ink-2);
+    margin-top: 2px;
+}
+
+.expired {
+    color: var(--neg);
+}
+
+.inviteActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* O link é a entrega: a API não manda e-mail, então quem não conseguir
+   copiar daqui não convidou ninguém. */
+.link {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+}
+
+.linkText {
+    flex: 1;
+    min-width: 0;
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.note {
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+}

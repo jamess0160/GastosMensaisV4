@@ -31,6 +31,9 @@ const Settings = lazy(() =>
     import("@/pages/Settings/Settings").then((m) => ({ default: m.Settings })),
 );
 const Profile = lazy(() => import("@/pages/Profile/Profile").then((m) => ({ default: m.Profile })));
+const WorkspaceScreen = lazy(() =>
+    import("@/pages/Workspace/Workspace").then((m) => ({ default: m.Workspace })),
+);
 
 /** O intervalo entre clicar no menu e a tela chegar. Fica em `center`,
  *  a mesma medida do carregamento da sessão, para que a troca de tela
@@ -45,8 +48,8 @@ export interface ScreenRoute {
     element: ReactNode;
 }
 
-/** As 7 telas do chassi — as 8 do layout menos o login, mais o perfil,
- *  que o contrato pede e o layout não desenha. */
+/** As 8 telas do chassi — as 8 do layout menos o login, mais o perfil e
+ *  o espaço, que o contrato pede e o layout não desenha. */
 export const SHELL_SCREENS: ScreenRoute[] = [
     { index: true, element: load(<Dashboard />) },
     { path: "gastos", element: load(<Expenses />) },
@@ -55,6 +58,7 @@ export const SHELL_SCREENS: ScreenRoute[] = [
     { path: "relatorio", element: load(<Report />) },
     { path: "personalizacao", element: load(<Settings />) },
     { path: "perfil", element: load(<Profile />) },
+    { path: "espaco", element: load(<WorkspaceScreen />) },
 ];
 
 /** Rotas MODAIS: têm URL própria, mas não são uma tela — desenham um

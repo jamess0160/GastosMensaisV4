@@ -7,6 +7,7 @@ import {
     Settings,
     TrendingUp,
     User,
+    Users,
     Wallet,
     FileSpreadsheet,
     type LucideIcon,
@@ -38,6 +39,7 @@ export const IconSettings = adapt(Settings, "IconSettings");
 export const IconExport = adapt(FileSpreadsheet, "IconExport");
 export const IconSignOut = adapt(LogOut, "IconSignOut");
 export const IconProfile = adapt(User, "IconProfile");
+export const IconUsers = adapt(Users, "IconUsers");
 
 /** "Mais" — os três pontos que o layout desenha na quinta fatia da
  *  barra inferior (`Layout/Hi-fi Mobile/04`). */

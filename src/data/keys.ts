@@ -12,6 +12,10 @@ import type { ApiTypes } from "@/types/api";
 export const queryKeys = {
     /* Cadastros — mudam pouco e são lidos por quase toda tela. */
     categories: ["categories"] as const,
+    /** Os convites PENDENTES do espaço da sessão. Sem mês e sem id: a
+     *  rota não recebe nenhum dos dois — ela olha o workspace do cookie,
+     *  e trocar de espaço limpa o cache inteiro de qualquer jeito. */
+    invites: ["invites"] as const,
     persons: ["persons"] as const,
     /** As contas NÃO são o mesmo em todo mês: a lista é, o `Balance`
      *  não. Ele é recortado pelo `ReferenceMonth` a cada leitura, então

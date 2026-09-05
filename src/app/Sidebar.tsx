@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import styles from "./Sidebar.module.css";
 import { useSession, useSignOut } from "./session";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import {
     IconAccounts,
     IconExpenses,
@@ -23,9 +24,8 @@ const primary = [
 const settings = [{ to: "/personalizacao", label: "Personalização", Icon: IconSettings }] as const;
 
 export function Sidebar() {
-    const { user, workspaces } = useSession();
+    const { user } = useSession();
     const signOut = useSignOut();
-    const workspaceName = workspaces[0]?.Name ?? "";
 
     return (
         <aside className={styles.sidebar}>
@@ -33,7 +33,7 @@ export function Sidebar() {
                 <img className={styles.mark} src="/logo.png" alt="" />
                 <div>
                     <div className={styles.brandName}>Gastos mensais</div>
-                    {workspaceName && <div className={styles.brandSub}>{workspaceName}</div>}
+                    <div className={styles.brandSub}>Controle da casa</div>
                 </div>
             </div>
 
@@ -82,6 +82,11 @@ export function Sidebar() {
                     </div>
                 </div>
             </nav>
+
+            {/* O espaço vem antes do usuário porque é o de cima na
+                hierarquia: o usuário está DENTRO de um espaço, e tudo que
+                as telas mostram vive lá. */}
+            <WorkspaceSwitcher />
 
             <div className={styles.user}>
                 {/* O bloco do usuário é o caminho para o perfil: é onde

@@ -10,6 +10,7 @@ export function fakeSignUpContext(overrides: Partial<SignUpContext> = {}): SignU
         passwordConfirmation: "senha-forte-1",
         phone: "11999998888",
         acceptedTerms: true,
+        inviteHash: null,
         beginSubmit: vi.fn(),
         failSubmit: vi.fn(),
         finishSignUp: vi.fn(),

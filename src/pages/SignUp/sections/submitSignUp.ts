@@ -30,10 +30,12 @@ export function validateSignUp(context: SignUpContext): string | null {
  *  - a senha vai em TEXTO PURO. Pré-hashear no cliente não protege nada:
  *    o que a API recebe vira a credencial efetiva, e um hash vazado
  *    seria reproduzido como está. O bcrypt (custo 12) roda no servidor.
- *  - `IdWorkspace` NÃO é enviado. Ele é aceito pela API, mas entra
- *    direto como matrícula `owner`, sem convite nem conferência — é
- *    pendência de segurança conhecida do backend, e o cliente não a usa
- *    até virar convite assinado.
+ *  - `IdWorkspace` NÃO EXISTE MAIS: mandá-lo é 406. Ele entrava direto
+ *    como matrícula `owner`, sem convite nem conferência, com um id
+ *    sequencial que se adivinhava contando. No lugar dele vai o
+ *    `InviteHash`, e só quando a pessoa chegou por um link — sem ele, o
+ *    cadastro cria um espaço novo, que é o caso comum. O e-mail do
+ *    cadastro precisa bater com o do convite, senão é 406.
  *
  *  Se o cadastro passar e o login falhar, a conta ficou criada: a
  *  mensagem manda entrar em vez de sugerir cadastrar de novo, que
@@ -53,6 +55,9 @@ export async function submitSignUp(context: SignUpContext): Promise<void> {
             Email: context.email.trim(),
             Password: context.password,
             Phone: Number(context.phone),
+            // Espalhado, e não `InviteHash: null`: quem não veio de um
+            // convite não manda a chave.
+            ...(context.inviteHash ? { InviteHash: context.inviteHash } : {}),
         });
 
         context.finishSignUp();

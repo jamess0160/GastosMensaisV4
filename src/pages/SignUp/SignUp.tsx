@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { AuthLayout, authStyles as styles } from "@/ui/AuthLayout";
 import { Checkbox, FormField, Input, PasswordInput } from "@/ui/form";
@@ -21,6 +21,11 @@ export function SignUp() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
+    /* Quem chegou pela tela de aceite traz o hash na URL. Sem ele o
+       cadastro cria um espaço novo — que é o caminho normal. */
+    const [search] = useSearchParams();
+    const inviteHash = search.get("convite");
+
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
@@ -38,6 +43,7 @@ export function SignUp() {
             password,
             passwordConfirmation,
             acceptedTerms,
+            inviteHash,
             beginSubmit() {
                 setPending(true);
                 setError(null);
@@ -52,7 +58,17 @@ export function SignUp() {
                 navigate("/", { replace: true });
             },
         }),
-        [name, email, phone, password, passwordConfirmation, acceptedTerms, navigate, queryClient],
+        [
+            name,
+            email,
+            phone,
+            password,
+            passwordConfirmation,
+            acceptedTerms,
+            inviteHash,
+            navigate,
+            queryClient,
+        ],
     );
 
     const onSubmit = (event: FormEvent) => {
@@ -63,7 +79,11 @@ export function SignUp() {
     return (
         <AuthLayout
             heading="Criar sua conta"
-            subheading="Seu espaço nasce junto com a conta — sem convite e sem configuração."
+            subheading={
+                inviteHash
+                    ? "Você foi convidado: use o MESMO e-mail que recebeu o convite, ou a matrícula é recusada."
+                    : "Seu espaço nasce junto com a conta — sem convite e sem configuração."
+            }
             topRight={
                 <>
                     <span>Já tem conta?</span>
