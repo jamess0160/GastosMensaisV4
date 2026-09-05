@@ -6,17 +6,21 @@ import type { AccountsContext } from "../controller";
  *
  *  Duas coisas do contrato mandam na forma deste corpo:
  *
- *  - `InitialBalance` CONGELA depois do primeiro lançamento. Alterá-lo
- *    responde 406 ("Esta conta já tem lançamentos: o saldo inicial não
- *    pode mais ser alterado"). A tela desabilita o campo quando há
- *    movimento; aqui ele é OMITIDO nesse caso, porque no PUT campo
+ *  - `InitialBalance` e `Type` CONGELAM depois do primeiro lançamento,
+ *    pela mesma pergunta ("esta conta tem movimento?"). Alterá-los
+ *    responde 406. A tela desabilita os dois campos quando há
+ *    movimento; aqui eles são OMITIDOS nesse caso, porque no PUT campo
  *    omitido é campo mantido — mandar o mesmo valor de volta ainda
  *    contaria como alteração.
  *  - Saldo inicial NEGATIVO é válido: é o cheque especial. Não há
  *    conferência de sinal nem aqui nem na API.
  *
- *  A conta nasce com uma forma pix e uma débito, criadas pela própria
- *  API — por isso não há nada a fazer aqui depois do POST. */
+ *  AS FORMAS DE PAGAMENTO NASCEM COM A CONTA, e quais delas é o `Type`
+ *  que decide: `checking` nasce com pix + débito, `cash` com uma forma
+ *  "Dinheiro" e `card` — o vale-alimentação — com uma forma de débito
+ *  com o nome da conta. Quem as cria é a própria API, por isso não há
+ *  nada a fazer aqui depois do POST. Trocar o tipo depois NÃO as refaz,
+ *  nem numa conta vazia onde a troca é aceita. */
 export async function saveAccount(context: AccountsContext): Promise<void> {
     const draft = context.accountDraft;
     if (!draft) return;
@@ -41,12 +45,13 @@ export async function saveAccount(context: AccountsContext): Promise<void> {
         } else {
             await AccountsConnection.update(draft.IdAccount, {
                 Name: draft.Name.trim(),
-                Type: draft.Type,
                 Color: draft.Color,
-                // Congelado: omitir mantém. Reenviar seria uma alteração.
+                // Congelados JUNTOS: omitir mantém, e reenviar o mesmo
+                // valor ainda contaria como alteração.
                 ...(draft.balanceFrozen
                     ? {}
                     : {
+                          Type: draft.Type,
                           InitialBalance: draft.InitialBalance ?? 0,
                           InitialBalanceDate: draft.InitialBalanceDate,
                       }),

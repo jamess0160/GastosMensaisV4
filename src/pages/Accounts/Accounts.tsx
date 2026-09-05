@@ -63,7 +63,22 @@ const initials = (name: string) =>
 const TYPE_LABEL: Record<ApiTypes.AccountType, string> = {
     checking: "Conta corrente",
     cash: "Dinheiro",
+    card: "Vale",
 };
+
+/** O que nasce junto com a conta, por tipo — o texto de ajuda muda com o
+ *  seletor porque a resposta muda com ele. */
+const TYPE_HELP: Record<ApiTypes.AccountType, string> = {
+    checking: "Nasce com uma forma pix e uma de débito. É a única que aceita cartão de crédito.",
+    cash: 'Dinheiro na carteira: nasce com uma forma de débito chamada "Dinheiro". Sem cartão.',
+    card: "Vale-alimentação: saldo próprio, sem conta bancária atrás e sem fatura. Nasce com uma forma de débito com o nome da conta.",
+};
+
+/** Cartão de crédito só existe em conta corrente: `cash` e `card` são
+ *  contas de SALDO FECHADO, e uma fatura nelas não teria de onde sair —
+ *  o cartão de crédito é uma dívida que vence contra uma conta bancária.
+ *  A API responde 406; a tela nem oferece o caminho. */
+const acceptsCreditCard = (account: ApiTypes.Account): boolean => account.Type === "checking";
 
 const newAccountDraft = (): AccountDraft => ({
     IdAccount: null,
@@ -337,7 +352,7 @@ export function Accounts() {
                     <EmptyState
                         icon={<IconBank />}
                         title="Nenhuma conta ainda"
-                        description="Toda conta nasce com uma forma pix e uma de débito. O cartão de crédito você cria dentro dela."
+                        description="A conta nasce com as formas de pagamento do tipo dela: conta corrente com pix e débito, dinheiro e vale com uma forma de débito. O cartão de crédito você cria dentro da conta corrente."
                         action={
                             <Button
                                 variant="primary"
@@ -512,7 +527,7 @@ export function Accounts() {
                         <>
                             <FooterSpacer />
                             <Button onClick={() => setOpenAccount(null)}>Fechar</Button>
-                            {detail && (
+                            {detail && acceptsCreditCard(detail) && (
                                 <Button
                                     variant="primary"
                                     onClick={() => setCardDraft(newCardDraft(detail.IdAccount))}
@@ -555,9 +570,21 @@ export function Accounts() {
                                 <span>Cartões de crédito</span>
                             </div>
 
-                            {detail.PaymentMethods.filter(
-                                (method) => method.Active && method.Kind === "credit_card",
-                            ).length === 0 ? (
+                            {!acceptsCreditCard(detail) ? (
+                                /* Contas de saldo fechado — dinheiro na
+                                   carteira e vale-alimentação — não aceitam
+                                   cartão: uma fatura nelas não teria de onde
+                                   sair. A API responde 406, e a tela diz por
+                                   quê em vez de oferecer o botão. */
+                                <EmptyState
+                                    inline
+                                    icon={<IconCard />}
+                                    title="Cartão de crédito só existe em conta corrente"
+                                    description={`${TYPE_LABEL[detail.Type]} é conta de saldo fechado: o gasto sai no ato e não há fatura de onde o cartão pudesse ser pago.`}
+                                />
+                            ) : detail.PaymentMethods.filter(
+                                  (method) => method.Active && method.Kind === "credit_card",
+                              ).length === 0 ? (
                                 <EmptyState
                                     inline
                                     icon={<IconCard />}
@@ -710,7 +737,7 @@ export function Accounts() {
                     open={accountDraft !== null}
                     onClose={() => setAccountDraft(null)}
                     title={accountDraft?.IdAccount === null ? "Nova conta" : "Editar conta"}
-                    subtitle="Cartão de crédito não é conta — ele é forma de pagamento, e vive dentro dela."
+                    subtitle="Cartão de crédito não é conta — ele é forma de pagamento, e vive dentro de uma conta corrente. O tipo Vale é o vale-alimentação: saldo próprio, sem fatura."
                     footer={
                         <>
                             <FooterSpacer />
@@ -755,7 +782,19 @@ export function Accounts() {
                                 )}
                             </FormField>
 
-                            <FormField label="Tipo">
+                            {/* O tipo decide QUAIS FORMAS DE PAGAMENTO nascem
+                                com a conta, e por isso o texto de ajuda muda
+                                junto com ele. Congela pela mesma trava do
+                                saldo inicial — mesma pergunta ("esta conta tem
+                                movimento?"), mesmo 406. */}
+                            <FormField
+                                label="Tipo"
+                                help={
+                                    accountDraft.balanceFrozen
+                                        ? "Esta conta já tem lançamentos: o tipo dela não pode mais mudar."
+                                        : TYPE_HELP[accountDraft.Type]
+                                }
+                            >
                                 {() => (
                                     <SegmentedControl
                                         value={accountDraft.Type}
@@ -764,8 +803,21 @@ export function Accounts() {
                                         }
                                         ariaLabel="Tipo da conta"
                                         options={[
-                                            { value: "checking", label: "Conta corrente" },
-                                            { value: "cash", label: "Dinheiro" },
+                                            {
+                                                value: "checking",
+                                                label: TYPE_LABEL.checking,
+                                                disabled: accountDraft.balanceFrozen,
+                                            },
+                                            {
+                                                value: "cash",
+                                                label: TYPE_LABEL.cash,
+                                                disabled: accountDraft.balanceFrozen,
+                                            },
+                                            {
+                                                value: "card",
+                                                label: TYPE_LABEL.card,
+                                                disabled: accountDraft.balanceFrozen,
+                                            },
                                         ]}
                                     />
                                 )}

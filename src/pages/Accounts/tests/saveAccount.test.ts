@@ -34,7 +34,7 @@ describe("saveAccount", () => {
         expect(body?.InitialBalance).toBe(-350.5);
     });
 
-    it("OMITE o saldo inicial quando a conta já tem lançamentos", async () => {
+    it("OMITE saldo inicial E tipo quando a conta já tem lançamentos", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
             msw.put("*/api/Accounts/IdAccount=3", async ({ request }) => {
@@ -50,10 +50,32 @@ describe("saveAccount", () => {
         );
 
         // No PUT, campo omitido é campo mantido. Reenviar o mesmo valor
-        // ainda contaria como alteração e responderia 406.
+        // ainda contaria como alteração e responderia 406 — e os dois
+        // congelam pela MESMA pergunta ("esta conta tem movimento?").
         expect(body).not.toHaveProperty("InitialBalance");
         expect(body).not.toHaveProperty("InitialBalanceDate");
+        expect(body).not.toHaveProperty("Type");
         expect(body?.Name).toBe("Nubank");
+    });
+
+    it("cria uma conta de vale com Type: card", async () => {
+        let body: Record<string, unknown> | undefined;
+        server.use(
+            msw.post("*/api/Accounts", async ({ request }) => {
+                body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ IdAccount: 8 });
+            }),
+        );
+
+        await saveAccount(
+            fakeAccountsContext({
+                accountDraft: anAccountDraft({ Name: "Vale Alimentação", Type: "card" }),
+            }),
+        );
+
+        // `card` NÃO é conta de cartão de crédito: é o vale, e ele nasce
+        // com UMA forma de débito com o nome da conta.
+        expect(body?.Type).toBe("card");
     });
 
     it("manda o saldo inicial quando a conta ainda não tem movimento", async () => {
@@ -72,6 +94,7 @@ describe("saveAccount", () => {
         );
 
         expect(body?.InitialBalance).toBe(1000);
+        expect(body?.Type).toBe("checking");
     });
 
     it("mostra a mensagem da API quando o saldo congelado escapa", async () => {

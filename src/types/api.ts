@@ -94,9 +94,22 @@ export namespace ApiTypes {
 
     /* ── 5-6. Accounts e PaymentMethods ───────────────────────── */
 
-    export type AccountType = "checking" | "cash";
+    /** O tipo decide QUAIS FORMAS DE PAGAMENTO nascem com a conta:
+     *
+     *  | `Type`     | o que é                       | nasce com                    |
+     *  |------------|-------------------------------|------------------------------|
+     *  | `checking` | conta bancária                | pix + débito                 |
+     *  | `cash`     | dinheiro na carteira          | uma `debit` chamada Dinheiro |
+     *  | `card`     | vale-alimentação              | uma `debit` com o NOME DA CONTA |
+     *
+     *  `card` NÃO é "conta de cartão de crédito" — é o oposto disso. É o
+     *  vale: saldo próprio, sem conta bancária atrás e SEM FATURA, e o
+     *  gasto sai do saldo no ato. Por isso a forma que nasce com ele é
+     *  `debit`, e não um `Kind` novo. */
+    export type AccountType = "checking" | "cash" | "card";
 
-    /** Não existe conta de tipo cartão — cartão é forma de pagamento. */
+    /** Não existe conta de tipo cartão de crédito — cartão de crédito é
+     *  forma de pagamento, e só existe em conta `checking`. */
     export interface Account {
         IdAccount: number;
         IdWorkspace: number;
@@ -150,6 +163,8 @@ export namespace ApiTypes {
 
     export interface AccountCreateBody {
         Name: string;
+        /** Default `checking`. Ver `AccountType`: ele decide as formas de
+         *  pagamento que nascem junto. */
         Type?: AccountType;
         IconPath?: string | null;
         Color?: Color | null;
@@ -160,12 +175,21 @@ export namespace ApiTypes {
     }
 
     /** PUT é substituição: `Name` vai sempre. Omitido = mantém.
-     *  `InitialBalance` congela após o primeiro lançamento (406). */
+     *
+     *  `InitialBalance` E `Type` congelam após o primeiro lançamento
+     *  (406, pela mesma pergunta: "esta conta tem movimento?"). Enquanto
+     *  a conta está vazia a troca de tipo passa e NÃO refaz as formas de
+     *  pagamento — as que nasceram ficam, e renomeá-las é do usuário. */
     export interface AccountUpdateBody extends Partial<AccountCreateBody> {
         Name: string;
     }
 
     /** POST só aceita cartão de crédito: pix e débito nascem com a conta.
+     *
+     *  **E só em conta `checking`.** `IdAccount` apontando para uma conta
+     *  `cash` ou `card` responde 406: as duas são contas de SALDO
+     *  FECHADO — dinheiro na carteira e vale-alimentação — e uma fatura
+     *  nelas não teria de onde sair. Ofereça só as `checking` no seletor.
      *
      *  `Brand` e `LastDigits` NÃO EXISTEM MAIS: mandá-los responde 406.
      *  Nenhum dos dois entrava em saldo, fatura, filtro ou relatório, e
