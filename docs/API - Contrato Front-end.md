@@ -592,6 +592,32 @@ Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias,
 
 Arquiva. **Resposta:** `{ "msg": "Forma de pagamento arquivada com sucesso" }`.
 
+### `POST /PaymentMethods/IdPaymentMethod=:IdPaymentMethod/payInvoice`
+
+**Quita a fatura inteira.** É o que tira o dinheiro do cartão da conta — no crédito, a perna sozinha não quita (seção 12).
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `DueDate` | CalendarDate | obrigatório — **o vencimento identifica a fatura** |
+
+**A fatura não é um cadastro, é uma consulta.** Não existe tabela de faturas e não há id de fatura: todas as pernas de um mesmo ciclo compartilham o **mesmo `DueDate` exato**, porque ele é calculado a partir do `DueDay` do cartão. Uma fatura é `(IdPaymentMethod, DueDate)` — pegue o `DueDate` da própria perna, em `GET /ExpensePayments` ou no detalhe do gasto, e mande de volta.
+
+**Resposta:** `{ "msg": "Fatura quitada com sucesso", "Payments": 12 }` — `Payments` é **quantas pernas mudaram de estado**.
+
+**Repetir a chamada é inofensivo:** pernas já pagas são puladas, e `Payments: 0` é resposta legítima ("a fatura já estava assim"). É isso que resolve o caso real de **lançar hoje uma compra esquecida que pertence a uma fatura já paga** — chame de novo e só a que faltava é quitada.
+
+Pernas de **gasto cancelado ficam de fora**: cancelar já é o estorno, e a fatura não pode tirar da conta o dinheiro de uma compra que não existe mais.
+
+O `Status` de **cada gasto atingido** é recalculado na mesma transaction — doze pernas podem ser doze gastos diferentes.
+
+`406` se: a forma de pagamento não existe no workspace, **não é `credit_card`**, ou **não há fatura com esse vencimento** (fatura sem perna nenhuma não é fatura paga, é fatura que não existe).
+
+### `POST /PaymentMethods/IdPaymentMethod=:IdPaymentMethod/unpayInvoice`
+
+Mesmo corpo, sentido inverso. Existe pelo mesmo motivo que o `unpay`, e mais ainda: **um clique errado aqui tira quarenta pagamentos do saldo de uma vez.**
+
+**Resposta:** `{ "msg": "Fatura desquitada com sucesso", "Payments": 12 }`.
+
 ---
 
 ## 7. Categories — `/Categories` 🔒
@@ -965,6 +991,9 @@ A mesma linha **mais os três filhos**:
     "InstallmentTotal": 6,
     "ClosingDate": "2026-08-20",
     "DueDate": "2026-08-27",
+    "CompetenceDate": "2026-08-27",
+    "Charged": false,
+    "ChargedAt": null,
     "Paid": false,
     "PaidAt": null,
     "CreatedAt": "...",
@@ -989,6 +1018,17 @@ A mesma linha **mais os três filhos**:
 
 > Em cartão, um dia de diferença na compra vira **um mês** de diferença no caixa: a compra entra na **primeira fatura que ainda não fechou**. O fechamento sai do cartão como `DueDay − ClosingOffsetDays` (seção 6), então ele é uma data que muda de mês para mês — não um dia fixo do calendário.
 
+**`CompetenceDate` é a data em que a perna pesa** — `DueDate` quando existe, senão a data do gasto —, congelada no lançamento. É por ela que o saldo da conta, o `Spent` do orçamento e `GET /ExpensePayments` recortam o mês. Ela é informativa para o cliente: não é aceita em corpo nenhum.
+
+**`Charged` e `Paid` são dois fatos diferentes, e só um move dinheiro:**
+
+| Campo | O que afirma | Quem escreve | Move saldo? |
+|---|---|---|---|
+| `Charged`/`ChargedAt` | **a cobrança entrou na fatura** | o usuário, pelo `charge` (seção 12) | **não** |
+| `Paid`/`PaidAt` | **o dinheiro saiu da conta** | o cliente no lançamento, o `pay` da linha, ou — **no cartão** — o `payInvoice` (seção 6) | **sim** |
+
+`Charged` é **`null` fora do cartão de crédito**, pela mesma razão que `ClosingDate` é: não há fatura em que entrar. Use essa nulidade para saber se a linha da sua tela tem o botão de conferência.
+
 ### `POST /Expenses`
 
 | Campo | Tipo | Regra |
@@ -1006,7 +1046,7 @@ A mesma linha **mais os três filhos**:
 | `RecurrenceDay` | int 1–31 | **só** em `fixed`, opcional (sem ele vale o dia da compra) |
 | `RecurrenceEndDate` | CalendarDate \| null | **só** em `fixed` — corta a série antes da janela do servidor |
 
-`Paid: true` é o caso do débito, que já sai pago no ato; no cartão a perna fica em aberto e se quita pela rota da perna.
+**`Paid: true` é o caso do débito e do pix**, que já saem pagos no ato. **No cartão de crédito ele é recusado com `406`:** a compra no crédito não nasce quitada — ela é quitada com a **fatura** (`payInvoice`, seção 6). Não ofereça o campo no formulário quando a forma escolhida for cartão.
 
 **`Tags` é texto puro.** A API reusa a tag existente (ignorando maiúsculas), desarquiva a arquivada ou insere a nova — tudo dentro da transaction do gasto. É o **único** lugar em que uma tag nasce.
 
@@ -1070,7 +1110,15 @@ Cancela desta ocorrência para a frente.
 
 ## 12. ExpensePayments — `/ExpensePayments` 🔒
 
-A perna não tem `POST` de cadastro: ela nasce com o gasto. O que existe aqui é **a lista do que cai num período** e **o verbo que move saldo**.
+A perna não tem `POST` de cadastro: ela nasce com o gasto. O que existe aqui é **a lista do que cai num período** e **os verbos de estado**.
+
+**Dois fatos, dois verbos, e só um deles mexe em dinheiro:**
+
+| Verbo | Afirma | Onde | Move saldo? |
+|---|---|---|---|
+| `charge` / `uncharge` | a cobrança **entrou na fatura** | aqui, na perna — **só cartão** | **não** |
+| `pay` / `unpay` | o dinheiro **saiu da conta** | aqui, na perna — **nunca em cartão** | sim |
+| `payInvoice` / `unpayInvoice` | a **fatura** foi paga | seção 6, na forma de pagamento | sim |
 
 ### `GET /ExpensePayments`
 
@@ -1122,13 +1170,33 @@ A lista vem ordenada pela data em que a perna pesa, não pela data da compra.
 
 **Resposta:** `{ "msg": "Parcela quitada com sucesso" }`.
 
-`406` se: a perna não existe, o gasto está cancelado, ou a parcela **já está quitada**.
+> **🔴 Não vale para cartão de crédito.** Perna de cartão responde `406` `"Perna de cartão de crédito é quitada com a fatura: use POST /PaymentMethods/IdPaymentMethod=:Id/payInvoice."` **Não se paga uma compra isolada da fatura** — nenhum emissor oferece isso, e era esse botão que deixava o saldo do cartão errado. **Parcelado fora do cartão** (carnê, crediário, o racha com um amigo no pix) continua sendo quitado parcela a parcela por aqui.
+
+`406` se: a perna não existe, **é de cartão de crédito**, o gasto está cancelado, ou a parcela **já está quitada**.
 
 ### `POST /ExpensePayments/IdExpensePayment=:IdExpensePayment/unpay`
 
-Desquita. Existe porque um clique errado, sem ele, tiraria dinheiro da conta sem volta.
+Desquita. Existe porque um clique errado, sem ele, tiraria dinheiro da conta sem volta. Mesma recusa para perna de cartão.
 
 **Resposta:** `{ "msg": "Parcela desquitada com sucesso" }`.
+
+### `POST /ExpensePayments/IdExpensePayment=:IdExpensePayment/charge`
+
+**Sem body.** Marca que **a cobrança entrou na fatura** — `Charged: true` e `ChargedAt` com o instante. **Só em perna de cartão de crédito.**
+
+**Não move saldo nenhum**, não mexe no `Status` do gasto e não é pré-requisito de nada. É a conferência de assinatura: "a Netflix cobrou mesmo este mês? veio no valor certo?", e quem responde é o usuário olhando o app do cartão.
+
+> **É afirmação, não palpite.** Não derive de "a data já passou": a lista é olhada justamente para achar onde a realidade **discordou** da previsão — a assinatura que não cobrou, que cobrou dobrado, que mudou de dia. Uma marcação derivada da data nunca discorda de nada, então nunca acha nada.
+
+**Resposta:** `{ "msg": "Cobrança marcada como lançada na fatura" }`.
+
+`406` se: a perna não existe, **não é de cartão** (`Charged` é `null` ali), o gasto está cancelado, ou já está marcada.
+
+### `POST /ExpensePayments/IdExpensePayment=:IdExpensePayment/uncharge`
+
+Desmarca, e apaga o `ChargedAt` junto.
+
+**Resposta:** `{ "msg": "Cobrança desmarcada da fatura" }`.
 
 ---
 
@@ -1315,6 +1383,8 @@ Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de
 | POST | `/PaymentMethods` | 🔒 |
 | PUT | `/PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | 🔒 |
 | DELETE | `/PaymentMethods/IdPaymentMethod=:IdPaymentMethod` | 🔒 |
+| POST | `/PaymentMethods/IdPaymentMethod=:Id/payInvoice` | 🔒 |
+| POST | `/PaymentMethods/IdPaymentMethod=:Id/unpayInvoice` | 🔒 |
 | GET | `/Categories` | 🔒 |
 | POST | `/Categories` | 🔒 |
 | PUT | `/Categories/IdCategory=:IdCategory` | 🔒 |
@@ -1343,6 +1413,8 @@ Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de
 | GET | `/ExpensePayments` | 🔒 |
 | POST | `/ExpensePayments/IdExpensePayment=:Id/pay` | 🔒 |
 | POST | `/ExpensePayments/IdExpensePayment=:Id/unpay` | 🔒 |
+| POST | `/ExpensePayments/IdExpensePayment=:Id/charge` | 🔒 |
+| POST | `/ExpensePayments/IdExpensePayment=:Id/uncharge` | 🔒 |
 | GET | `/Budgets` | 🔒 |
 | POST | `/Budgets` | 🔒 |
 | PUT | `/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
@@ -1371,6 +1443,39 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-06 — O cartão de crédito ganha fatura, e `Paid` para de mentir
+
+🔴 **Quebra** nas seções 11 e 12, 🟢 **adição** nas seções 6 e 12. **É a mudança mais visível desta leva** — a ação da linha de cartão, na tela de Gastos, muda de significado.
+
+**O problema que ela conserta: o saldo da conta estava errado.** `Paid` significava duas coisas conforme a forma de pagamento. No pix e no débito quer dizer "o dinheiro saiu da conta" — e sai mesmo. No cartão, marcar uma perna como paga **não tira dinheiro de conta nenhuma**: quem tira é o pagamento da fatura, semanas depois. E como só existia o `pay` de **uma perna por vez**, ninguém marcava as 40 compras de uma fatura: as pernas ficavam `pending` para sempre e **o saldo nunca descia**, subindo mês a mês enquanto a conta real caía.
+
+São **três fatos**, e dois deles dividiam o mesmo booleano:
+
+| Fato | Pergunta | Onde vive agora |
+|---|---|---|
+| prevista | "a Netflix vai cobrar dia 15" | a ocorrência do gasto fixo, que já existia |
+| **entrou na fatura** | "cobrou mesmo? veio no valor certo?" | **`Charged`/`ChargedAt`** — novo |
+| **fatura paga** | "o dinheiro saiu da conta" | `Paid`/`PaidAt`, escrito só pelo **`payInvoice`** no cartão |
+
+🟢 **Quatro rotas novas.** `POST /ExpensePayments/IdExpensePayment=:Id/charge` e `/uncharge` (seção 12) marcam que a cobrança entrou na fatura — **sem body, e sem mexer em saldo nenhum**. `POST /PaymentMethods/IdPaymentMethod=:Id/payInvoice` e `/unpayInvoice` (seção 6) recebem `{ "DueDate" }` e quitam a **fatura inteira**.
+
+**A fatura não é cadastro, é consulta:** não há tabela nem id de fatura. Todas as pernas de um ciclo compartilham o **mesmo `DueDate` exato**, então a fatura é `(IdPaymentMethod, DueDate)` — pegue o `DueDate` da perna e mande de volta. A resposta traz `Payments`, quantas pernas mudaram; **repetir é inofensivo** (as já pagas são puladas), o que resolve lançar hoje uma compra esquecida de uma fatura já paga.
+
+🔴 **`pay`/`unpay` recusam perna de cartão** (`406`, com a `msg` apontando o `payInvoice`). 🔴 **`Paid: true` no `POST /Expenses` com forma `credit_card` é `406`.** Fora do cartão os dois seguem exatamente como estavam — inclusive parcelado em carnê ou crediário, que continua sendo quitado parcela a parcela.
+
+**Ação do front, e é trabalho de verdade:**
+
+1. **A ação da linha de cartão troca de rota e de rótulo.** Onde ela dizia "quitar" e chamava `pay`, passa a dizer **"entrou na fatura"** e chamar `charge`. O botão não some — ele para de mentir. Para o usuário é troca de rótulo, não de gesto.
+2. **Ganhe uma ação de fatura**, por cartão e por vencimento, chamando `payInvoice`. É ela que faz o saldo descer.
+3. **Não ofereça `Paid` no formulário de lançamento quando a forma escolhida for cartão** — ele agora é recusado.
+4. Depois de qualquer uma das duas, **releia `GET /Accounts`**: o `Balance` é somado dos lançamentos a cada leitura.
+
+🟢 **A perna ganha três campos na resposta:** `Charged`, `ChargedAt` e **`CompetenceDate`**. `Charged` é **`null` fora do cartão** (é assim que você sabe se a linha tem botão de conferência). `CompetenceDate` é a data em que a perna pesa — `DueDate` quando existe, senão a data do gasto —, congelada no lançamento; é por ela que o saldo, o `Spent` do orçamento e `GET /ExpensePayments` recortam o mês. Nenhuma dessas três é aceita em corpo nenhum.
+
+**Nada mudou de valor:** a `CompetenceDate` é exatamente o `coalesce(DueDate, ExpenseDate)` que as consultas já calculavam — nenhum número da tela muda por causa dela. E `Expenses.Status` continua derivado só do `Paid`: uma compra no cartão vira `paid` quando a fatura for paga, e a de 6× depois das seis. Que é a verdade.
+
+**De brinde:** com `Charged` dá para responder o que nada respondia — "fatura de outubro: 1.230 previstos, 890 já lançados", a diferença entre o esperado e o que o cartão já registrou.
 
 ### 2026-09-05 — `/Budgets`: o teto agora pode ser **de uma pessoa**, não só de uma categoria
 

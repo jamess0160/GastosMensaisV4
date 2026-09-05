@@ -1,6 +1,6 @@
 import Joi from "joi"
 import { joiController } from "root/Utils/joiController"
-import { color } from "root/Utils/joiSchemas"
+import { color, isoDate } from "root/Utils/joiSchemas"
 
 const day = Joi.number().integer().min(1).max(31)
 
@@ -86,6 +86,24 @@ class Schema {
             IdPaymentMethod: Joi.number().required(),
         })),
     ]
+
+    //  A fatura é identificada pelo **vencimento**, não por um id: ela não é linha de tabela
+    //  nenhuma. O DueDate é o mesmo que veio na perna, em GET /ExpensePayments.
+    public readonly payInvoice = [
+        joiController.validateParams(Joi.object({
+            IdPaymentMethod: Joi.number().required(),
+        })),
+        joiController.validateBody(Joi.object({
+            DueDate: isoDate.required(),
+        })),
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+            /** Quantas pernas mudaram de estado — zero quando a fatura já estava assim. */
+            Payments: Joi.number().required(),
+        })),
+    ]
+
+    public readonly unpayInvoice = this.payInvoice
 }
 
 export const PaymentMethods_schema = new Schema()

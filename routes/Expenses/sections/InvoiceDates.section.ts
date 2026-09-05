@@ -19,10 +19,10 @@ class Controller {
      */
     public forPayment(paymentMethod: Database.PaymentMethods, ExpenseDate: string) {
         if (!this.isCreditCard(paymentMethod)) {
-            return { ClosingDate: null, DueDate: null }
+            return this.withCompetence({ ClosingDate: null, DueDate: null }, ExpenseDate)
         }
 
-        return this.creditCardInvoice(paymentMethod, ExpenseDate, 0)
+        return this.withCompetence(this.creditCardInvoice(paymentMethod, ExpenseDate, 0), ExpenseDate)
     }
 
     /**
@@ -35,10 +35,36 @@ class Controller {
      */
     public forInstallment(paymentMethod: Database.PaymentMethods, ExpenseDate: string, index: number) {
         if (!this.isCreditCard(paymentMethod)) {
-            return { ClosingDate: null, DueDate: Utils.addMonthsToDate(ExpenseDate, index) }
+            return this.withCompetence({ ClosingDate: null, DueDate: Utils.addMonthsToDate(ExpenseDate, index) }, ExpenseDate)
         }
 
-        return this.creditCardInvoice(paymentMethod, ExpenseDate, index)
+        return this.withCompetence(this.creditCardInvoice(paymentMethod, ExpenseDate, index), ExpenseDate)
+    }
+
+    /**
+     * **A data em que a perna pesa**, gravada junto com as outras duas.
+     *
+     * Sai daqui, e não de cada escritor, porque todo escritor de perna já espalha o retorno
+     * destes dois métodos (`...InvoiceDates.forPayment(...)`) — assim nenhum deles pode
+     * esquecer a coluna, e o `CompetenceMode` da leva 3 vira uma mudança **nesta linha**, sem
+     * tocar em leitor nenhum.
+     *
+     * Hoje é exatamente o `coalesce(DueDate, ExpenseDate)` que as consultas repetiam: o
+     * vencimento quando existe (a parcela e a fatura do cartão), senão o dia do gasto.
+     */
+    private withCompetence(dates: { ClosingDate: string | null, DueDate: string | null }, ExpenseDate: string) {
+        return { ...dates, CompetenceDate: dates.DueDate ?? ExpenseDate }
+    }
+
+    /**
+     * O estado inicial do `Charged` de uma perna: `false` no cartão, **nulo fora dele**.
+     *
+     * Nulo porque não há fatura em que entrar, exatamente como as datas — e é essa nulidade que
+     * as rotas leem depois para saber se a perna é de cartão, sem reler a forma de pagamento
+     * (que pode ter sido arquivada nesse meio-tempo).
+     */
+    public initialCharged(paymentMethod: Database.PaymentMethods) {
+        return paymentMethod.Kind === "credit_card" ? false : null
     }
 
     /**

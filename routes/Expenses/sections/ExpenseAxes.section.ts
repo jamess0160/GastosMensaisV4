@@ -50,9 +50,32 @@ class Controller {
             })
         }
 
+        this.assertPaidOnlyOffCreditCard(payments, byId)
+
         this.assertClosesWithTotal(TotalValue, payments.map((payment) => payment.Value), "das formas de pagamento")
 
         return byId
+    }
+
+    //  **No cartão de crédito, `Paid` não vem do cliente.**
+    //
+    //  Marcar como paga uma perna de cartão no lançamento é dizer que o dinheiro saiu da conta —
+    //  e ele não saiu: quem tira é o pagamento da fatura, semanas depois. Era exatamente isso
+    //  que deixava o saldo errado, e o argumento não é de modelagem, é do mundo: **não se paga
+    //  uma compra isolada da fatura.** Nenhum emissor oferece isso.
+    //
+    //  Fora do cartão o `Paid: true` no lançamento continua valendo, e é o caso comum: o débito
+    //  e o pix saem no ato.
+    private assertPaidOnlyOffCreditCard(payments: ExpensesNamespace.PaymentPayload[], byId: Map<number, Database.PaymentMethods>) {
+        let invalid = payments.filter((payment) => payment.Paid && byId.get(payment.IdPaymentMethod)?.Kind === "credit_card")
+
+        if (!invalid.length) return
+
+        throw new APIError({
+            msg: "Compra no cartão de crédito não nasce quitada: ela é quitada com a fatura.",
+            status: 406,
+            data: { invalid: invalid.map((payment) => payment.IdPaymentMethod) },
+        })
     }
 
     //  O eixo analítico é opcional: gasto que não se reparte não precisa de rateio nenhum.

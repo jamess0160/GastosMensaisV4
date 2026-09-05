@@ -23,10 +23,10 @@ import { Database } from "root/Utils/database"
 //  (`< primeiro dia do mês seguinte`), como em BudgetSpent: não precisa saber quantos dias tem
 //  o mês, e o dia 31 não escapa de um `between` mal montado.
 //
-//  A data que vale é a do lançamento, a mesma das listagens da tela — `CompetenceDate` na
-//  entrada, `coalesce(DueDate, ExpenseDate)` na perna de gasto (a parcela sai na data da
-//  fatura, não na da compra). Não é `ReceivedAt`/`PaidAt`: aqueles são o instante do clique,
-//  então quitar hoje a fatura de setembro jogaria a saída no mês errado.
+//  A data que vale é a do lançamento, a mesma das listagens da tela — `CompetenceDate` nos dois
+//  lados: na entrada e na perna de gasto (onde ela é o vencimento da fatura, não o dia da
+//  compra). Não é `ReceivedAt`/`PaidAt`: aqueles são o instante do clique, então quitar hoje a
+//  fatura de setembro jogaria a saída no mês errado.
 //
 //  Recebe a lista de contas e devolve um mapa: são três consultas agrupadas, não três por
 //  conta, senão o GET com dez contas viraria trinta consultas.
@@ -117,9 +117,8 @@ class Controller {
             .whereIn("PaymentMethods.IdAccount", ids)
             .where("ExpensePayments.Paid", true)
             .whereNot("Expenses.Status", "canceled")
-            //  A mesma data de saída de BudgetSpent, e identificadores entre aspas: o Postgres
-            //  dobra para minúsculo sem elas.
-            .whereRaw('coalesce("ExpensePayments"."DueDate", "Expenses"."ExpenseDate") < ?', [NextMonth])
+            //  A coluna congelada no lançamento, e não mais o coalesce repetido em cada leitor.
+            .where("ExpensePayments.CompetenceDate", "<", NextMonth)
             .groupBy("PaymentMethods.IdAccount") as Array<{ IdAccount: number, Total: number }>
 
         return new Map(rows.map((row) => [row.IdAccount, Number(row.Total)]))

@@ -530,6 +530,8 @@ describe("Expenses", () => {
         })
 
         //  Quitar uma parcela não torna a compra paga: o Status derivado resolve sozinho
+        //  No cartão quem quita é a **fatura**, uma por vez: cada parcela cai na sua, e o gasto
+        //  só vira 'paid' quando a última delas for paga.
         it("só fica pago depois da última parcela quitada", async () => {
             let workspace = await buildWorkspace()
             let card = await createCard(workspace)
@@ -544,12 +546,39 @@ describe("Expenses", () => {
             let payments = await findPayments(created.IdExpense)
 
             for (let index = 0; index < payments.length; index++) {
-                await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payments[index].IdExpensePayment}/pay`)
+                await workspace.client.post(`/PaymentMethods/IdPaymentMethod=${card}/payInvoice`, { DueDate: payments[index].DueDate })
 
                 let expected = index === payments.length - 1 ? "paid" : "pending"
 
                 expect((await findExpense(created.IdExpense)).Status).toBe(expected)
             }
+        })
+
+        //  **Compra no cartão não nasce quitada.** Marcar Paid no lançamento diz que o dinheiro
+        //  saiu da conta, e ele não saiu: quem tira é o pagamento da fatura, semanas depois. Era
+        //  exatamente isso que deixava o saldo errado.
+        it("recusa Paid no lançamento quando a forma é cartão de crédito", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            let response = await workspace.client.post(`/Expenses`, buildBody(workspace, {
+                Payments: [{ IdPaymentMethod: card, Value: 100, Paid: true }],
+            }))
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Fora do cartão continua valendo, e é o caso comum: débito e pix saem no ato
+        it("segue aceitando Paid no lançamento em débito", async () => {
+            let workspace = await buildWorkspace()
+
+            let created = await createExpense(workspace, {
+                Payments: [{ IdPaymentMethod: workspace.IdDebit, Value: 100, Paid: true }],
+            })
+
+            expect((await findPayments(created.IdExpense))[0].Paid).toBe(true)
+            //  E fora do cartão o Charged é nulo: não há fatura em que a cobrança possa entrar
+            expect((await findPayments(created.IdExpense))[0].Charged).toBeNull()
         })
     })
 
@@ -1132,8 +1161,12 @@ describe("Expenses", () => {
             //  Nada quitado ainda: a compra no cartão não tirou dinheiro da conta
             expect(await balanceOf(flowClient, account.body.IdAccount)).toBe(4600)
 
-            //  Quita a primeira parcela: só ela sai do saldo, e o gasto continua pendente
-            expect((await flowClient.post(`/ExpensePayments/IdExpensePayment=${detail.body.Payments[0].IdExpensePayment}/pay`)).status).toBe(200)
+            //  Paga a **fatura** de agosto: só a parcela dela sai do saldo, e o gasto continua
+            //  pendente. No cartão a perna sozinha não quita — quem quita é a fatura.
+            let invoice = await flowClient.post(`/PaymentMethods/IdPaymentMethod=${card.body.IdPaymentMethod}/payInvoice`, { DueDate: "2026-08-28" })
+
+            expect(invoice.status).toBe(200)
+            expect(invoice.body.Payments).toBe(1)
             expect(await balanceOf(flowClient, account.body.IdAccount)).toBe(4500)
             expect((await flowClient.get(`/Expenses/IdExpense=${notebook.body.IdExpense}`)).body.Status).toBe("pending")
 

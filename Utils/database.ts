@@ -309,6 +309,32 @@ export namespace Database {
         /** Fechamento da fatura em que esta perna caiu. Nulo fora de cartao. */
         ClosingDate: CalendarDate | null
         DueDate: CalendarDate | null
+        /**
+         * **A data em que a perna PESA** - congelada no lancamento com o mesmo valor que as
+         * consultas calculavam antes: coalesce(DueDate, ExpenseDate).
+         *
+         * E a coluna de filtro do saldo da conta, do comprometido do orcamento e da lista de
+         * pernas do periodo. Congelada, e nao calculada, para que virar a chave do cartao
+         * (CompetenceMode) nao reescreva mes fechado.
+         */
+        CompetenceDate: CalendarDate
+        /**
+         * **A cobranca entrou na fatura** - afirmacao do usuario olhando o app do cartao, nunca
+         * derivada de "a data ja passou": a lista e olhada justamente para achar onde a
+         * realidade discordou da previsao, e uma marcacao derivada da data nunca discorda.
+         *
+         * NULO fora do cartao, pela mesma razao que ClosingDate e DueDate ficam - e e essa
+         * nulidade que diz, para qualquer leitor, se a perna e de cartao.
+         *
+         * Nao confundir com Paid: marcar Charged nao move saldo nenhum.
+         */
+        Charged: boolean | null
+        ChargedAt: Datetime | null
+        /**
+         * **O dinheiro saiu da conta.** No pix e no debito quem escreve e o cliente no
+         * lancamento ou o pay da linha; **no cartao, so o payInvoice** - nao se paga uma compra
+         * isolada da fatura.
+         */
         Paid: boolean
         PaidAt: Datetime | null
         CreatedAt: Datetime

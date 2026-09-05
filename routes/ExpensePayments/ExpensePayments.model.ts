@@ -13,11 +13,6 @@ import { ExpensePaymentsNamespace } from "./sections/types"
 //  não têm rota e por isso ficam como model dentro de routes/Expenses.
 export class class_ExpensePayments_model extends BaseModel {
 
-    //  A data em que a perna **pesa**: o vencimento da fatura quando existe, senão o dia do
-    //  gasto. Escrita uma vez só porque ela aparece três vezes na mesma consulta (dois filtros
-    //  e a ordenação) e as três têm que ser a mesma expressão.
-    private static readonly competenceDate = 'coalesce("ExpensePayments"."DueDate", "Expenses"."ExpenseDate")'
-
     private readonly baseQuery = this.KnexConnection.select("*").from<Database.ExpensePayments>("ExpensePayments").orderBy("InstallmentNumber").orderBy("IdExpensePayment")
 
     getByExpense(IdExpense: number) {
@@ -27,26 +22,24 @@ export class class_ExpensePayments_model extends BaseModel {
     //  **As pernas que caem num período** — a lista do que *sai* no mês, ao contrário de
     //  GET /Expenses, que é a lista do que foi *comprado*.
     //
-    //  A data comparada é `coalesce(DueDate, ExpenseDate)`, a mesma do BudgetSpent: no cartão
-    //  vale o vencimento da fatura em que a perna caiu, e fora dele o dia da compra, porque pix
-    //  e débito não têm fatura. É esse coalesce que faz a 6ª parcela de uma compra de março
-    //  aparecer em agosto — filtrando por ExpenseDate ela sumiria do mês em que pesa.
+    //  A data comparada é a `CompetenceDate` da perna, a mesma do BudgetSpent e do saldo: no
+    //  cartão o vencimento da fatura em que ela caiu, fora dele o dia da compra. É ela que faz a
+    //  6ª parcela de uma compra de março aparecer em agosto — filtrando por ExpenseDate a
+    //  parcela sumiria do mês em que pesa.
     //
-    //  O join com Expenses é obrigatório e não é só pelo coalesce: é ele que deixa excluir o
-    //  gasto cancelado, que não pesa em mês nenhum. A ordenação sai pela mesma expressão do
-    //  filtro, senão a lista viria na ordem da compra e não na do desembolso.
+    //  O join com Expenses continua obrigatório mesmo depois de a coluna existir: é ele que
+    //  deixa excluir o gasto cancelado, que não pesa em mês nenhum.
     getByPeriod(IdWorkspace: number, filters: ExpensePaymentsNamespace.ListFilters = {}) {
         let query = this.KnexConnection
             .select("ExpensePayments.*")
             .from<Database.ExpensePayments>("ExpensePayments")
             .innerJoin("Expenses", "Expenses.IdExpense", "ExpensePayments.IdExpense")
             .where("ExpensePayments.IdWorkspace", IdWorkspace)
-            .orderByRaw(`${class_ExpensePayments_model.competenceDate} asc`)
+            .orderBy("ExpensePayments.CompetenceDate")
             .orderBy("ExpensePayments.IdExpensePayment")
 
-        //  Identificadores entre aspas: o Postgres dobra para minúsculo sem elas.
-        if (filters.From) query = query.whereRaw(`${class_ExpensePayments_model.competenceDate} >= ?`, [filters.From])
-        if (filters.To) query = query.whereRaw(`${class_ExpensePayments_model.competenceDate} <= ?`, [filters.To])
+        if (filters.From) query = query.where("ExpensePayments.CompetenceDate", ">=", filters.From)
+        if (filters.To) query = query.where("ExpensePayments.CompetenceDate", "<=", filters.To)
 
         //  A mesma regra que GET /Expenses ganhou: as duas listas do mesmo mês não podem
         //  discordar sobre o que contêm.
@@ -67,11 +60,48 @@ export class class_ExpensePayments_model extends BaseModel {
         return this.KnexConnection.update({ ...record, UpdatedAt: this.KnexConnection.fn.now() }).from("ExpensePayments").where("IdExpensePayment", IdExpensePayment)
     }
 
+    //  **As pernas de uma fatura.** A fatura já existe nos dados e não é cadastro nenhum: todas
+    //  as pernas de um mesmo ciclo compartilham o **mesmo DueDate exato**, porque o InvoiceDates
+    //  calcula o vencimento a partir do DueDay do cartão — duas compras do mesmo ciclo caem no
+    //  mesmo dia do mesmo mês. Uma fatura é `(IdPaymentMethod, DueDate)`, uma consulta.
+    //
+    //  O join com Expenses exclui o cancelado: cancelar um gasto já é o estorno dele, e pagar a
+    //  fatura não pode tirar da conta o dinheiro de uma compra que não existe mais.
+    getByInvoice(IdWorkspace: number, IdPaymentMethod: number, DueDate: string) {
+        return this.KnexConnection
+            .select("ExpensePayments.*")
+            .from<Database.ExpensePayments>("ExpensePayments")
+            .innerJoin("Expenses", "Expenses.IdExpense", "ExpensePayments.IdExpense")
+            .where("ExpensePayments.IdWorkspace", IdWorkspace)
+            .where("ExpensePayments.IdPaymentMethod", IdPaymentMethod)
+            .where("ExpensePayments.DueDate", DueDate)
+            .whereNot("Expenses.Status", "canceled")
+            .orderBy("ExpensePayments.IdExpensePayment")
+    }
+
     //  Quitar é por perna: a compra em 6x precisa saber qual parcela já foi paga. Esse detalhe
     //  nunca sobe para o gasto como status parcial — quem o resume é o ExpenseStatus.
     pay(IdExpensePayment: number, Paid: boolean) {
         return this.KnexConnection
             .update({ Paid, PaidAt: Paid ? this.KnexConnection.fn.now() : null, UpdatedAt: this.KnexConnection.fn.now() })
+            .from("ExpensePayments")
+            .where("IdExpensePayment", IdExpensePayment)
+    }
+
+    //  O `pay` em lote, da fatura inteira. Um UPDATE só para as 40 pernas: quarenta chamadas
+    //  seriam quarenta janelas em que o saldo estaria meio pago.
+    payMany(ids: number[], Paid: boolean) {
+        return this.KnexConnection
+            .update({ Paid, PaidAt: Paid ? this.KnexConnection.fn.now() : null, UpdatedAt: this.KnexConnection.fn.now() })
+            .from("ExpensePayments")
+            .whereIn("IdExpensePayment", ids)
+    }
+
+    //  "Entrou na fatura" — outro fato, outra coluna. Não move saldo e não alimenta derivado
+    //  nenhum: o Status do gasto continua saindo só do Paid.
+    charge(IdExpensePayment: number, Charged: boolean) {
+        return this.KnexConnection
+            .update({ Charged, ChargedAt: Charged ? this.KnexConnection.fn.now() : null, UpdatedAt: this.KnexConnection.fn.now() })
             .from("ExpensePayments")
             .where("IdExpensePayment", IdExpensePayment)
     }

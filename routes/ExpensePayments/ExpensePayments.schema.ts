@@ -35,6 +35,11 @@ class Schema {
     ]
 
     public readonly unpay = this.pay
+
+    //  Mesma forma do pay: um verbo sobre a perna do caminho, sem corpo.
+    public readonly charge = this.pay
+
+    public readonly uncharge = this.pay
 }
 
 export const ExpensePayments_schema = new Schema()

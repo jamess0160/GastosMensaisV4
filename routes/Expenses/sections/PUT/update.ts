@@ -78,17 +78,25 @@ export class Update {
 
                 await ExpensePayments_model.deleteByExpense(IdExpense)
 
-                await ExpensePayments_model.create(body.Payments.map((payment) => ({
-                    IdWorkspace,
-                    IdExpense,
-                    IdPaymentMethod: payment.IdPaymentMethod,
-                    Value: payment.Value,
-                    //  Refeitas a partir da data nova: mudar a data da compra pode mudar a
-                    //  fatura em que ela cai. À vista, porque o PUT não mexe em parcela — a
-                    //  compra parcelada é recusada logo acima.
-                    ...InvoiceDates.forPayment(methods.get(payment.IdPaymentMethod)!, body.ExpenseDate),
-                    Paid: Boolean(payment.Paid),
-                })))
+                await ExpensePayments_model.create(body.Payments.map((payment) => {
+                    let method = methods.get(payment.IdPaymentMethod)!
+
+                    return {
+                        IdWorkspace,
+                        IdExpense,
+                        IdPaymentMethod: payment.IdPaymentMethod,
+                        Value: payment.Value,
+                        //  Refeitas a partir da data nova: mudar a data da compra pode mudar a
+                        //  fatura em que ela cai — e com ela a CompetenceDate. À vista, porque o
+                        //  PUT não mexe em parcela: a compra parcelada é recusada logo acima.
+                        ...InvoiceDates.forPayment(method, body.ExpenseDate),
+                        //  A perna é substituída inteira, então o "entrou na fatura" recomeça —
+                        //  a fatura pode ter mudado com a data nova, e a conferência é sobre a
+                        //  fatura em que a perna caiu agora.
+                        Charged: InvoiceDates.initialCharged(method),
+                        Paid: Boolean(payment.Paid),
+                    }
+                }))
             }
 
             if (body.Persons) {

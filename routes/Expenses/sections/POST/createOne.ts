@@ -79,22 +79,32 @@ export class CreateOne {
                 Value,
                 InstallmentNumber: index + 1,
                 InstallmentTotal: body.InstallmentTotal!,
-                //  Cada parcela vence um mês depois da anterior — na fatura, se for cartão.
+                //  Cada parcela vence um mês depois da anterior — na fatura, se for cartão. Sai
+                //  daqui também a CompetenceDate, o mês em que a parcela pesa.
                 ...InvoiceDates.forInstallment(method, options.ExpenseDate, index),
-                //  Parcela nasce em aberto: quitar é perna a perna, pela rota do pagamento.
+                //  Nulo fora do cartão: não há fatura em que a cobrança possa entrar.
+                Charged: InvoiceDates.initialCharged(method),
+                //  Parcela nasce em aberto: quitar é perna a perna (ou, no cartão, pela fatura).
                 Paid: false,
             }))
         }
 
-        return body.Payments.map((payment) => ({
-            IdPaymentMethod: payment.IdPaymentMethod,
-            Value: payment.Value,
-            InstallmentNumber: null,
-            InstallmentTotal: null,
-            //  Nulas fora do cartão: pix e débito saem na hora, não têm fatura.
-            ...InvoiceDates.forPayment(options.methods.get(payment.IdPaymentMethod)!, options.ExpenseDate),
-            Paid: options.forceUnpaid ? false : Boolean(payment.Paid),
-        }))
+        return body.Payments.map((payment) => {
+            let method = options.methods.get(payment.IdPaymentMethod)!
+
+            return {
+                IdPaymentMethod: payment.IdPaymentMethod,
+                Value: payment.Value,
+                InstallmentNumber: null,
+                InstallmentTotal: null,
+                //  Nulas fora do cartão: pix e débito saem na hora, não têm fatura.
+                ...InvoiceDates.forPayment(method, options.ExpenseDate),
+                Charged: InvoiceDates.initialCharged(method),
+                //  No cartão o Paid nunca vem do corpo — o ExpenseAxes recusa antes de chegar
+                //  aqui, e quem o escreve é o payInvoice.
+                Paid: options.forceUnpaid ? false : Boolean(payment.Paid),
+            }
+        })
     }
 }
 

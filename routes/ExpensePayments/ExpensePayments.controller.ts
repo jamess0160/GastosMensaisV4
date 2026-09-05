@@ -1,5 +1,6 @@
 import { Request, Response } from "express"
 import { GetByWorkspace } from "./sections/GET/getByWorkspace"
+import { Charge } from "./sections/POST/charge"
 import { Pay } from "./sections/POST/pay"
 
 class Controller {
@@ -18,6 +19,16 @@ class Controller {
     //  tiraria dinheiro da conta sem volta.
     unpay = async (req: Request, res: Response) => {
         res.json(await new Pay().run(res.locals.IdWorkspace, Number(req.params.IdExpensePayment), res.locals.IdUser, false))
+    }
+
+    //  Outro fato, outro verbo: "entrou na fatura" não é "o dinheiro saiu da conta". Este par
+    //  não move saldo nenhum.
+    charge = async (req: Request, res: Response) => {
+        res.json(await new Charge().run(res.locals.IdWorkspace, Number(req.params.IdExpensePayment), res.locals.IdUser, true))
+    }
+
+    uncharge = async (req: Request, res: Response) => {
+        res.json(await new Charge().run(res.locals.IdWorkspace, Number(req.params.IdExpensePayment), res.locals.IdUser, false))
     }
 }
 

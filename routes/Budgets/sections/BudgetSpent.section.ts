@@ -10,14 +10,13 @@ import { Utils } from "root/Utils/Utils"
 //     agosto: come 100 em cada um dos seis meses, que é como o dinheiro realmente sai e como
 //     a pessoa orça ("a parcela do notebook pesa 100 por mês"). Somar `Expenses.TotalValue` na
 //     data da compra estouraria o teto de agosto por uma dívida que é de meio ano.
-//  2. **A data que vale é a da saída:** `DueDate` quando existe (parcela, e a fatura do cartão),
-//     senão a data do gasto — pix e débito à vista saem no ato e não têm vencimento.
+//  2. **A data que vale é a da saída:** a `CompetenceDate` da perna, congelada no lançamento —
+//     o vencimento quando existe (parcela, e a fatura do cartão), senão a data do gasto, já que
+//     pix e débito à vista saem no ato e não têm vencimento.
 //  3. **Conta pago e pendente, ao contrário do saldo.** Saldo é realizado; orçamento é
 //     comprometido. O gasto lançado e ainda não quitado já consumiu o teto do mês — é
 //     exatamente o que a pessoa precisa ver antes de gastar de novo. Só o cancelado sai.
 class Controller {
-
-    private static readonly competenceDate = 'coalesce("ExpensePayments"."DueDate", "Expenses"."ExpenseDate")'
 
     public async getByCategories(IdWorkspace: number, ReferenceMonth: string, categories: number[]) {
         let spent = new Map<number, number>()
@@ -37,9 +36,8 @@ class Controller {
             .whereIn("Expenses.IdCategory", categories)
             //  Gasto cancelado não compromete teto nenhum, como não move saldo.
             .whereNot("Expenses.Status", "canceled")
-            //  Identificadores entre aspas: o Postgres dobra para minúsculo sem elas.
-            .whereRaw(`${Controller.competenceDate} >= ?`, [ReferenceMonth])
-            .whereRaw(`${Controller.competenceDate} < ?`, [nextMonth])
+            .where("ExpensePayments.CompetenceDate", ">=", ReferenceMonth)
+            .where("ExpensePayments.CompetenceDate", "<", nextMonth)
             .groupBy("Expenses.IdCategory") as Array<{ IdCategory: number, Total: number }>
 
         for (let row of rows) {
@@ -84,8 +82,8 @@ class Controller {
             .where("Expenses.IdWorkspace", IdWorkspace)
             .whereIn("ExpensePersons.IdPerson", persons)
             .whereNot("Expenses.Status", "canceled")
-            .whereRaw(`${Controller.competenceDate} >= ?`, [ReferenceMonth])
-            .whereRaw(`${Controller.competenceDate} < ?`, [nextMonth])
+            .where("ExpensePayments.CompetenceDate", ">=", ReferenceMonth)
+            .where("ExpensePayments.CompetenceDate", "<", nextMonth)
             .groupBy("ExpensePersons.IdPerson") as Array<{ IdPerson: number, Total: number }>
 
         for (let row of rows) {
