@@ -5,7 +5,6 @@ import { AuthLayout, authStyles as styles } from "@/ui/AuthLayout";
 import { Button } from "@/ui/primitives";
 import { ConfirmDialog } from "@/ui/overlay";
 import { FormField, Input, PasswordInput } from "@/ui/form";
-import { clearSignedOut, markSignedOut } from "@/app/session";
 import { IconFingerprint } from "@/ui/icons";
 import { LoginController, type LoginContext } from "./controller";
 import { readDeviceKey, writeDeviceKey } from "@/lib/deviceKey";
@@ -37,9 +36,8 @@ export function Login() {
             },
             finishSignIn() {
                 setPending(false);
-                // A sessão nova é o único momento em que a trava de saída
-                // cai — ver `markSignedOut` em src/app/session.tsx.
-                clearSignedOut();
+                // O cache é do usuário anterior: entrar não pode mostrar
+                // o mês de quem estava logado antes.
                 queryClient.clear();
                 navigate("/", { replace: true });
             },
@@ -56,17 +54,15 @@ export function Login() {
         [deviceKey, email, password, navigate, queryClient],
     );
 
-    /* Chegar ao login é sair.
+    /* Chegar ao login limpa o que ficou na memória da tela anterior.
      *
-     *  Sem rota de logout o cookie sobrevive, e sem esta trava abrir
-     *  /login com sessão de pé mostrava o formulário mas mantinha o app
-     *  logado por trás — voltar para "/" entrava direto na conta
-     *  anterior. Marcar aqui cobre os dois caminhos que o usuário chama
-     *  de "sair": o botão do menu e digitar o endereço do login. */
+     *  Quem encerra a SESSÃO é `POST /Users/logout`, no botão "Sair" —
+     *  não esta tela: abrir /login por engano com a sessão de pé não pode
+     *  deslogar ninguém. O que se limpa aqui é só o cache do cliente, que
+     *  não é de quem está prestes a entrar. */
     useEffect(() => {
-        markSignedOut();
         queryClient.clear();
-        // Só na montagem: é a chegada à tela que desconecta.
+        // Só na montagem: é a chegada à tela que limpa.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

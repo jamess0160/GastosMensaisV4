@@ -4,7 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { MonthProvider } from "./monthScope";
 import { ScreenRoutes, useScreenLocation } from "./modalRoute";
-import { isSignedOut, SessionProvider, useSessionQuery, useUnauthorizedRedirect } from "./session";
+import { SessionProvider, useSessionQuery, useUnauthorizedRedirect } from "./session";
 import { ApiUnauthorizedError } from "@/api/client";
 
 /** Guard + chassi das rotas autenticadas. Quem decide se há sessão é o
@@ -14,13 +14,9 @@ export function AppShell() {
     const session = useSessionQuery();
     const screenAt = useScreenLocation();
 
-    /* Saiu pelo menu (ou passou pelo login): o cookie pode continuar
-       válido, mas a sessão do cliente não. Sem esta linha, "Sair" só
-       recarregaria a mesma tela logada — não há rota de logout. */
-    if (isSignedOut()) {
-        return <Navigate to="/login" replace />;
-    }
-
+    /* Quem decide se há sessão é o `getSelf`, e só ele: desde que
+       `POST /Users/logout` existe, sair apaga o cookie de verdade e o
+       401 chega aqui sozinho. Não há mais trava local a consultar. */
     if (session.isPending) {
         return <div className={styles.center}>Carregando…</div>;
     }

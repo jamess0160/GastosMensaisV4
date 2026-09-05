@@ -19,6 +19,19 @@ class Connection {
         return data;
     }
 
+    /** Público, sem body. Sobrescreve o cookie `token` com um
+     *  `Set-Cookie` expirado — é a ÚNICA forma de encerrar a sessão:
+     *  o cookie é `HttpOnly` e o `document.cookie` não o alcança.
+     *
+     *  NÃO EXIGE SESSÃO DE PROPÓSITO: chamar sem cookie, com cookie
+     *  expirado ou com token inválido responde 200 do mesmo jeito. Um
+     *  logout que respondesse 401 travaria o botão "Sair" justamente no
+     *  caso em que o usuário mais quer sair. */
+    async logout(): Promise<{ msg: string }> {
+        const { data } = await http.post<{ msg: string }>(`${this.route}/logout`);
+        return data;
+    }
+
     /** `Password` nunca sai na resposta. */
     async getSelf(): Promise<ApiTypes.User> {
         const { data } = await http.get<ApiTypes.User>(`${this.route}/getSelf`);

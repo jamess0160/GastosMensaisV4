@@ -15,7 +15,7 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 
 | # | Pendência | Tipo | Bloqueia |
 |---|---|---|---|
-| 1 | [Logout](#1-logout) | Segurança | Uso em computador compartilhado |
+| ~~1~~ | [Logout](#1-logout) | Segurança | ✅ **Entregue** em 04/09 |
 | 2 | [`IdWorkspace` no cadastro](#2-idworkspace-no-cadastro-aceito-sem-convite) | Segurança | Convite / workspace compartilhado |
 | 3 | [Agregados do mês](#3-agregados-do-mês-para-o-dashboard) | Performance | Escala do Dashboard |
 | 4 | [Rotina mensal de orçamento](#4-rotina-mensal-de-orçamento) | Produto | Orçamento sem trabalho manual |
@@ -41,14 +41,35 @@ chamada nova a fazer. O **12** subiu na forma preferida, `GET
 seções deles ficam abaixo como registro do que foi pedido e do que
 subiu; nada nelas é trabalho pendente.
 
-Os itens 1 e 2 são de segurança e valem ser tratados antes do MVP ir ao
-ar. Do 3 ao 9 são cortes conscientes do MVP — o frontend já está
-desenhado para viver sem eles —, e o 11 virou registro histórico quando
-o 15 substituiu a forma dele.
+O **1** também subiu, na forma proposta e com a mesma idempotência: o
+contorno que o cliente mantinha no `localStorage` foi apagado junto. Do
+**2** falta a metade do cliente — o campo perigoso saiu do `POST /Users`
+e entrou o `InviteHash`, mas não há como convidar ninguém pela tela.
+
+Do 3 ao 9 são cortes conscientes do MVP — o frontend já está desenhado
+para viver sem eles —, e o 11 virou registro histórico quando o 15
+substituiu a forma dele. O **17** nasceu da leva 4 e é o único item novo:
+uma divergência entre o changelog e o exemplo de resposta da seção 12.
 
 ---
 
 ## 1. Logout
+
+> ✅ **Entregue em 04/09**, exatamente na forma proposta:
+> `POST /Users/logout`, **público**, sem body, sobrescrevendo o cookie
+> `token` com um `Set-Cookie` expirado. Chamar sem sessão responde `200`
+> do mesmo jeito — é o que impede o botão "Sair" de travar justamente no
+> caso em que o usuário mais quer sair.
+>
+> **O contorno saiu junto.** A trava `gm.session.signedOut` no
+> `localStorage`, o `enabled: !isSignedOut()` da consulta de sessão e a
+> checagem no `AppShell` deixaram de existir; o `Login` parou de marcá-la.
+> Quem diz se há sessão volta a ser só o `getSelf`, e sair agora sai de
+> verdade: apertar "voltar" no navegador ou digitar a URL da home cai no
+> login, porque o `getSelf` responde `401`.
+>
+> Falha de rede não prende ninguém: o cliente limpa o cache e navega
+> para o login de qualquer jeito.
 
 **O problema.** Não existe rota de logout. O cookie `token` é `HttpOnly`,
 então o JavaScript não consegue apagá-lo — é justamente o ponto de ser

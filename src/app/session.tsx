@@ -33,8 +33,6 @@ export function useSessionQuery(): UseQueryResult<ApiTypes.User> {
         retry: (failureCount, error) =>
             !(error instanceof ApiUnauthorizedError) && failureCount < 2,
         staleTime: 5 * 60 * 1000,
-        // Quem saiu não volta pelo cookie que sobrou: ver `markSignedOut`.
-        enabled: !isSignedOut(),
     });
 }
 
@@ -68,54 +66,36 @@ export function useUnauthorizedRedirect() {
     }, [navigate, queryClient]);
 }
 
-/* ── Saída da sessão ──────────────────────────────────────────
-   PENDÊNCIA: o contrato não tem rota de logout, e o cookie é HttpOnly —
-   o JS não consegue apagá-lo. Um `POST /Users/logout` que sobrescreva o
-   cookie com Max-Age=0 resolve de verdade.
+/* ── Saída da sessão ────────────────────────────────────────── */
 
-   Até lá, o cliente guarda a saída: o `getSelf` continuaria respondendo
-   200 com o cookie que ficou, e sem esta trava "sair" só recarregaria a
-   tela logada. A trava vale para o aparelho, e por isso mora no
-   localStorage: um F5 depois de sair tem que continuar fora.
-   ────────────────────────────────────────────────────────────── */
-
-const SIGNED_OUT_KEY = "gm.session.signedOut";
-
-/** Modo privado e storage bloqueado lançam no acesso: sem storage a
- *  trava não existe, e o pior caso é o comportamento antigo. */
-function readFlag(): boolean {
-    try {
-        return window.localStorage.getItem(SIGNED_OUT_KEY) === "1";
-    } catch {
-        return false;
-    }
-}
-
-export const isSignedOut = (): boolean => readFlag();
-
-export function markSignedOut(): void {
-    try {
-        window.localStorage.setItem(SIGNED_OUT_KEY, "1");
-    } catch {
-        /* sem storage, a trava não existe — segue como antes */
-    }
-}
-
-/** Chamado só quando uma sessão NOVA nasce (login por senha ou passkey). */
-export function clearSignedOut(): void {
-    try {
-        window.localStorage.removeItem(SIGNED_OUT_KEY);
-    } catch {
-        /* idem */
-    }
-}
-
+/** Sair de verdade.
+ *
+ *  O cookie `token` é `HttpOnly`: o JavaScript nunca conseguiu apagá-lo,
+ *  e está certo que seja assim. Até a rota existir, o cliente contornava
+ *  com uma trava no `localStorage` que fazia o app se COMPORTAR como
+ *  deslogado enquanto a sessão continuava viva no servidor por 24h — em
+ *  computador compartilhado, sair não saía. A trava saiu junto com o
+ *  contorno: quem encerra a sessão agora é `POST /Users/logout`.
+ *
+ *  A ORDEM IMPORTA e o erro não pode prender ninguém. A rota é pública e
+ *  responde 200 mesmo sem cookie, então não há caso em que o botão
+ *  trave; falha de rede também não pode deixar o usuário na tela logada,
+ *  e por isso limpar o cache e navegar acontecem de qualquer jeito. */
 export function useSignOut() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+
     return () => {
-        markSignedOut();
-        queryClient.clear();
-        navigate("/login", { replace: true });
+        void (async () => {
+            try {
+                await UsersConnection.logout();
+            } catch {
+                /* Sem rede o cookie sobrevive até o `exp`, e não há o que
+                   o cliente possa fazer sobre isso — o que ele não pode é
+                   deixar o usuário preso na sessão anterior. */
+            }
+            queryClient.clear();
+            navigate("/login", { replace: true });
+        })();
     };
 }
