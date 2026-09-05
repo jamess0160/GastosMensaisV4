@@ -364,10 +364,45 @@ export namespace ApiTypes {
         /** Vivem na perna, não no gasto — cada parcela cai numa fatura. */
         ClosingDate: CalendarDate | null;
         DueDate: CalendarDate | null;
+        /** A data em que a perna PESA: `DueDate` quando existe, senão a
+         *  data do gasto. Congelada no lançamento, e é por ela que o
+         *  saldo da conta, o `Spent` do orçamento e
+         *  `GET /ExpensePayments` recortam o mês. Não é aceita em corpo
+         *  nenhum — o servidor a escreve. */
+        CompetenceDate: CalendarDate;
         Paid: boolean;
         PaidAt: DateTime | null;
         CreatedAt: DateTime;
         UpdatedAt: DateTime;
+    }
+
+    /** A perna como `GET /ExpensePayments` a devolve: com o gasto de
+     *  origem e o rateio DELE.
+     *
+     *  ⚠️ `Persons` é o rateio do GASTO, não o da perna. Numa compra de
+     *  600 em 6×, as SEIS pernas trazem o mesmo rateio de 600 — somar
+     *  pessoa a pessoa, perna a perna, dá 3600, e nada estoura: o número
+     *  só fica errado. Quem rateia é `spentByPerson`.
+     *
+     *  A forma de pagamento vem como id, não inteira: ela já chega
+     *  completa em `GET /Accounts`, e repeti-la em cada perna repetiria
+     *  a mesma linha dezenas de vezes na resposta de um mês. Idem a
+     *  pessoa, que sai de `GET /Persons`. E não há tags: quem as mostra
+     *  abre o gasto. */
+    export interface ExpensePaymentRow extends ExpensePayment {
+        Expense: Expense;
+        Persons: ExpensePerson[];
+    }
+
+    /** A lista do que CAI no período — filtra por `CompetenceDate`, e não
+     *  por `ExpenseDate` como `GET /Expenses`. É o que traz a 6ª parcela
+     *  de uma compra de março para o total de agosto. */
+    export interface ExpensePaymentListQuery {
+        From?: CalendarDate;
+        To?: CalendarDate;
+        /** Segue a regra de `GET /Expenses`: sem ele, as pernas de gasto
+         *  cancelado ficam de fora. */
+        IncludeCanceled?: boolean;
     }
 
     /** Eixo analítico: de quem é o custo. NÃO move saldo. */

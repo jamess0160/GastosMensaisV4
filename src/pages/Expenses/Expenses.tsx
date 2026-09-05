@@ -15,7 +15,6 @@ import {
 import {
     useExpenseDetail,
     useInvalidateMovement,
-    useMonthExpenseDetails,
     useMonthExpenses,
     useMonthLegs,
 } from "@/data/month";
@@ -52,7 +51,6 @@ import { CardGroup, CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows, StatusBadge } from "@/ui/states";
 import {
     isLive,
-    legsOf,
     legsOfKind,
     sumMoney,
     totalPaid,
@@ -132,7 +130,6 @@ export function Expenses() {
 
     const expenses = useMonthExpenses(month);
     const monthLegs = useMonthLegs(month);
-    const monthDetails = useMonthExpenseDetails(month);
     const detail = useExpenseDetail(openExpense);
     const categories = useCategories();
     const categoryIndex = useCategoryIndex();
@@ -165,6 +162,25 @@ export function Expenses() {
         [seriesDraft, invalidateMovement],
     );
 
+    /* As pernas do mês, indexadas pelo gasto de origem.
+       É daqui que a linha da tabela tira destino, forma de pagamento e
+       o botão de status — as três coisas que custavam um `get(id)` por
+       gasto do mês.
+
+       Uma linha pode não ter perna nenhuma aqui, e isso é correto: a
+       lista de compras filtra pela data da COMPRA e a de pernas pela
+       data em que ela PESA. Uma compra de 25/08 no cartão que vence em
+       27/09 aparece na lista de agosto e tem perna só em setembro. */
+    const legsByExpense = useMemo(() => {
+        const index = new Map<number, ExpenseLeg[]>();
+        for (const leg of monthLegs.legs) {
+            const found = index.get(leg.expense.IdExpense);
+            if (found) found.push(leg);
+            else index.set(leg.expense.IdExpense, [leg]);
+        }
+        return index;
+    }, [monthLegs.legs]);
+
     /* ── O filtro ──────────────────────────────────────────────
        Um só, aplicado em DOIS conjuntos: a lista de compras (a
        tabela) e as pernas do mês (a faixa de indicadores). São
@@ -172,10 +188,10 @@ export function Expenses() {
        de março pesa em agosto sem estar na lista de agosto —, e é por
        isso que o predicado mora aqui, num lugar só.
 
-       Destino e forma de pagamento vivem no DETALHE, que chega gasto
-       a gasto: enquanto ele não chega, a linha não passa no filtro.
-       Sem detalhe nenhum a lista ficaria vazia e pareceria erro, e é
-       por isso que o filtro só se aplica depois que o detalhe existe. */
+       Destino e forma de pagamento vêm da PERNA, que já chegou junto
+       com o resto: filtrar por eles não espera mais por requisição
+       nenhuma. Uma compra cuja perna cai noutro mês não tem como
+       responder aos dois, e por isso não passa nesses filtros. */
     const matches = useMemo(() => {
         const term = search.trim().toLowerCase();
 
@@ -186,17 +202,17 @@ export function Expenses() {
             if (term && !expense.Description.toLowerCase().includes(term)) return false;
 
             if (idPersons.length > 0 || idMethods.length > 0) {
-                const found = monthDetails.byId.get(expense.IdExpense);
-                if (!found) return false;
+                const found = legsByExpense.get(expense.IdExpense) ?? [];
+                if (found.length === 0) return false;
                 if (
                     idPersons.length > 0 &&
-                    !found.Persons.some((person) => idPersons.includes(person.IdPerson))
+                    !found[0].persons.some((person) => idPersons.includes(person.IdPerson))
                 ) {
                     return false;
                 }
                 if (
                     idMethods.length > 0 &&
-                    !found.Payments.some((payment) => idMethods.includes(payment.IdPaymentMethod))
+                    !found.some((leg) => idMethods.includes(leg.payment.IdPaymentMethod))
                 ) {
                     return false;
                 }
@@ -204,7 +220,7 @@ export function Expenses() {
 
             return true;
         };
-    }, [search, statuses, kinds, idCategories, idPersons, idMethods, monthDetails.byId]);
+    }, [search, statuses, kinds, idCategories, idPersons, idMethods, legsByExpense]);
 
     const rows = useMemo(() => (expenses.data ?? []).filter(matches), [expenses.data, matches]);
 
@@ -268,34 +284,29 @@ export function Expenses() {
        diferentes. O cálculo mora aqui, uma vez: as duas leem daqui. */
     const rowInfo = (row: ApiTypes.Expense) => {
         const category = categoryIndex.get(row.IdCategory);
-        const found = monthDetails.byId.get(row.IdExpense);
 
-        const legs = found ? legsOf(found) : [];
-        const dueThisMonth = legs.filter((leg) => leg.month === month);
+        /* As pernas deste gasto que PESAM no mês exibido — o único
+           universo em que a linha do mês tem o que dizer. Com mais de
+           uma candidata, adivinhar qual quitar seria pior do que não
+           oferecer: o botão apaga e diz por quê. */
+        const legs = legsByExpense.get(row.IdExpense) ?? [];
+        const payable = legs.length === 1 ? legs[0] : null;
 
-        /* Qual perna o botão de status move. `single` e `fixed` têm UMA
-           por definição, e é dela que o status da linha fala — mesmo
-           que ela vença noutro mês. `installment` tem N, e só a do mês
-           visível faz sentido aqui. Com mais de uma candidata, adivinhar
-           qual quitar seria pior do que não oferecer: o botão apaga e
-           diz por quê. */
-        const candidates = row.Kind === "installment" ? dueThisMonth : legs;
-        const payable = candidates.length === 1 ? candidates[0] : null;
-
-        const persons = found?.Persons ?? [];
-        const methods = found?.Payments ?? [];
+        // O rateio é o do GASTO, e vem igual em toda perna dele.
+        const persons = legs[0]?.persons ?? [];
+        const methods = legs.map((leg) => leg.payment);
 
         return {
             category,
             color: category ? categoryColor(category) : "var(--ink-3)",
-            found,
-            dueThisMonth,
+            loaded: !monthLegs.isPending,
+            legs,
             payable,
-            payReason: !found
-                ? "Carregando o detalhe deste gasto…"
-                : candidates.length === 0
-                  ? "Nenhuma parcela deste gasto vence no mês visível"
-                  : candidates.length > 1
+            payReason: monthLegs.isPending
+                ? "Carregando as parcelas do mês…"
+                : legs.length === 0
+                  ? "Nenhuma parcela deste gasto pesa no mês exibido"
+                  : legs.length > 1
                     ? "Este gasto tem mais de uma perna no mês — abra o detalhe para escolher"
                     : undefined,
             persons,
@@ -312,7 +323,7 @@ export function Expenses() {
      *  embaixo — o total da compra é outra pergunta, e um clique no
      *  próprio valor a responde ali mesmo, sem abrir o painel. */
     const amountOf = (row: ApiTypes.Expense, info: RowInfo) => {
-        const leg = info.dueThisMonth[0];
+        const leg = info.legs[0];
         const payment = leg?.payment;
 
         if (row.Kind !== "installment" || !payment?.InstallmentTotal) {
@@ -695,7 +706,7 @@ export function Expenses() {
                                                 <Cell>
                                                     {info.persons.length === 0 ? (
                                                         <span className={styles.meta}>
-                                                            {info.found ? "—" : ""}
+                                                            {info.loaded ? "—" : ""}
                                                         </span>
                                                     ) : (
                                                         <span className={styles.who}>
@@ -716,7 +727,7 @@ export function Expenses() {
                                                 <Cell>
                                                     {info.methods.length === 0 ? (
                                                         <span className={styles.meta}>
-                                                            {info.found ? "—" : ""}
+                                                            {info.loaded ? "—" : ""}
                                                         </span>
                                                     ) : (
                                                         <span className={styles.who}>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import styles from "./src/styles.module.css";
 import { useCategories, useCategoryIndex, usePaymentMethods, usePersons } from "@/data/catalogs";
-import { useExpenseDetails, useRangeLegs } from "@/data/month";
+import { useRangeLegs } from "@/data/month";
 import { Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { ClearFilters, FilterBar, FilterMultiSelect, SearchInput } from "@/ui/controls";
 import { DateInput } from "@/ui/form";
@@ -125,21 +125,18 @@ export function Report() {
     const persons = usePersons();
     const methods = usePaymentMethods();
 
-    /* Destino e forma vivem no `get(id)`. A busca por eles só sai
-       quando um dos dois filtros está em uso — ver `useExpenseDetails`. */
-    const needsDetails = idPersons.length > 0 || idMethods.length > 0;
-    const detailIds = useMemo(() => [...new Set(legs.map((leg) => leg.expense.IdExpense))], [legs]);
-    const details = useExpenseDetails(detailIds, needsDetails);
-
     /* ── O recorte ─────────────────────────────────────────────
-       Um predicado só, sobre PERNAS. O intervalo é aparado aqui, no
-       dia: o cache trabalha em meses inteiros, e um período que começa
-       no dia 10 não pode trazer os nove primeiros junto. */
+       Um predicado só, sobre PERNAS — e todos os cinco filtros são
+       respondidos pela própria perna, inclusive destino e forma de
+       pagamento, que antes custavam um `get(id)` por gasto do período.
+       O intervalo é aparado aqui, no dia: o cache trabalha em meses
+       inteiros, e um período que começa no dia 10 não pode trazer os
+       nove primeiros junto. */
     const shown = useMemo(() => {
         const term = search.trim().toLowerCase();
 
         return legs.filter((leg) => {
-            const day = legCompetence(leg.expense, leg.payment).slice(0, 10);
+            const day = legCompetence(leg).slice(0, 10);
             if (day < range.From || day > range.To) return false;
 
             if (kinds.length > 0 && !kinds.includes(leg.expense.Kind)) return false;
@@ -148,36 +145,19 @@ export function Report() {
             }
             if (term && !leg.expense.Description.toLowerCase().includes(term)) return false;
 
-            if (needsDetails) {
-                const found = details.byId.get(leg.expense.IdExpense);
-                if (!found) return false;
-                if (
-                    idPersons.length > 0 &&
-                    !found.Persons.some((person) => idPersons.includes(person.IdPerson))
-                ) {
-                    return false;
-                }
-                if (
-                    idMethods.length > 0 &&
-                    !found.Payments.some((payment) => idMethods.includes(payment.IdPaymentMethod))
-                ) {
-                    return false;
-                }
+            if (idMethods.length > 0 && !idMethods.includes(leg.payment.IdPaymentMethod)) {
+                return false;
+            }
+            if (
+                idPersons.length > 0 &&
+                !leg.persons.some((person) => idPersons.includes(person.IdPerson))
+            ) {
+                return false;
             }
 
             return true;
         });
-    }, [
-        legs,
-        range,
-        kinds,
-        idCategories,
-        idPersons,
-        idMethods,
-        search,
-        needsDetails,
-        details.byId,
-    ]);
+    }, [legs, range, kinds, idCategories, idPersons, idMethods, search]);
 
     const days = useMemo(() => daysBetween(range.From, range.To), [range]);
     const byDay = useMemo(() => spentByDay(shown, days), [shown, days]);

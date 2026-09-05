@@ -3,9 +3,8 @@ import {
     budgetPercent,
     budgetRemaining,
     budgetState,
-    impliedLeg,
     legsOfKind,
-    monthLegs,
+    paymentLegs,
     spentByCategory,
     spentByDay,
     spentByMonthCategory,
@@ -19,13 +18,19 @@ import {
 } from "@/lib/aggregate";
 import {
     aBudgetPeriod,
+    aLegRow,
     anAccount,
     anExpense,
-    anExpenseDetail,
     anInflow,
-    anInstallment,
-    aPayment,
+    installmentRows,
 } from "./factories";
+import type { ApiTypes } from "@/types/api";
+
+/** O recorte que a API faz: `GET /ExpensePayments?From=&To=` devolve as
+ *  pernas cuja `CompetenceDate` cai no período. Aqui ele é imitado sobre
+ *  as pernas de teste, para que cada caso diga de que MÊS está falando. */
+const inMonth = (month: ApiTypes.ReferenceMonth, rows: readonly ApiTypes.ExpensePaymentRow[]) =>
+    paymentLegs(rows.filter((row) => row.CompetenceDate.startsWith(month)));
 
 describe("sumMoney", () => {
     it("soma em centavos: 0,1 + 0,2 é 0,30 e não 0,30000000000000004", () => {
@@ -78,80 +83,67 @@ describe("totalExpectedInflow", () => {
     });
 });
 
-describe("impliedLeg", () => {
-    it("dá a perna de um gasto à vista sem precisar do detalhe", () => {
-        const leg = impliedLeg(anExpense({ TotalValue: 250, ExpenseDate: "2026-08-10" }));
-
-        expect(leg).toMatchObject({ value: 250, month: "2026-08" });
-    });
-
-    it("recusa parcelado: a lista não sabe quanto cabe a cada mês", () => {
-        // 600 em 6x na lista aparece como uma compra de 600. Chutar aqui
-        // colocaria 600 no mês da compra em vez de 100.
-        expect(impliedLeg(anExpense({ Kind: "installment", TotalValue: 600 }))).toBeNull();
-    });
-});
-
-describe("monthLegs", () => {
+describe("paymentLegs", () => {
     it("600 em 6x custa 100 ao mês, não 600", () => {
-        const legs = monthLegs("2026-08", [], [anInstallment({ total: 600, parts: 6 })]);
-
-        expect(totalSpent(legs)).toBe(100);
+        expect(totalSpent(inMonth("2026-08", installmentRows({ total: 600, parts: 6 })))).toBe(100);
     });
 
     it("a parcela cai no mês da fatura, e a compra de agosto pesa em setembro", () => {
-        const parcelado = anInstallment({ total: 600, parts: 6, firstDueMonth: 8 });
+        const rows = installmentRows({ total: 600, parts: 6, firstDueMonth: 8 });
 
-        expect(totalSpent(monthLegs("2026-09", [], [parcelado]))).toBe(100);
-        expect(totalSpent(monthLegs("2027-02", [], [parcelado]))).toBe(0);
-        expect(totalSpent(monthLegs("2027-01", [], [parcelado]))).toBe(100);
+        expect(totalSpent(inMonth("2026-09", rows))).toBe(100);
+        expect(totalSpent(inMonth("2027-01", rows))).toBe(100);
+        expect(totalSpent(inMonth("2027-02", rows))).toBe(0);
+    });
+
+    it("a parcela de uma compra de 3 anos atrás entra no total do mês", () => {
+        // Era o único lugar em que o número na tela ficava ERRADO, e não
+        // só ausente: a varredura de 24 meses para trás não alcançava a
+        // compra, e a parcela sumia do mês. A lista de pernas não tem
+        // janela — quem recorta é a competência da própria perna.
+        const rows = installmentRows({
+            total: 12000,
+            parts: 60,
+            firstDueMonth: 1,
+            year: 2023,
+        });
+
+        expect(totalSpent(inMonth("2026-08", rows))).toBe(200);
     });
 
     it("o centavo que sobra vai na primeira parcela", () => {
-        const legs = monthLegs("2026-08", [], [anInstallment({ total: 100, parts: 3 })]);
+        const rows = installmentRows({ total: 100, parts: 3 });
 
-        expect(totalSpent(legs)).toBe(33.34);
-        expect(
-            totalSpent(monthLegs("2026-09", [], [anInstallment({ total: 100, parts: 3 })])),
-        ).toBe(33.33);
+        expect(totalSpent(inMonth("2026-08", rows))).toBe(33.34);
+        expect(totalSpent(inMonth("2026-09", rows))).toBe(33.33);
     });
 
     it("gasto cancelado não conta", () => {
-        const legs = monthLegs("2026-08", [
-            anExpense({ IdExpense: 1, TotalValue: 100 }),
-            anExpense({ IdExpense: 2, TotalValue: 999, Status: "canceled" }),
+        const legs = paymentLegs([
+            aLegRow(anExpense({ IdExpense: 1, TotalValue: 100 })),
+            aLegRow(anExpense({ IdExpense: 2, TotalValue: 999, Status: "canceled" })),
         ]);
-
-        expect(totalSpent(legs)).toBe(100);
-    });
-
-    it("não conta duas vezes o gasto que veio na lista e no detalhe", () => {
-        const parcelado = anInstallment({ IdExpense: 7, total: 600, parts: 6 });
-        const legs = monthLegs("2026-08", [parcelado], [parcelado]);
 
         expect(totalSpent(legs)).toBe(100);
     });
 
     it("um gasto no cartão pesa no mês do vencimento da fatura", () => {
         // Comprou em 25/08, a fatura vence em 27/09: agosto não sente.
-        const noCartao = anExpenseDetail({
-            IdExpense: 3,
-            TotalValue: 320,
-            ExpenseDate: "2026-08-25",
-            Payments: [aPayment({ Value: 320, DueDate: "2026-09-27" })],
-        });
+        const noCartao = aLegRow(
+            anExpense({ IdExpense: 3, TotalValue: 320, ExpenseDate: "2026-08-25" }),
+            { Value: 320, DueDate: "2026-09-27", CompetenceDate: "2026-09-27" },
+        );
 
-        expect(totalSpent(monthLegs("2026-08", [], [noCartao]))).toBe(0);
-        expect(totalSpent(monthLegs("2026-09", [], [noCartao]))).toBe(320);
+        expect(totalSpent(inMonth("2026-08", [noCartao]))).toBe(0);
+        expect(totalSpent(inMonth("2026-09", [noCartao]))).toBe(320);
     });
 });
 
 describe("totalPaid e totalPending", () => {
     it("separam o que já saiu da conta do que ainda vai sair", () => {
-        const legs = monthLegs(
+        const legs = inMonth(
             "2026-08",
-            [],
-            [anInstallment({ IdExpense: 1, total: 600, parts: 6, paidUntil: 1 })],
+            installmentRows({ IdExpense: 1, total: 600, parts: 6, paidUntil: 1 }),
         );
 
         expect(totalPaid(legs)).toBe(100);
@@ -159,7 +151,7 @@ describe("totalPaid e totalPending", () => {
     });
 
     it("um gasto pendente do mês entra em pending", () => {
-        const legs = monthLegs("2026-08", [anExpense({ TotalValue: 80, Status: "pending" })]);
+        const legs = paymentLegs([aLegRow(anExpense({ TotalValue: 80, Status: "pending" }))]);
 
         expect(totalPending(legs)).toBe(80);
         expect(totalPaid(legs)).toBe(0);
@@ -168,14 +160,11 @@ describe("totalPaid e totalPending", () => {
 
 describe("legsOfKind", () => {
     it("recorta os fixos e as parcelas do mês", () => {
-        const legs = monthLegs(
-            "2026-08",
-            [
-                anExpense({ IdExpense: 1, TotalValue: 90 }),
-                anExpense({ IdExpense: 2, TotalValue: 1200, Kind: "fixed" }),
-            ],
-            [anInstallment({ IdExpense: 3, total: 600, parts: 6 })],
-        );
+        const legs = inMonth("2026-08", [
+            aLegRow(anExpense({ IdExpense: 1, TotalValue: 90 })),
+            aLegRow(anExpense({ IdExpense: 2, TotalValue: 1200, Kind: "fixed" })),
+            ...installmentRows({ IdExpense: 3, total: 600, parts: 6 }),
+        ]);
 
         expect(totalSpent(legsOfKind(legs, "fixed"))).toBe(1200);
         expect(totalSpent(legsOfKind(legs, "installment"))).toBe(100);
@@ -187,30 +176,32 @@ describe("spentByMonthCategory", () => {
     const months = ["2026-07", "2026-08"];
 
     it("dá uma série por categoria, com um valor por mês do período", () => {
-        const legs = [
-            ...monthLegs("2026-07", [
+        const legs = paymentLegs([
+            aLegRow(
                 anExpense({
                     IdExpense: 1,
                     IdCategory: 1,
                     TotalValue: 100,
                     ExpenseDate: "2026-07-05",
                 }),
-            ]),
-            ...monthLegs("2026-08", [
+            ),
+            aLegRow(
                 anExpense({
                     IdExpense: 2,
                     IdCategory: 1,
                     TotalValue: 40,
                     ExpenseDate: "2026-08-05",
                 }),
+            ),
+            aLegRow(
                 anExpense({
                     IdExpense: 3,
                     IdCategory: 2,
                     TotalValue: 300,
                     ExpenseDate: "2026-08-06",
                 }),
-            ]),
-        ];
+            ),
+        ]);
 
         expect(spentByMonthCategory(legs, months)).toEqual([
             { IdCategory: 2, total: 300, values: [0, 300] },
@@ -219,16 +210,30 @@ describe("spentByMonthCategory", () => {
     });
 
     it("mantém o mês sem gasto no eixo, com zero", () => {
-        const legs = monthLegs("2026-08", [
-            anExpense({ IdExpense: 1, IdCategory: 1, TotalValue: 50, ExpenseDate: "2026-08-05" }),
+        const legs = paymentLegs([
+            aLegRow(
+                anExpense({
+                    IdExpense: 1,
+                    IdCategory: 1,
+                    TotalValue: 50,
+                    ExpenseDate: "2026-08-05",
+                }),
+            ),
         ]);
 
         expect(spentByMonthCategory(legs, months)[0].values).toEqual([0, 50]);
     });
 
     it("ignora a perna que cai fora do período pedido", () => {
-        const legs = monthLegs("2026-06", [
-            anExpense({ IdExpense: 1, IdCategory: 1, TotalValue: 90, ExpenseDate: "2026-06-05" }),
+        const legs = paymentLegs([
+            aLegRow(
+                anExpense({
+                    IdExpense: 1,
+                    IdCategory: 1,
+                    TotalValue: 90,
+                    ExpenseDate: "2026-06-05",
+                }),
+            ),
         ]);
 
         expect(spentByMonthCategory(legs, months)).toEqual([]);
@@ -237,10 +242,10 @@ describe("spentByMonthCategory", () => {
 
 describe("spentByCategory", () => {
     it("agrupa e ordena do maior para o menor", () => {
-        const legs = monthLegs("2026-08", [
-            anExpense({ IdExpense: 1, IdCategory: 1, TotalValue: 100 }),
-            anExpense({ IdExpense: 2, IdCategory: 2, TotalValue: 300 }),
-            anExpense({ IdExpense: 3, IdCategory: 1, TotalValue: 50 }),
+        const legs = paymentLegs([
+            aLegRow(anExpense({ IdExpense: 1, IdCategory: 1, TotalValue: 100 })),
+            aLegRow(anExpense({ IdExpense: 2, IdCategory: 2, TotalValue: 300 })),
+            aLegRow(anExpense({ IdExpense: 3, IdCategory: 1, TotalValue: 50 })),
         ]);
 
         expect(spentByCategory(legs)).toEqual([
@@ -250,11 +255,10 @@ describe("spentByCategory", () => {
     });
 
     it("o total do donut bate com o total gasto do mês", () => {
-        const legs = monthLegs(
-            "2026-08",
-            [anExpense({ IdExpense: 1, IdCategory: 2, TotalValue: 45.9 })],
-            [anInstallment({ IdExpense: 2, total: 600, parts: 6 })],
-        );
+        const legs = inMonth("2026-08", [
+            aLegRow(anExpense({ IdExpense: 1, IdCategory: 2, TotalValue: 45.9 })),
+            ...installmentRows({ IdExpense: 2, total: 600, parts: 6 }),
+        ]);
 
         expect(sumMoney(spentByCategory(legs).map((slice) => slice.value))).toBe(totalSpent(legs));
     });
@@ -262,16 +266,16 @@ describe("spentByCategory", () => {
 
 describe("spentByDay", () => {
     it("devolve um valor por dia do eixo, zero incluído", () => {
-        const legs = monthLegs("2026-08", [
-            anExpense({ IdExpense: 1, ExpenseDate: "2026-08-02", TotalValue: 30 }),
-            anExpense({ IdExpense: 2, ExpenseDate: "2026-08-02", TotalValue: 20 }),
+        const legs = paymentLegs([
+            aLegRow(anExpense({ IdExpense: 1, ExpenseDate: "2026-08-02", TotalValue: 30 })),
+            aLegRow(anExpense({ IdExpense: 2, ExpenseDate: "2026-08-02", TotalValue: 20 })),
         ]);
 
         expect(spentByDay(legs, ["2026-08-01", "2026-08-02", "2026-08-03"])).toEqual([0, 50, 0]);
     });
 
     it("a parcela cai no dia do vencimento, não no da compra", () => {
-        const legs = monthLegs("2026-09", [], [anInstallment({ total: 600, parts: 6 })]);
+        const legs = inMonth("2026-09", installmentRows({ total: 600, parts: 6 }));
 
         expect(spentByDay(legs, ["2026-09-10", "2026-09-27"])).toEqual([0, 100]);
     });

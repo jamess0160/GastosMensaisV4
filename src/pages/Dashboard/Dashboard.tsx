@@ -14,7 +14,6 @@ import {
 import {
     useInvalidateMovement,
     useMonthBudgets,
-    useMonthExpenseDetails,
     useMonthInflows,
     useMonthLegs,
 } from "@/data/month";
@@ -119,7 +118,6 @@ export function Dashboard() {
     const categoryIndex = useCategoryIndex();
     const personIndex = usePersonIndex();
     const methodIndex = usePaymentMethodIndex();
-    const monthDetails = useMonthExpenseDetails(month);
     const invalidateMovement = useInvalidateMovement();
 
     const context = useMemo<DashboardContext>(
@@ -179,18 +177,14 @@ export function Dashboard() {
           ? (spent / received) * 100
           : 0;
 
-    /* ── As três quebras do layout ─────────────────────────── */
-    const detailOf = useMemo(
-        () => (idExpense: number) => monthDetails.byId.get(idExpense),
-        [monthDetails.byId],
-    );
-
+    /* ── As três quebras do layout ───────────────────────────
+       As três saem da MESMA lista de pernas: categoria vem do gasto,
+       forma de pagamento vem da própria perna e destino é o rateio do
+       gasto rateado pela perna. Nenhuma delas espera por requisição
+       nenhuma — era daqui que saíam os `get(id)` por linha. */
     const byCategory = useMemo(() => spentByCategory(legs).slice(0, 5), [legs]);
-    const byMethod = useMemo(
-        () => spentByPaymentMethod(legs, detailOf).slice(0, 5),
-        [legs, detailOf],
-    );
-    const byPerson = useMemo(() => spentByPerson(legs, detailOf).slice(0, 5), [legs, detailOf]);
+    const byMethod = useMemo(() => spentByPaymentMethod(legs).slice(0, 5), [legs]);
+    const byPerson = useMemo(() => spentByPerson(legs).slice(0, 5), [legs]);
 
     const firstName = user.Name.split(/\s+/)[0];
 
@@ -452,11 +446,7 @@ export function Dashboard() {
                         <Breakdown
                             title="Por forma de pagamento"
                             total={spent}
-                            empty={
-                                monthDetails.isPending
-                                    ? "Carregando as formas de pagamento…"
-                                    : "Nenhum gasto neste mês."
-                            }
+                            empty="Nenhum gasto neste mês."
                             rows={byMethod.map((slice) => {
                                 const option = methodIndex.get(slice.IdPaymentMethod);
                                 return {
@@ -475,11 +465,7 @@ export function Dashboard() {
                         <Breakdown
                             title="Por destino"
                             total={spent}
-                            empty={
-                                monthDetails.isPending
-                                    ? "Carregando os destinos…"
-                                    : "Nenhum gasto neste mês."
-                            }
+                            empty="Nenhum gasto neste mês."
                             rows={byPerson.map((slice) => ({
                                 key: `p${slice.IdPerson ?? "none"}`,
                                 label:

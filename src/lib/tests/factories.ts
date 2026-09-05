@@ -27,6 +27,9 @@ export function anExpense(overrides: Partial<ApiTypes.Expense> = {}): ApiTypes.E
     };
 }
 
+/** `CompetenceDate` segue o `DueDate` quando ele existe, que é o que a
+ *  API congela no lançamento — informar as duas coisas separadas num
+ *  teste seria poder escrever uma perna que não existe. */
 export function aPayment(
     overrides: Partial<ApiTypes.ExpensePayment> = {},
 ): ApiTypes.ExpensePayment {
@@ -40,6 +43,7 @@ export function aPayment(
         InstallmentTotal: null,
         ClosingDate: null,
         DueDate: null,
+        CompetenceDate: overrides.DueDate ?? "2026-08-10",
         Paid: false,
         PaidAt: null,
         CreatedAt: NOW,
@@ -48,27 +52,57 @@ export function aPayment(
     };
 }
 
-export function anExpenseDetail(
-    overrides: Partial<ApiTypes.ExpenseDetail> = {},
-): ApiTypes.ExpenseDetail {
+/** Uma perna como `GET /ExpensePayments` a devolve: com o gasto de
+ *  origem e o rateio DELE. É a unidade de todo total de gasto. */
+export function aLegRow(
+    expense: ApiTypes.Expense = anExpense(),
+    payment: Partial<ApiTypes.ExpensePayment> = {},
+    persons: ApiTypes.ExpensePerson[] = [],
+): ApiTypes.ExpensePaymentRow {
     return {
-        ...anExpense(),
-        Payments: [aPayment()],
-        Persons: [],
-        Tags: [],
-        ...overrides,
+        ...aPayment({
+            IdExpense: expense.IdExpense,
+            Value: expense.TotalValue,
+            CompetenceDate: expense.ExpenseDate,
+            ...payment,
+        }),
+        Expense: expense,
+        Persons: persons,
     };
 }
 
-/** Uma compra parcelada como a API a monta: uma linha de gasto com o
- *  total da compra e N pernas, cada uma com o `DueDate` da sua fatura. */
-export function anInstallment({
+/** O rateio de um gasto entre pessoas, do jeito que vem na perna. */
+export function anExpensePerson(
+    IdPerson: number,
+    Value: ApiTypes.Money,
+    IdExpense = 1,
+): ApiTypes.ExpensePerson {
+    return {
+        IdExpensePerson: IdPerson,
+        IdWorkspace: 1,
+        IdExpense,
+        IdPerson,
+        Value,
+        CreatedAt: NOW,
+        UpdatedAt: NOW,
+    };
+}
+
+/** Uma compra parcelada como a API a devolve em `GET /ExpensePayments`:
+ *  N pernas, cada uma carregando a MESMA linha de gasto (com o total da
+ *  compra) e o MESMO rateio — e cada uma com o `DueDate` da sua fatura.
+ *
+ *  É essa repetição que faz `spentByPerson` precisar ratear: somar o
+ *  `Persons` perna a perna contaria a compra inteira seis vezes. */
+export function installmentRows({
     IdExpense = 1,
     total = 600,
     parts = 6,
     firstDueMonth = 8,
     year = 2026,
     paidUntil = 0,
+    IdPaymentMethod = 1,
+    persons = [],
     ...rest
 }: {
     IdExpense?: number;
@@ -77,35 +111,40 @@ export function anInstallment({
     firstDueMonth?: number;
     year?: number;
     paidUntil?: number;
-} & Partial<ApiTypes.Expense> = {}): ApiTypes.ExpenseDetail {
+    IdPaymentMethod?: number;
+    persons?: ApiTypes.ExpensePerson[];
+} & Partial<ApiTypes.Expense> = {}): ApiTypes.ExpensePaymentRow[] {
     const cents = Math.round(total * 100);
     const base = Math.floor(cents / parts);
     // O centavo que sobra vai na PRIMEIRA parcela, como a API faz.
     const remainder = cents - base * parts;
 
-    return {
-        ...anExpense({
-            IdExpense,
-            TotalValue: total,
-            Kind: "installment",
-            ExpenseDate: `${year}-${String(firstDueMonth).padStart(2, "0")}-10`,
-            ...rest,
-        }),
-        Payments: Array.from({ length: parts }, (_, index) => {
-            const due = new Date(year, firstDueMonth - 1 + index, 27);
-            return aPayment({
+    const expense = anExpense({
+        IdExpense,
+        TotalValue: total,
+        Kind: "installment",
+        ExpenseDate: `${year}-${String(firstDueMonth).padStart(2, "0")}-10`,
+        ...rest,
+    });
+
+    return Array.from({ length: parts }, (_, index) => {
+        const due = new Date(year, firstDueMonth - 1 + index, 27);
+        const DueDate = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-27`;
+        return aLegRow(
+            expense,
+            {
                 IdExpensePayment: index + 1,
-                IdExpense,
+                IdPaymentMethod,
                 Value: (index === 0 ? base + remainder : base) / 100,
                 InstallmentNumber: index + 1,
                 InstallmentTotal: parts,
-                DueDate: `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-27`,
+                DueDate,
+                CompetenceDate: DueDate,
                 Paid: index < paidUntil,
-            });
-        }),
-        Persons: [],
-        Tags: [],
-    };
+            },
+            persons,
+        );
+    });
 }
 
 export function anInflow(overrides: Partial<ApiTypes.Inflow> = {}): ApiTypes.Inflow {

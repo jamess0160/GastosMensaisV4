@@ -44,17 +44,23 @@ export const totalExpectedInflow = (inflows: readonly ApiTypes.Inflow[]): ApiTyp
 
 /* ── Gastos: a unidade é a PERNA, não a compra ────────────── */
 
-/** Uma perna com o gasto de onde ela veio.
+/** Uma perna com o gasto de onde ela veio e o rateio DELE.
  *
  *  É esta a unidade de todo total de gasto: 600 em 6x é UMA compra de
  *  600 e SEIS pernas de 100, e agosto custou 100. Somar `TotalValue` da
- *  lista contaria 600 no mês da compra. */
+ *  lista contaria 600 no mês da compra.
+ *
+ *  A perna é sempre REAL — vem de `GET /ExpensePayments`, não é mais
+ *  adivinhada da linha da compra. Foi o que dispensou a varredura de
+ *  meses para trás atrás de parcelamentos abertos, e com ela a janela
+ *  acima da qual a parcela sumia do total. */
 export interface ExpenseLeg {
     expense: ApiTypes.Expense;
-    /** `null` quando a perna não foi carregada (a lista de gastos não
-     *  traz pernas) e o gasto tem uma perna só — aí o valor da perna é o
-     *  total da compra. */
-    payment: ApiTypes.ExpensePayment | null;
+    payment: ApiTypes.ExpensePayment;
+    /** ⚠️ O rateio do GASTO, não o da perna: numa compra de 600 em 6×,
+     *  as seis pernas trazem o mesmo rateio de 600. Quem o transforma na
+     *  fatia do mês é `spentByPerson`. */
+    persons: readonly ApiTypes.ExpensePerson[];
     value: ApiTypes.Money;
     /** O mês em que esta perna pesa, "YYYY-MM". */
     month: ApiTypes.ReferenceMonth;
@@ -63,72 +69,34 @@ export interface ExpenseLeg {
 
 /** A data que decide de que mês a perna é.
  *
- *  `coalesce(DueDate, ExpenseDate)` — a mesma regra do `Spent` do
- *  orçamento: uma parcela cai no mês em que a fatura vence, não no da
- *  compra. */
-export const legCompetence = (
-    expense: ApiTypes.Expense,
-    payment: ApiTypes.ExpensePayment | null,
-): ApiTypes.CalendarDate => payment?.DueDate ?? expense.ExpenseDate;
-
-/** Explode um gasto detalhado nas suas pernas. */
-export function legsOf(expense: ApiTypes.ExpenseDetail): ExpenseLeg[] {
-    return expense.Payments.map((payment) => ({
-        expense,
-        payment,
-        value: payment.Value,
-        month: toReferenceMonth(legCompetence(expense, payment)),
-        paid: payment.Paid,
-    }));
-}
-
-/** A perna implícita de um gasto de que só se tem a linha da lista.
- *
- *  Vale para `single` e para `fixed`: os dois têm uma ocorrência por
- *  linha, então a soma das pernas é o próprio `TotalValue`. NÃO vale
- *  para `installment` — lá a compra tem N pernas e é preciso o
- *  `get(id)`. Por isso a função devolve `null` nesse caso, em vez de
- *  chutar. */
-export function impliedLeg(expense: ApiTypes.Expense): ExpenseLeg | null {
-    if (expense.Kind === "installment") return null;
-    return {
-        expense,
-        payment: null,
-        value: expense.TotalValue,
-        month: toReferenceMonth(expense.ExpenseDate),
-        paid: expense.Status === "paid",
-    };
-}
+ *  Não é mais calculada aqui: `CompetenceDate` é a `coalesce(DueDate,
+ *  ExpenseDate)` congelada no lançamento, e a regra passou a vir do
+ *  servidor — é por ela que o saldo da conta, o `Spent` do orçamento e
+ *  a lista de pernas recortam o mês. Nenhum número mudou. */
+export const legCompetence = (leg: ExpenseLeg): ApiTypes.CalendarDate => leg.payment.CompetenceDate;
 
 /** Gasto cancelado não conta em lugar nenhum — nem no saldo, nem no
  *  orçamento, nem no relatório. */
 export const isLive = (expense: ApiTypes.Expense): boolean => expense.Status !== "canceled";
 
-/** As pernas que pesam num mês, a partir do que o cliente conseguiu
- *  carregar.
+/** As pernas que a lista do período devolveu, prontas para somar.
  *
- *  `details` são os gastos que já vieram pelo `get(id)` (na prática, os
- *  parcelados, que são os únicos que a lista não descreve por inteiro);
- *  `expenses` é a lista crua do mês. Um gasto presente nos dois entra
- *  UMA vez só, pelo detalhe, que é a versão mais precisa. */
-export function monthLegs(
-    month: ApiTypes.ReferenceMonth,
-    expenses: readonly ApiTypes.Expense[],
-    details: readonly ApiTypes.ExpenseDetail[] = [],
-): ExpenseLeg[] {
-    const detailed = new Set(details.map((expense) => expense.IdExpense));
-
-    const fromDetails = details
-        .filter(isLive)
-        .flatMap(legsOf)
-        .filter((leg) => leg.month === month);
-
-    const fromList = expenses
-        .filter((expense) => isLive(expense) && !detailed.has(expense.IdExpense))
-        .map(impliedLeg)
-        .filter((leg): leg is ExpenseLeg => leg !== null && leg.month === month);
-
-    return [...fromDetails, ...fromList];
+ *  Uma requisição por mês, e nada aqui completa nada: a resposta já
+ *  descreve o mês por inteiro, parcela de compra antiga inclusive. O
+ *  filtro de cancelado fica como guarda — a consulta é feita sem
+ *  `IncludeCanceled`, mas todo total do sistema passa por `isLive`, e
+ *  não é aqui que essa regra vai deixar de valer. */
+export function paymentLegs(rows: readonly ApiTypes.ExpensePaymentRow[]): ExpenseLeg[] {
+    return rows
+        .filter((row) => isLive(row.Expense))
+        .map((row) => ({
+            expense: row.Expense,
+            payment: row,
+            persons: row.Persons,
+            value: row.Value,
+            month: toReferenceMonth(row.CompetenceDate),
+            paid: row.Paid,
+        }));
 }
 
 /** "Quanto gastou no mês" — soma de pernas, o número do Dashboard. */
@@ -165,39 +133,20 @@ export function spentByCategory(
         .sort((a, b) => b.value - a.value);
 }
 
-/** Onde uma perna encontra o gasto detalhado a que pertence. A lista
- *  não traz `Payments` nem `Persons`; quem os tem é o `get(id)`, e é
- *  ele que estes dois recortes exigem. */
-export type DetailLookup = (idExpense: number) => ApiTypes.ExpenseDetail | undefined;
-
 /** Total por forma de pagamento.
  *
- *  A perna já sabe a forma quando veio do detalhe. Quando ela é a perna
- *  IMPLÍCITA da lista (`single` e `fixed`, que têm uma ocorrência por
- *  linha), a forma só existe no detalhe — e o gasto pode ter sido pago
- *  com duas formas, então o que se soma são as pernas dele, cuja soma é
- *  o próprio valor da perna implícita.
- *
- *  Gasto cujo detalhe ainda não chegou fica de fora em vez de virar uma
- *  fatia "desconhecido": a lista se completa sozinha em segundos, e uma
- *  fatia que encolhe sozinha é pior do que uma que aparece. */
+ *  A perna sabe a forma dela, e é só isso: a fatia não espera mais por
+ *  requisição nenhuma, e nenhum gasto fica de fora por falta de detalhe.
+ *  O gasto pago com duas formas vira duas pernas, cada uma somando na
+ *  sua — que é a razão de o eixo financeiro ser rateio, e não um campo. */
 export function spentByPaymentMethod(
     legs: readonly ExpenseLeg[],
-    detailOf: DetailLookup,
 ): { IdPaymentMethod: number; value: ApiTypes.Money }[] {
     const byMethod = new Map<number, number>();
 
-    const add = (idPaymentMethod: number, cents: number) =>
-        byMethod.set(idPaymentMethod, (byMethod.get(idPaymentMethod) ?? 0) + cents);
-
     for (const leg of legs) {
-        if (leg.payment) {
-            add(leg.payment.IdPaymentMethod, toCents(leg.value));
-            continue;
-        }
-        const detail = detailOf(leg.expense.IdExpense);
-        if (!detail) continue;
-        for (const payment of detail.Payments) add(payment.IdPaymentMethod, toCents(payment.Value));
+        const key = leg.payment.IdPaymentMethod;
+        byMethod.set(key, (byMethod.get(key) ?? 0) + toCents(leg.value));
     }
 
     return [...byMethod.entries()]
@@ -207,16 +156,17 @@ export function spentByPaymentMethod(
 
 /** Total por destino (pessoa).
  *
- *  O rateio entre pessoas é gravado sobre o TOTAL DA COMPRA, não sobre a
- *  perna: numa compra de 600 em 6x dividida meio a meio, cada pessoa tem
- *  300 gravados e o mês custa 50 a cada uma. Por isso a fatia da pessoa
- *  é proporcional — `valor da perna × (fatia da pessoa ÷ total)`.
+ *  ⚠️ O `Persons` que vem na perna é o do GASTO. Numa compra de 600 em
+ *  6× dividida meio a meio, as seis pernas trazem os mesmos 300 de cada
+ *  pessoa — somar perna a perna daria 3600, e nada estouraria: o número
+ *  só ficaria errado. Por isso a fatia é proporcional,
+ *  `Persons[i].Value × Payment.Value ÷ Expense.TotalValue`, que é a
+ *  mesma fórmula do `Spent` de um orçamento de pessoa.
  *
  *  `IdPerson: null` é o gasto sem rateio nenhum, que é a maioria: ele
  *  não pertence a ninguém em particular e some se for descartado. */
 export function spentByPerson(
     legs: readonly ExpenseLeg[],
-    detailOf: DetailLookup,
 ): { IdPerson: number | null; value: ApiTypes.Money }[] {
     const byPerson = new Map<number | null, number>();
 
@@ -224,10 +174,9 @@ export function spentByPerson(
         byPerson.set(idPerson, (byPerson.get(idPerson) ?? 0) + cents);
 
     for (const leg of legs) {
-        const detail = detailOf(leg.expense.IdExpense);
-        const split = detail?.Persons ?? [];
+        const split = leg.persons;
 
-        if (split.length === 0 || leg.expense.TotalValue <= 0) {
+        if (split.length === 0 || leg.expense.TotalValue === 0) {
             add(null, toCents(leg.value));
             continue;
         }
@@ -237,9 +186,10 @@ export function spentByPerson(
         let distributed = 0;
 
         split.forEach((person, index) => {
-            // O centavo que sobra vai no primeiro, a mesma regra do
-            // parcelamento — sem isso a soma das fatias não fecha com o
-            // total do mês e o gráfico mente no último dígito.
+            // O arredondamento acontece UMA vez, no fim: a última fatia é
+            // o que sobrou, a mesma regra do `Spent` do servidor. Sem
+            // isso a soma das fatias não fecha com o total do mês e o
+            // gráfico mente no último dígito.
             const share =
                 index === split.length - 1
                     ? legCents - distributed
@@ -263,7 +213,7 @@ export function spentByDay(
 ): ApiTypes.Money[] {
     const byDay = new Map<string, number>();
     for (const leg of legs) {
-        const day = legCompetence(leg.expense, leg.payment).slice(0, 10);
+        const day = legCompetence(leg).slice(0, 10);
         byDay.set(day, (byDay.get(day) ?? 0) + toCents(leg.value));
     }
     return days.map((day) => fromCents(byDay.get(day) ?? 0));

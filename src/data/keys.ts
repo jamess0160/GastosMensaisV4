@@ -24,9 +24,10 @@ export const queryKeys = {
        mesmo mês compartilham a resposta em vez de pedirem duas vezes. */
     expenses: (month: ApiTypes.ReferenceMonth) => ["expenses", month] as const,
     expense: (idExpense: number) => ["expense", idExpense] as const,
-    /** Os parcelados de uma janela de meses — a fatia que a lista do mês
-     *  não descreve por inteiro. */
-    installments: (month: ApiTypes.ReferenceMonth) => ["installments", month] as const,
+    /** As PERNAS que pesam no mês — a unidade de todo total de gasto, e
+     *  a única lista que descreve o mês por inteiro: a 6ª parcela de uma
+     *  compra de março está aqui e não em `expenses`. */
+    legs: (month: ApiTypes.ReferenceMonth) => ["legs", month] as const,
     inflows: (month: ApiTypes.ReferenceMonth) => ["inflows", month] as const,
     inflow: (idInflow: number) => ["inflow", idInflow] as const,
     budgets: (month: ApiTypes.ReferenceMonth) => ["budgets", month] as const,
@@ -35,6 +36,7 @@ export const queryKeys = {
        que atravessa meses (parcelado, série de fixo, estorno). */
     allAccounts: ["accounts"] as const,
     allExpenses: ["expenses"] as const,
+    allLegs: ["legs"] as const,
     allInflows: ["inflows"] as const,
     allBudgets: ["budgets"] as const,
 };

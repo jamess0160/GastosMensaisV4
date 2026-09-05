@@ -26,18 +26,19 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | 9 | [Notificações](#9-notificações) | Produto | "Avisos" do Dashboard |
 | ~~10~~ | [`Occurrences` fora do `POST /Expenses`](#10-occurrences-fora-do-post-expenses) | Contrato | ✅ **Entregue** em 04/09 |
 | 11 | [Clonar o mês anterior de Renda](#11-clonar-o-mês-anterior-de-renda) | Produto | Botão "Clonar mês anterior" |
-| 12 | [Lista de gastos com os filhos](#12-lista-de-gastos-com-os-filhos) | Performance | Colunas de destino e forma de pagamento |
+| ~~12~~ | [Lista de gastos com os filhos](#12-lista-de-gastos-com-os-filhos) | Performance | ✅ **Entregue** em 05/09 |
 | ~~13~~ | [`IncludeCanceled` em `GET /Expenses`](#13-includecanceled-em-get-expenses) | Contrato | ✅ **Entregue** em 03/09 |
 | ~~14~~ | [Desfazer recebimento de entrada](#14-desfazer-recebimento-de-entrada) | Produto | ✅ **Entregue** em 04/09 |
 | ~~15~~ | [Criação de entradas em lote](#15-criação-de-entradas-em-lote) | Produto | ✅ **Entregue** em 04/09 |
 | ~~16~~ | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | ✅ **Entregue** em 04/09 |
 
-**Cinco itens saíram da fila.** Os de número **10, 13, 14, 15 e 16**
-subiram na virada de setembro, exatamente na forma proposta aqui — e em
+**Seis itens saíram da fila.** Os de número **10, 13, 14, 15 e 16**
+subiram na virada de setembro exatamente na forma proposta aqui — e em
 todos eles o cliente já estava escrito assumindo a rota, então não houve
-chamada nova a fazer. As seções deles ficam abaixo como registro do que
-foi pedido e do que subiu; nada nelas é trabalho pendente. O **12**
-também subiu, como `GET /ExpensePayments`.
+chamada nova a fazer. O **12** subiu na forma preferida, `GET
+/ExpensePayments`, e esse custou trabalho de verdade no cliente. As
+seções deles ficam abaixo como registro do que foi pedido e do que
+subiu; nada nelas é trabalho pendente.
 
 Os itens 1 e 2 são de segurança e valem ser tratados antes do MVP ir ao
 ar. Do 3 ao 9 são cortes conscientes do MVP — o frontend já está
@@ -393,6 +394,29 @@ o que espera rota é só o `POST` final — ver item 15.
 ---
 
 ## 12. Lista de gastos com os filhos
+
+> ✅ **Entregue em 05/09, na proposta 2** — `GET /ExpensePayments?From=&To=&IncludeCanceled=`,
+> devolvendo as pernas cuja `coalesce(DueDate, ExpenseDate)` cai no
+> intervalo, cada uma com o gasto de origem e o rateio dele. Ela fechou
+> os DOIS furos de uma vez:
+>
+> - **o N+1 morreu.** `useMonthExpenseDetails` e `useExpenseDetails`
+>   saíram de `src/data/month.ts`; destino e forma de pagamento passaram
+>   a sair da própria perna, no Início, na lista de Gastos e no
+>   Relatório. O `get(id)` por gasto sobrou só para as **tags**, no
+>   slide-over de um gasto — uma consulta, quando o painel abre.
+> - **a janela morreu.** `INSTALLMENT_LOOKBACK_MONTHS` não existe mais, e
+>   com ele o único lugar do MVP em que o número na tela ficava *errado*:
+>   a parcela de uma compra acima de 24 meses atrás agora entra no total.
+>
+> Um mês é **uma** requisição de pernas; o Relatório de doze meses são
+> doze, e não doze listas mais uma varredura mais um `get(id)` por
+> parcelado de cada uma.
+>
+> ⚠️ **O `Persons` da perna é o do GASTO, não o da perna** — as seis
+> pernas de uma compra de 600 em 6× trazem o mesmo rateio de 600. Somar
+> perna a perna dá 3600 e nada estoura. `spentByPerson` rateia
+> (`Persons[i].Value × Payment.Value ÷ Expense.TotalValue`), com teste.
 
 **O problema.** `GET /Expenses` não traz `Payments`, `Persons` nem
 `Tags` — só o `get(id)` traz. Mas a tela de Gastos mostra **destino
