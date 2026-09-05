@@ -1,5 +1,6 @@
 import { errorMessage } from "@/api/client";
 import { PaymentMethodsConnection } from "@/api/PaymentMethods.connection";
+import { cardCycleFromDates, MAX_CLOSING_OFFSET_DAYS, MIN_CLOSING_OFFSET_DAYS } from "@/lib/card";
 import type { AccountsContext } from "../controller";
 
 /** Criar ou editar um cartão de crédito.
@@ -17,10 +18,13 @@ import type { AccountsContext } from "../controller";
  *  guardado à toa. Não há leitura defensiva nem campo legado — o banco
  *  é ajustado junto.
  *
- *  `ClosingDay` e `DueDay` são obrigatórios no cartão, e mandar `null`
- *  neles no PUT responde 406 — daí a conferência local antes. Eles não
- *  são detalhe: em cartão, um dia de diferença na compra vira um mês de
- *  diferença no caixa. */
+ *  O CICLO DA FATURA. A tela pergunta duas datas — quando a última
+ *  fatura fechou e quando ela venceu —, e o que a API guarda é o par
+ *  `DueDay` + `ClosingOffsetDays`: o dia do vencimento e quantos dias
+ *  antes dele a fatura fecha. A conversão é a de `src/lib/card.ts`.
+ *  Mandar `null` em qualquer um dos dois no PUT responde 406, daí a
+ *  conferência local antes. Eles não são detalhe: em cartão, um dia de
+ *  diferença na compra vira um mês de diferença no caixa. */
 export async function saveCard(context: AccountsContext): Promise<void> {
     const draft = context.cardDraft;
     if (!draft) return;
@@ -29,20 +33,28 @@ export async function saveCard(context: AccountsContext): Promise<void> {
         context.failSubmit("Informe o nome do cartão.");
         return;
     }
-    if (!Number.isInteger(draft.ClosingDay) || draft.ClosingDay < 1 || draft.ClosingDay > 31) {
-        context.failSubmit("O dia de fechamento vai de 1 a 31.");
+    if (!draft.ClosingDate || !draft.DueDate) {
+        context.failSubmit("Informe o fechamento e o vencimento da última fatura.");
         return;
     }
-    if (!Number.isInteger(draft.DueDay) || draft.DueDay < 1 || draft.DueDay > 31) {
-        context.failSubmit("O dia de vencimento vai de 1 a 31.");
+
+    const cycle = cardCycleFromDates(draft.ClosingDate, draft.DueDate);
+
+    if (cycle.ClosingOffsetDays < MIN_CLOSING_OFFSET_DAYS) {
+        context.failSubmit("A fatura tem que fechar antes de vencer.");
+        return;
+    }
+    if (cycle.ClosingOffsetDays > MAX_CLOSING_OFFSET_DAYS) {
+        context.failSubmit(
+            `O fechamento precisa cair entre ${MIN_CLOSING_OFFSET_DAYS} e ${MAX_CLOSING_OFFSET_DAYS} dias antes do vencimento.`,
+        );
         return;
     }
     context.beginSubmit();
 
     const common = {
         Name: draft.Name.trim(),
-        ClosingDay: draft.ClosingDay,
-        DueDay: draft.DueDay,
+        ...cycle,
         Color: draft.Color,
     };
 

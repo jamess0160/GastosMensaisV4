@@ -34,10 +34,16 @@ import {
 import { CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import { totalBalance } from "@/lib/aggregate";
+import {
+    cardCycleFromDates,
+    invoiceDates,
+    MAX_CLOSING_OFFSET_DAYS,
+    MIN_CLOSING_OFFSET_DAYS,
+} from "@/lib/card";
 import { accentColor } from "@/lib/categoryColor";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatMoney } from "@/lib/money";
-import { today } from "@/lib/date";
+import { currentMonth, formatDate, formatShort, today } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
 const initials = (name: string) =>
@@ -63,14 +69,41 @@ const newAccountDraft = (): AccountDraft => ({
     balanceFrozen: false,
 });
 
+/** Nasce sem as datas: elas são lidas da última fatura, no app do banco,
+ *  e chutar um par plausível aqui só faria o usuário salvar o chute. */
 const newCardDraft = (idAccount: number): CardDraft => ({
     IdPaymentMethod: null,
     IdAccount: idAccount,
     Name: "",
-    ClosingDay: 20,
-    DueDay: 27,
+    ClosingDate: null,
+    DueDate: null,
     Color: null,
 });
+
+/** "fecha 03 ago · vence 10 ago" — a fatura DAQUELE mês. */
+const cardCycle = (method: ApiTypes.PaymentMethod, month: ApiTypes.ReferenceMonth): string => {
+    const { closing, due } = invoiceDates(month, method.DueDay, method.ClosingOffsetDays);
+    return `fecha ${formatShort(closing)} · vence ${formatShort(due)}`;
+};
+
+/** O caminho de volta: o cartão guarda vencimento + folga, e o
+ *  formulário fala em datas. `month` é o mês exibido — a fatura de
+ *  agosto e a de setembro fecham em dias diferentes. */
+const editCardDraft = (
+    method: ApiTypes.PaymentMethod,
+    idAccount: number,
+    month: ApiTypes.ReferenceMonth,
+): CardDraft => {
+    const { closing, due } = invoiceDates(month, method.DueDay, method.ClosingOffsetDays);
+    return {
+        IdPaymentMethod: method.IdPaymentMethod,
+        IdAccount: idAccount,
+        Name: method.Name,
+        ClosingDate: closing,
+        DueDate: due,
+        Color: method.Color,
+    };
+};
 
 /** O rascunho de edição de uma conta — a tabela e a lista de cards
  *  abrem o mesmo. `balanceFrozen`: saldo diferente do inicial quer dizer
@@ -102,8 +135,51 @@ function MethodChip({ method }: { method: ApiTypes.PaymentMethod }) {
     );
 }
 
+/** O que as duas datas do formulário viraram.
+ *
+ *  O usuário digita datas; a API guarda vencimento + folga. Sem esta
+ *  linha, a conversão seria invisível até o cartão já estar salvo — e a
+ *  data de fechamento, que muda de mês para mês, pareceria fixa. */
+function CycleHint({ draft, month }: { draft: CardDraft; month: ApiTypes.ReferenceMonth }) {
+    if (!draft.ClosingDate || !draft.DueDate) {
+        return (
+            <div className={styles.cycleHint}>
+                As duas datas estão na sua última fatura — o app do banco mostra as duas. É delas
+                que saem o dia do vencimento e a folga de fechamento do cartão.
+            </div>
+        );
+    }
+
+    const { DueDay, ClosingOffsetDays } = cardCycleFromDates(draft.ClosingDate, draft.DueDate);
+
+    if (
+        ClosingOffsetDays < MIN_CLOSING_OFFSET_DAYS ||
+        ClosingOffsetDays > MAX_CLOSING_OFFSET_DAYS
+    ) {
+        return (
+            <div className={`${styles.cycleHint} ${styles.cycleHintBad}`}>
+                A fatura precisa fechar de {MIN_CLOSING_OFFSET_DAYS} a {MAX_CLOSING_OFFSET_DAYS}{" "}
+                dias antes de vencer.
+            </div>
+        );
+    }
+
+    const { closing, due } = invoiceDates(month, DueDay, ClosingOffsetDays);
+
+    return (
+        <div className={styles.cycleHint}>
+            Vence dia <b>{DueDay}</b> e fecha <b>{ClosingOffsetDays} dias antes</b>. A data do
+            fechamento muda de mês para mês: a fatura que vence em {formatDate(due)} fecha em{" "}
+            {formatDate(closing)}.
+        </div>
+    );
+}
+
 export function Accounts() {
     const isMobile = useIsMobile();
+    /* O mês da fatura mostrada nos cartões. Na etapa 2 ele passa a ser o
+       do chassi, junto com o saldo por mês. */
+    const month = currentMonth();
     const accounts = useAccounts();
     const invalidateCatalogs = useInvalidateCatalogs();
 
@@ -463,22 +539,20 @@ export function Accounts() {
                                         </span>
                                         <div className={styles.cardBody}>
                                             <div className={styles.cardName}>{method.Name}</div>
+                                            {/* Não existe "dia do fechamento": ele é
+                                                `DueDay − ClosingOffsetDays` e muda de mês
+                                                para mês — então o que se mostra é a fatura
+                                                deste mês, com data. */}
                                             <div className={styles.cardSub}>
-                                                fecha dia {method.ClosingDay} · vence dia{" "}
-                                                {method.DueDay}
+                                                {cardCycle(method, month)}
                                             </div>
                                         </div>
                                         <IconButton
                                             label="Editar cartão"
                                             onClick={() =>
-                                                setCardDraft({
-                                                    IdPaymentMethod: method.IdPaymentMethod,
-                                                    IdAccount: detail.IdAccount,
-                                                    Name: method.Name,
-                                                    ClosingDay: method.ClosingDay ?? 1,
-                                                    DueDay: method.DueDay ?? 1,
-                                                    Color: method.Color,
-                                                })
+                                                setCardDraft(
+                                                    editCardDraft(method, detail.IdAccount, month),
+                                                )
                                             }
                                         >
                                             <IconEdit />
@@ -667,47 +741,39 @@ export function Accounts() {
                             )}
                         </FormField>
 
+                        {/* O cartão é descrito por vencimento + folga, mas
+                            ninguém sabe a folga de cabeça: o que se lê no app
+                            do banco são as duas datas da última fatura. A
+                            conversão é `cardCycleFromDates`, em `saveCard`. */}
                         <FormGrid columns={2}>
-                            <FormField label="Fecha no dia" required>
+                            <FormField label="Fechamento da última fatura" required>
                                 {(field) => (
-                                    <Input
+                                    <DateInput
                                         {...field}
-                                        type="number"
-                                        min={1}
-                                        max={31}
-                                        value={cardDraft.ClosingDay}
-                                        onChange={(event) =>
-                                            setCardDraft((c) =>
-                                                c
-                                                    ? {
-                                                          ...c,
-                                                          ClosingDay: Number(event.target.value),
-                                                      }
-                                                    : c,
-                                            )
+                                        value={cardDraft.ClosingDate}
+                                        onValueChange={(ClosingDate) =>
+                                            setCardDraft((c) => (c ? { ...c, ClosingDate } : c))
                                         }
                                     />
                                 )}
                             </FormField>
-                            <FormField label="Vence no dia" required>
+                            <FormField label="Vencimento dessa fatura" required>
                                 {(field) => (
-                                    <Input
+                                    <DateInput
                                         {...field}
-                                        type="number"
-                                        min={1}
-                                        max={31}
-                                        value={cardDraft.DueDay}
-                                        onChange={(event) =>
-                                            setCardDraft((c) =>
-                                                c
-                                                    ? { ...c, DueDay: Number(event.target.value) }
-                                                    : c,
-                                            )
+                                        value={cardDraft.DueDate}
+                                        onValueChange={(DueDate) =>
+                                            setCardDraft((c) => (c ? { ...c, DueDate } : c))
                                         }
                                     />
                                 )}
                             </FormField>
                         </FormGrid>
+
+                        {/* O que foi derivado das duas datas, à vista: o
+                            fechamento não é um dia fixo do calendário, e a
+                            conta fica auditável em vez de mágica. */}
+                        <CycleHint draft={cardDraft} month={month} />
 
                         <FormField label="Cor">
                             {() => (

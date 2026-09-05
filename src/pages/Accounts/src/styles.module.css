@@ -241,3 +241,22 @@
     font-weight: 700;
     color: var(--ink-2);
 }
+
+/* O que o formulário de cartão DERIVOU das duas datas — vencimento,
+   folga e a fatura resultante. Fica sob os campos porque é resultado,
+   não instrução. */
+.cycleHint {
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: -4px;
+}
+
+.cycleHintBad {
+    color: var(--neg);
+    border-color: var(--neg);
+}

@@ -124,9 +124,16 @@ export namespace ApiTypes {
         IdAccount: number;
         Name: string;
         Kind: PaymentMethodKind;
-        /** Só faz sentido em credit_card; null nas outras. */
-        ClosingDay: number | null;
+        /** O dia do mês em que a fatura vence — o dado que o emissor
+         *  pede ao cliente. Só faz sentido em credit_card; null nas
+         *  outras. */
         DueDay: number | null;
+        /** Quantos dias ANTES do vencimento a fatura fecha (1-28, default
+         *  7). Não existe um campo com o dia do fechamento: ele é
+         *  `DueDay − ClosingOffsetDays` e MUDA de mês para mês —
+         *  vencendo dia 5 com folga de 7, a fatura fecha em 26/02 e em
+         *  29/03. Ver `src/lib/card.ts`. */
+        ClosingOffsetDays: number | null;
         IconPath: string | null;
         Color: Color | null;
         Position: number | null;
@@ -163,18 +170,24 @@ export namespace ApiTypes {
         IdAccount: number;
         Name: string;
         Kind: "credit_card";
-        ClosingDay: number;
+        /** O único obrigatório do par: a folga tem default 7 no
+         *  servidor, e omiti-la é o caminho certo quando o formulário
+         *  não pergunta por ela. */
         DueDay: number;
+        ClosingOffsetDays?: number;
         IconPath?: string | null;
         Color?: Color | null;
         Position?: number | null;
     }
 
-    /** `Kind` e `IdAccount` não são aceitos no PUT. */
+    /** `Kind` e `IdAccount` não são aceitos no PUT. Editar o cartão
+     *  também NÃO recalcula as compras já lançadas: `ClosingDate` e
+     *  `DueDate` são gravadas na perna no lançamento e ninguém as
+     *  revisita. */
     export interface PaymentMethodUpdateBody {
         Name: string;
-        ClosingDay?: number;
         DueDay?: number;
+        ClosingOffsetDays?: number;
         IconPath?: string | null;
         Color?: Color | null;
         Position?: number | null;

@@ -23,8 +23,13 @@ export interface CardDraft {
     IdPaymentMethod: number | null;
     IdAccount: number;
     Name: string;
-    ClosingDay: number;
-    DueDay: number;
+    /** As DATAS da última fatura, como o usuário as lê no app do banco.
+     *  A API guarda outra coisa — `DueDay` + `ClosingOffsetDays` —, e a
+     *  conversão acontece na saída (`src/lib/card.ts`): ninguém sabe de
+     *  cabeça "quantos dias antes", mas todo mundo sabe quando a fatura
+     *  fechou e quando ela venceu. */
+    ClosingDate: ApiTypes.CalendarDate | null;
+    DueDate: ApiTypes.CalendarDate | null;
     Color: ApiTypes.Color | null;
 }
 

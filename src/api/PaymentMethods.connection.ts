@@ -18,7 +18,12 @@ class Connection {
     /** `Kind` e `IdAccount` não são aceitos: um pix não vira cartão e um
      *  cartão não muda de conta — as duas trocas reescreveriam o
      *  significado das compras já lançadas nele. Mandar null em
-     *  ClosingDay/DueDay de um cartão dá 406. */
+     *  DueDay/ClosingOffsetDays de um cartão dá 406.
+     *
+     *  Editar o cartão NÃO recalcula o que já foi lançado: `ClosingDate`
+     *  e `DueDate` moram na perna, gravadas no momento do lançamento.
+     *  Corrigir o vencimento vale daqui para a frente; o que já está
+     *  gravado só muda por um PUT no próprio gasto. */
     async update(
         idPaymentMethod: number,
         body: ApiTypes.PaymentMethodUpdateBody,

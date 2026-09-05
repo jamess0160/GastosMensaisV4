@@ -149,6 +149,30 @@ export function addMonthsToDate(date: ApiTypes.CalendarDate, delta: number): Api
     return fromLocalDate(new Date(year, month - 1 + delta, Math.min(day, lastDay)));
 }
 
+/** O mesmo dia em outra data, sem passar pelo parser ISO. Dias negativos
+ *  andam para trás, e o mês vira sozinho: 03/09 menos 7 é 27/08. */
+export function addDaysToDate(date: ApiTypes.CalendarDate, delta: number): ApiTypes.CalendarDate {
+    const { year, month, day } = parts(date);
+    return fromLocalDate(new Date(year, month - 1, day + delta));
+}
+
+/** Quantos dias de calendário separam duas datas — negativo se `to` vem
+ *  antes de `from`. É a folga do cartão vista de fora: fechou 27/08,
+ *  venceu 03/09, folga de 7. */
+export function daysApart(from: ApiTypes.CalendarDate, to: ApiTypes.CalendarDate): number {
+    const millis = toLocalDate(to).getTime() - toLocalDate(from).getTime();
+    return Math.round(millis / 86_400_000);
+}
+
+/** A data daquele dia naquele mês, APARADA no mês curto: dia 31 em
+ *  fevereiro é 28, e nunca 3 de março. Mesmo cuidado do
+ *  `addMonthsToDate` — um vencimento dia 31 não pode virar dia 3. */
+export function dayInMonth(month: ApiTypes.ReferenceMonth, day: number): ApiTypes.CalendarDate {
+    const [year, monthNumber] = month.split("-").map(Number);
+    const lastDay = new Date(year, monthNumber, 0).getDate();
+    return fromLocalDate(new Date(year, monthNumber - 1, Math.min(day, lastDay)));
+}
+
 /** Os meses de um intervalo, das duas pontas inclusive.
  *
  *  É a unidade em que o cache de movimento é guardado (uma chave por

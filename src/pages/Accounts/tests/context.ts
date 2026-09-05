@@ -16,8 +16,9 @@ export const aCardDraft = (overrides: Partial<CardDraft> = {}): CardDraft => ({
     IdPaymentMethod: null,
     IdAccount: 1,
     Name: "Cartão Roxo",
-    ClosingDay: 20,
-    DueDay: 27,
+    // Fechou 29/08 e venceu 05/09: vencimento dia 5, folga de 7 dias.
+    ClosingDate: "2026-08-29",
+    DueDate: "2026-09-05",
     Color: null,
     ...overrides,
 });

@@ -111,8 +111,10 @@ describe("saveCard", () => {
 
         expect(body?.Kind).toBe("credit_card");
         expect(body?.IdAccount).toBe(1);
-        expect(body?.ClosingDay).toBe(20);
-        expect(body?.DueDay).toBe(27);
+        // A tela pergunta duas datas; a API guarda vencimento + folga.
+        expect(body?.DueDay).toBe(5);
+        expect(body?.ClosingOffsetDays).toBe(7);
+        expect(body).not.toHaveProperty("ClosingDay");
     });
 
     it("NÃO manda Kind nem IdAccount no PUT — a API não os aceita", async () => {
@@ -132,12 +134,40 @@ describe("saveCard", () => {
         expect(body).not.toHaveProperty("IdAccount");
     });
 
-    it("recusa dia de fechamento fora de 1–31 sem gastar requisição", async () => {
-        const context = fakeAccountsContext({ cardDraft: aCardDraft({ ClosingDay: 45 }) });
+    it("recusa fatura que fecha depois de vencer, sem gastar requisição", async () => {
+        const context = fakeAccountsContext({
+            cardDraft: aCardDraft({ ClosingDate: "2026-09-10", DueDate: "2026-09-05" }),
+        });
 
         await saveCard(context);
 
-        expect(context.failSubmit).toHaveBeenCalledWith("O dia de fechamento vai de 1 a 31.");
+        expect(context.failSubmit).toHaveBeenCalledWith("A fatura tem que fechar antes de vencer.");
+        expect(context.beginSubmit).not.toHaveBeenCalled();
+    });
+
+    it("recusa folga acima de 28 dias — é o limite do schema", async () => {
+        const context = fakeAccountsContext({
+            cardDraft: aCardDraft({ ClosingDate: "2026-08-01", DueDate: "2026-09-05" }),
+        });
+
+        await saveCard(context);
+
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "O fechamento precisa cair entre 1 e 28 dias antes do vencimento.",
+        );
+        expect(context.beginSubmit).not.toHaveBeenCalled();
+    });
+
+    it("recusa cartão sem as datas da fatura", async () => {
+        const context = fakeAccountsContext({
+            cardDraft: aCardDraft({ ClosingDate: null, DueDate: null }),
+        });
+
+        await saveCard(context);
+
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "Informe o fechamento e o vencimento da última fatura.",
+        );
         expect(context.beginSubmit).not.toHaveBeenCalled();
     });
 
