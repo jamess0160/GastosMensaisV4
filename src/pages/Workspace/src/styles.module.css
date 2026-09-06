@@ -4,11 +4,18 @@
    aqui — e a segunda é a que importa, já que é a única forma de outra
    pessoa entrar no espaço. */
 
+/* Centrado, e não encostado à esquerda: a tela tem dois cards estreitos
+   e nada na coluna da direita — alinhá-los à esquerda deixava metade da
+   largura vazia, que é o que o print mostrava. O teto de largura fica
+   porque um campo de nome com 1200px de largura não é melhor, é só
+   maior. */
 .grid {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    max-width: 760px;
+    width: 100%;
+    max-width: 820px;
+    margin: 0 auto;
 }
 
 .section {
@@ -41,6 +48,14 @@
     align-items: flex-end;
     gap: 12px;
     flex-wrap: wrap;
+}
+
+/* O cabeçalho da tela acompanha a coluna dos cards — um título alinhado
+   à esquerda com os cards centrados fica torto. */
+.head {
+    width: 100%;
+    max-width: 820px;
+    margin: 0 auto;
 }
 
 .rowGrow {

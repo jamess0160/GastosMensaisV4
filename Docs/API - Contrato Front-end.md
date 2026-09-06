@@ -316,7 +316,19 @@ Soft delete (a linha fica, para o `CredentialId` seguir ocupando o índice únic
 
 ## 4. Workspaces — `/Workspaces` 🔒 *(exceto `GET /Workspaces/invite/Hash=:Hash`)*
 
-Não há `POST`: um workspace nasce no cadastro, e a única forma de entrar num que já existe é o **convite** (4.1). Um usuário pode ser membro de mais de um — `getSelf` devolve todos, e é o `switch` que escolhe em qual a sessão está.
+Um usuário pode ser membro de mais de um workspace, e há **três** formas de isso acontecer: o primeiro nasce no cadastro, um workspace novo se cria com `POST /Workspaces`, e num que já existe só se entra por **convite** (4.1). `getSelf` devolve todos, e é o `switch` que escolhe em qual a sessão está.
+
+### `POST /Workspaces`
+
+Cria um workspace novo, com o usuário da sessão como dono. É a tela de "separar as finanças" — casa e empresa, pessoal e do casal — para quem já tem conta.
+
+**Body:** `Name` (obrigatório, ≤255).
+
+**Resposta `200`:** `{ "IdWorkspace": 2 }`.
+
+Não recebe `IdWorkspace` (ele nasce aqui) nem `IdOwnerUser` (é o usuário do token). O workspace nasce **vazio**: sem contas, sem categorias próprias, sem lançamentos — só com você como membro `owner` e com a sua pessoa (`Persons`) criada dentro dele, para você já poder entrar num rateio. As categorias globais aparecem nele como em qualquer outro.
+
+> ⚠️ **Criar NÃO troca a sessão**, exatamente como o `join`: o cookie continua apontando para o workspace em que você estava. Para operar no novo, chame **`POST /Workspaces/switch`** com o `IdWorkspace` que voltou.
 
 ### `GET /Workspaces/getSelf`
 
@@ -1369,7 +1381,7 @@ Existe no banco, mas **sem rota**: `UserDevices`, `Notifications`, `Plans`, `Sub
 
 **Gestão de membros ainda não existe:** listar quem é membro, trocar o papel de alguém, remover um membro, sair de um workspace e transferir propriedade. O convite (4.1) entrega só a entrada. Revogar um convite **não** desfaz matrícula já criada.
 
-Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de `PaymentMethods` (vem embutido na conta), CRUD de `Tags` além de busca e arquivar, `GET`/`POST` de `BudgetPeriods`, e a **rotina mensal** que materializaria os orçamentos.
+Também não existem: `GET` de `PaymentMethods` (vem embutido na conta), CRUD de `Tags` além de busca e arquivar, `GET`/`POST` de `BudgetPeriods`, e a **rotina mensal** que materializaria os orçamentos.
 
 **Fora deste contrato:** `/Cache` (`GET /Cache/CacheName=:CacheName`, `POST /Cache`, `POST /Cache/Reset/CacheName=:CacheName`) é o subsistema interno de cache em memória sincronizado por socket. Não tem schema Joi, não é escopado por workspace e não faz parte do domínio do app — não consuma a partir das telas.
 
@@ -1393,6 +1405,7 @@ Também não existem: `POST /Workspaces` (workspace nasce no cadastro), `GET` de
 | POST | `/UsersAuth/register` | 🔒 |
 | POST | `/UsersAuth/skipDevice` | 🔒 |
 | DELETE | `/UsersAuth/IdUserAuth=:IdUserAuth` | 🔒 |
+| POST | `/Workspaces` | 🔒 |
 | GET | `/Workspaces/getSelf` | 🔒 |
 | POST | `/Workspaces/switch` | 🔒 |
 | POST | `/Workspaces/invite` | 🔒 `owner` |
@@ -1468,6 +1481,18 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-06 — `POST /Workspaces`: criar um workspace novo
+
+🟢 **Adição** — ver a seção 4.
+
+**O que entrou.** `POST /Workspaces` com `{ Name }`, respondendo `{ IdWorkspace }`. Até agora um workspace só nascia dentro do cadastro, então quem já tinha conta e queria separar as finanças em dois lugares (a casa e a empresa, o pessoal e o do casal) não tinha caminho nenhum — a saída era criar outra conta com outro e-mail, o que espalha o login em vez de organizar o dinheiro.
+
+**Quem cria é `owner`**, e o `IdOwnerUser` vem do token: não há campo no corpo por onde apontá-lo para outra pessoa. O workspace nasce **vazio** — sem contas, sem categorias próprias, sem lançamentos —, com a matrícula e com a **sua pessoa (`Persons`) já criada dentro dele**, porque todo rateio é entre pessoas e sem ela você não apareceria no próprio gasto.
+
+**Ação do front:** depois do `POST`, chame **`POST /Workspaces/switch`** com o `IdWorkspace` que voltou. **Criar não troca a sessão**, pela mesma razão do `join` (seção 4.1): trocar o workspace debaixo da tela que o usuário estava usando é pior do que um clique a mais. Sem o `switch`, o usuário cria o workspace e continua vendo o antigo — é o mesmo bug provável que o do aceite de convite.
+
+**Nada mudou** para quem tem um workspace só: o cadastro continua criando o primeiro, e nenhuma resposta existente mudou de forma.
 
 ### 2026-09-06 — `POST /Expenses`: estorno, o gasto de valor **negativo**
 

@@ -124,10 +124,12 @@ export function Workspace() {
 
     return (
         <Page>
-            <PageHead
-                title={workspace.Name}
-                subtitle={`Onde vivem suas contas, categorias e lançamentos · ${workspaces.length} espaço${workspaces.length === 1 ? "" : "s"} nesta conta`}
-            />
+            <div className={styles.head}>
+                <PageHead
+                    title={workspace.Name}
+                    subtitle={`Onde vivem suas contas, categorias e lançamentos · ${workspaces.length} espaço${workspaces.length === 1 ? "" : "s"} nesta conta`}
+                />
+            </div>
 
             <div className={styles.grid}>
                 {/* ── O nome ────────────────────────────────── */}

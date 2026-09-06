@@ -1,8 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./WorkspaceSwitcher.module.css";
 import { useSession, useSwitchWorkspace } from "./session";
+import {
+    createWorkspace,
+    type CreateWorkspaceContext,
+} from "@/pages/Workspace/sections/createWorkspace";
 import { IconChevronDown, IconEdit, IconPlus } from "@/ui/icons";
+import { Button } from "@/ui/primitives";
+import { FormError, FormField, Input } from "@/ui/form";
+import { FooterSpacer, Modal } from "@/ui/overlay";
 import { errorMessage } from "@/api/client";
 import type { ApiTypes } from "@/types/api";
 
@@ -22,9 +29,9 @@ import type { ApiTypes } from "@/types/api";
      espaço DA SESSÃO e não recebem id, editar um espaço que não é o
      atual TROCA a sessão antes — não há outro jeito de o formulário
      gravar no lugar certo.
-   - **Criar** não existe: não há `POST /Workspaces` (pendência 18). O
-     botão fica desabilitado e rotulado, como os outros do sistema que
-     esperam rota.
+   - **Criar** chama `POST /Workspaces` e, logo depois, o `switch` — a
+     rota não troca a sessão sozinha, pela mesma razão do `join`. O
+     espaço nasce vazio e com você como dono.
    ════════════════════════════════════════════════════════════ */
 
 const initials = (name: string) =>
@@ -45,6 +52,13 @@ export function WorkspaceSwitcher() {
     const [error, setError] = useState<string | null>(null);
     const wrapRef = useRef<HTMLDivElement>(null);
 
+    /* O nome do espaço novo. `null` é "o formulário não está aberto" —
+       um campo de texto não cabe na largura da sidebar, então ele vira
+       um modal por cima. */
+    const [newName, setNewName] = useState<string | null>(null);
+    const [creating, setCreating] = useState(false);
+    const [createError, setCreateError] = useState<string | null>(null);
+
     /* Clique fora e Esc fecham. O painel cobre a navegação e o bloco do
        usuário: deixá-lo aberto por engano esconde meia sidebar. */
     useEffect(() => {
@@ -64,6 +78,30 @@ export function WorkspaceSwitcher() {
             document.removeEventListener("keydown", onKeyDown);
         };
     }, [open]);
+
+    const createContext = useMemo<CreateWorkspaceContext>(
+        () => ({
+            name: newName ?? "",
+            beginSubmit() {
+                setCreating(true);
+                setCreateError(null);
+            },
+            failSubmit(message) {
+                setCreating(false);
+                setCreateError(message);
+            },
+            finishCreate() {
+                setCreating(false);
+                setNewName(null);
+                /* O `switch` já aconteceu: a tela do espaço abre JÁ no
+                   novo. Ela é o lugar certo para cair — acabou de ser
+                   nomeado, está vazio, e o passo seguinte de quem cria um
+                   espaço para dividir é convidar alguém. */
+                navigate("/espaco");
+            },
+        }),
+        [newName, navigate],
+    );
 
     if (!workspace) return null;
 
@@ -131,7 +169,7 @@ export function WorkspaceSwitcher() {
                                 onClick={() => void run(candidate.IdWorkspace)}
                             >
                                 <span className={styles.dot} />
-                                <span style={{ minWidth: 0 }}>
+                                <span className={styles.pickText}>
                                     <span className={styles.pickName}>{candidate.Name}</span>
                                     <span className={styles.pickSub}>
                                         {isCurrent(candidate)
@@ -169,18 +207,73 @@ export function WorkspaceSwitcher() {
 
                     <div className={styles.sep} />
 
-                    {/* Sem rota: não existe `POST /Workspaces`, e um
-                        workspace só nasce no cadastro. Pendência 18. */}
-                    <button type="button" className={styles.new} disabled title="Ainda sem API">
+                    <button
+                        type="button"
+                        className={styles.new}
+                        disabled={pending}
+                        onClick={() => {
+                            setOpen(false);
+                            setCreateError(null);
+                            setNewName("");
+                        }}
+                    >
                         <IconPlus />
                         Novo espaço
                     </button>
-                    <div className={styles.note}>
-                        Criar um espaço novo ainda não tem rota na API. Para entrar num espaço de
-                        outra pessoa, peça um convite ao dono dele.
-                    </div>
                 </div>
             )}
+
+            {/* Criar é um formulário de um campo só, e ele não cabe na
+                largura da sidebar — por isso o modal. */}
+            <Modal
+                open={newName !== null}
+                onClose={() => setNewName(null)}
+                title="Novo espaço"
+                subtitle="Um espaço separa as finanças: casa e empresa, pessoal e do casal. Ele nasce vazio e com você como dono."
+                footer={
+                    <>
+                        <FooterSpacer />
+                        <Button onClick={() => setNewName(null)} disabled={creating}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="primary"
+                            type="submit"
+                            form="new-workspace-form"
+                            disabled={creating}
+                        >
+                            {creating ? "Criando…" : "Criar e entrar"}
+                        </Button>
+                    </>
+                }
+            >
+                <form
+                    id="new-workspace-form"
+                    onSubmit={(event: FormEvent) => {
+                        event.preventDefault();
+                        void createWorkspace(createContext, switchWorkspace);
+                    }}
+                    style={{ display: "flex", flexDirection: "column", gap: 14 }}
+                >
+                    <FormError>{createError}</FormError>
+
+                    <FormField
+                        label="Nome"
+                        required
+                        help="Você entra nele assim que for criado. Suas contas e lançamentos atuais continuam no espaço de onde você veio."
+                    >
+                        {(field) => (
+                            <Input
+                                {...field}
+                                maxLength={255}
+                                placeholder="Empresa, Viagem, Casa da praia…"
+                                value={newName ?? ""}
+                                onChange={(event) => setNewName(event.target.value)}
+                            />
+                        )}
+                    </FormField>
+                </form>
+            </Modal>
         </div>
     );
 }

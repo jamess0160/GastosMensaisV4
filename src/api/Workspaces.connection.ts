@@ -1,9 +1,9 @@
 import { http } from "./client";
 import type { ApiTypes } from "@/types/api";
 
-/** `/Workspaces` — não há POST: um workspace nasce no cadastro, e a
- *  única forma de entrar num que já existe é o CONVITE (pendência 18
- *  pede a criação avulsa).
+/** `/Workspaces` — três formas de um usuário ser membro de um: o
+ *  primeiro nasce no cadastro, um novo se cria aqui, e num que já existe
+ *  só se entra por CONVITE.
  *
  *  As três rotas de gestão — `update`, `invites` e `invite` — agem no
  *  workspace DA SESSÃO e não recebem id: quem escolhe em qual espaço se
@@ -18,6 +18,23 @@ class Connection {
      *  dentro do token, e o cookie é `HttpOnly`. Ver a pendência 19. */
     async getSelf(): Promise<ApiTypes.Workspace[]> {
         const { data } = await http.get<ApiTypes.Workspace[]>(`${this.route}/getSelf`);
+        return data;
+    }
+
+    /** Cria um espaço novo, com o usuário da sessão como dono. É a tela
+     *  de "separar as finanças" — casa e empresa, pessoal e do casal —
+     *  para quem já tem conta.
+     *
+     *  O espaço nasce VAZIO: sem contas, sem categorias próprias e sem
+     *  lançamentos, só com a matrícula `owner` e com a Person do usuário
+     *  criada dentro dele, para ele já poder entrar num rateio. As
+     *  categorias globais aparecem nele como em qualquer outro.
+     *
+     *  ⚠️ CRIAR NÃO TROCA A SESSÃO, exatamente como o `join`: o cookie
+     *  continua apontando para o workspace em que se estava. Para operar
+     *  no novo, chame `switch` com o `IdWorkspace` que voltou. */
+    async create(body: ApiTypes.WorkspaceCreateBody): Promise<{ IdWorkspace: number }> {
+        const { data } = await http.post<{ IdWorkspace: number }>(this.route, body);
         return data;
     }
 

@@ -92,9 +92,10 @@ export namespace ApiTypes {
 
     /* ── 4. Workspaces ────────────────────────────────────────── */
 
-    /** Não há `POST`: um workspace nasce no cadastro, e a única forma de
-     *  entrar num que já existe é o convite. Um usuário pode ser membro
-     *  de vários — `getSelf` devolve todos, e é o `switch` que escolhe em
+    /** Um usuário pode ser membro de vários workspaces, e há TRÊS formas
+     *  de isso acontecer: o primeiro nasce no cadastro, um novo se cria
+     *  com `POST /Workspaces`, e num que já existe só se entra por
+     *  CONVITE. `getSelf` devolve todos, e é o `switch` que escolhe em
      *  qual a sessão está.
      *
      *  ⚠️ A lista NÃO diz qual é o da sessão: o `IdWorkspace` vive dentro
@@ -106,6 +107,17 @@ export namespace ApiTypes {
         IdOwnerUser: number;
         CreatedAt: DateTime;
         UpdatedAt: DateTime;
+    }
+
+    /** `IdWorkspace` não entra (ele nasce aqui) e `IdOwnerUser` também
+     *  não (é o usuário do token) — não há campo por onde apontar a
+     *  propriedade para outra pessoa.
+     *
+     *  O workspace nasce VAZIO: sem contas, sem categorias próprias e sem
+     *  lançamentos, só com a matrícula `owner` e com a Person do usuário
+     *  criada dentro dele. */
+    export interface WorkspaceCreateBody {
+        Name: string;
     }
 
     /* ── 4.1 Convites ─────────────────────────────────────────── */

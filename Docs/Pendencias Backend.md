@@ -32,7 +32,7 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | ~~15~~ | [Criação de entradas em lote](#15-criação-de-entradas-em-lote) | Produto | ✅ **Entregue** em 04/09 |
 | ~~16~~ | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | ✅ **Entregue** em 04/09 |
 | 17 | [`Charged` e `CompetenceDate` em `GET /ExpensePayments`](#17-charged-e-competencedate-em-get-expensepayments) | Contrato | Botão "entrou na fatura" na lista |
-| 18 | [Criar um workspace novo](#18-criar-um-workspace-novo) | Produto | Botão "Novo espaço" no seletor |
+| ~~18~~ | [Criar um workspace novo](#18-criar-um-workspace-novo) | Produto | ✅ **Entregue** em 06/09 |
 | 19 | [Saber em qual workspace a sessão está](#19-saber-em-qual-workspace-a-sessão-está) | Contrato | O seletor de espaço do chassi |
 | 20 | [Gestão de membros](#20-gestão-de-membros) | Produto | Tirar alguém de um espaço |
 | 21 | [O `403` não está na tabela de erros](#21-o-403-não-está-na-tabela-de-erros) | Contrato | Mensagem de "não é o dono" |
@@ -53,11 +53,12 @@ Do 3 ao 9 são cortes conscientes do MVP — o frontend já está desenhado
 para viver sem eles —, e o 11 virou registro histórico quando o 15
 substituiu a forma dele.
 
-**Os itens 17 a 21 nasceram da leva 4.** O 17 é uma divergência entre o
-changelog e o exemplo de resposta da seção 12; os outros três são o que a
-tela de espaços pediu e não encontrou — e o **19 é o mais incômodo**,
-porque o chassi passou a afirmar em toda tela uma coisa que o cliente não
-tem como saber.
+**Os itens 17 a 21 nasceram da leva 4**, e o **18 já subiu**: `POST
+/Workspaces` entrou no mesmo dia, na forma proposta aqui. O 17 é uma
+divergência entre o changelog e o exemplo de resposta da seção 12; o 19,
+o 20 e o 21 são o que a tela de espaços pediu e não encontrou — e o
+**19 é o mais incômodo**, porque o chassi passou a afirmar em toda tela
+uma coisa que o cliente não tem como saber.
 
 ---
 
@@ -746,6 +747,18 @@ qual — a tela muda, e muda para pior.
 ---
 
 ## 18. Criar um workspace novo
+
+> ✅ **Entregue em 06/09**, na forma proposta: `POST /Workspaces` com
+> `{ Name }`, respondendo `{ IdWorkspace }`, e o usuário da sessão como
+> `owner` — sem campo por onde apontar a propriedade para outra pessoa.
+>
+> Duas coisas do jeito que a rota subiu importam para a tela: o espaço
+> nasce **vazio**, mas já com a **Person do usuário** criada dentro dele
+> (senão ele não apareceria no próprio rateio); e **criar não troca a
+> sessão**, pela mesma razão do `join` — o cliente chama `switch` logo
+> depois, e é isso que `createWorkspace` faz, com teste.
+>
+> O botão "Novo espaço" do seletor deixou de estar desabilitado.
 
 **O problema.** Não existe `POST /Workspaces`. O contrato é explícito —
 "um workspace nasce no cadastro, e a única forma de entrar num que já
