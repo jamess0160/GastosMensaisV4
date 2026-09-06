@@ -11,6 +11,19 @@ const inviteRole = Joi.string().valid("editor", "viewer")
 
 class Schema {
 
+    //  Só o nome. IdOwnerUser vem do token, e não há IdWorkspace a receber: ele nasce nesta
+    //  chamada. Mesma forma do Name do update, que edita o mesmo campo.
+    public readonly create = [
+        joiController.validateBody(Joi.object({
+            Name: Joi.string().trim().max(255).required(),
+        })),
+        //  Só o id, como todo POST do projeto: a linha inteira o cliente busca no getSelf, que
+        //  é onde ela já ia aparecer na lista de workspaces.
+        joiController.validateResponse(Joi.object({
+            IdWorkspace: Joi.number().required(),
+        })),
+    ]
+
     public readonly getSelf = [
         joiController.validateResponse(Joi.array().items(Joi.object({
             IdWorkspace: Joi.number().required(),

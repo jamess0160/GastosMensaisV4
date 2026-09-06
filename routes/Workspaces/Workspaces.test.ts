@@ -2,8 +2,9 @@ import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tes
 
 //  Testes integrados da feature Workspaces. Um describe por rota de Workspaces.route.ts.
 //
-//  O workspace não tem rota de criação: ele nasce dentro do POST /Users, na mesma
-//  transaction. É o describe do fluxo end to end que cobre esse nascimento, por HTTP.
+//  O PRIMEIRO workspace do usuário nasce dentro do POST /Users, na mesma transaction — é o
+//  describe do fluxo end to end que cobre esse nascimento, por HTTP. O POST /Workspaces é o
+//  segundo em diante, para quem já tem conta.
 
 describe("Workspaces", () => {
 
@@ -15,6 +16,82 @@ describe("Workspaces", () => {
 
         root = await UsersFactory.create({ Name: "Dono do workspace" })
         client = new TestClient(root.token)
+    })
+
+    describe("POST /Workspaces", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().post("/Workspaces", { Name: "Empresa" })
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa corpo sem o Name", async () => {
+            let response = await client.post("/Workspaces", {})
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Quem cria não foi convidado por ninguém: entra como dono, e o IdOwnerUser é o do
+        //  token — não há campo no corpo por onde apontá-lo para outra pessoa.
+        it("cria o workspace com o usuário do token como dono e como owner da matrícula", async () => {
+            let creator = await UsersFactory.createClient({ Name: "Dono de dois workspaces" })
+
+            let response = await creator.client.post("/Workspaces", { Name: "Empresa" })
+
+            expect(response.status).toBe(200)
+            //  Só o id: a linha inteira sai no getSelf
+            expect(response.body).toEqual({ IdWorkspace: expect.any(Number) })
+
+            let created = await findWorkspace(response.body.IdWorkspace)
+
+            expect(created).toMatchObject({ Name: "Empresa", IdOwnerUser: creator.user.IdUser })
+
+            //  Sem a matrícula o tenant seria órfão: toda leitura passa por getByMember
+            expect((await findMembership(response.body.IdWorkspace, creator.user.IdUser))?.Role).toBe("owner")
+        })
+
+        //  Todo rateio é entre Persons, então um workspace em que o criador não é pessoa é um
+        //  workspace onde ele não pode aparecer no próprio gasto. O nome é o do USUÁRIO, não o
+        //  do workspace: no cadastro os dois coincidem, aqui não — e é aqui que dá para provar.
+        it("cria a Person do criador no workspace novo, com o nome do usuário", async () => {
+            let creator = await UsersFactory.createClient({ Name: "Pessoa do criador" })
+
+            let response = await creator.client.post("/Workspaces", { Name: "Empresa" })
+
+            let person = (await findPersonsByUser(creator.user.IdUser)).find((item) => item.IdWorkspace === response.body.IdWorkspace)
+
+            expect(person).toMatchObject({ Name: "Pessoa do criador", IdUser: creator.user.IdUser })
+        })
+
+        it("passa a listar os dois workspaces no getSelf", async () => {
+            let creator = await UsersFactory.createClient()
+
+            let response = await creator.client.post("/Workspaces", { Name: "Empresa" })
+
+            let self = await creator.client.get("/Workspaces/getSelf")
+
+            expect(self.body.map((item: { IdWorkspace: number }) => item.IdWorkspace).sort()).toEqual(
+                [creator.workspace.IdWorkspace, response.body.IdWorkspace].sort()
+            )
+        })
+
+        //  Como o join: criar dá matrícula, não troca a sessão — senão o workspace mudaria
+        //  debaixo da tela que o usuário estava usando. Quem quiser operar no novo chama o
+        //  switch, que continua sendo a única rota que muda a seleção.
+        it("não reemite o token, e o switch é que leva a sessão para o workspace novo", async () => {
+            let creator = await UsersFactory.createClient()
+
+            let response = await creator.client.post("/Workspaces", { Name: "Empresa" })
+
+            expect(TestClient.extractCookieToken(response)).toBeNull()
+            expect(TestClient.decodeToken(creator.client.getToken()!).IdWorkspace).toBe(creator.workspace.IdWorkspace)
+
+            let switched = await creator.client.post("/Workspaces/switch", { IdWorkspace: response.body.IdWorkspace })
+
+            expect(switched.status).toBe(200)
+            expect(TestClient.decodeToken(TestClient.extractCookieToken(switched)!).IdWorkspace).toBe(response.body.IdWorkspace)
+        })
     })
 
     describe("GET /Workspaces/getSelf", () => {
@@ -678,6 +755,10 @@ async function countInvites(IdWorkspace: number) {
     let rows = await TestDatabase.connection().select("*").from("WorkspaceInvites").where("IdWorkspace", IdWorkspace)
 
     return rows.length
+}
+
+function findWorkspace(IdWorkspace: number) {
+    return TestDatabase.connection().select("*").from("Workspaces").where("IdWorkspace", IdWorkspace).first()
 }
 
 function findMembership(IdWorkspace: number, IdUser: number) {

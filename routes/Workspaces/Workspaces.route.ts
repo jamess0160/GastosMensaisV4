@@ -5,8 +5,14 @@ import { Workspaces_schema } from "./Workspaces.schema"
 
 export const Workspaces_route = express()
 
-//  Não há POST: hoje é um workspace por usuário e ele nasce dentro do cadastro
-//  (routes/Users/sections/POST/create.ts), na mesma transaction que cria o usuário.
+//  O primeiro workspace nasce dentro do cadastro (routes/Users/sections/POST/create.ts), na
+//  mesma transaction que cria o usuário. Esta rota é para o segundo em diante: quem já tem
+//  conta e quer separar as finanças em mais de um lugar. Não recebe IdWorkspace nenhum — o
+//  workspace ainda não existe, e o dono é o usuário do token.
+//
+//  Como o join, NÃO reemite o token: criar dá matrícula, não troca a sessão.
+Workspaces_route.post("/Workspaces", Workspaces_schema.create, AsyncHandler(Workspaces_controller.create))
+
 Workspaces_route.get("/Workspaces/getSelf", Workspaces_schema.getSelf, AsyncHandler(Workspaces_controller.getSelf))
 
 //  Escolhe em qual workspace a sessão está. É a única rota que recebe um IdWorkspace escrito

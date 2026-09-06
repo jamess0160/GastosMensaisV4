@@ -1,4 +1,9 @@
 export namespace WorkspacesNamespace {
+    //  Só o nome: o dono é o usuário do token, e o id nasce na própria chamada.
+    export interface CreateWorkspacePayload {
+        Name: string
+    }
+
     export interface UpdateWorkspacePayload {
         Name: string
     }

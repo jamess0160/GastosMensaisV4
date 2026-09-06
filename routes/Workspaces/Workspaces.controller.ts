@@ -1,4 +1,5 @@
 import { Request, Response } from "express"
+import { CreateOwn } from "./sections/POST/createOwn"
 import { GetSelf } from "./sections/GET/getSelf"
 import { GetInviteByHash } from "./sections/GET/getInviteByHash"
 import { GetInvites } from "./sections/GET/getInvites"
@@ -9,6 +10,11 @@ import { RevokeInvite } from "./sections/DELETE/revokeInvite"
 import { Update } from "./sections/PUT/update"
 
 class Controller {
+
+    //  Sem res.locals.IdWorkspace: o workspace nasce aqui, não vem da sessão.
+    create = async (req: Request, res: Response) => {
+        res.json(await new CreateOwn().run(res.locals.IdUser, req.body))
+    }
 
     getSelf = async (req: Request, res: Response) => {
         res.json(await new GetSelf().run(res.locals.IdUser))
