@@ -28,7 +28,7 @@ valer, aqui que foi entregue.
 
 **Suítes:** 15 arquivos `.test.ts`. A leva 1 fechou com **391 testes**; o total depois da leva 2
 não foi anotado no fim dela, e a primeira execução completa depois disso — no fim da etapa 4 da
-leva 3 — deu **574 testes**.
+leva 3 — deu **574 testes**. No fim da etapa 6 são **604**.
 
 Os dois arquivos novos são os primeiros que não ficam ao lado de uma feature de `routes/`, porque
 o que eles testam também não fica: `rotines/Rotines.test.ts` (o motor e as rotinas do orçamento) e
@@ -120,8 +120,8 @@ numa leva onde não está.
 | **2** | A rotina mensal do orçamento | `b9f127e` | 2026-09-07 |
 | **3** | A infra de e-mail | `0961637` | 2026-09-07 |
 | **4** | Recuperação de senha | `f154afa` | 2026-09-07 |
-| **5** | Confirmação de e-mail | `PENDENTE` | 2026-09-07 |
-| **6** | Duração de sessão configurável | `PENDENTE` | 2026-09-07 |
+| **5** | Confirmação de e-mail | `5d4a8d9` | 2026-09-07 |
+| **6** | Duração de sessão configurável | `b973821` | 2026-09-07 |
 
 Cada etapa concluída ganha sua linha, com commit e data, no commit em que for concluída.
 
