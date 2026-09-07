@@ -119,7 +119,7 @@ numa leva onde não está.
 | **1** | O motor de rotinas | `31a542e` | 2026-09-07 |
 | **2** | A rotina mensal do orçamento | `b9f127e` | 2026-09-07 |
 | **3** | A infra de e-mail | `0961637` | 2026-09-07 |
-| **4** | Recuperação de senha | `_pendente_` | 2026-09-07 |
+| **4** | Recuperação de senha | `f154afa` | 2026-09-07 |
 
 Cada etapa concluída ganha sua linha, com commit e data, no commit em que for concluída.
 
