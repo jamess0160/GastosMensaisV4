@@ -24,7 +24,7 @@ valer, aqui que foi entregue.
 | --- | --- | --- | --- | --- |
 | **1 — MVP** | [1. ROADMAP- MVP.md](levas/1.%20ROADMAP-%20MVP.md) | **fechada**, com duas etapas deixadas de fora de propósito | 8 de 10 | 2026-07-30 → 2026-08-30 |
 | **2 — o que sobe junto com o MVP** | [2. Plano de Desenvolvimento - Leva 2.md](levas/2.%20Plano%20de%20Desenvolvimento%20-%20Leva%202.md) | **fechada** | 11 de 11 | 2026-09-04 → 2026-09-05 |
-| **3 — o que depende de infra ou de decisão** | [3. Plano de Desenvolvimento - Leva 3.md](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md) | **em andamento** | 2 de 10 | 2026-09-07 → |
+| **3 — o que depende de infra ou de decisão** | [3. Plano de Desenvolvimento - Leva 3.md](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md) | **em andamento** | 3 de 10 | 2026-09-07 → |
 
 **Suítes:** 13 arquivos `.test.ts`, um por feature. A leva 1 fechou com **391 testes**; o total
 depois da leva 2 não foi anotado no fim dela — a próxima execução completa da suíte preenche este
@@ -65,7 +65,7 @@ conteúdo, e uma etapa pode aparecer em mais de um commit.
 
 | Etapa | Por quê | Onde está agora |
 | --- | --- | --- |
-| **8b** — a rotina mensal do orçamento | Precisa de agendador, que o projeto não tinha | Na [leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md), com o desenho fechado e o agendador junto |
+| **8b** — a rotina mensal do orçamento | Precisa de agendador, que o projeto não tinha | **Feita na [leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md)**, com o agendador junto: o motor de rotinas e as duas rotinas do orçamento |
 | **9** — compartilhamento de workspace | Fora do MVP, mas com uma pendência de segurança aberta | **Parcialmente feita:** o convite e o aceite foram feitos na leva 2, e fecharam a pendência. A gestão de membros (listar, trocar papel, remover, sair, transferir propriedade) continua aberta e não está em leva nenhuma |
 
 ---
@@ -113,7 +113,8 @@ numa leva onde não está.
 | Etapa | O que é | Commit | Data |
 | --- | --- | --- | --- |
 | **1** | O motor de rotinas | `31a542e` | 2026-09-07 |
-| **2** | A rotina mensal do orçamento | `_pendente_` | 2026-09-07 |
+| **2** | A rotina mensal do orçamento | `b9f127e` | 2026-09-07 |
+| **3** | A infra de e-mail | `_pendente_` | 2026-09-07 |
 
 Cada etapa concluída ganha sua linha, com commit e data, no commit em que for concluída.
 

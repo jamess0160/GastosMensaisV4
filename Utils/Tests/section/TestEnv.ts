@@ -9,6 +9,12 @@ process.env.NODE_ENV = "test"
 //  para o modo end to end (NODE_ENV=test npx tsx index.ts) carrega exatamente o mesmo par.
 Utils.configEnv()
 
+//  O endereço público do front, que os links dos e-mails carregam. Ele é **obrigatório** no
+//  app (ver Utils/Mail/appLink.ts), e a suíte não pode depender de um .env local para existir:
+//  sem este default, uma máquina sem a variável reprovaria testes que não têm nada a ver com
+//  configuração. Quem quiser afirmar outro domínio declara APP_URL no .env.test, e ele vence.
+process.env.APP_URL = process.env.APP_URL || "https://app.gastos.local"
+
 export namespace TestEnv {
 
     //  Quando preenchida, os testes deixam de subir o app em memória e passam a bater em um
