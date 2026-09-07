@@ -24,15 +24,17 @@ valer, aqui que foi entregue.
 | --- | --- | --- | --- | --- |
 | **1 — MVP** | [1. ROADMAP- MVP.md](levas/1.%20ROADMAP-%20MVP.md) | **fechada**, com duas etapas deixadas de fora de propósito | 8 de 10 | 2026-07-30 → 2026-08-30 |
 | **2 — o que sobe junto com o MVP** | [2. Plano de Desenvolvimento - Leva 2.md](levas/2.%20Plano%20de%20Desenvolvimento%20-%20Leva%202.md) | **fechada** | 11 de 11 | 2026-09-04 → 2026-09-05 |
-| **3 — o que depende de infra ou de decisão** | [3. Plano de Desenvolvimento - Leva 3.md](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md) | **em andamento** | 6 de 10 | 2026-09-07 → |
+| **3 — o que depende de infra ou de decisão** | [3. Plano de Desenvolvimento - Leva 3.md](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md) | **fechada** | 10 de 10 | 2026-09-07 |
 
-**Suítes:** 15 arquivos `.test.ts`. A leva 1 fechou com **391 testes**; o total depois da leva 2
+**Suítes:** 16 arquivos `.test.ts`. A leva 1 fechou com **391 testes**; o total depois da leva 2
 não foi anotado no fim dela, e a primeira execução completa depois disso — no fim da etapa 4 da
-leva 3 — deu **574 testes**. No fim da etapa 6 são **604**.
+leva 3 — deu **574 testes**. No fim da etapa 6 são **604**, e no fim da leva **654**.
 
-Os dois arquivos novos são os primeiros que não ficam ao lado de uma feature de `routes/`, porque
-o que eles testam também não fica: `rotines/Rotines.test.ts` (o motor e as rotinas do orçamento) e
-`Utils/Connections/Mailer.test.ts` (a infra de e-mail).
+Três arquivos não ficam ao lado de uma feature de `routes/`, porque o que eles testam também não
+fica: `rotines/Rotines.test.ts` (o motor e as rotinas do orçamento) e
+`Utils/Connections/Mailer.test.ts` (a infra de e-mail) nasceram na leva 3, e
+`routes/Reports/Reports.test.ts` fica ao lado de uma feature que **não tem tabela** — a primeira
+do projeto.
 
 ---
 
@@ -112,7 +114,7 @@ numa leva onde não está.
 
 ---
 
-## Leva 3 — em andamento
+## Leva 3 — o que depende de infra ou de decisão
 
 | Etapa | O que é | Commit | Data |
 | --- | --- | --- | --- |
@@ -122,13 +124,21 @@ numa leva onde não está.
 | **4** | Recuperação de senha | `f154afa` | 2026-09-07 |
 | **5** | Confirmação de e-mail | `5d4a8d9` | 2026-09-07 |
 | **6** | Duração de sessão configurável | `b973821` | 2026-09-07 |
+| **7** | `CompetenceMode`: o cartão que conta como débito — e a perna ganha a segunda data | `8d1a4ef` | 2026-09-07 |
+| **8** | Agregados do mês, em `routes/Reports/` | `70db953` | 2026-09-07 |
+| **9** | Extrato de conta e de cartão | `1ed7174` | 2026-09-07 |
+| **10** | Exportar para Excel | `0e8c198` | 2026-09-07 |
 
 Cada etapa concluída ganha sua linha, com commit e data, no commit em que for concluída.
 
-**O que falta se lê no [documento da leva](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md)** — a tabela dele é a fonte, e este documento
-não a copia. O espelho que existia aqui foi removido em 2026-09-07: ele duplicava dez linhas que
-mudam sozinhas, e a renumeração daquele dia mostrou o preço — duas tabelas dizendo números
-diferentes sobre a mesma etapa, sem que nada avisasse qual estava velha.
+**Duas etapas mudaram de definição enquanto eram executadas**, e as edições foram para o
+documento da leva, não para cá (`65c7ac3`): a 7 fechou a escolha que estava em aberto sobre por
+qual data o saldo corta — a perna passou a ter **duas** datas, competência e caixa —, e a 10
+fechou a única decisão que faltava na leva inteira, a biblioteca da planilha.
+
+**A leva não deixou nada de fora**, ao contrário da 1: as dez etapas existem em código. O que
+saiu dela saiu **antes** de virar etapa — notificações e conciliação de extrato —, e o documento
+da leva registra o que se sabia sobre as duas.
 
 **Os números da leva 3 mudaram em 2026-09-07, e mudam uma vez só.** Ela foi renumerada para que a
 ordem dos números **seja** a ordem de execução, o que só pôde ser feito porque nada dela tinha
