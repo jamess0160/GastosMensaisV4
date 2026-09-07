@@ -114,6 +114,8 @@ E-mail já em uso: `406`.
 
 > O cadastro **não** loga o usuário. Chame `POST /Users/login` em seguida.
 
+**O usuário nasce com o e-mail não confirmado** (`EmailConfirmedAt: null`) e recebe, logo depois do cadastro, um e-mail com o link de confirmação. Isso **não bloqueia nada**: ele loga e usa o app normalmente. O que a tela precisa fazer é mostrar a faixa pedindo a confirmação enquanto `GET /Users/getSelf` devolver `EmailConfirmedAt: null` — ver o `POST /Users/confirmEmail`.
+
 ---
 
 ### `POST /Users/login` *(público)*
@@ -204,6 +206,56 @@ Token inválido, expirado, de outra finalidade ou **já usado**: `406` com `{ "m
 
 ---
 
+### `POST /Users/confirmEmail` *(público)*
+
+Confirma o endereço a partir do token que chegou por e-mail. O e-mail sai sozinho no cadastro, e de novo sempre que o endereço muda.
+
+**Body**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Token` | string | obrigatório — o que veio na query do link |
+
+**Resposta `200`**
+
+```json
+{ "msg": "E-mail confirmado com sucesso" }
+```
+
+Token inválido, expirado, de outra finalidade ou **de um endereço que não é mais o da conta**: `406` com `{ "msg": "Link de confirmação inválido ou expirado. Peça um novo." }` — uma mensagem só para todos os motivos, porque a ação da tela é a mesma: pedir outro link.
+
+O link do e-mail aponta para **o front**: `APP_URL/confirmar-email?Token=…`. Monte essa tela — é ela que lê o `Token` da query e chama esta rota. Vale **48 horas**.
+
+> **Confirmar duas vezes não é erro.** A segunda chamada responde `200` sem reescrever nada. Quem clica no link de novo, ou o pré-carregador de link do cliente de e-mail, não pode ver tela de erro para algo que já deu certo.
+
+> **Não confirmar não bloqueia nada hoje.** O usuário entra e usa o app; o que ele perde é a recuperação de senha funcionando de verdade, que depende de o endereço ser mesmo o dele.
+
+> **Não vem `Set-Cookie`**: confirmar o e-mail não abre sessão.
+
+---
+
+### `POST /Users/resendConfirmation` *(público)*
+
+Manda de novo o link de confirmação, para quem não recebeu o do cadastro.
+
+**Body**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Email` | string | obrigatório, formato de e-mail, normalizado para minúsculas |
+
+**Resposta `200`** — **sempre**, inclusive para e-mail que não tem conta e para quem já confirmou:
+
+```json
+{ "msg": "Se este e-mail tiver uma conta pendente de confirmação, enviamos o link." }
+```
+
+> **A resposta é idêntica em todos os casos, de propósito** — a mesma razão do `forgotPassword`: responder diferente transformaria a rota num verificador de quais e-mails têm conta. **Não tente inferir da resposta se a conta existe ou se ela já está confirmada.**
+
+> **Há um freio de 2 minutos por endereço.** Dois pedidos seguidos para o mesmo e-mail respondem os dois `200`, mas só o primeiro manda e-mail. A resposta não muda — um `429` aqui devolveria justamente o que a resposta única esconde. Do lado da tela: desabilite o botão e ofereça o reenvio com um contador.
+
+---
+
 ### `GET /Users/getSelf` 🔒
 
 **Resposta `200`** (`Password` nunca sai):
@@ -214,6 +266,7 @@ Token inválido, expirado, de outra finalidade ou **já usado**: `406` com `{ "m
   "Name": "Tiago",
   "Email": "tiago@exemplo.com",
   "Phone": 11999999999,
+  "EmailConfirmedAt": null,
   "LastLogin": "2026-08-30T12:00:00.000Z",
   "TrialStartAt": "2026-08-01T00:00:00.000Z",
   "TrialEndAt": null,
@@ -225,11 +278,17 @@ Token inválido, expirado, de outra finalidade ou **já usado**: `406` com `{ "m
 
 ---
 
+`EmailConfirmedAt` é `null` enquanto o endereço não foi confirmado, e é ele que a faixa da tela lê para saber se aparece. Ele **volta a ser `null`** quando o usuário troca o e-mail.
+
+---
+
 ### `PUT /Users/IdUser=:IdUser` 🔒
 
 **Body:** `Name` (obrigatório), `Email` (obrigatório), `Phone` (obrigatório).
 
 **Resposta `200`:** corpo vazio.
+
+> ⚠️ **Trocar o `Email` derruba a confirmação.** `EmailConfirmedAt` volta a `null` e sai um novo e-mail de confirmação para o **endereço novo**. Mandar o mesmo `Email` de volta — o caso de quem só mudou o nome — não mexe em nada. Depois de um `PUT` que muda o endereço, releia o `getSelf`: a faixa da confirmação volta.
 
 ---
 
@@ -1536,6 +1595,31 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-07 — `/Users`: confirmação de e-mail
+
+🟢 **Adição** — duas rotas públicas na seção 2 — e 🟡 **Comportamento**: `GET /Users/getSelf` passa a devolver `EmailConfirmedAt`, e `PUT /Users` passa a ter um efeito colateral quando o `Email` muda.
+
+**O que entrou.**
+
+| Rota | Corpo | O que faz |
+|---|---|---|
+| `POST /Users/confirmEmail` | `{ Token }` | confirma o endereço a partir do link |
+| `POST /Users/resendConfirmation` | `{ Email }` | manda o link de novo |
+
+Até agora ninguém provava que o endereço cadastrado era seu. Duas consequências: uma conta nascia sobre um e-mail com erro de digitação e o dono nunca recebia a recuperação de senha — trancado para fora sem ter feito nada errado —, e o endereço de outra pessoa podia ser usado no cadastro.
+
+**Quem não confirmou continua entrando e usando o app.** Nada é bloqueado por causa disso, e essa é uma decisão, não uma etapa pela metade: bloquear o login seria mais simples de raciocinar e é o que custa cadastro — quem não recebe o e-mail (spam, typo, provedor lento) ficaria do lado de fora dependendo de o reenvio funcionar.
+
+**A tela que falta é sua.** O e-mail aponta para `APP_URL/confirmar-email?Token=…` — **o front**, não a API. Essa tela lê o `Token` da query e chama o `POST /Users/confirmEmail`. O link vale 48 horas, e clicar nele duas vezes responde `200` das duas.
+
+**Três coisas para acertar:**
+
+1. **A faixa da tela lê o `EmailConfirmedAt` do `getSelf`.** `null` = aparece.
+2. **Trocar o e-mail no `PUT /Users` derruba a confirmação** e dispara um novo e-mail para o endereço novo. Releia o `getSelf` depois de um `PUT` que muda o endereço.
+3. **`resendConfirmation` responde `200` sempre**, inclusive para e-mail sem conta e para quem já confirmou — e tem um freio de 2 minutos por endereço, que **não** muda a resposta. Segure o botão do seu lado com um contador.
+
+**Ação do front:** montar a tela `/confirmar-email`, ler o `EmailConfirmedAt` no `getSelf` para decidir a faixa, e oferecer o reenvio com contador.
 
 ### 2026-09-07 — `/Users`: recuperação de senha
 

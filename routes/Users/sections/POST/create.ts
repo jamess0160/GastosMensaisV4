@@ -6,6 +6,7 @@ import { InviteAcceptance } from "root/routes/Workspaces/sections/InviteAcceptan
 import { CreateSelf as CreateSelfPerson } from "root/routes/Persons/sections/POST/createSelf"
 import { Users_model } from "../../Users.model"
 import { PasswordHasher } from "../PasswordHasher.section"
+import { SendEmailConfirmation } from "../SendEmailConfirmation.section"
 import { UsersNamespace } from "../types"
 
 //  Cadastro. Usuário, workspace e a Person do próprio dono nascem juntos: todo dado de domínio
@@ -25,7 +26,7 @@ export class Create {
         //  não deve segurar conexão, e o e-mail errado é o caso comum (link repassado).
         let invite = await this.resolveInvite(body)
 
-        return await KnexTransaction(async (tx) => {
+        return await KnexTransaction(async (tx, events) => {
 
             let IdUser = await Users_model.create({
                 Name: body.Name,
@@ -33,6 +34,18 @@ export class Create {
                 Phone: body.Phone,
                 Password: await PasswordHasher.hash(body.Password),
             }).transacting(tx).returnId("IdUser")
+
+            //  O e-mail de confirmação pendura no `attachOnEnd`, nunca dentro da transaction:
+            //  o `fireOnEnd` roda DEPOIS do commit, então um cadastro que rolou para trás não
+            //  manda nada — e um SMTP fora do ar não desfaz uma conta que já existe.
+            //
+            //  A linha é relida ali dentro, e não montada com o que veio no corpo: o que o
+            //  e-mail atesta tem que ser o que foi realmente gravado.
+            events.attachOnEnd(async () => {
+                let created = await Users_model.getUnique(IdUser)
+
+                if (created) await SendEmailConfirmation.run(created)
+            })
 
             //  O aceite grava matrícula, Person e a baixa do convite na MESMA transaction do
             //  usuário: um convite marcado como aceito por um cadastro que caiu deixaria o

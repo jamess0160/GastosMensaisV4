@@ -49,6 +49,31 @@ class Schema {
         })),
     ]
 
+    //  O Token no CORPO, como no resetPassword: ele chega pela query do link do e-mail, e o
+    //  que a tela faz com ele e um POST. Na URL da API o path cairia no log de acesso do
+    //  proxy e no header Referer - e um GET que muda estado seria gasto pelo pre-carregador
+    //  de link do cliente de e-mail, confirmando um endereco que ninguem abriu.
+    public readonly confirmEmail = [
+        joiController.validateBody(Joi.object({
+            Token: Joi.string().trim().required(),
+        })),
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+        })),
+    ]
+
+    //  Mesma forma do forgotPassword, e pelo mesmo motivo: o lowercase para reencontrar a
+    //  conta gravada em minusculas, e uma msg fixa que e a mesma para e-mail que tem conta e
+    //  para e-mail que nao tem.
+    public readonly resendConfirmation = [
+        joiController.validateBody(Joi.object({
+            Email: Joi.string().trim().lowercase().email(emailOptions).required(),
+        })),
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+        })),
+    ]
+
     //  Espelha a linha de Users, menos o Password: o hash nunca sai da API.
     //  As datas chegam aqui como Date (o res.json só serializa depois da validação).
     public readonly getSelf = [
@@ -57,6 +82,8 @@ class Schema {
             Name: Joi.string().trim().required(),
             Email: Joi.string().trim().required(),
             Phone: Joi.number().required(),
+            //  E o que a faixa da tela le para saber se aparece: nulo = ainda nao confirmado.
+            EmailConfirmedAt: Joi.date().allow(null).required(),
             LastLogin: Joi.date().required(),
             TrialStartAt: Joi.date().required(),
             TrialEndAt: Joi.date().allow(null).required(),

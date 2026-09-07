@@ -8,6 +8,14 @@ export namespace Database {
         Email: string
         Password: string
         Phone: number
+        /**
+         * Quando o dono provou que o endereco e dele - nulo enquanto nao provou.
+         *
+         * Nao bloqueia nada: o usuario nao confirmado entra e usa o app, e a tela
+         * mostra a faixa pedindo a confirmacao. Trocar o `Email` zera esta coluna,
+         * senao "confirmado" passaria a valer para um endereco que ninguem provou.
+         */
+        EmailConfirmedAt: Datetime | null
         LastLogin: Datetime
         TrialStartAt: Datetime
         TrialEndAt: Datetime | null

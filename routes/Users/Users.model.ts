@@ -31,6 +31,12 @@ export class class_Users_model extends BaseModel {
         return this.KnexConnection.insert(records).into("Users")
     }
 
+    //  O carimbo da confirmacao de e-mail, com metodo proprio como o `receive` de Inflows:
+    //  quem confirma nao escolhe a data - ela e o instante do banco, e nao o do processo.
+    confirmEmail(IdUser: number) {
+        return this.update(IdUser, { EmailConfirmedAt: this.KnexConnection.fn.now() as unknown as Database.Users["EmailConfirmedAt"] })
+    }
+
     update(IdUser: number, record: Partial<Database.Users>) {
         return this.KnexConnection.update({ ...record, UpdatedAt: this.KnexConnection.fn.now() }).from("Users").where("IdUser", IdUser)
     }

@@ -21,6 +21,13 @@ Users_route.post("/Users/forgotPassword", Users_schema.forgotPassword, AsyncHand
 
 Users_route.post("/Users/resetPassword", Users_schema.resetPassword, AsyncHandler(Users_controller.resetPassword, false))
 
+//  As duas da confirmacao tambem sao publicas, e pelo mesmo motivo das de cima: quem nao
+//  confirmou pode nao ter sessao nenhuma - o link chega no cadastro e e aberto em outro
+//  aparelho, e o reenvio e pedido justamente por quem nao conseguiu entrar.
+Users_route.post("/Users/confirmEmail", Users_schema.confirmEmail, AsyncHandler(Users_controller.confirmEmail, false))
+
+Users_route.post("/Users/resendConfirmation", Users_schema.resendConfirmation, AsyncHandler(Users_controller.resendConfirmation, false))
+
 Users_route.get("/Users/getSelf", Users_schema.getSelf, AsyncHandler(Users_controller.getSelf))
 
 Users_route.post("/Users", Users_schema.create, AsyncHandler(Users_controller.create, false))

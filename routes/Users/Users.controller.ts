@@ -8,6 +8,8 @@ import { UpdatePassword } from './sections/PUT/updatePassword'
 import { GetSelf } from './sections/GET/getSelf'
 import { ForgotPassword } from './sections/POST/forgotPassword'
 import { ResetPassword } from './sections/POST/resetPassword'
+import { ConfirmEmail } from './sections/POST/confirmEmail'
+import { ResendConfirmation } from './sections/POST/resendConfirmation'
 
 class Controller {
 
@@ -34,6 +36,14 @@ class Controller {
 
     resetPassword = async (req: Request, res: Response) => {
         res.json(await new ResetPassword().run(req.body.Token, req.body.NewPassword))
+    }
+
+    confirmEmail = async (req: Request, res: Response) => {
+        res.json(await new ConfirmEmail().run(req.body.Token))
+    }
+
+    resendConfirmation = async (req: Request, res: Response) => {
+        res.json(await new ResendConfirmation().run(req.body.Email))
     }
 
     acessMiddleware = (req: Request, res: Response) => {

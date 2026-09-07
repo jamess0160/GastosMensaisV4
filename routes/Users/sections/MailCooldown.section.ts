@@ -1,0 +1,84 @@
+import crypto from "crypto"
+
+//  **O primeiro freio do projeto contra abuso**, e ele é pequeno de propósito: uma janela em
+//  memória que decide se *este* endereço já recebeu este e-mail agora há pouco.
+//
+//  Uma rota pública que dispara e-mail é o lugar onde a falta de rate limiting passa a doer:
+//  sem freio nenhum, um laço sobre o `resendConfirmation` enche a caixa de entrada de outra
+//  pessoa usando o meu servidor, e queima a reputação do domínio no provedor junto.
+//
+//  **NÃO passa pelo `cacheEngine`**, e essa é a única decisão desta section. O plano da etapa
+//  previa isso — o `cacheEngine` já é um cache em memória por chave, e seria a peça óbvia —,
+//  mas ele é exposto por HTTP: `GET /Cache/CacheName=:CacheName` devolve o balde inteiro para
+//  qualquer sessão autenticada, e `POST /Cache` escreve nele. Guardar aqui a lista de quem
+//  pediu reenvio publicaria **exatamente** o que a resposta 200-sempre existe para esconder —
+//  quais e-mails têm conta —, e um `POST /Cache` limparia o freio. Um `Map` privado dentro
+//  desta section não tem nenhuma das duas portas.
+//
+//  Duas consequências aceitas, e as duas são o preço de não ter tabela nem Redis:
+//
+//  - **morre no restart**, o que só significa uma janela perdida por deploy;
+//  - **é por processo**: com duas instâncias, o freio afrouxa na proporção. O dia em que isso
+//    importar é o dia em que o freio vira uma tabela ou um Redis — e o ponto de troca é este
+//    arquivo, que é o único que sabe onde a janela mora.
+class Controller {
+
+    //  Curta: ela existe para barrar o laço e o clique repetido, não para punir quem
+    //  realmente não recebeu o e-mail. Quem esperar dois minutos pede de novo.
+    private readonly windowMs = 2 * 60 * 1000
+
+    private readonly claims = new Map<string, number>()
+
+    /**
+     * Tenta reservar a janela para uma chave. `true` = pode mandar, `false` = mandou agora há
+     * pouco.
+     *
+     * **Quem chama nunca muda a resposta HTTP por causa disto.** As rotas que usam este freio
+     * respondem 200 com a mesma `msg` de sempre; o que o `false` faz é não mandar o e-mail. Um
+     * 429 aqui devolveria a informação que a resposta única esconde: só um endereço com conta
+     * chegaria a ter cooldown para estourar.
+     */
+    public claim(key: string) {
+        let now = Date.now()
+
+        this.prune(now)
+
+        let hashed = this.hash(key)
+
+        if (this.claims.has(hashed)) {
+            return false
+        }
+
+        this.claims.set(hashed, now + this.windowMs)
+
+        return true
+    }
+
+    /** Para a suíte: o freio é global e sobreviveria de um teste para o outro. */
+    public clear() {
+        this.claims.clear()
+    }
+
+    /**
+     * A chave entra **hasheada**, e não em texto puro.
+     *
+     * O que se guarda aqui é um endereço de e-mail de alguém que tem conta. Hasheado, o mapa
+     * responde a única pergunta que ele precisa responder — "esta chave já passou por aqui?" —
+     * sem virar uma lista de e-mails cadastrados dentro do processo, legível num heap dump.
+     */
+    private hash(key: string) {
+        return crypto.createHash("sha256").update(key.trim().toLowerCase()).digest("hex")
+    }
+
+    //  Sem timer: a limpeza acontece na chamada seguinte. Um `setInterval` aqui seria mais um
+    //  handle vivo no processo — e o `memoryLog` do cache já mostrou o preço disso na suíte.
+    private prune(now: number) {
+        for (let [key, expiresAt] of this.claims) {
+            if (expiresAt <= now) {
+                this.claims.delete(key)
+            }
+        }
+    }
+}
+
+export const MailCooldown = new Controller()
