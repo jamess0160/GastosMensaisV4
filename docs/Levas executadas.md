@@ -160,5 +160,6 @@ Ao concluir uma etapa, no **mesmo commit** da etapa:
    trabalho de sumir entre duas levas.
 
 E o que **não** entra aqui: o porquê de uma decisão (isso é do documento da leva), o que mudou
-para o front (isso é a seção 18 do
-[contrato](API%20-%20Contrato%20Front-end.md)), e commit de ajuste que não fecha etapa.
+para o front (isso é o **changelog da leva**, em
+[contrato Front-end/changelogs/](contrato%20Front-end/changelogs/) — um arquivo por leva, com as
+mesmas fronteiras deste documento), e commit de ajuste que não fecha etapa.

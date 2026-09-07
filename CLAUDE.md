@@ -32,8 +32,8 @@ for it explicitly.**
   heading in the plan. For work that is not a stage, use the same shape: one line, what changed,
   no body.
 - **The "why" does not go in the commit message.** It already lives in three places that outlive
-  it — the comments in the code, the stage's section in `docs/levas/`, and the changelog in
-  `docs/API - Contrato Front-end.md`. A long commit body is a fourth copy that drifts from the
+  it — the comments in the code, the stage's section in `docs/levas/`, and the batch's changelog
+  in `docs/contrato Front-end/changelogs/`. A long commit body is a fourth copy that drifts from the
   other three.
 - **Do not push.** The owner pushes when they want to; `main` sitting a few commits ahead of
   `origin/main` is the normal state here.
@@ -230,11 +230,13 @@ Two operational notes: the engine is started **only from `index.ts`, and only ou
 
 ## The front-end contract, and its changelog
 
-`docs/API - Contrato Front-end.md` is what the front-end reads: every route, its Joi validation as it actually runs, and the shape of every response. It describes the **current** state, and section 18 is a **changelog** that describes the *deltas*.
+`docs/API - Contrato Front-end.md` is what the front-end reads: every route, its Joi validation as it actually runs, and the shape of every response. It describes the **current** state; the *deltas* live beside it, in `docs/contrato Front-end/changelogs/`.
 
-**Any change that the front-end can observe gets an entry in that changelog, in the same commit as the change.** That means: a new or removed route, a new/removed/renamed field in a request or response, a new query parameter, a changed status code or `msg`, a changed default, and — the case that motivated the section — **a number that keeps its name but changes its meaning**. A silent semantic change is the worst of the lot, because nothing on the client throws: it just starts showing something else. Internal refactors, tests and indexes are not front-facing and do not belong there.
+**The changelog is split by batch — one file per leva** (`Fase #1.md`, `Fase #2.md`, `Fase #3.md`, plus `Fora de leva.md` for what belongs to no plan), and section 19 of the contract is the index plus the rules. Per batch, not one long file, because nobody reads a changelog by date: they read it to answer *what do I have to change to follow the new version*, and the unit of that question is the batch — it ships together and the front-end learns about it at once. The `Fora de leva.md` file exists for the same reason `Levas executadas.md` has a section with that name: pretending every commit is born inside a plan is what makes work disappear between two batches. `Fase #1.md` deliberately holds no entries — the contract was **written with** the MVP, so there was no earlier state to describe a delta from — and it says so, because a missing file reads as a lost one.
 
-Entries go **newest first**, under `### YYYY-MM-DD — <route>: <what changed>`, and carry the same four things: the date, the affected route, the severity marker (🔴 breaks / 🟡 behaviour / 🟢 addition, defined in the section's own table), and **the action the front-end has to take**. Update the route's own section too — the changelog says what moved, the section says what is true now, and the two are not interchangeable.
+**Any change that the front-end can observe gets an entry in the current batch's file, in the same commit as the change.** That means: a new or removed route, a new/removed/renamed field in a request or response, a new query parameter, a changed status code or `msg`, a changed default, and — the case that motivated all of this — **a number that keeps its name but changes its meaning**. A silent semantic change is the worst of the lot, because nothing on the client throws: it just starts showing something else. Internal refactors, tests and indexes are not front-facing and do not belong there. Infrastructure that no route exposes (the rotine engine, the mailer) produces no entry at all: when a routine changes a number on screen, the entry belongs to the routine.
+
+Entries go **newest first inside the batch's file**, under `### YYYY-MM-DD — <route>: <what changed>`, and carry the same four things: the date, the affected route, the severity marker (🔴 breaks / 🟡 behaviour / 🟢 addition, defined in the contract's section 19), and **the action the front-end has to take**. Update the route's own section in the contract too — the changelog says what moved, the section says what is true now, and the two are not interchangeable.
 
 `docs/levas/1. ROADMAP- MVP.md` maps the work in stages, ordered by the foreign keys, and records the cross-cutting decisions plus how each stage actually turned out. All four decisions are now settled: the workspace rides inside the token, the balance is computed and never cached, `Expenses.Status` is written only by `ExpenseStatus.section.ts`, and the period filter is `From`/`To`. Read it before starting a new feature — it also carries what is deliberately left open (workspace sharing, and the `Persons` `unique(IdUser)` constraint that assumes one workspace per user). The later batches live beside it (`docs/levas/2. ...`, `3. ...`), each one a plan for its own stages.
 
