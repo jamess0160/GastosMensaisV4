@@ -1,5 +1,7 @@
-import { TestDatabase, UsersFactory } from "root/Utils/Tests"
+import { TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
 import { Database } from "root/Utils/database"
+import { CloseBudgetMonth } from "./CloseBudgetMonth.rotine"
+import { MaterializeBudgetPeriods } from "./MaterializeBudgetPeriods.rotine"
 import { lastDueOccurrence } from "./section/lastDueOccurrence"
 import { RotineEngine } from "./section/RotineEngine"
 import { runForEachWorkspace } from "./section/WorkspaceRunner"
@@ -236,6 +238,150 @@ describe("Rotines", () => {
             expect(run.Error).toContain(`#${broken.workspace.IdWorkspace}`)
         })
     })
+
+    //  As duas rotinas do orçamento — a virada do mês vista dos dois lados. Elas são o
+    //  primeiro consumidor do motor, e é por elas que ele passa a ser verificável de ponta a
+    //  ponta: uma agenda declarada, uma ocorrência reivindicada, e linhas gravadas no banco.
+    describe("Rotinas do orçamento", () => {
+
+        let owner: TestUser
+        let IdCategory: number
+
+        beforeEach(async () => {
+            //  CASCADE: truncar Users leva Workspaces, Categories, Budgets e BudgetPeriods
+            await TestDatabase.truncate(["Users", "RotineRuns"])
+
+            owner = await UsersFactory.create({ Name: "Dono do orçamento" })
+            IdCategory = await createCategory(owner.workspace.IdWorkspace, "Mercado")
+        })
+
+        it("materializa o mês da ocorrência a partir das definições ativas", async () => {
+            let IdBudget = await createBudget(owner.workspace.IdWorkspace, IdCategory, { LimitValue: 800, AlertPercent: 70 })
+
+            await new RotineEngine().register(MaterializeBudgetPeriods).tick("2026-09-01 03:30")
+
+            let periods = await getPeriods(owner.workspace.IdWorkspace)
+
+            expect(periods).toHaveLength(1)
+            expect(periods[0].IdBudget).toBe(IdBudget)
+            expect(periods[0].ReferenceMonth).toBe("2026-09-01")
+            expect(periods[0].LimitValue).toBe(800)
+            expect(periods[0].AlertPercent).toBe(70)
+            expect(periods[0].Status).toBe("open")
+        })
+
+        //  O mês sai da ocorrência, não do relógio: rodando no dia 2 por catch-up, é o mês do
+        //  dia 1º que nasce. Um `moment()` dentro da rotina materializaria o mês errado
+        //  justamente no dia em que o servidor caiu — e numa rotina mensal, errar uma vez é
+        //  perder o mês.
+        it("no catch-up, materializa o mês da ocorrência e não o do relógio", async () => {
+            await createBudget(owner.workspace.IdWorkspace, IdCategory, { LimitValue: 500 })
+
+            //  Relógio no dia 4 de outubro: a ocorrência vencida ainda é a de 1º de outubro
+            await new RotineEngine().register(MaterializeBudgetPeriods).tick("2026-10-04 09:00")
+
+            let periods = await getPeriods(owner.workspace.IdWorkspace)
+
+            expect(periods).toHaveLength(1)
+            expect(periods[0].ReferenceMonth).toBe("2026-10-01")
+        })
+
+        //  A regra que a etapa carrega: só inserir o que falta. O mês congelado é história, e
+        //  o teto que o usuário ajustou nele não pode ser recalculado por ninguém.
+        it("não sobrescreve o teto que o usuário ajustou no mês", async () => {
+            let IdBudget = await createBudget(owner.workspace.IdWorkspace, IdCategory, { LimitValue: 800 })
+
+            await new RotineEngine().register(MaterializeBudgetPeriods).tick("2026-09-01 03:30")
+
+            //  O usuário ajusta o mês na mão: "neste mês pode 1.500"
+            await TestDatabase.connection()
+                .update({ LimitValue: 1500 })
+                .from("BudgetPeriods")
+                .where("IdBudget", IdBudget)
+
+            //  Uma segunda execução da mesma ocorrência (outra instância, um restart em loop)
+            await new RotineEngine().register(MaterializeBudgetPeriods).tick("2026-09-01 03:40")
+
+            let periods = await getPeriods(owner.workspace.IdWorkspace)
+
+            expect(periods).toHaveLength(1)
+            expect(periods[0].LimitValue).toBe(1500)
+        })
+
+        //  **É aqui que o Active de Budgets finalmente significa alguma coisa** — antes desta
+        //  rotina nada o lia, e "parar de orçar esta categoria" não tinha efeito nenhum.
+        it("ignora a definição arquivada", async () => {
+            await createBudget(owner.workspace.IdWorkspace, IdCategory, { LimitValue: 800, Active: false })
+
+            await new RotineEngine().register(MaterializeBudgetPeriods).tick("2026-09-01 03:30")
+
+            expect(await getPeriods(owner.workspace.IdWorkspace)).toHaveLength(0)
+        })
+
+        it("materializa cada workspace com as definições dele", async () => {
+            let other = await UsersFactory.create({ Name: "Dono do outro workspace" })
+            let otherCategory = await createCategory(other.workspace.IdWorkspace, "Transporte")
+
+            await createBudget(owner.workspace.IdWorkspace, IdCategory, { LimitValue: 800 })
+            await createBudget(other.workspace.IdWorkspace, otherCategory, { LimitValue: 300 })
+
+            await new RotineEngine().register(MaterializeBudgetPeriods).tick("2026-09-01 03:30")
+
+            expect((await getPeriods(owner.workspace.IdWorkspace)).map((period) => period.LimitValue)).toEqual([800])
+            expect((await getPeriods(other.workspace.IdWorkspace)).map((period) => period.LimitValue)).toEqual([300])
+        })
+
+        it("fecha o mês anterior e não encosta no mês que está começando", async () => {
+            let IdBudget = await createBudget(owner.workspace.IdWorkspace, IdCategory, { LimitValue: 800 })
+
+            await createPeriod(owner.workspace.IdWorkspace, IdBudget, "2026-08-01")
+            await createPeriod(owner.workspace.IdWorkspace, IdBudget, "2026-09-01")
+
+            await new RotineEngine().register(CloseBudgetMonth).tick("2026-09-01 03:30")
+
+            let periods = await getPeriods(owner.workspace.IdWorkspace)
+            let august = periods.find((period) => period.ReferenceMonth === "2026-08-01")!
+            let september = periods.find((period) => period.ReferenceMonth === "2026-09-01")!
+
+            expect(august.Status).toBe("closed")
+            expect(august.ClosedAt).not.toBeNull()
+            expect(september.Status).toBe("open")
+            expect(september.ClosedAt).toBeNull()
+        })
+
+        //  Convergência: é a premissa que torna o catch-up seguro
+        it("fechar de novo não reescreve o ClosedAt de quem já fechou", async () => {
+            let IdBudget = await createBudget(owner.workspace.IdWorkspace, IdCategory, { LimitValue: 800 })
+            await createPeriod(owner.workspace.IdWorkspace, IdBudget, "2026-08-01")
+
+            await new RotineEngine().register(CloseBudgetMonth).tick("2026-09-01 03:30")
+            let first = (await getPeriods(owner.workspace.IdWorkspace))[0]
+
+            //  A reivindicação já barraria a segunda execução; aqui a rotina é chamada direto
+            //  para provar que a **escrita** também é convergente, e não só o registro dela.
+            await CloseBudgetMonth.run("2026-09-01 03:00")
+
+            let second = (await getPeriods(owner.workspace.IdWorkspace))[0]
+
+            expect(second.Status).toBe("closed")
+            expect(new Date(second.ClosedAt!).getTime()).toBe(new Date(first.ClosedAt!).getTime())
+        })
+
+        //  As duas no mesmo tick, que é como elas rodam de verdade
+        it("no mesmo tick, abre o mês novo e fecha o anterior", async () => {
+            let IdBudget = await createBudget(owner.workspace.IdWorkspace, IdCategory, { LimitValue: 800 })
+            await createPeriod(owner.workspace.IdWorkspace, IdBudget, "2026-08-01")
+
+            let executed = await new RotineEngine().register(MaterializeBudgetPeriods, CloseBudgetMonth).tick("2026-09-01 03:30")
+
+            expect(executed).toEqual(["MaterializeBudgetPeriods", "CloseBudgetMonth"])
+
+            let periods = await getPeriods(owner.workspace.IdWorkspace)
+
+            expect(periods.find((period) => period.ReferenceMonth === "2026-08-01")!.Status).toBe("closed")
+            expect(periods.find((period) => period.ReferenceMonth === "2026-09-01")!.Status).toBe("open")
+        })
+    })
 })
 
 //  Uma rotina que só anota com qual ScheduledFor foi chamada. É o que separa "rodou" de
@@ -267,4 +413,43 @@ async function countRuns(Name: string) {
     let rows = await TestDatabase.connection().select("*").from<Database.RotineRuns>("RotineRuns").where("Name", Name)
 
     return rows.length
+}
+
+async function createCategory(IdWorkspace: number, Description: string) {
+    //  Semeada à mão: truncar Users leva Categories junto por CASCADE, e isso apaga também as
+    //  13 globais da migration de seed — elas moram na mesma tabela, com IdWorkspace nulo.
+    let [category] = await TestDatabase.connection()
+        .insert({ IdWorkspace, Description })
+        .into("Categories")
+        .returning("*") as Database.Categories[]
+
+    return category.IdCategory
+}
+
+//  A definição vai direto ao banco: o que está sob teste é a rotina, não o POST /Budgets — e
+//  o POST materializaria o mês junto, escondendo o efeito que a rotina tem que produzir.
+async function createBudget(IdWorkspace: number, IdCategory: number, values: Partial<Database.Budgets>) {
+    let [budget] = await TestDatabase.connection()
+        .insert({ IdWorkspace, IdCategory, AlertPercent: 80, ...values })
+        .into("Budgets")
+        .returning("*") as Database.Budgets[]
+
+    return budget.IdBudget
+}
+
+async function createPeriod(IdWorkspace: number, IdBudget: number, ReferenceMonth: string) {
+    let [period] = await TestDatabase.connection()
+        .insert({ IdWorkspace, IdBudget, ReferenceMonth, LimitValue: 800, AlertPercent: 80 })
+        .into("BudgetPeriods")
+        .returning("*") as Database.BudgetPeriods[]
+
+    return period.IdBudgetPeriod
+}
+
+function getPeriods(IdWorkspace: number) {
+    return TestDatabase.connection()
+        .select("*")
+        .from<Database.BudgetPeriods>("BudgetPeriods")
+        .where("IdWorkspace", IdWorkspace)
+        .orderBy("IdBudgetPeriod") as Promise<Database.BudgetPeriods[]>
 }

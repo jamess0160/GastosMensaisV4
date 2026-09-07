@@ -24,7 +24,7 @@ valer, aqui que foi entregue.
 | --- | --- | --- | --- | --- |
 | **1 — MVP** | [1. ROADMAP- MVP.md](levas/1.%20ROADMAP-%20MVP.md) | **fechada**, com duas etapas deixadas de fora de propósito | 8 de 10 | 2026-07-30 → 2026-08-30 |
 | **2 — o que sobe junto com o MVP** | [2. Plano de Desenvolvimento - Leva 2.md](levas/2.%20Plano%20de%20Desenvolvimento%20-%20Leva%202.md) | **fechada** | 11 de 11 | 2026-09-04 → 2026-09-05 |
-| **3 — o que depende de infra ou de decisão** | [3. Plano de Desenvolvimento - Leva 3.md](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md) | **em andamento** | 1 de 10 | 2026-09-07 → |
+| **3 — o que depende de infra ou de decisão** | [3. Plano de Desenvolvimento - Leva 3.md](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md) | **em andamento** | 2 de 10 | 2026-09-07 → |
 
 **Suítes:** 13 arquivos `.test.ts`, um por feature. A leva 1 fechou com **391 testes**; o total
 depois da leva 2 não foi anotado no fim dela — a próxima execução completa da suíte preenche este
@@ -112,7 +112,8 @@ numa leva onde não está.
 
 | Etapa | O que é | Commit | Data |
 | --- | --- | --- | --- |
-| **1** | O motor de rotinas | `7ada095` | 2026-09-07 |
+| **1** | O motor de rotinas | `31a542e` | 2026-09-07 |
+| **2** | A rotina mensal do orçamento | `_pendente_` | 2026-09-07 |
 
 Cada etapa concluída ganha sua linha, com commit e data, no commit em que for concluída.
 

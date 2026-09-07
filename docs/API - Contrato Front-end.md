@@ -1237,7 +1237,7 @@ Desmarca, e apaga o `ChargedAt` junto.
 
 ## 13. Budgets — `/Budgets` 🔒
 
-> **Entrega reduzida de propósito: o cadastro do mês é manual.** A rotina que materializaria o mês a partir da definição ainda não existe, então hoje é o usuário que informa o mês.
+> **O mês passa a nascer sozinho.** Todo dia 1º, uma rotina no servidor materializa o mês novo a partir das definições ativas e fecha o mês que acabou (`Status: "closed"`). O `POST /Budgets` continua existindo e continua criando o mês que você informar — ele é o caminho de **cadastrar um teto agora**, sem esperar a virada.
 
 **Modelo:** `Budgets` é a **definição vigente** (uma linha por alvo, sem mês); `BudgetPeriods` é o **mês congelado**. Editar a definição muda **o futuro**; mês passado guarda o teto que realmente valeu. Nunca leia o limite de um mês passado da definição.
 
@@ -1319,7 +1319,7 @@ Numa transaction: resolve a definição vigente (cria, ou **atualiza** para o no
 
 Orçar o **mesmo alvo duas vezes no mesmo mês** responde `406` `"Este orçamento já existe neste mês."` — o conserto é editar o mês que já existe (seção 14), não cadastrar de novo. Só existe **uma definição por alvo**: cadastrar o mês seguinte reencontra a mesma e passa a valer o teto novo, sem reescrever os meses já congelados.
 
-`Status` **não é aceito**: o mês nasce `open`.
+`Status` **não é aceito**: o mês nasce `open`, e quem o move para `closed` é a rotina do dia 1º — nunca uma rota.
 
 **Resposta:** `{ "IdBudget": 1, "IdBudgetPeriod": 1 }`.
 
@@ -1334,6 +1334,8 @@ Orçar o **mesmo alvo duas vezes no mesmo mês** responde `406` `"Este orçament
 **Body:** `LimitValue` (obrigatório, > 0), `AlertPercent` (opcional, 1–100).
 
 **`ReferenceMonth` e `IdBudget` não são aceitos:** mover o teto de lugar é apagar este e cadastrar outro.
+
+**Um mês `closed` continua editável.** Fechar é um carimbo de "este mês acabou", não uma trava: corrigir o teto de um mês passado é justamente o que a tabela do mês congelado permite. O `Status` só volta a `open` se o período for apagado e cadastrado de novo.
 
 **Resposta:** `{ "msg": "Orçamento do mês atualizado com sucesso" }`.
 
@@ -1381,7 +1383,9 @@ Existe no banco, mas **sem rota**: `UserDevices`, `Notifications`, `Plans`, `Sub
 
 **Gestão de membros ainda não existe:** listar quem é membro, trocar o papel de alguém, remover um membro, sair de um workspace e transferir propriedade. O convite (4.1) entrega só a entrada. Revogar um convite **não** desfaz matrícula já criada.
 
-Também não existem: `GET` de `PaymentMethods` (vem embutido na conta), CRUD de `Tags` além de busca e arquivar, `GET`/`POST` de `BudgetPeriods`, e a **rotina mensal** que materializaria os orçamentos.
+Também não existem: `GET` de `PaymentMethods` (vem embutido na conta), CRUD de `Tags` além de busca e arquivar, e `GET`/`POST` de `BudgetPeriods`.
+
+A **rotina mensal do orçamento passou a existir** (2026-09-07) e roda no servidor, sem rota: ela não é chamável pelo front e não aparece neste contrato a não ser pelo efeito — o mês do orçamento existir no dia 1º sem ninguém ter cadastrado.
 
 **Fora deste contrato:** `/Cache` (`GET /Cache/CacheName=:CacheName`, `POST /Cache`, `POST /Cache/Reset/CacheName=:CacheName`) é o subsistema interno de cache em memória sincronizado por socket. Não tem schema Joi, não é escopado por workspace e não faz parte do domínio do app — não consuma a partir das telas.
 
@@ -1481,6 +1485,27 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-07 — `/Budgets`: o mês do orçamento passa a nascer sozinho, e o mês anterior a fechar
+
+🟡 **Comportamento** — ver as seções 13 e 14. Nenhuma rota mudou de forma: o que mudou é **o que existe no banco quando você lê**.
+
+**O que entrou.** Duas rotinas no servidor, todo dia 1º:
+
+| Rotina | O que faz |
+|---|---|
+| Materializar | cria o mês novo a partir de cada definição **ativa** de orçamento, com o teto que valia naquele dia |
+| Fechar | carimba `Status: "closed"` e `ClosedAt` em todo período do mês que acabou |
+
+**O recado que some da tela.** Até aqui o orçamento de junho simplesmente não existia até alguém cadastrá-lo, e a tela precisava dizer *"seu teto de alimentação existe, mas não para este mês"*. Não precisa mais: no dia 1º o mês está lá.
+
+**`Status` agora muda sozinho.** Um período que você leu como `open` em 31 de agosto volta como `closed` em 1º de setembro, sem nenhuma chamada sua. Se a sua tela desenha algo a partir do `Status`, é este o ponto a conferir — **fechado não é travado**: o `PUT` de um mês fechado continua funcionando, porque corrigir o teto de um mês passado é o que a tabela do mês congelado existe para permitir.
+
+**O que *não* mudou.** `POST /Budgets` continua igual, e continua sendo o caminho para orçar **agora** em vez de esperar a virada. Cadastrar um mês que a rotina já criou continua respondendo `406` `"Este orçamento já existe neste mês."` — o conserto continua sendo editar o mês (seção 14). E a rotina **nunca sobrescreve** um mês que já existe: o teto que você ajustou na mão fica.
+
+**Mês passado que a rotina não pegou continua sem período**, e isso é de propósito: a resposta certa para "qual era meu limite em março" é *"esse mês não tem período"*, não um teto inventado hoje.
+
+**Ação do front:** nenhuma, além de tirar da tela o aviso de mês não cadastrado e de conferir o que você desenha a partir de `Status`.
 
 ### 2026-09-06 — `POST /Workspaces`: criar um workspace novo
 
