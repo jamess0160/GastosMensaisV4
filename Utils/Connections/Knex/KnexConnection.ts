@@ -59,6 +59,9 @@ export interface DBTypes {
     Tags: Database.Tags
     ExpenseTags: Database.ExpenseTags
 
+    // Sistema
+    RotineRuns: Database.RotineRuns
+
     // Plataforma
     UserDevices: Database.UserDevices
     Notifications: Database.Notifications

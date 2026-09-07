@@ -24,7 +24,7 @@ valer, aqui que foi entregue.
 | --- | --- | --- | --- | --- |
 | **1 — MVP** | [1. ROADMAP- MVP.md](levas/1.%20ROADMAP-%20MVP.md) | **fechada**, com duas etapas deixadas de fora de propósito | 8 de 10 | 2026-07-30 → 2026-08-30 |
 | **2 — o que sobe junto com o MVP** | [2. Plano de Desenvolvimento - Leva 2.md](levas/2.%20Plano%20de%20Desenvolvimento%20-%20Leva%202.md) | **fechada** | 11 de 11 | 2026-09-04 → 2026-09-05 |
-| **3 — o que depende de infra ou de decisão** | [3. Plano de Desenvolvimento - Leva 3.md](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md) | **não iniciada** | 0 de 10 | — |
+| **3 — o que depende de infra ou de decisão** | [3. Plano de Desenvolvimento - Leva 3.md](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md) | **em andamento** | 1 de 10 | 2026-09-07 → |
 
 **Suítes:** 13 arquivos `.test.ts`, um por feature. A leva 1 fechou com **391 testes**; o total
 depois da leva 2 não foi anotado no fim dela — a próxima execução completa da suíte preenche este
@@ -108,10 +108,13 @@ numa leva onde não está.
 
 ---
 
-## Leva 3 — não iniciada
+## Leva 3 — em andamento
 
-**Nenhuma das dez etapas foi executada**, então não há nada a registrar aqui ainda. Cada uma
-ganha sua linha, com commit e data, no commit em que for concluída.
+| Etapa | O que é | Commit | Data |
+| --- | --- | --- | --- |
+| **1** | O motor de rotinas | `7ada095` | 2026-09-07 |
+
+Cada etapa concluída ganha sua linha, com commit e data, no commit em que for concluída.
 
 **O que falta se lê no [documento da leva](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md)** — a tabela dele é a fonte, e este documento
 não a copia. O espelho que existia aqui foi removido em 2026-09-07: ele duplicava dez linhas que

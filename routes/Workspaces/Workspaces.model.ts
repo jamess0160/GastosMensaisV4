@@ -19,6 +19,13 @@ export class class_Workspaces_model extends BaseModel {
         )
     }
 
+    //  Todos os workspaces, sem filtro nenhum: é a leitura das **rotinas**, que rodam como o
+    //  sistema e iteram os tenants elas mesmas. Nenhuma rota chama isto — numa rota o escopo
+    //  vem sempre do token, pelo getByMember.
+    getAll() {
+        return this.baseQuery.clone()
+    }
+
     create(records: MaybeArray<Partial<Database.Workspaces>>) {
         return this.KnexConnection.insert(records).into("Workspaces")
     }

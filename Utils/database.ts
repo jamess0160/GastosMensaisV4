@@ -375,6 +375,39 @@ export namespace Database {
 
     //#endregion
 
+    //#region Sistema
+
+    /**
+     * A execucao de uma rotina - uma linha por (rotina, ocorrencia vencida).
+     *
+     * **Primeira tabela do projeto sem IdWorkspace**, e de proposito: ela nao e de
+     * dominio, e do sistema, e uma execucao atravessa todos os workspaces.
+     *
+     * O unique(Name, ScheduledFor) e o motor: o tick tenta inserir a ocorrencia
+     * vencida com onConflict().ignore() e so roda quem conseguiu escrever. Catch-up e
+     * idempotencia saem dai, sem uma linha de logica de recuperacao.
+     */
+    export interface RotineRuns {
+        IdRotineRun: number
+        /** O nome declarado no registro em rotines/index.ts. */
+        Name: string
+        /**
+         * O rotulo da ocorrencia, "YYYY-MM-DD HH:mm" na hora local do servidor.
+         *
+         * String e nao Datetime: e identidade de um horario agendado, nao um instante
+         * sobre o qual se faz conta. Ver a migration para os tres motivos.
+         */
+        ScheduledFor: string
+        StartedAt: Datetime
+        FinishedAt: Datetime | null
+        Status: "running" | "done" | "failed"
+        Error: string | null
+        CreatedAt: Datetime
+        UpdatedAt: Datetime
+    }
+
+    //#endregion
+
     //#region Plataforma
 
     export interface UserDevices {
