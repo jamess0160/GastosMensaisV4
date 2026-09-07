@@ -7,6 +7,7 @@ import { ExpensePayments_route } from "./ExpensePayments/ExpensePayments.route";
 import { Expenses_route } from "./Expenses/Expenses.route";
 import { Inflows_route } from "./Inflows/Inflows.route";
 import { Persons_route } from "./Persons/Persons.route";
+import { Reports_route } from "./Reports/Reports.route";
 import { Tags_route } from "./Tags/Tags.route";
 import { Base_Cache_route } from "./Cache/Cache.route";
 import { Users_route } from "./Users/Users.route";
@@ -29,5 +30,6 @@ export const Routes = [
     ExpensePayments_route,
     Budgets_route,
     BudgetPeriods_route,
+    Reports_route,
     Base_Utils_route,
 ]

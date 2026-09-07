@@ -2,7 +2,7 @@
 
 Documento gerado a partir dos `*.route.ts` e `*.schema.ts` do repositório. Ele descreve **o que a API aceita e o que devolve hoje**. Toda validação citada aqui é a que roda de verdade (Joi, em `<Feature>.schema.ts`), não uma intenção.
 
-> **Mudou alguma coisa?** O [changelog](#18-changelog) no fim do documento lista toda alteração que afeta o front, da mais recente para a mais antiga, dizendo o que quebra e o que fazer. Comece por ele.
+> **Mudou alguma coisa?** O [changelog](#19-changelog) no fim do documento lista toda alteração que afeta o front, da mais recente para a mais antiga, dizendo o que quebra e o que fazer. Comece por ele.
 
 ---
 
@@ -1497,7 +1497,80 @@ Orçar o **mesmo alvo duas vezes no mesmo mês** responde `406` `"Este orçament
 
 ---
 
-## 15. Utils — `/Utils`
+## 15. Reports — `/Reports` 🔒
+
+**A feature sem tabela própria.** Ela não guarda nada: lê das outras e devolve o número somado. Existe porque as regras de agregação **se contradizem de propósito**, e enquanto elas moravam replicadas no cliente, duas implementações da mesma pergunta terminavam mostrando dois totais diferentes na mesma tela.
+
+| Número | Regra que **não** vale para os outros |
+|---|---|
+| Quanto entrou | filtra `Kind <> 'transfer'` |
+| Quanto gastou | soma **pernas**, não o `TotalValue` da compra |
+| Saldo da conta | **ignora** o pendente |
+| `Spent` do orçamento | **conta** o pendente junto com o pago |
+
+Nenhuma dessas regras nasce aqui: as rotas desta seção chamam as mesmas sections que `GET /Accounts` e `GET /Budgets` já usam. Se um número daqui divergir do da tela dele, é bug — não duas leituras legítimas.
+
+### `GET /Reports/Month`
+
+**Os dois indicadores do Dashboard, somados no servidor.**
+
+| Query | Tipo | Regra |
+|---|---|---|
+| `ReferenceMonth` | `YYYY-MM` | opcional, default o **mês corrente** |
+
+Mês, e não `From`/`To` das listagens de movimento: as duas pontas do cálculo são **posições**, não recortes.
+
+```json
+{
+  "ReferenceMonth": "2026-09-01",
+  "OpeningBalance": 1500,
+  "Inflows": 3000,
+  "Expenses": 500,
+  "OverdueReceivable": 0,
+  "OverduePayable": 0,
+  "Available": 4000,
+  "CurrentBalance": 1300,
+  "OpenInvoices": 300
+}
+```
+
+**`Available` ("quanto ainda posso gastar") e `CurrentBalance` ("quanto tenho em conta") não são duas versões do mesmo fato**, e é por isso que a tela mostra os dois lado a lado: um é o **mês que a pessoa está vivendo**, o outro é o **dinheiro que já saiu**. Eles discordam de propósito.
+
+| | `Available` | `CurrentBalance` |
+|---|---|---|
+| **Abertura** | `OpeningBalance` — o saldo realizado no fim do mês anterior | nenhuma: o saldo já é acumulado desde a abertura da conta |
+| **Base de data** | competência (`CompetenceDate` da perna, que o `CompetenceMode` governa — seção 6) | caixa (`CashDate` da perna) |
+| **Base de estado** | comprometido: pendente **e** pago | realizado: só pago / recebido |
+| **Entradas** | **as pendentes entram** | só as recebidas |
+| **Unidade** | a **perna**, nunca o `TotalValue` da compra | a perna paga |
+
+```
+Available = OpeningBalance
+          + Inflows            (competência no mês, pendentes + recebidas, sem transferência)
+          − Expenses           (pernas com competência no mês, pendentes + pagas)
+          + OverdueReceivable
+          − OverduePayable
+```
+
+**`OpeningBalance` é o termo que faltava, e a ausência dele era um erro de verdade.** Somar só as entradas do mês para dizer quanto ainda dá para gastar ignora o dinheiro que já estava na conta no dia 1º: quem começa setembro com 1000 e recebe 3000 de salário via **3000**, tendo 4000. Se o seu cliente calculava isso somando `GET /Inflows`, **pare** — este é o número certo.
+
+> Se você já usava o paliativo de somar os `Balance` de `GET /Accounts?ReferenceMonth=<mês anterior>`, ele continua dando o mesmo número. A rota existe para tirar essa regra do cliente, não porque o paliativo estivesse errado.
+
+**`OverdueReceivable`/`OverduePayable` são o atrasado, e entram no `Available` dos dois lados.** Uma perna com competência em julho e ainda pendente não está no saldo de julho (não foi paga) nem na janela de agosto (a competência é de julho): sem isso ela **some** do indicador — e some justamente o compromisso que ninguém honrou.
+
+> **O custo está aceito de olhos abertos:** uma entrada prevista que nunca chega infla o `Available` para sempre. É por isso que os dois vão **expostos à parte** — mostre "R$ X vencidos" na tela, com um caminho para receber ou cancelar o que ficou para trás. A alternativa seria o servidor corrigir sozinho, sem contar a ninguém.
+
+**`OpenInvoices` é o que liga os dois números: quanto do saldo já tem dono.** É a soma das pernas de **cartão** que vencem até o fim do mês e ainda não foram pagas — o buraco que o `Available` mostra hoje é o que o `CurrentBalance` vai mostrar quando a fatura for paga.
+
+**E a dupla contagem que não existe:** `payInvoice` **não cria lançamento**, só vira o `Paid` de pernas que já existem. A compra de agosto contada em agosto não volta a contar em setembro.
+
+**Só conta `Active` entra no `OpeningBalance` e no `CurrentBalance`** — o mesmo filtro de `GET /Accounts`, senão a soma do Dashboard discordaria da lista de contas na mesma tela.
+
+`ReferenceMonth` **volta como `YYYY-MM-01`**, como no orçamento: é o mês normalizado que a resposta afirma ter usado.
+
+---
+
+## 16. Utils — `/Utils`
 
 | Rota | Auth | Resposta |
 |---|---|---|
@@ -1527,7 +1600,7 @@ Orçar o **mesmo alvo duas vezes no mesmo mês** responde `406` `"Este orçament
 
 ---
 
-## 16. O que ainda não tem API
+## 17. O que ainda não tem API
 
 Existe no banco, mas **sem rota**: `UserDevices`, `Notifications`, `Plans`, `Subscriptions`.
 
@@ -1541,7 +1614,7 @@ A **rotina mensal do orçamento passou a existir** (2026-09-07) e roda no servid
 
 ---
 
-## 17. Cola rápida
+## 18. Cola rápida
 
 | Método | Rota | Auth |
 |---|---|---|
@@ -1613,6 +1686,7 @@ A **rotina mensal do orçamento passou a existir** (2026-09-07) e roda no servid
 | POST | `/Budgets` | 🔒 |
 | PUT | `/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
 | DELETE | `/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
+| GET | `/Reports/Month` | 🔒 |
 | GET | `/Utils/ServerTime` | público |
 | GET | `/Utils/Health` | público |
 | GET | `/Utils/Reload` | 🔒 |
@@ -1620,7 +1694,7 @@ A **rotina mensal do orçamento passou a existir** (2026-09-07) e roda no servid
 
 ---
 
-## 18. Changelog
+## 19. Changelog
 
 Toda mudança da API que o front enxerga entra aqui, **da mais recente para a mais antiga**. O
 resto do documento descreve sempre o estado *atual*; esta seção é o que diz **o que mudou desde
@@ -1637,6 +1711,24 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-07 — `GET /Reports/Month`: os agregados do Dashboard saem do cliente
+
+🟢 **Adição** — uma rota nova e uma seção própria (15). Nada do que existe muda de forma; o que muda é **de onde o número vem**.
+
+**Por que ela existe.** As quatro regras de agregação do app **se contradizem de propósito** — a transferência conta no saldo e não conta no "quanto entrou"; o orçamento conta o pendente e o saldo não; o gasto se soma por perna, não por compra. Enquanto elas viviam replicadas no cliente, duas implementações da mesma pergunta terminavam mostrando dois totais diferentes na mesma tela.
+
+**O que entrou.** `GET /Reports/Month?ReferenceMonth=YYYY-MM` (opcional, default o mês corrente), com nove números — ver a seção 15 para a tabela completa das regras.
+
+**🔴 Um deles conserta um erro que o cliente tinha: `OpeningBalance`.** Somar só as entradas do mês para dizer quanto ainda dá para gastar ignora o dinheiro que já estava na conta no dia 1º — quem começa setembro com 1000 e recebe 3000 vê **3000**, tendo 4000. Não é problema de escala: dá errado com dois lançamentos no banco.
+
+**`Available` e `CurrentBalance` vão discordar, e é a resposta certa.** Um é o mês que a pessoa está vivendo (competência, pendente conta, abre com o saldo anterior); o outro é o dinheiro que já saiu (caixa, só o realizado). `OpenInvoices` é o que liga os dois: quanto do saldo já tem dono.
+
+**Ação do front:**
+
+1. **apague as somas de agregação do cliente** e leia esta rota — inclusive quem só precisa do "posso gastar";
+2. mostre `OverdueReceivable`/`OverduePayable` na tela ("R$ X vencidos"), com caminho para receber ou cancelar. Eles entram no `Available` de propósito, e uma previsão que nunca chega infla o indicador para sempre se ninguém a resolver;
+3. quem usava o paliativo de somar `GET /Accounts?ReferenceMonth=<mês anterior>` para achar a abertura pode parar: o número é o mesmo, e agora vem pronto.
 
 ### 2026-09-07 — `/PaymentMethods`: `CompetenceMode`, o cartão que conta como débito
 
