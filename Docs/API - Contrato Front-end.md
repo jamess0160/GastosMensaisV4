@@ -2,7 +2,7 @@
 
 Documento gerado a partir dos `*.route.ts` e `*.schema.ts` do repositório. Ele descreve **o que a API aceita e o que devolve hoje**. Toda validação citada aqui é a que roda de verdade (Joi, em `<Feature>.schema.ts`), não uma intenção.
 
-> **Mudou alguma coisa?** O [changelog](#18-changelog) no fim do documento lista toda alteração que afeta o front, da mais recente para a mais antiga, dizendo o que quebra e o que fazer. Comece por ele.
+> **Mudou alguma coisa?** O [changelog](#19-changelog) — um arquivo por leva de desenvolvimento, em [`contrato Front-end/changelogs/`](contrato%20Front-end/changelogs/) — lista toda alteração que afeta o front, dizendo o que quebra e o que fazer. Comece pela leva mais nova.
 
 ---
 
@@ -114,6 +114,8 @@ E-mail já em uso: `406`.
 
 > O cadastro **não** loga o usuário. Chame `POST /Users/login` em seguida.
 
+**O usuário nasce com o e-mail não confirmado** (`EmailConfirmedAt: null`) e recebe, logo depois do cadastro, um e-mail com o link de confirmação. Isso **não bloqueia nada**: ele loga e usa o app normalmente. O que a tela precisa fazer é mostrar a faixa pedindo a confirmação enquanto `GET /Users/getSelf` devolver `EmailConfirmedAt: null` — ver o `POST /Users/confirmEmail`.
+
 ---
 
 ### `POST /Users/login` *(público)*
@@ -124,6 +126,7 @@ E-mail já em uso: `406`.
 |---|---|---|
 | `login` | string | obrigatório, normalizado para minúsculas (é o e-mail) |
 | `password` | string | obrigatório |
+| `RememberDevice` | boolean | opcional, default `false` — o "manter conectado" |
 
 **Resposta `200`** — e o `Set-Cookie: token=...`, que é o que importa.
 
@@ -134,6 +137,17 @@ E-mail já em uso: `406`.
 Credencial errada: `406` com `{ "msg": "Login inválido" }` — a mesma mensagem para e-mail inexistente e senha errada, de propósito.
 
 O login já seleciona o primeiro workspace do usuário, então a sessão nunca começa sem workspace.
+
+**A duração da sessão sai daqui, e é uma escolha entre duas:**
+
+| `RememberDevice` | Duração | `Max-Age` do cookie |
+|---|---|---|
+| ausente ou `false` | **24 horas** | `86400` |
+| `true` | **30 dias** | `2592000` |
+
+O cookie e o token têm sempre a **mesma** duração — não há como sobrar um sem o outro. A escolha viaja dentro do token, então `POST /Workspaces/switch` reemite a credencial **sem rebaixar** uma sessão de 30 dias.
+
+> **Marque a caixa "manter conectado" da sua tela neste campo**, e só nele: não guarde nada do lado do cliente para "lembrar" a sessão. O que mantém o usuário logado é o cookie, e ele é `HttpOnly`.
 
 ---
 
@@ -155,6 +169,105 @@ O token continua **tecnicamente válido até o `exp`** (24h) para quem tiver cop
 
 ---
 
+### `POST /Users/forgotPassword` *(público)*
+
+Manda para o e-mail da conta um link de recuperação de senha. É o par do "Esqueci minha senha".
+
+**Body**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Email` | string | obrigatório, formato de e-mail, normalizado para minúsculas |
+
+**Resposta `200`** — **sempre**, inclusive para e-mail que não tem conta:
+
+```json
+{ "msg": "Se este e-mail tiver uma conta, enviamos o link de recuperação." }
+```
+
+> **A resposta é idêntica nos dois casos, de propósito.** Responder diferente transformaria a rota num verificador de quais e-mails têm conta — a mesma razão pela qual o login usa a mesma `msg` para e-mail errado e senha errada. **Não tente inferir da resposta se a conta existe**, e não mostre "e-mail não encontrado" na tela: a informação não está aí.
+
+O link do e-mail aponta para **o front**, não para a API: `APP_URL/recuperar-senha?Token=…`. Monte essa tela — é ela que recebe o `Token` da query e chama o `POST /Users/resetPassword`. O link vale **30 minutos** e serve **uma vez só**.
+
+> ⚠️ **O servidor ainda não tem rate limiting.** Enquanto não tiver, segure o botão do seu lado: desabilite-o depois do envio e ofereça o reenvio com um intervalo. Uma rota pública que dispara e-mail é o primeiro lugar onde a falta disso dói.
+
+---
+
+### `POST /Users/resetPassword` *(público)*
+
+Grava a senha nova a partir do token que chegou por e-mail.
+
+**Body**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Token` | string | obrigatório — o que veio na query do link |
+| `NewPassword` | string | obrigatório, **texto puro** (as mesmas regras do cadastro) |
+
+**Resposta `200`**
+
+```json
+{ "msg": "Senha alterada com sucesso" }
+```
+
+Token inválido, expirado, de outra finalidade ou **já usado**: `406` com `{ "msg": "Link de recuperação inválido ou expirado. Peça um novo." }` — uma mensagem só para todos os motivos, porque a ação da tela é a mesma em todos: pedir outro link.
+
+**O link morre no primeiro uso**, sem lista de revogação: o token carrega uma impressão digital da senha atual, e trocar a senha faz ela deixar de casar. Consequência prática: pedir dois links e usar o segundo **invalida o primeiro**.
+
+> **A troca não loga o usuário.** Não vem `Set-Cookie` nenhum — mande para a tela de login com a senha nova.
+
+---
+
+### `POST /Users/confirmEmail` *(público)*
+
+Confirma o endereço a partir do token que chegou por e-mail. O e-mail sai sozinho no cadastro, e de novo sempre que o endereço muda.
+
+**Body**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Token` | string | obrigatório — o que veio na query do link |
+
+**Resposta `200`**
+
+```json
+{ "msg": "E-mail confirmado com sucesso" }
+```
+
+Token inválido, expirado, de outra finalidade ou **de um endereço que não é mais o da conta**: `406` com `{ "msg": "Link de confirmação inválido ou expirado. Peça um novo." }` — uma mensagem só para todos os motivos, porque a ação da tela é a mesma: pedir outro link.
+
+O link do e-mail aponta para **o front**: `APP_URL/confirmar-email?Token=…`. Monte essa tela — é ela que lê o `Token` da query e chama esta rota. Vale **48 horas**.
+
+> **Confirmar duas vezes não é erro.** A segunda chamada responde `200` sem reescrever nada. Quem clica no link de novo, ou o pré-carregador de link do cliente de e-mail, não pode ver tela de erro para algo que já deu certo.
+
+> **Não confirmar não bloqueia nada hoje.** O usuário entra e usa o app; o que ele perde é a recuperação de senha funcionando de verdade, que depende de o endereço ser mesmo o dele.
+
+> **Não vem `Set-Cookie`**: confirmar o e-mail não abre sessão.
+
+---
+
+### `POST /Users/resendConfirmation` *(público)*
+
+Manda de novo o link de confirmação, para quem não recebeu o do cadastro.
+
+**Body**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Email` | string | obrigatório, formato de e-mail, normalizado para minúsculas |
+
+**Resposta `200`** — **sempre**, inclusive para e-mail que não tem conta e para quem já confirmou:
+
+```json
+{ "msg": "Se este e-mail tiver uma conta pendente de confirmação, enviamos o link." }
+```
+
+> **A resposta é idêntica em todos os casos, de propósito** — a mesma razão do `forgotPassword`: responder diferente transformaria a rota num verificador de quais e-mails têm conta. **Não tente inferir da resposta se a conta existe ou se ela já está confirmada.**
+
+> **Há um freio de 2 minutos por endereço.** Dois pedidos seguidos para o mesmo e-mail respondem os dois `200`, mas só o primeiro manda e-mail. A resposta não muda — um `429` aqui devolveria justamente o que a resposta única esconde. Do lado da tela: desabilite o botão e ofereça o reenvio com um contador.
+
+---
+
 ### `GET /Users/getSelf` 🔒
 
 **Resposta `200`** (`Password` nunca sai):
@@ -165,6 +278,7 @@ O token continua **tecnicamente válido até o `exp`** (24h) para quem tiver cop
   "Name": "Tiago",
   "Email": "tiago@exemplo.com",
   "Phone": 11999999999,
+  "EmailConfirmedAt": null,
   "LastLogin": "2026-08-30T12:00:00.000Z",
   "TrialStartAt": "2026-08-01T00:00:00.000Z",
   "TrialEndAt": null,
@@ -176,11 +290,17 @@ O token continua **tecnicamente válido até o `exp`** (24h) para quem tiver cop
 
 ---
 
+`EmailConfirmedAt` é `null` enquanto o endereço não foi confirmado, e é ele que a faixa da tela lê para saber se aparece. Ele **volta a ser `null`** quando o usuário troca o e-mail.
+
+---
+
 ### `PUT /Users/IdUser=:IdUser` 🔒
 
 **Body:** `Name` (obrigatório), `Email` (obrigatório), `Phone` (obrigatório).
 
 **Resposta `200`:** corpo vazio.
+
+> ⚠️ **Trocar o `Email` derruba a confirmação.** `EmailConfirmedAt` volta a `null` e sai um novo e-mail de confirmação para o **endereço novo**. Mandar o mesmo `Email` de volta — o caso de quem só mudou o nome — não mexe em nada. Depois de um `PUT` que muda o endereço, releia o `getSelf`: a faixa da confirmação volta.
 
 ---
 
@@ -247,6 +367,7 @@ O desafio **não fixa usuário**: duas pessoas podem ter passkey no mesmo aparel
 |---|---|---|
 | `ChallengeToken` | string | obrigatório, o que veio do passo 1 |
 | `Response` | object | obrigatório, o retorno do `startAuthentication()` — precisa ter `id`; o resto passa como veio |
+| `RememberDevice` | boolean | opcional, default `false` — o mesmo campo e as mesmas duas durações do `POST /Users/login` |
 
 **Resposta `200`** — mesma do login por senha, com o `Set-Cookie`:
 
@@ -488,12 +609,14 @@ Devolve as contas do workspace com as formas de pagamento embutidas. **O `Refere
 
 **`Balance`** = `InitialBalance` + entradas recebidas − transferências que saíram − **pernas de gasto pagas**, tudo **com data até o último dia do `ReferenceMonth`**. Pendente é previsão e **não entra**. Não é coluna: não tente recalcular somando lançamentos no cliente.
 
-A data que conta é a do lançamento — `CompetenceDate` na entrada, `DueDate` (ou a data do gasto, fora de cartão) na perna —, **não a data em que se clicou em receber/quitar**. Duas consequências para a tela:
+A data que conta é a do lançamento — `CompetenceDate` na entrada, **`CashDate`** na perna (o vencimento quando existe, senão a data do gasto) —, **não a data em que se clicou em receber/quitar**. Duas consequências para a tela:
 
 - uma entrada de setembro já marcada como recebida **não** aparece no saldo de agosto: peça `ReferenceMonth=2026-09` para vê-la;
 - quitar hoje a parcela que vence em novembro **não** mexe no saldo de agosto — ela sai no saldo de novembro.
 
 O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDate`: uma conta aberta em agosto vem com `Balance: 0` em março. Sem `InitialBalanceDate`, a abertura conta em qualquer mês.
+
+> **O `Balance` não muda com o `CompetenceMode` do cartão (seção 6), e é de propósito.** Ele lê a `CashDate` da perna — quando o dinheiro *sai* —, nunca a `CompetenceDate` — quando a compra *pesa*. Num cartão `purchase`, a compra de 20/08 pesa em agosto no orçamento e só sai da conta em 05/09, com a fatura. Os dois números discordam porque respondem a perguntas diferentes.
 
 **`Type` ∈ `checking` | `cash` | `card`**, e o tipo decide **quais formas de pagamento nascem com a conta**:
 
@@ -552,6 +675,7 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
   "Kind": "credit_card",
   "DueDay": 27,
   "ClosingOffsetDays": 7,
+  "CompetenceMode": "purchase",
   "IconPath": null,
   "Color": null,
   "Position": 1,
@@ -561,13 +685,24 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
 }
 ```
 
-`Kind` ∈ `pix` | `debit` | `credit_card`. `DueDay`/`ClosingOffsetDays` só fazem sentido em `credit_card` — nas outras são `null`.
+`Kind` ∈ `pix` | `debit` | `credit_card`. `DueDay`/`ClosingOffsetDays`/`CompetenceMode` só fazem sentido em `credit_card` — nas outras são `null`.
 
 **`debit` cobre três coisas diferentes** e o que as separa é o `Name`, não o `Kind`: o débito da conta corrente, o "Dinheiro" da conta `cash` e a forma com o nome da conta num vale (`Type='card'`). Nas três o gasto sai do saldo **no ato** e não há fatura — que é exatamente o que `debit` significa no modelo.
 
 **O cartão é descrito pelo vencimento, não pelo fechamento.** `DueDay` é o dia do mês em que a fatura vence e `ClosingOffsetDays` é quantos dias **antes** dele ela fecha — é o dado que o emissor realmente pede ao cliente, e a folga é o que ele aplica por baixo. Não existe mais um campo com o dia do fechamento: ele é `DueDay − ClosingOffsetDays` e muda de mês para mês (vencendo dia 5 com folga de 7, a fatura fecha em 26/02 e em 29/03).
 
 Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias, e o **default é 7**. Na tela de cadastro, peça o vencimento e deixe a folga num campo avançado já preenchido.
+
+**`CompetenceMode` diz em qual mês a compra do cartão pesa** — e é a única configuração do cadastro que muda um número já mostrado na tela.
+
+| Modo | A compra de **21/08**, num cartão que vence dia 28 | Para quem |
+|---|---|---|
+| `purchase` *(default)* | pesa em **agosto**, o mês da compra | quem paga a fatura inteira todo mês e usa o cartão como meio de pagamento |
+| `invoice` | pesa em **setembro**, o mês do vencimento | quem usa o cartão para adiar, e planeja pelo mês da fatura |
+
+**Ele governa a competência, nunca o caixa.** O `Balance` da conta (seção 5) é **idêntico nos dois modos**: o dinheiro sai quando a fatura é paga, e isso não muda. O que muda é o `Spent` do orçamento (seção 13) e o mês em que a perna aparece em `GET /ExpensePayments` (seção 12). Se o seu "quanto ainda posso gastar" e o seu "quanto tenho em conta" começarem a discordar num cartão `purchase`, **é assim que tem que ser**: o primeiro é o mês que a pessoa está vivendo, o segundo é o dinheiro que já saiu.
+
+**Em parcelado o avanço continua por parcela.** 600 em 6× num cartão `purchase` pesa **100 por mês** a partir do mês da compra — não 600 no primeiro.
 
 **Não existem `Brand` nem `LastDigits`.** Quem identifica o cartão na tela é o `Name`, que o usuário escreve — e o `IconPath`/`Color`, se você quiser um rótulo visual. Se a sua tela mostrava "Nubank ****1234", peça isso dentro do `Name`.
 
@@ -584,6 +719,7 @@ Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias,
 | `Kind` | `credit_card` | obrigatório, único valor aceito |
 | `DueDay` | int 1–31 | **obrigatório** |
 | `ClosingOffsetDays` | int 1–28 | default `7` |
+| `CompetenceMode` | `purchase` \| `invoice` | default **`purchase`** |
 | `IconPath` | string \| null | ≤255, default `null` |
 | `Color` | `#RRGGBB` \| null | default `null` |
 | `Position` | int \| null | default `null` |
@@ -592,11 +728,11 @@ Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias,
 
 ### `PUT /PaymentMethods/IdPaymentMethod=:IdPaymentMethod`
 
-`Name` obrigatório; `DueDay`, `ClosingOffsetDays`, `IconPath`, `Color`, `Position` opcionais.
+`Name` obrigatório; `DueDay`, `ClosingOffsetDays`, `CompetenceMode`, `IconPath`, `Color`, `Position` opcionais.
 
-**`Kind` e `IdAccount` não são aceitos:** um pix não vira cartão e um cartão não muda de conta — as duas trocas reescreveriam o significado das compras já lançadas nele. Mandar `null` em `DueDay`/`ClosingOffsetDays` de um cartão dá `406`.
+**`Kind` e `IdAccount` não são aceitos:** um pix não vira cartão e um cartão não muda de conta — as duas trocas reescreveriam o significado das compras já lançadas nele. Mandar `null` em `DueDay`/`ClosingOffsetDays`/`CompetenceMode` de um cartão dá `406`, e mandar qualquer um dos três **fora** de um cartão dá `406` também.
 
-**Editar o cartão não recalcula as compras já lançadas.** `ClosingDate`/`DueDate` são gravadas na perna no momento do lançamento (seção 11) e não são revistas depois. Corrigir o vencimento ou a folga vale para o que vier daí em diante; o que já está gravado só muda por um `PUT` no próprio gasto.
+**Editar o cartão não recalcula as compras já lançadas.** `ClosingDate`/`DueDate`/`CompetenceDate`/`CashDate` são gravadas na perna no momento do lançamento (seção 11) e não são revistas depois. Corrigir o vencimento, a folga **ou o `CompetenceMode`** vale para o que vier daí em diante; o que já está gravado só muda por um `PUT` no próprio gasto. Virar a chave em novembro não reescreve agosto — e é de propósito: a alternativa seria mês fechado mudando de número sozinho.
 
 **Resposta:** `{ "msg": "Forma de pagamento atualizada com sucesso" }`.
 
@@ -1027,6 +1163,7 @@ A mesma linha **mais os três filhos**:
     "ClosingDate": "2026-08-20",
     "DueDate": "2026-08-27",
     "CompetenceDate": "2026-08-27",
+    "CashDate": "2026-08-27",
     "Charged": false,
     "ChargedAt": null,
     "Paid": false,
@@ -1053,7 +1190,14 @@ A mesma linha **mais os três filhos**:
 
 > Em cartão, um dia de diferença na compra vira **um mês** de diferença no caixa: a compra entra na **primeira fatura que ainda não fechou**. O fechamento sai do cartão como `DueDay − ClosingOffsetDays` (seção 6), então ele é uma data que muda de mês para mês — não um dia fixo do calendário.
 
-**`CompetenceDate` é a data em que a perna pesa** — `DueDate` quando existe, senão a data do gasto —, congelada no lançamento. É por ela que o saldo da conta, o `Spent` do orçamento e `GET /ExpensePayments` recortam o mês. Ela é informativa para o cliente: não é aceita em corpo nenhum.
+**A perna tem duas datas, e elas discordam de propósito.** As duas são congeladas no lançamento e nenhuma das duas é aceita em corpo nenhum — são informativas.
+
+| Campo | O que é | Quem recorta o mês por ela |
+|---|---|---|
+| `CompetenceDate` | **quando a perna pesa** | o `Spent` do orçamento (seção 13) e `GET /ExpensePayments` (seção 12) |
+| `CashDate` | **quando o dinheiro sai da conta** — `DueDate` quando existe, senão a data do gasto | o `Balance` da conta (seção 5) |
+
+Fora de um cartão `purchase` as duas são **sempre iguais**, e é por isso que elas só nasceram agora: até o `CompetenceMode` existir, "pesar" e "sair" eram a mesma coisa. Num cartão `purchase` a compra de 20/08 pesa em **agosto** e sai da conta em **05/09**, com a fatura — uma data não responde às duas perguntas.
 
 **`Charged` e `Paid` são dois fatos diferentes, e só um move dinheiro:**
 
@@ -1157,7 +1301,9 @@ A perna não tem `POST` de cadastro: ela nasce com o gasto. O que existe aqui é
 
 ### `GET /ExpensePayments`
 
-**A lista do que *sai* no mês.** `GET /Expenses` é a lista do que foi **comprado** (filtra por `ExpenseDate`); esta é a lista do que **cai** — filtra por `coalesce(DueDate, ExpenseDate)`, a mesma data que o `Spent` do orçamento e o `Balance` da conta já usam.
+**A lista do que *pesa* no mês.** `GET /Expenses` é a lista do que foi **comprado** (filtra por `ExpenseDate`); esta filtra pela **`CompetenceDate`** da perna — a mesma data que o `Spent` do orçamento usa, e a que o `CompetenceMode` do cartão governa (seção 6). Num cartão `invoice` ela é o vencimento da fatura; num `purchase`, o mês da compra (avançando por parcela).
+
+> O `Balance` da conta **não** recorta por aqui: ele usa a `CashDate`, que vem na mesma linha. Se a sua tela soma esta lista esperando bater com o saldo, some pela `CashDate` e conte só o que está `Paid`.
 
 **É por isso que ela existe:** uma compra parcelada feita em **março** não aparece em `GET /Expenses?From=2026-08-01&To=2026-08-31`, mas a **6ª parcela dela pesa em agosto**. Quem monta o total do mês a partir da lista de gastos precisa varrer meses para trás atrás de parcelamentos abertos — e o contrato permite 120 parcelas, então acima de qualquer janela que você escolher a parcela **some do total**. Com esta rota a varredura inteira sai: uma requisição devolve tudo que cai no período, parcelas de compras antigas incluídas.
 
@@ -1184,6 +1330,10 @@ A lista vem ordenada pela data em que a perna pesa, não pela data da compra.
   "InstallmentTotal": 6,
   "ClosingDate": "2026-08-20",
   "DueDate": "2026-08-28",
+  "CompetenceDate": "2026-08-28",
+  "CashDate": "2026-08-28",
+  "Charged": false,
+  "ChargedAt": null,
   "Paid": false,
   "PaidAt": null,
   "CreatedAt": "...",
@@ -1237,7 +1387,7 @@ Desmarca, e apaga o `ChargedAt` junto.
 
 ## 13. Budgets — `/Budgets` 🔒
 
-> **Entrega reduzida de propósito: o cadastro do mês é manual.** A rotina que materializaria o mês a partir da definição ainda não existe, então hoje é o usuário que informa o mês.
+> **O mês passa a nascer sozinho.** Todo dia 1º, uma rotina no servidor materializa o mês novo a partir das definições ativas e fecha o mês que acabou (`Status: "closed"`). O `POST /Budgets` continua existindo e continua criando o mês que você informar — ele é o caminho de **cadastrar um teto agora**, sem esperar a virada.
 
 **Modelo:** `Budgets` é a **definição vigente** (uma linha por alvo, sem mês); `BudgetPeriods` é o **mês congelado**. Editar a definição muda **o futuro**; mês passado guarda o teto que realmente valeu. Nunca leia o limite de um mês passado da definição.
 
@@ -1288,7 +1438,7 @@ Note que `ReferenceMonth` **volta como `YYYY-MM-01`** (a coluna guarda o dia 1),
 **`Spent` — três regras que mudam o número:**
 
 1. **Soma pernas, não gastos.** 600 em 6× custa 100 ao orçamento de agosto, não 600 — o resto é problema do mês seguinte.
-2. **A data que conta é `coalesce(DueDate, ExpenseDate)`**, então uma compra no cartão cai no mês em que a fatura vence.
+2. **A data que conta é a `CompetenceDate` da perna**, e no cartão quem a decide é o `CompetenceMode` (seção 6): em `invoice` a compra cai no mês em que a fatura vence, em `purchase` no mês da compra. Fora do cartão é a data do gasto (ou o vencimento da parcela, no carnê).
 3. **Conta pendente junto com pago** — ao contrário do saldo da conta. Orçamento é o que você **comprometeu**; saldo é o que você **realizou**. Só o cancelado sai.
 
 **No `Scope: "person"` vale uma quarta regra: o comprometido é rateado pelas parcelas.**
@@ -1319,7 +1469,7 @@ Numa transaction: resolve a definição vigente (cria, ou **atualiza** para o no
 
 Orçar o **mesmo alvo duas vezes no mesmo mês** responde `406` `"Este orçamento já existe neste mês."` — o conserto é editar o mês que já existe (seção 14), não cadastrar de novo. Só existe **uma definição por alvo**: cadastrar o mês seguinte reencontra a mesma e passa a valer o teto novo, sem reescrever os meses já congelados.
 
-`Status` **não é aceito**: o mês nasce `open`.
+`Status` **não é aceito**: o mês nasce `open`, e quem o move para `closed` é a rotina do dia 1º — nunca uma rota.
 
 **Resposta:** `{ "IdBudget": 1, "IdBudgetPeriod": 1 }`.
 
@@ -1335,6 +1485,8 @@ Orçar o **mesmo alvo duas vezes no mesmo mês** responde `406` `"Este orçament
 
 **`ReferenceMonth` e `IdBudget` não são aceitos:** mover o teto de lugar é apagar este e cadastrar outro.
 
+**Um mês `closed` continua editável.** Fechar é um carimbo de "este mês acabou", não uma trava: corrigir o teto de um mês passado é justamente o que a tabela do mês congelado permite. O `Status` só volta a `open` se o período for apagado e cadastrado de novo.
+
 **Resposta:** `{ "msg": "Orçamento do mês atualizado com sucesso" }`.
 
 ### `DELETE /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod`
@@ -1345,7 +1497,197 @@ Orçar o **mesmo alvo duas vezes no mesmo mês** responde `406` `"Este orçament
 
 ---
 
-## 15. Utils — `/Utils`
+## 15. Reports — `/Reports` 🔒
+
+**A feature sem tabela própria.** Ela não guarda nada: lê das outras e devolve o número somado. Existe porque as regras de agregação **se contradizem de propósito**, e enquanto elas moravam replicadas no cliente, duas implementações da mesma pergunta terminavam mostrando dois totais diferentes na mesma tela.
+
+| Número | Regra que **não** vale para os outros |
+|---|---|
+| Quanto entrou | filtra `Kind <> 'transfer'` |
+| Quanto gastou | soma **pernas**, não o `TotalValue` da compra |
+| Saldo da conta | **ignora** o pendente |
+| `Spent` do orçamento | **conta** o pendente junto com o pago |
+
+Nenhuma dessas regras nasce aqui: as rotas desta seção chamam as mesmas sections que `GET /Accounts` e `GET /Budgets` já usam. Se um número daqui divergir do da tela dele, é bug — não duas leituras legítimas.
+
+### `GET /Reports/Month`
+
+**Os dois indicadores do Dashboard, somados no servidor.**
+
+| Query | Tipo | Regra |
+|---|---|---|
+| `ReferenceMonth` | `YYYY-MM` | opcional, default o **mês corrente** |
+
+Mês, e não `From`/`To` das listagens de movimento: as duas pontas do cálculo são **posições**, não recortes.
+
+```json
+{
+  "ReferenceMonth": "2026-09-01",
+  "OpeningBalance": 1500,
+  "Inflows": 3000,
+  "Expenses": 500,
+  "OverdueReceivable": 0,
+  "OverduePayable": 0,
+  "Available": 4000,
+  "CurrentBalance": 1300,
+  "OpenInvoices": 300
+}
+```
+
+**`Available` ("quanto ainda posso gastar") e `CurrentBalance` ("quanto tenho em conta") não são duas versões do mesmo fato**, e é por isso que a tela mostra os dois lado a lado: um é o **mês que a pessoa está vivendo**, o outro é o **dinheiro que já saiu**. Eles discordam de propósito.
+
+| | `Available` | `CurrentBalance` |
+|---|---|---|
+| **Abertura** | `OpeningBalance` — o saldo realizado no fim do mês anterior | nenhuma: o saldo já é acumulado desde a abertura da conta |
+| **Base de data** | competência (`CompetenceDate` da perna, que o `CompetenceMode` governa — seção 6) | caixa (`CashDate` da perna) |
+| **Base de estado** | comprometido: pendente **e** pago | realizado: só pago / recebido |
+| **Entradas** | **as pendentes entram** | só as recebidas |
+| **Unidade** | a **perna**, nunca o `TotalValue` da compra | a perna paga |
+
+```
+Available = OpeningBalance
+          + Inflows            (competência no mês, pendentes + recebidas, sem transferência)
+          − Expenses           (pernas com competência no mês, pendentes + pagas)
+          + OverdueReceivable
+          − OverduePayable
+```
+
+**`OpeningBalance` é o termo que faltava, e a ausência dele era um erro de verdade.** Somar só as entradas do mês para dizer quanto ainda dá para gastar ignora o dinheiro que já estava na conta no dia 1º: quem começa setembro com 1000 e recebe 3000 de salário via **3000**, tendo 4000. Se o seu cliente calculava isso somando `GET /Inflows`, **pare** — este é o número certo.
+
+> Se você já usava o paliativo de somar os `Balance` de `GET /Accounts?ReferenceMonth=<mês anterior>`, ele continua dando o mesmo número. A rota existe para tirar essa regra do cliente, não porque o paliativo estivesse errado.
+
+**`OverdueReceivable`/`OverduePayable` são o atrasado, e entram no `Available` dos dois lados.** Uma perna com competência em julho e ainda pendente não está no saldo de julho (não foi paga) nem na janela de agosto (a competência é de julho): sem isso ela **some** do indicador — e some justamente o compromisso que ninguém honrou.
+
+> **O custo está aceito de olhos abertos:** uma entrada prevista que nunca chega infla o `Available` para sempre. É por isso que os dois vão **expostos à parte** — mostre "R$ X vencidos" na tela, com um caminho para receber ou cancelar o que ficou para trás. A alternativa seria o servidor corrigir sozinho, sem contar a ninguém.
+
+**`OpenInvoices` é o que liga os dois números: quanto do saldo já tem dono.** É a soma das pernas de **cartão** que vencem até o fim do mês e ainda não foram pagas — o buraco que o `Available` mostra hoje é o que o `CurrentBalance` vai mostrar quando a fatura for paga.
+
+**E a dupla contagem que não existe:** `payInvoice` **não cria lançamento**, só vira o `Paid` de pernas que já existem. A compra de agosto contada em agosto não volta a contar em setembro.
+
+**Só conta `Active` entra no `OpeningBalance` e no `CurrentBalance`** — o mesmo filtro de `GET /Accounts`, senão a soma do Dashboard discordaria da lista de contas na mesma tela.
+
+`ReferenceMonth` **volta como `YYYY-MM-01`**, como no orçamento: é o mês normalizado que a resposta afirma ter usado.
+
+### `GET /Reports/Statement`
+
+**O extrato de cada conta e de cada cartão, numa rota só** — não uma por conta: a tela é uma, e uma requisição por conta multiplicaria ida e volta para montar tela nenhuma a mais.
+
+| Query | Tipo | Regra |
+|---|---|---|
+| `ReferenceMonth` | `YYYY-MM` | opcional, default o **mês corrente** |
+
+**O extrato é a decomposição do saldo, não uma consulta paralela.** É a promessa inteira da rota:
+
+```
+OpeningBalance (saldo no fim do mês anterior)
+  + entradas recebidas na conta, no mês
+  − transferências recebidas que saíram da conta, no mês
+  − pernas de gasto pagas da conta, no mês
+  = ClosingBalance  ← o mesmo Balance que GET /Accounts devolve para este mês
+```
+
+**Some `OpeningBalance` com os `Value` das linhas e você chega ao `ClosingBalance`, ao centavo.** Se não chegar, é bug da API — não arredonde por conta própria para "fechar" a tela.
+
+```json
+{
+  "ReferenceMonth": "2026-09-01",
+  "Accounts": [{
+    "IdAccount": 1, "Name": "Conta corrente", "Active": true,
+    "OpeningBalance": 1000.00, "ClosingBalance": 4300.00,
+    "Entries": [
+      { "Date": "2026-09-05", "Kind": "inflow",   "Description": "Salário",         "Value":  3000.00, "IdInflow": 12 },
+      { "Date": "2026-09-10", "Kind": "transfer", "Description": "Para a poupança", "Value":  -200.00, "IdInflow": 15 },
+      { "Date": "2026-09-15", "Kind": "invoice",  "Description": "Fatura Nubank",   "Value":  -500.00, "IdPaymentMethod": 7 }
+    ]
+  }],
+  "Cards": [{
+    "IdPaymentMethod": 7, "Name": "Nubank", "DueDate": "2026-09-15",
+    "Total": 500.00,
+    "Entries": [
+      { "Date": "2026-08-20", "Description": "Mercado", "Value": 320.00, "IdExpense": 44, "IdExpensePayment": 61, "InstallmentNumber": null, "InstallmentTotal": null, "Paid": true, "Charged": true }
+    ]
+  }]
+}
+```
+
+**`Value` é assinado, e não duas colunas de débito e crédito.** Com sinal, conferir o extrato é literalmente somar a lista; com duas colunas, vira uma subtração que alguém escreve ao contrário uma hora.
+
+**`Kind` discrimina a origem, e cada linha carrega o id do que a gerou** para a tela navegar do extrato até o lançamento:
+
+| `Kind` | O que é | Ids que vêm |
+|---|---|---|
+| `opening` | o **saldo inicial da conta**, quando o `InitialBalanceDate` cai dentro do mês | nenhum — não é lançamento |
+| `inflow` | entrada recebida | `IdInflow` |
+| `transfer` | transferência recebida — **nas duas contas, com sinais opostos** | `IdInflow` |
+| `expense` | perna de gasto paga **fora do cartão** | `IdExpense`, `IdExpensePayment` |
+| `invoice` | **a fatura inteira do cartão, agregada numa linha** | `IdPaymentMethod` |
+
+**A fatura entra como uma linha, e o detalhe fica no extrato do cartão.** Quarenta compras do cartão viram quarenta linhas no extrato da conta — o que nenhum extrato bancário faz, e o que soterra as linhas que importam. O agrupamento é `(cartão, vencimento)`, e **a soma não muda**: o total do grupo é o mesmo que as pernas somavam.
+
+**A transferência não é filtrada aqui**, ao contrário do "quanto entrou" da rota anterior: para o extrato, ela é uma saída real de uma conta e uma entrada real na outra. Some as duas linhas e o patrimônio não muda — que é o que uma transferência é.
+
+#### As duas assimetrias — leia antes de montar a tela
+
+**1. Extrato da conta é caixa; extrato do cartão é fatura.**
+
+| | Extrato da conta | Extrato do cartão |
+|---|---|---|
+| O que é | o dinheiro que **passou** | a **fatura** — o que foi comprado |
+| Estado | **só liquidado** (entrada recebida, perna paga) | **pago E pendente** |
+| Corte | a `CashDate` da perna / a competência da entrada | o **`DueDate`** — a fatura é o par `(cartão, vencimento)` |
+| Data da linha | a do lançamento | a da **compra** |
+
+Uma fatura existe antes de ser paga — é isso que a torna útil de olhar. Já o extrato da conta só pode conter o que saiu, ou a soma não fecha. Os dois estão certos, e estão certos por motivos opostos.
+
+> **O custo está aceito:** quem abrir o extrato no dia 20 **não** vê a conta de luz lançada para o dia 25. O lugar dela é `GET /Expenses`, que tem filtro de status justamente para isso. Extrato é o que aconteceu; previsão é outra tela.
+
+**2. Detalhada no cartão, agregada na conta — e não é dupla contagem.** É a mesma perna vista dos dois lados: linha a linha na fatura, e uma linha só na conta no mês em que a fatura venceu. `payInvoice` **não cria lançamento**, só vira o `Paid` de pernas que já existem.
+
+**Conta e cartão arquivados continuam tendo extrato.** `Active = false` quer dizer "não use mais", não "não existiu": o mês em que a conta ainda tinha movimento é consultável, e a conta vem com `Active: false` para a tela poder rotular. A arquivada **sem** movimento no mês some da lista — ela não tem o que mostrar.
+
+**Gasto cancelado não aparece em lugar nenhum**, e o mês em que foi cancelado continua fechando: cancelar um gasto quitado é o estorno dele.
+
+**`ReferenceMonth`, e não `From`/`To`.** As duas pontas são posições: um extrato de 15 de agosto a 3 de setembro não tem saldo de abertura que signifique alguma coisa.
+
+### `GET /Reports/Export`
+
+**A planilha do período, gerada pelo servidor.** É a **única rota do contrato que não responde JSON**.
+
+| Query | Tipo | Regra |
+|---|---|---|
+| `From` | CalendarDate | opcional, inclusivo |
+| `To` | CalendarDate | opcional, inclusivo |
+
+`From`/`To`, como todas as listagens de movimento — não `ReferenceMonth`: exportar é recortar, e um recorte de exportação não precisa ser um mês civil. **Sem nenhuma das duas pontas, sai o histórico inteiro.**
+
+**Resposta:** o arquivo, não um JSON.
+
+| Cabeçalho | Valor |
+|---|---|
+| `Content-Type` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` |
+| `Content-Disposition` | `attachment; filename="Gastos Mensais - 2026-09-01 a 2026-09-30.xlsx"` |
+
+> **Não trate a resposta como JSON.** No `fetch`, use `response.blob()`; no `axios`, `responseType: "blob"`. E **a chamada precisa mandar o cookie** (`credentials: "include"` no `fetch`) — uma `<a href>` simples funciona no mesmo domínio, mas não deixa você tratar o `401`.
+
+**Três abas:**
+
+| Aba | O que tem |
+|---|---|
+| `Resumo` | total de entradas, total de gastos e o resultado — **como fórmula**, não como número somado no servidor |
+| `Entradas` | uma linha por entrada, com as contas de origem e destino pelo nome |
+| `Gastos` | uma linha por **perna**, não por compra |
+
+**A aba de gastos lista pernas.** 600 em 6× são seis linhas de 100, cada uma no mês em que pesa — a mesma unidade do `Spent` do orçamento e do `Expenses` de `GET /Reports/Month`. Uma planilha por compra jogaria 600 no mês da compra e não bateria com número nenhum da tela.
+
+**O resumo é fórmula de propósito:** apagar uma linha dentro do Excel não pode deixar o total mentindo, e uma planilha exportada existe justamente para ser mexida.
+
+**As datas saem como texto `dd/MM/yyyy`.** As colunas de data do sistema são dias de calendário, não instantes (seção 1.5): convertê-las para data do Excel reintroduziria o fuso e a planilha sairia com todo lançamento um dia atrás. O custo é que o Excel não ordena a coluna como data — é o lado certo do erro.
+
+O período recorta pela **competência** nas duas abas, e o cancelado fica de fora.
+
+---
+
+## 16. Utils — `/Utils`
 
 | Rota | Auth | Resposta |
 |---|---|---|
@@ -1375,25 +1717,29 @@ Orçar o **mesmo alvo duas vezes no mesmo mês** responde `406` `"Este orçament
 
 ---
 
-## 16. O que ainda não tem API
+## 17. O que ainda não tem API
 
 Existe no banco, mas **sem rota**: `UserDevices`, `Notifications`, `Plans`, `Subscriptions`.
 
 **Gestão de membros ainda não existe:** listar quem é membro, trocar o papel de alguém, remover um membro, sair de um workspace e transferir propriedade. O convite (4.1) entrega só a entrada. Revogar um convite **não** desfaz matrícula já criada.
 
-Também não existem: `GET` de `PaymentMethods` (vem embutido na conta), CRUD de `Tags` além de busca e arquivar, `GET`/`POST` de `BudgetPeriods`, e a **rotina mensal** que materializaria os orçamentos.
+Também não existem: `GET` de `PaymentMethods` (vem embutido na conta), CRUD de `Tags` além de busca e arquivar, e `GET`/`POST` de `BudgetPeriods`.
+
+A **rotina mensal do orçamento passou a existir** (2026-09-07) e roda no servidor, sem rota: ela não é chamável pelo front e não aparece neste contrato a não ser pelo efeito — o mês do orçamento existir no dia 1º sem ninguém ter cadastrado.
 
 **Fora deste contrato:** `/Cache` (`GET /Cache/CacheName=:CacheName`, `POST /Cache`, `POST /Cache/Reset/CacheName=:CacheName`) é o subsistema interno de cache em memória sincronizado por socket. Não tem schema Joi, não é escopado por workspace e não faz parte do domínio do app — não consuma a partir das telas.
 
 ---
 
-## 17. Cola rápida
+## 18. Cola rápida
 
 | Método | Rota | Auth |
 |---|---|---|
 | POST | `/Users` | público |
 | POST | `/Users/login` | público |
 | POST | `/Users/logout` | público |
+| POST | `/Users/forgotPassword` | público |
+| POST | `/Users/resetPassword` | público |
 | GET | `/Users/getSelf` | 🔒 |
 | PUT | `/Users/IdUser=:IdUser` | 🔒 |
 | PUT | `/Users/updatePassword` | 🔒 |
@@ -1457,6 +1803,9 @@ Também não existem: `GET` de `PaymentMethods` (vem embutido na conta), CRUD de
 | POST | `/Budgets` | 🔒 |
 | PUT | `/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
 | DELETE | `/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
+| GET | `/Reports/Month` | 🔒 |
+| GET | `/Reports/Statement` | 🔒 |
+| GET | `/Reports/Export` | 🔒 |
 | GET | `/Utils/ServerTime` | público |
 | GET | `/Utils/Health` | público |
 | GET | `/Utils/Reload` | 🔒 |
@@ -1464,15 +1813,38 @@ Também não existem: `GET` de `PaymentMethods` (vem embutido na conta), CRUD de
 
 ---
 
-## 18. Changelog
+## 19. Changelog
 
-Toda mudança da API que o front enxerga entra aqui, **da mais recente para a mais antiga**. O
-resto do documento descreve sempre o estado *atual*; esta seção é o que diz **o que mudou desde
-a última vez que você leu** e o que precisa mudar do seu lado.
+**O changelog não mora mais neste arquivo.** Ele foi quebrado **por leva de desenvolvimento**, um
+arquivo por leva, em [`contrato Front-end/changelogs/`](contrato%20Front-end/changelogs/):
 
-Uma entrada tem sempre as mesmas quatro partes: a data, a rota afetada, **se quebra ou não** o
-que já está escrito, e a ação do front. Mudança que não afeta o front (refatoração interna,
-teste, índice de banco) **não** entra aqui.
+| Arquivo | O que tem | Quando |
+|---|---|---|
+| [Fase #3](contrato%20Front-end/changelogs/Fase%20%233.md) | a leva 3 — infra, e-mail, sessão, `CompetenceMode` e `/Reports` | 2026-09-07 |
+| [Fase #2](contrato%20Front-end/changelogs/Fase%20%232.md) | a leva 2 — as correções que sobem junto com o MVP | 2026-09-04 → 2026-09-06 |
+| [Fase #1](contrato%20Front-end/changelogs/Fase%20%231.md) | o MVP: **não tem entradas**, e o arquivo explica por quê | até 2026-08-30 |
+| [Fora de leva](contrato%20Front-end/changelogs/Fora%20de%20leva.md) | o que mudou fora de qualquer plano | 2026-08-31 → 2026-09-06 |
+
+**Por leva, e não num arquivo só, porque é assim que o front atualiza.** Ninguém lê changelog por
+data: lê para saber *o que preciso mexer para acompanhar a versão nova*, e a unidade dessa
+pergunta é a leva — ela sobe junta, e é dela que o front toma conhecimento de uma vez. O arquivo
+único também crescia sem fim, e a leva 3 sozinha teria empurrado a metade antiga para fora de
+qualquer leitura.
+
+**Comece pela leva mais nova e vá descendo** até encontrar a última que você já tinha lido.
+
+### O que entra, e como
+
+Toda mudança da API **que o front enxerga** vira uma entrada, **no mesmo commit da mudança**:
+rota nova ou removida, campo novo/removido/renomeado em requisição ou resposta, parâmetro de query
+novo, status ou `msg` diferente, default diferente — e o caso que motivou tudo isto, **um número
+que mantém o nome e muda de significado**. Uma mudança semântica silenciosa é a pior de todas,
+porque nada no cliente estoura: ele só passa a mostrar outra coisa.
+
+Mudança que o front **não** enxerga (refatoração interna, teste, índice de banco) não entra.
+
+Uma entrada tem sempre as mesmas quatro partes: **a data**, **a rota afetada**, **o marcador** e
+**a ação do front**. Entradas em ordem decrescente de data dentro do arquivo da leva.
 
 | Marcador | Significado |
 |---|---|
@@ -1480,290 +1852,6 @@ teste, índice de banco) **não** entra aqui.
 | 🟡 **Comportamento** | Nada quebra na chamada, mas a resposta mudou de significado. Confira antes de ignorar |
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
----
-
-### 2026-09-06 — `POST /Workspaces`: criar um workspace novo
-
-🟢 **Adição** — ver a seção 4.
-
-**O que entrou.** `POST /Workspaces` com `{ Name }`, respondendo `{ IdWorkspace }`. Até agora um workspace só nascia dentro do cadastro, então quem já tinha conta e queria separar as finanças em dois lugares (a casa e a empresa, o pessoal e o do casal) não tinha caminho nenhum — a saída era criar outra conta com outro e-mail, o que espalha o login em vez de organizar o dinheiro.
-
-**Quem cria é `owner`**, e o `IdOwnerUser` vem do token: não há campo no corpo por onde apontá-lo para outra pessoa. O workspace nasce **vazio** — sem contas, sem categorias próprias, sem lançamentos —, com a matrícula e com a **sua pessoa (`Persons`) já criada dentro dele**, porque todo rateio é entre pessoas e sem ela você não apareceria no próprio gasto.
-
-**Ação do front:** depois do `POST`, chame **`POST /Workspaces/switch`** com o `IdWorkspace` que voltou. **Criar não troca a sessão**, pela mesma razão do `join` (seção 4.1): trocar o workspace debaixo da tela que o usuário estava usando é pior do que um clique a mais. Sem o `switch`, o usuário cria o workspace e continua vendo o antigo — é o mesmo bug provável que o do aceite de convite.
-
-**Nada mudou** para quem tem um workspace só: o cadastro continua criando o primeiro, e nenhuma resposta existente mudou de forma.
-
-### 2026-09-06 — `POST /Expenses`: estorno, o gasto de valor **negativo**
-
-🟢 **Adição** — ver a seção 11, e a subseção **11.3** que nasceu com ela.
-
-**O que entrou.** `TotalValue` e os valores dos dois eixos passam a aceitar **negativo**. É como se lança um **estorno de compra** — aquilo que volta na fatura, às vezes na seguinte. Antes não havia como lançá-lo: a parede era tripla (o `.positive()` da validação e três `CHECK` do banco).
-
-**Estorno não é entrada, e é por isso que ele é um gasto.** Se virasse um `Inflow`, o saldo da conta subiria no mês do estorno **e** a fatura continuaria sendo paga cheia — errado dos dois lados. Nenhum dinheiro entra na conta: **a fatura é que encolhe**. E o gasto negativo carrega de graça as cinco coisas que o estorno precisa — categoria, datas de fatura, competência, rateio por pessoa e linha da fatura.
-
-**Quatro regras, todas `406`:** só em forma de pagamento `credit_card`; **um gasto é inteiro positivo ou inteiro negativo** (todas as partes, nos dois eixos, com o sinal do total); **`Kind='single'` apenas** — estorno de parcelado se lança um por parcela; e **zero continua proibido**, em `TotalValue` e em cada valor.
-
-**Ação do front:** liberar o sinal no campo de valor **quando a forma escolhida for cartão de crédito**, e propagar o sinal para as linhas dos dois eixos que você montar. Em qualquer outra forma, mantenha o campo positivo — dinheiro que volta fora do cartão é `POST /Inflows`.
-
-**Juros, anuidade e IOF não entram aqui:** são gastos **positivos** comuns, no cartão, numa categoria de tarifas. Só o estorno tem sinal invertido, porque só ele **reduz** o que você vai pagar.
-
-🟡 **`Spent` pode vir negativo** em `GET /Budgets` (seção 13), num mês em que os estornos superam as compras. Não quebra nada, mas a barra de progresso precisa tratar o caso. **O crédito cai no mês de competência do estorno**, que costuma ser outro mês: agosto fica com a compra cheia e outubro recebe o crédito — corrigir agosto seria reescrever mês fechado.
-
-**Não mudou nada para quem não lança estorno:** compra positiva segue idêntica em toda regra, e o estorno é quitado com a fatura (`payInvoice`) como qualquer linha de cartão.
-
-### 2026-09-06 — O cartão de crédito ganha fatura, e `Paid` para de mentir
-
-🔴 **Quebra** nas seções 11 e 12, 🟢 **adição** nas seções 6 e 12. **É a mudança mais visível desta leva** — a ação da linha de cartão, na tela de Gastos, muda de significado.
-
-**O problema que ela conserta: o saldo da conta estava errado.** `Paid` significava duas coisas conforme a forma de pagamento. No pix e no débito quer dizer "o dinheiro saiu da conta" — e sai mesmo. No cartão, marcar uma perna como paga **não tira dinheiro de conta nenhuma**: quem tira é o pagamento da fatura, semanas depois. E como só existia o `pay` de **uma perna por vez**, ninguém marcava as 40 compras de uma fatura: as pernas ficavam `pending` para sempre e **o saldo nunca descia**, subindo mês a mês enquanto a conta real caía.
-
-São **três fatos**, e dois deles dividiam o mesmo booleano:
-
-| Fato | Pergunta | Onde vive agora |
-|---|---|---|
-| prevista | "a Netflix vai cobrar dia 15" | a ocorrência do gasto fixo, que já existia |
-| **entrou na fatura** | "cobrou mesmo? veio no valor certo?" | **`Charged`/`ChargedAt`** — novo |
-| **fatura paga** | "o dinheiro saiu da conta" | `Paid`/`PaidAt`, escrito só pelo **`payInvoice`** no cartão |
-
-🟢 **Quatro rotas novas.** `POST /ExpensePayments/IdExpensePayment=:Id/charge` e `/uncharge` (seção 12) marcam que a cobrança entrou na fatura — **sem body, e sem mexer em saldo nenhum**. `POST /PaymentMethods/IdPaymentMethod=:Id/payInvoice` e `/unpayInvoice` (seção 6) recebem `{ "DueDate" }` e quitam a **fatura inteira**.
-
-**A fatura não é cadastro, é consulta:** não há tabela nem id de fatura. Todas as pernas de um ciclo compartilham o **mesmo `DueDate` exato**, então a fatura é `(IdPaymentMethod, DueDate)` — pegue o `DueDate` da perna e mande de volta. A resposta traz `Payments`, quantas pernas mudaram; **repetir é inofensivo** (as já pagas são puladas), o que resolve lançar hoje uma compra esquecida de uma fatura já paga.
-
-🔴 **`pay`/`unpay` recusam perna de cartão** (`406`, com a `msg` apontando o `payInvoice`). 🔴 **`Paid: true` no `POST /Expenses` com forma `credit_card` é `406`.** Fora do cartão os dois seguem exatamente como estavam — inclusive parcelado em carnê ou crediário, que continua sendo quitado parcela a parcela.
-
-**Ação do front, e é trabalho de verdade:**
-
-1. **A ação da linha de cartão troca de rota e de rótulo.** Onde ela dizia "quitar" e chamava `pay`, passa a dizer **"entrou na fatura"** e chamar `charge`. O botão não some — ele para de mentir. Para o usuário é troca de rótulo, não de gesto.
-2. **Ganhe uma ação de fatura**, por cartão e por vencimento, chamando `payInvoice`. É ela que faz o saldo descer.
-3. **Não ofereça `Paid` no formulário de lançamento quando a forma escolhida for cartão** — ele agora é recusado.
-4. Depois de qualquer uma das duas, **releia `GET /Accounts`**: o `Balance` é somado dos lançamentos a cada leitura.
-
-🟢 **A perna ganha três campos na resposta:** `Charged`, `ChargedAt` e **`CompetenceDate`**. `Charged` é **`null` fora do cartão** (é assim que você sabe se a linha tem botão de conferência). `CompetenceDate` é a data em que a perna pesa — `DueDate` quando existe, senão a data do gasto —, congelada no lançamento; é por ela que o saldo, o `Spent` do orçamento e `GET /ExpensePayments` recortam o mês. Nenhuma dessas três é aceita em corpo nenhum.
-
-**Nada mudou de valor:** a `CompetenceDate` é exatamente o `coalesce(DueDate, ExpenseDate)` que as consultas já calculavam — nenhum número da tela muda por causa dela. E `Expenses.Status` continua derivado só do `Paid`: uma compra no cartão vira `paid` quando a fatura for paga, e a de 6× depois das seis. Que é a verdade.
-
-**De brinde:** com `Charged` dá para responder o que nada respondia — "fatura de outubro: 1.230 previstos, 890 já lançados", a diferença entre o esperado e o que o cartão já registrou.
-
-### 2026-09-05 — `/Budgets`: o teto agora pode ser **de uma pessoa**, não só de uma categoria
-
-🟢 **Adição** — ver a seção 13, `/Budgets`.
-
-**O que entrou.** O mesmo teto mensal que existia por categoria, agora somando tudo que é **atribuído a uma pessoa** — o eixo analítico (`ExpensePersons`), não o financeiro.
-
-- **`POST /Budgets`** passa a aceitar `IdPerson` **no lugar de** `IdCategory`. Os dois são **mutuamente exclusivos**: mandar os dois, ou nenhum, é `406`. O resto do corpo não muda.
-- **`GET /Budgets`** devolve os dois tipos **na mesma lista** e cada linha ganha três campos: **`Scope`** (`"category"` | `"person"`), **`IdPerson`** e **`Person`** (a linha inteira). `IdCategory` e `Category` passam a vir **`null`** nas linhas de `Scope: "person"`.
-
-**Ação do front:** ler o `Scope` antes de desenhar a linha, em vez de assumir que `Category` está sempre preenchida. Quem só quer o comportamento de hoje pode filtrar `Scope === "category"` e nada muda — nenhum orçamento de pessoa existe até alguém cadastrar o primeiro.
-
-**O `Spent` da pessoa é rateado pelas parcelas:** `ExpensePersons.Value × ExpensePayments.Value ÷ Expenses.TotalValue`. 600 em 6× todos da Maria dão **100 por mês**, o mesmo número que a categoria enxerga — sem o rateio o mesmo gasto contaria 600 num orçamento e 100 no outro. Arredondado uma vez, no fim.
-
-**Um gasto conta nos dois orçamentos, e isso não é dupla contagem** — são duas perguntas sobre o mesmo dinheiro. **Não some os dois num total.**
-
-> **⚠️ A soma dos orçamentos de pessoa não fecha com o total gasto do mês, e isso não é bug.** O rateio é **opcional** no gasto: um gasto sem `Persons` não entra em orçamento de pessoa nenhum. Deixe isso escrito na tela.
-
-🟡 **A `msg` do mês repetido mudou:** orçar o mesmo alvo duas vezes no mesmo mês respondia `"Esta categoria já tem orçamento neste mês."` e agora responde `"Este orçamento já existe neste mês."` — a mensagem não podia continuar falando em categoria. Continua `406`, no mesmo caso. Se você mostrava a `msg` do servidor, nada a fazer; se comparava o texto, ajuste.
-
-**Não mudou:** `PUT` e `DELETE /BudgetPeriods` servem aos dois tipos sem nenhuma diferença (é o motivo de o alvo novo ter entrado na mesma tabela), e o `Spent` de categoria continua contando exatamente como contava.
-
-### 2026-09-05 — `/Accounts` e `/PaymentMethods`: conta "apenas cartão", e quem aceita cartão de crédito
-
-🟢 **Adição** na seção 5 e 🔴 **Quebra** na seção 6.
-
-**Entrou o `Type='card'`.** O caso é o **vale-alimentação**: um cartão com saldo próprio, sem conta bancária atrás e **sem fatura**. Até aqui o cadastro obrigava a escolher entre `checking` (que nasce com pix + débito) e `cash` (que nasce com "Dinheiro"), e nenhum dos dois descreve um vale.
-
-A conta `card` nasce com **uma forma de pagamento só**, `Kind='debit'`, **com o nome da conta** — "Vale Alimentação" é o que o usuário quer ver na hora de escolher como pagou. Não há `Kind='voucher'`: vale não tem fatura, o gasto sai do saldo no ato, e isso já é o que `debit` significa. `InitialBalance` funciona normalmente e é o saldo do vale, com a trava de sempre (congela no primeiro lançamento).
-
-**Ação do front:** acrescentar a opção no seletor de tipo de conta do cadastro. Nada mais muda para quem já usa `checking` e `cash` — os dois continuam criando exatamente o que criavam.
-
-🔴 **`POST /PaymentMethods` passa a responder `406` para cartão de crédito fora de conta corrente.** `IdAccount` de uma conta `cash` **ou** `card` devolve `"Cartão de crédito só existe em conta corrente."` As duas são contas de saldo fechado e uma fatura nelas não teria de onde sair.
-
-**Ação do front:** no cadastro do cartão de crédito, oferecer **só as contas `checking`** no seletor de conta. Na prática esse caminho nunca foi oferecido, mas a chamada existia e passava — por isso entra como quebra, e não como comportamento.
-
-**É regra nova para o `cash` também**, não só para o tipo que está nascendo: fazer valer para um e não para o outro deixaria a regra arbitrária. **Linhas que já existem continuam valendo:** um cartão criado antes numa conta `cash` não é apagado nem migrado — gasto lançado aponta para ele.
-
-🟡 **`PUT /Accounts` passa a recusar a troca de `Type` em conta já movimentada**, com `406` `"Esta conta já tem lançamentos: o tipo dela não pode mais ser alterado."` — a mesma trava que o `InitialBalance` já tinha, e pela mesma pergunta ("esta conta tem movimento?"). Enquanto a conta está vazia a troca passa, e **não cria nem apaga forma de pagamento nenhuma**: as que nasceram ficam. Desabilite o campo `Type` junto com o `InitialBalance`.
-
-### 2026-09-05 — `GET /ExpensePayments`: a lista do que **cai** no mês, com a parcela da compra antiga junto
-
-🟢 **Adição** — ver a seção 12, `/ExpensePayments`.
-
-**O que entrou.** `GET /ExpensePayments?From=&To=&IncludeCanceled=`. Devolve as **pernas** cuja `coalesce(DueDate, ExpenseDate)` cai no intervalo, cada uma com o **gasto de origem** (`Expense`) e o **rateio dele** (`Persons`). As duas pontas do período são opcionais e `IncludeCanceled` segue a mesma regra de `GET /Expenses`.
-
-**O furo que ela fecha — leia mesmo que você não vá usar a rota agora.** `GET /Expenses` filtra por `ExpenseDate`: uma compra parcelada de **março não aparece em agosto**, mas a 6ª parcela dela **pesa** em agosto. Quem monta o total do mês pela lista de gastos tem que varrer meses para trás atrás de parcelamentos abertos, e o contrato permite **120 parcelas** — acima da janela que você escolher, a parcela **some do total do mês**. É a única lacuna em que o número na tela fica *errado*, e não só ausente.
-
-**Ação do front:** trocar por esta rota a varredura de meses para trás (`INSTALLMENT_LOOKBACK_MONTHS`) **e** o `GET /Expenses/IdExpense=:IdExpense` por linha que preenchia as colunas de pessoa e forma de pagamento. Uma requisição resolve as duas coisas — inclusive no Relatório, que olha período e hoje paga esse custo por mês do intervalo.
-
-> **⚠️ O `Persons` que vem na perna é o do GASTO, não o da perna.** Numa compra de 600 em 6×, as seis pernas trazem o mesmo rateio de **600**. Somar pessoa a pessoa, perna a perna, dá **3600** — e **nada estoura**: o número só fica errado. Para "quanto é da Maria neste mês", rateie: `Persons[i].Value × Payment.Value ÷ Expense.TotalValue`.
-
-**A forma de pagamento vem como `IdPaymentMethod`**, não a linha inteira — ela já está em `GET /Accounts`. Idem a pessoa, que está em `GET /Persons`. **Não há tags** na resposta.
-
-**Não mudou nada:** `GET /Expenses` continua exatamente como estava — é a lista das **compras**, e as duas convivem. O `pay`/`unpay` também não muda.
-
-### 2026-09-04 — `POST /Inflows/batch`: grava várias entradas de uma vez, tudo ou nada
-
-🟢 **Adição** — ver a seção 10, `/Inflows`.
-
-**O que entrou.** `POST /Inflows/batch`, com `{ "Inflows": [ ...até 100 itens... ] }`. **Cada item é exatamente o body do `POST /Inflows`**, validado pelo mesmo schema. Resposta: `{ msg, IdInflows: [...] }`, com os ids **na ordem em que você mandou**.
-
-**É tudo ou nada.** Um item recusado derruba o lote inteiro — nenhuma linha é gravada, nem as que estavam certas. A `msg` diz qual item foi: `"Item 2: ..."`, contando a partir de 1 (a posição `1` do array). Destaque essa linha no formulário.
-
-**Ação do front:** a tela de "repetir o mês passado" monta as cópias no cliente — escolha do usuário item a item, datas avançadas, dia aparado no mês curto, rateio junto — e manda tudo numa chamada. Depois do `200`, invalide o cache do mês com os `IdInflows` que voltaram.
-
-**Desabilite o botão enquanto a requisição está em voo.** Não há idempotência do lado do servidor e não vai haver: repetir o lote cria tudo de novo. Não existe repetição silenciosa a evitar aqui — só duplo clique, que é do cliente.
-
-**Todas nascem `pending`**, como no `POST` avulso: nenhum saldo se move na gravação, o que torna o erro fácil de refazer.
-
-> **`POST /Inflows/clone` não vai existir.** Ele foi substituído por esta rota: quem escolhe o que clonar é o usuário, e ao servidor sobrou gravar. Fica registrado para ninguém esperar por ele.
-
-**Não mudou:** o `POST /Inflows` avulso, nem nenhuma validação — o schema do item é literalmente o mesmo objeto.
-
-### 2026-09-04 — `/Inflows`: dá para **desfazer** um recebimento
-
-🟢 **Adição** — ver a seção 10, `/Inflows`.
-
-**O que entrou.** `POST /Inflows/IdInflow=:IdInflow/unreceive`, sem body. Volta o `Status` para `pending`, limpa o `ReceivedAt` e o dinheiro sai do saldo. É a simétrica exata do `receive`, do mesmo jeito que o `unpay` é a do `pay` na perna do gasto.
-
-**Ação do front:** ligar o botão de desfazer da tela de Renda nesta rota. Depois do `200`, **releia `GET /Accounts`** — o `Balance` volta sozinho ao valor de antes.
-
-**Não lance nada para compensar.** O saldo não é guardado: ele é somado dos lançamentos `received` a cada leitura, então voltar o `Status` já é a retirada. Uma entrada de sinal contrário criada "para estornar" contaria duas vezes.
-
-Numa **transferência**, desfazer devolve as duas contas de uma vez.
-
-`406` quando a entrada não existe no workspace, **não está recebida**, ou está cancelada — cada caso com a sua `msg`, espelhando as que o `receive` já tinha.
-
-**Não mudou:** o `receive`, o cálculo do saldo, e o fato de que editar uma entrada já recebida continua permitido.
-
-### 2026-09-04 — `/PaymentMethods`: `Brand` e `LastDigits` deixam de existir
-
-🔴 **Quebra** — ver as seções 5, `/Accounts`, e 6, `/PaymentMethods`.
-
-**As duas colunas foram derrubadas do banco.** Elas somem da resposta e deixam de ser aceitas na entrada:
-
-- **Ler:** a forma de pagamento embutida em `GET /Accounts` **não traz mais** `Brand` nem `LastDigits`. Quem lê qualquer um dos dois passa a receber `undefined`.
-- **Escrever:** `POST` e `PUT /PaymentMethods` com qualquer um dos dois respondem `406` (`"Dados de entrada inválidos."`).
-
-**Ação do front:** tirar os dois campos do formulário de cartão e de qualquer leitura. Quem mostrava "Nubank ****1234" põe isso no `Name`, que é o campo que o usuário escreve e o único que o sistema usa para identificar a forma de pagamento. O front já os havia removido de tudo — esta entrada existe para o contrato parar de prometê-los.
-
-**Por que.** Nenhuma regra do sistema lia qualquer um dos dois: a fatura sai de `DueDay`/`ClosingOffsetDays`, o saldo sai da perna, o rateio sai do gasto. E o `LastDigits` ainda carregava quatro dígitos de um cartão real gravados em texto puro para servir de rótulo — dado sensível guardado sem nada em troca.
-
-**Os dados não voltam.** As colunas foram apagadas; a bandeira e o final que estavam gravados se foram junto. Nada mais muda: `DueDay`, `ClosingOffsetDays`, `Name`, `IconPath`, `Color` e `Position` seguem iguais.
-
-### 2026-09-04 — `POST /Expenses`: `Occurrences` sai do corpo e a janela do gasto fixo passa a ser do servidor
-
-🔴 **Quebra** — ver a seção 11, `/Expenses`.
-
-**O que quebrou.** `POST /Expenses` **não aceita mais `Occurrences`**. Mandar o campo agora responde `406` (`"Dados de entrada inválidos."`), inclusive com o valor que era o default.
-
-**O que entrou no lugar.** A janela virou **constante do servidor: 12 ocorrências, contando a raiz.** O que limita a série passa a ser essa janela **ou** o `RecurrenceEndDate`, o que vier primeiro — e o `RecurrenceEndDate` continua no corpo, igual. A recorrência **não** fica aberta; nem antes ficava.
-
-**A resposta não muda.** `POST /Expenses` continua devolvendo `{ IdExpense, Occurrences }`, e `Occurrences` continua sendo quantas linhas de gasto nasceram. O mesmo vale para `PUT .../series`.
-
-**Ação do front:** parar de enviar `Occurrences` — quem já parou não precisa fazer nada. Continue lendo o número **da resposta** para dizer quantas ocorrências foram criadas; a tela não precisa saber a janela antes de salvar, ela pergunta gravando. Se você quer uma série mais curta, mande `RecurrenceEndDate`.
-
-**Por que mudou.** Quantas ocorrências nascem de uma vez é regra de domínio, não escolha de quem lança um gasto: quem cadastra um aluguel quer "todo mês", não "doze". Enquanto o campo existia no contrato e o cliente não o mandava, quem lesse o contrato para escrever tela nova escreveria errado.
-
-### 2026-09-04 — `POST /Users`: `IdWorkspace` sai do cadastro; entrar em workspace alheio agora exige **convite**
-
-🔴 **Quebra** · 🟢 **Adição** — ver as seções 2, `/Users`, e 4.1, convites.
-
-**O que quebrou.** `POST /Users` **não aceita mais `IdWorkspace`**. Mandar o campo agora responde `406` (`"Dados de entrada inválidos."`), e nenhuma matrícula nasce dele.
-
-**Por que.** A rota é pública e esse campo entrava direto como matrícula **`owner`** do workspace informado, sem convite e sem conferência de dono. `IdWorkspace` é inteiro sequencial: adivinhava-se contando. Era a pendência que segurava o deploy, e ela está fechada.
-
-**O que entrou no lugar: `InviteHash`.** Mesmo campo opcional, outro valor — o hash de 32 bytes de uma linha de convite, que só existe se alguém criou. Com ele, o cadastro entra no workspace do convite com o papel que a **linha** manda; sem ele, nasce o workspace próprio, como sempre.
-
-**Cinco rotas novas em `/Workspaces`** (seção 4.1): criar convite, listar pendentes, descrever um convite pelo hash (**pública**), aceitar quem já tem conta, e revogar. **A API não manda e-mail** — ela devolve o hash e quem entrega o link é o usuário.
-
-**Ação do front:**
-
-1. **Tirar `IdWorkspace` de qualquer chamada de cadastro.** Se a sua tela ainda tem esse campo, ele agora quebra o cadastro inteiro em vez de fazer nada.
-2. **Tela de convite (dono):** `POST /Workspaces/invite` com `{ Email, Role }`, montar a URL da sua tela de aceite com o `Hash` que voltou, e oferecer copiar/compartilhar. `GET /Workspaces/invites` lista os pendentes com o `Hash` de cada um, para reenviar; `DELETE` revoga.
-3. **Tela de aceite (convidado), pública:** `GET /Workspaces/invite/Hash=:Hash` para mostrar quem convidou, para qual workspace e **para qual e-mail** — sem sessão. Daí saem dois caminhos: quem não tem conta vai para o cadastro com `InviteHash`; quem já tem entra e chama `POST /Workspaces/join`.
-4. **Depois do `join`, chame `POST /Workspaces/switch`.** O `join` **não** troca a sessão de propósito. Sem o switch, o usuário aceita e continua vendo o workspace antigo — que é o bug mais provável desta entrega.
-5. **Trate os `406` pela `msg`.** Convite inexistente, revogado, expirado, já usado e e-mail diferente são cinco mensagens distintas, e cada uma manda o usuário para um lugar diferente.
-
-**A regra que não é óbvia: o e-mail tem que bater.** O link é compartilhável por desenho, então o hash sozinho não é a tranca — quem recebesse o encaminhamento entraria. A API compara o e-mail do convite com o da conta que aceita (o da sessão no `join`, o do corpo no cadastro). Deixe isso claro na tela: mostre o `Email` que o `GET` público devolve, com um "entre com esta conta".
-
-**Convidar o mesmo e-mail duas vezes renova o convite**, com hash novo — o link anterior morre. Não gere dois links esperando que os dois funcionem.
-
-**Não mudou:** o `POST /Users` sem convite, o login, o `switch`, e o formato de `GET /Workspaces/getSelf` (que agora simplesmente pode devolver mais de um workspace).
-
-### 2026-09-04 — `POST /Users/logout`: agora existe como sair da sessão
-
-🟢 **Adição** — ver a seção 2, `/Users`.
-
-**O que entrou.** `POST /Users/logout`, **pública**, sem body. A resposta é `200` com `{ "msg": "Sessão encerrada com sucesso" }` e um `Set-Cookie` que expira o `token`. Depois dela, toda rota 🔒 responde `401`.
-
-**Por que ela não exige token.** Exigir sessão para encerrar sessão responde `401` no caso em que o usuário mais precisa sair — token expirado, cookie meio apagado, aba antiga —, e o botão "Sair" trava sem ter o que fazer. Não há o que autorizar aqui: o efeito da rota é apagar um cookie do próprio chamador.
-
-**Ação do front:** trocar qualquer limpeza local de sessão pela chamada à rota. O cookie é `HttpOnly`, então o `document.cookie` **nunca** conseguiu apagá-lo — quem hoje só limpa o estado da aplicação está deixando a sessão viva no navegador. Depois do `200`: limpe o cache local e redirecione para o login.
-
-**O que não mudou:** nada. Nenhuma rota existente teve resposta, corpo ou status alterados.
-
-**Limite conhecido:** não há lista de revogação. O token segue válido até o `exp` (24h) para quem tiver copiado o valor antes — o que exige acesso ao aparelho, já que ele é `HttpOnly`. Se "encerrar sessões nos outros aparelhos" virar requisito, é aí que entra uma lista de revogação, não antes.
-
-### 2026-09-03 — `GET /Expenses`: `IncludeCanceled` traz os cancelados junto com o resto
-
-🟢 **Adição** — ver a seção 11, `/Expenses`.
-
-**O que entrou.** Um booleano opcional na query, `IncludeCanceled`, default `false`. Com ele em `true` a lista vem completa, cancelados incluídos.
-
-**Nada do que já existe muda.** `IncludeCanceled` ausente ou `false` devolve exatamente a resposta de hoje, e `Status=canceled` continua trazendo só os cancelados. `Status` e `IncludeCanceled` podem vir juntos, e **`Status` ganha**: ele é sempre o recorte de um estado só.
-
-**Ação do front:** para o filtro de status multi-seleção, pare de mandar `Status` e mande `IncludeCanceled=true`, separando por `Status` no cliente. Quem não usa o filtro não muda nada.
-
-**Por que um booleano e não `Status` aceitando lista** — com o booleano o app pede **o mês uma vez** e aplica os cinco filtros de tela sobre a lista em cache: uma chave de cache por mês, reaproveitada entre Início, Gastos e Relatório. Com `Status` em lista, cada combinação de filtro vira uma consulta e uma chave nova. A alternativa do lado do cliente — disparar as duas consultas e fundir por id — dobrava a requisição do mês e mudava de lugar uma regra ("o que a lista contém") que é do servidor.
-
-### 2026-09-03 — `/PaymentMethods`: o cartão passa a ser descrito pelo **vencimento e uma folga**, não por um dia de fechamento
-
-🔴 **Quebra** — ver as seções 6, `/PaymentMethods`, e 11, `/Expenses`.
-
-**`ClosingDay` deixou de existir.** No lugar entrou **`ClosingOffsetDays`**: quantos dias antes do vencimento a fatura fecha, default `7`, aceito de 1 a 28. `DueDay` continua igual e passa a ser o único campo obrigatório dos dois.
-
-**Ação do front:**
-
-- **`POST` e `PUT /PaymentMethods`:** trocar `ClosingDay` por `ClosingOffsetDays`. Mandar `ClosingDay` agora é `406`. Se o formulário só pedir o vencimento, **omita a folga** e deixe o default de 7 valer.
-- **Ler a linha da forma de pagamento** (dentro de `GET /Accounts`): `ClosingDay` sumiu da resposta. Quem mostrava "fecha dia 20" tem que calcular a data a partir de `DueDay − ClosingOffsetDays`, lembrando que ela **muda de mês para mês**.
-- **Tela de cadastro:** pergunte o **vencimento**, que é o que o usuário sabe de cabeça, e deixe a folga num campo avançado já preenchido com 7.
-
-**Por que mudou** — o modelo pedia um dado que o usuário não tem: nenhum emissor brasileiro deixa escolher o dia do fechamento, todos pedem o vencimento e fecham N dias antes. Pior, um fechamento guardado como dia do mês precisava ser grampeado onde o dia não existe (dia 30 em fevereiro) enquanto a comparação que decide a fatura seguia usando o número original — as duas metades da regra passavam a falar de datas diferentes. E a rolagem do vencimento tinha que ser inferida de dois números soltos, em vez de ser a própria subtração.
-
-**Os cálculos de `ClosingDate`/`DueDate` das pernas mudam junto** (seção 11), mesmo para cartões cujo cadastro não for tocado, porque a regra de qual fatura recebe a compra é outra. Um cartão que vence dia 10 com folga de 7 agora fecha dia 3: a compra do dia 2 vence **no mesmo mês**, onde antes o par `fecha 30 / vence 10` sempre a jogava para o mês seguinte. Confira as datas que a sua tela mostra depois de subir.
-
-**Gastos já lançados não são recalculados pela API.** As pernas guardam as datas do momento do lançamento; nada as revisita.
-
-### 2026-08-31 — `GET /Accounts`: o saldo agora é sempre o saldo **de um mês**
-
-🟡 **Comportamento** · 🟢 **Adição** — ver a seção 5, `/Accounts`.
-
-**O que estava errado.** O `Balance` filtrava só por *estado* (`Status='received'` na entrada,
-`Paid=true` na perna de gasto) e por **data nenhuma**. Estado não é data: uma entrada com
-`CompetenceDate` em setembro que já tivesse sido marcada como recebida entrava no saldo exibido
-em agosto, e quitar hoje uma parcela que vence em novembro tirava o dinheiro do saldo de agosto.
-O saldo ficava plausível e errado.
-
-**O que mudou.**
-
-- `GET /Accounts` passou a aceitar `?ReferenceMonth=YYYY-MM` (**opcional**, default o mês
-  corrente). Ele recorta **o `Balance`, não a lista** — as contas são as mesmas em qualquer mês.
-- O corte vai até o **último dia** do mês pedido e lê **a data do lançamento**: `CompetenceDate`
-  na entrada, `DueDate` (ou a data do gasto, fora de cartão) na perna. **Não** a data em que se
-  clicou em receber/quitar.
-- O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDate`: conta
-  aberta em agosto vem com `Balance: 0` em março. Sem `InitialBalanceDate` a abertura conta em
-  qualquer mês, como antes.
-- `ReferenceMonth` fora do formato `YYYY-MM` responde `406` (`"Parâmetros inválidos na Query."`).
-
-**Ação do front.**
-
-1. Na tela que tem seletor de mês, **mande o mês exibido**: `GET /Accounts?ReferenceMonth=2026-08`.
-   Sem o parâmetro você recebe o mês corrente, que é o comportamento certo para quem abre o app.
-2. Se você exibe saldo junto de uma lista filtrada por `From`/`To`, os dois recortes são
-   diferentes de propósito — saldo é **posição** (mês fechado), lista é **fatia** (intervalo
-   livre). Não tente derivar um do outro.
-3. Números que pareciam certos podem mudar: um saldo que incluía lançamento de mês futuro agora
-   não inclui mais. Isso é a correção, não uma regressão.
-
-**Não mudou:** a forma da linha de `Accounts`, o `POST`/`PUT`/`DELETE`, nem a regra de que
-pendente é previsão e não entra no saldo.
+**A seção da rota, aqui neste documento, é atualizada junto.** O changelog diz **o que mudou**; a
+seção diz **o que é verdade agora**. Os dois não são intercambiáveis, e nenhum dos dois substitui
+o outro.
