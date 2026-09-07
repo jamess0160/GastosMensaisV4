@@ -19,10 +19,10 @@ class Controller {
      */
     public forPayment(paymentMethod: Database.PaymentMethods, ExpenseDate: string) {
         if (!this.isCreditCard(paymentMethod)) {
-            return this.withCompetence({ ClosingDate: null, DueDate: null }, ExpenseDate)
+            return this.withDates({ ClosingDate: null, DueDate: null }, paymentMethod, ExpenseDate, 0)
         }
 
-        return this.withCompetence(this.creditCardInvoice(paymentMethod, ExpenseDate, 0), ExpenseDate)
+        return this.withDates(this.creditCardInvoice(paymentMethod, ExpenseDate, 0), paymentMethod, ExpenseDate, 0)
     }
 
     /**
@@ -35,25 +35,49 @@ class Controller {
      */
     public forInstallment(paymentMethod: Database.PaymentMethods, ExpenseDate: string, index: number) {
         if (!this.isCreditCard(paymentMethod)) {
-            return this.withCompetence({ ClosingDate: null, DueDate: Utils.addMonthsToDate(ExpenseDate, index) }, ExpenseDate)
+            return this.withDates({ ClosingDate: null, DueDate: Utils.addMonthsToDate(ExpenseDate, index) }, paymentMethod, ExpenseDate, index)
         }
 
-        return this.withCompetence(this.creditCardInvoice(paymentMethod, ExpenseDate, index), ExpenseDate)
+        return this.withDates(this.creditCardInvoice(paymentMethod, ExpenseDate, index), paymentMethod, ExpenseDate, index)
     }
 
     /**
-     * **A data em que a perna pesa**, gravada junto com as outras duas.
+     * **As duas datas que a perna carrega além da fatura** — e a etapa inteira do
+     * `CompetenceMode` mora aqui, numa linha.
      *
-     * Sai daqui, e não de cada escritor, porque todo escritor de perna já espalha o retorno
-     * destes dois métodos (`...InvoiceDates.forPayment(...)`) — assim nenhum deles pode
-     * esquecer a coluna, e o `CompetenceMode` da leva 3 vira uma mudança **nesta linha**, sem
-     * tocar em leitor nenhum.
+     * Saem daqui, e não de cada escritor, porque todo escritor de perna já espalha o retorno
+     * dos dois métodos acima (`...InvoiceDates.forPayment(...)`): nenhum deles pode esquecer
+     * uma coluna, e mudar a regra não toca em leitor nenhum.
      *
-     * Hoje é exatamente o `coalesce(DueDate, ExpenseDate)` que as consultas repetiam: o
-     * vencimento quando existe (a parcela e a fatura do cartão), senão o dia do gasto.
+     * **`CashDate` é quando o dinheiro sai da conta** — `coalesce(DueDate, ExpenseDate)`,
+     * sempre, sem depender de modo nenhum. É o corte do saldo e do extrato.
+     *
+     * **`CompetenceDate` é quando a perna pesa**, e é ela que o cartão governa:
+     *
+     *     invoice    ->  o vencimento — a compra de 20/08 pesa no mês da fatura
+     *     purchase   ->  ExpenseDate + (n−1) meses — o cartão contado como débito
+     *
+     * O avanço por parcela no modo `purchase` **não é detalhe**: sem ele, 600 em 6x jogaria
+     * 600 inteiros no mês da compra e mataria a regra "a parcela pesa 100 por mês", que é a
+     * razão de o orçamento somar pernas em vez de gastos. E é a mesma fórmula que o carnê e o
+     * crediário fora do cartão já usam — o modo novo não inventa conceito nenhum.
+     *
+     * Fora do cartão o modo é nulo e não há o que escolher: sem fatura, consumo e pagamento
+     * acontecem no mesmo dia e as duas datas coincidem.
      */
-    private withCompetence(dates: { ClosingDate: string | null, DueDate: string | null }, ExpenseDate: string) {
-        return { ...dates, CompetenceDate: dates.DueDate ?? ExpenseDate }
+    private withDates(
+        dates: { ClosingDate: string | null, DueDate: string | null },
+        paymentMethod: Database.PaymentMethods,
+        ExpenseDate: string,
+        index: number,
+    ) {
+        let CashDate = dates.DueDate ?? ExpenseDate
+
+        let CompetenceDate = paymentMethod.CompetenceMode === "purchase"
+            ? Utils.addMonthsToDate(ExpenseDate, index)
+            : CashDate
+
+        return { ...dates, CashDate, CompetenceDate }
     }
 
     /**

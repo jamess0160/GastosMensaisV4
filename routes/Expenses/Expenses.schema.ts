@@ -71,9 +71,13 @@ export const expensePaymentResponse = Joi.object({
     //  Nulas fora do cartão de crédito: pix e débito não têm fatura.
     ClosingDate: isoDate.allow(null).required(),
     DueDate: isoDate.allow(null).required(),
-    //  A data em que a perna pesa, congelada no lançamento: o vencimento quando existe, senão o
-    //  dia do gasto. É por ela que o saldo, o orçamento e a lista de pernas filtram o mês.
+    //  **As duas datas da perna, congeladas no lançamento, e elas divergem de propósito:**
+    //  a competência é o mês em que a perna PESA (orçamento e "posso gastar"), a de caixa é o
+    //  dia em que o dinheiro SAI da conta (saldo e extrato). Num cartão em modo 'purchase' a
+    //  compra de 20/08 pesa em agosto e sai da conta em 05/09. Fora desse modo, as duas são
+    //  iguais — o vencimento quando existe, senão o dia do gasto.
     CompetenceDate: isoDate.required(),
+    CashDate: isoDate.required(),
     //  "A cobrança entrou na fatura" — **nulo fora do cartão**, e é isso que diz se a perna é de
     //  cartão. Não confundir com Paid: marcar Charged não move saldo nenhum.
     Charged: Joi.boolean().allow(null).required(),

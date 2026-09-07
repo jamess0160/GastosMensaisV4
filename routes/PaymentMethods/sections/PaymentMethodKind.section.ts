@@ -13,9 +13,12 @@ import { PaymentMethodsNamespace } from "./types"
 //  A regra vive num lugar só porque tem dois pontos de escrita e o Joi não cobre os dois: no
 //  POST ele consegue usar o `when` sobre o Kind do body, mas no PUT o Kind que manda é o da
 //  linha gravada, que o schema não enxerga.
-//  A lista encolheu com a saída de Brand e LastDigits, mas não sumiu: DueDay e
-//  ClosingOffsetDays continuam sendo campos exclusivos de cartão que o banco não protege.
-const creditCardOnly = ["DueDay", "ClosingOffsetDays"] as const
+//  A lista encolheu com a saída de Brand e LastDigits, mas não sumiu: DueDay,
+//  ClosingOffsetDays e CompetenceMode continuam sendo campos exclusivos de cartão que o banco
+//  não protege. O CompetenceMode entrou pelo mesmo argumento dos outros dois: fora do cartão
+//  não existe defasagem entre consumo e pagamento, então não há dois meses entre os quais
+//  escolher — um pix com CompetenceMode='invoice' seria um valor sem significado nenhum.
+const creditCardOnly = ["DueDay", "ClosingOffsetDays", "CompetenceMode"] as const
 
 class Controller {
 
@@ -60,9 +63,10 @@ class Controller {
             return
         }
 
-        //  Em cartão, apagar vencimento ou folga de fechamento não é edição parcial: é deixar
-        //  a compra sem fatura. Omitir mantém o que está gravado; mandar null é recusado.
-        let cleared = (["DueDay", "ClosingOffsetDays"] as const).filter((field) => field in body && body[field] === null)
+        //  Em cartão, apagar vencimento, folga de fechamento ou modo de competência não é
+        //  edição parcial: é deixar a compra sem fatura, ou sem mês em que pesar. Omitir mantém
+        //  o que está gravado; mandar null é recusado.
+        let cleared = creditCardOnly.filter((field) => field in body && body[field] === null)
 
         if (cleared.length) {
             throw new APIError({

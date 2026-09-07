@@ -609,12 +609,14 @@ Devolve as contas do workspace com as formas de pagamento embutidas. **O `Refere
 
 **`Balance`** = `InitialBalance` + entradas recebidas − transferências que saíram − **pernas de gasto pagas**, tudo **com data até o último dia do `ReferenceMonth`**. Pendente é previsão e **não entra**. Não é coluna: não tente recalcular somando lançamentos no cliente.
 
-A data que conta é a do lançamento — `CompetenceDate` na entrada, `DueDate` (ou a data do gasto, fora de cartão) na perna —, **não a data em que se clicou em receber/quitar**. Duas consequências para a tela:
+A data que conta é a do lançamento — `CompetenceDate` na entrada, **`CashDate`** na perna (o vencimento quando existe, senão a data do gasto) —, **não a data em que se clicou em receber/quitar**. Duas consequências para a tela:
 
 - uma entrada de setembro já marcada como recebida **não** aparece no saldo de agosto: peça `ReferenceMonth=2026-09` para vê-la;
 - quitar hoje a parcela que vence em novembro **não** mexe no saldo de agosto — ela sai no saldo de novembro.
 
 O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDate`: uma conta aberta em agosto vem com `Balance: 0` em março. Sem `InitialBalanceDate`, a abertura conta em qualquer mês.
+
+> **O `Balance` não muda com o `CompetenceMode` do cartão (seção 6), e é de propósito.** Ele lê a `CashDate` da perna — quando o dinheiro *sai* —, nunca a `CompetenceDate` — quando a compra *pesa*. Num cartão `purchase`, a compra de 20/08 pesa em agosto no orçamento e só sai da conta em 05/09, com a fatura. Os dois números discordam porque respondem a perguntas diferentes.
 
 **`Type` ∈ `checking` | `cash` | `card`**, e o tipo decide **quais formas de pagamento nascem com a conta**:
 
@@ -673,6 +675,7 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
   "Kind": "credit_card",
   "DueDay": 27,
   "ClosingOffsetDays": 7,
+  "CompetenceMode": "purchase",
   "IconPath": null,
   "Color": null,
   "Position": 1,
@@ -682,13 +685,24 @@ O saldo de abertura obedece ao mesmo corte quando a conta tem `InitialBalanceDat
 }
 ```
 
-`Kind` ∈ `pix` | `debit` | `credit_card`. `DueDay`/`ClosingOffsetDays` só fazem sentido em `credit_card` — nas outras são `null`.
+`Kind` ∈ `pix` | `debit` | `credit_card`. `DueDay`/`ClosingOffsetDays`/`CompetenceMode` só fazem sentido em `credit_card` — nas outras são `null`.
 
 **`debit` cobre três coisas diferentes** e o que as separa é o `Name`, não o `Kind`: o débito da conta corrente, o "Dinheiro" da conta `cash` e a forma com o nome da conta num vale (`Type='card'`). Nas três o gasto sai do saldo **no ato** e não há fatura — que é exatamente o que `debit` significa no modelo.
 
 **O cartão é descrito pelo vencimento, não pelo fechamento.** `DueDay` é o dia do mês em que a fatura vence e `ClosingOffsetDays` é quantos dias **antes** dele ela fecha — é o dado que o emissor realmente pede ao cliente, e a folga é o que ele aplica por baixo. Não existe mais um campo com o dia do fechamento: ele é `DueDay − ClosingOffsetDays` e muda de mês para mês (vencendo dia 5 com folga de 7, a fatura fecha em 26/02 e em 29/03).
 
 Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias, e o **default é 7**. Na tela de cadastro, peça o vencimento e deixe a folga num campo avançado já preenchido.
+
+**`CompetenceMode` diz em qual mês a compra do cartão pesa** — e é a única configuração do cadastro que muda um número já mostrado na tela.
+
+| Modo | A compra de **21/08**, num cartão que vence dia 28 | Para quem |
+|---|---|---|
+| `purchase` *(default)* | pesa em **agosto**, o mês da compra | quem paga a fatura inteira todo mês e usa o cartão como meio de pagamento |
+| `invoice` | pesa em **setembro**, o mês do vencimento | quem usa o cartão para adiar, e planeja pelo mês da fatura |
+
+**Ele governa a competência, nunca o caixa.** O `Balance` da conta (seção 5) é **idêntico nos dois modos**: o dinheiro sai quando a fatura é paga, e isso não muda. O que muda é o `Spent` do orçamento (seção 13) e o mês em que a perna aparece em `GET /ExpensePayments` (seção 12). Se o seu "quanto ainda posso gastar" e o seu "quanto tenho em conta" começarem a discordar num cartão `purchase`, **é assim que tem que ser**: o primeiro é o mês que a pessoa está vivendo, o segundo é o dinheiro que já saiu.
+
+**Em parcelado o avanço continua por parcela.** 600 em 6× num cartão `purchase` pesa **100 por mês** a partir do mês da compra — não 600 no primeiro.
 
 **Não existem `Brand` nem `LastDigits`.** Quem identifica o cartão na tela é o `Name`, que o usuário escreve — e o `IconPath`/`Color`, se você quiser um rótulo visual. Se a sua tela mostrava "Nubank ****1234", peça isso dentro do `Name`.
 
@@ -705,6 +719,7 @@ Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias,
 | `Kind` | `credit_card` | obrigatório, único valor aceito |
 | `DueDay` | int 1–31 | **obrigatório** |
 | `ClosingOffsetDays` | int 1–28 | default `7` |
+| `CompetenceMode` | `purchase` \| `invoice` | default **`purchase`** |
 | `IconPath` | string \| null | ≤255, default `null` |
 | `Color` | `#RRGGBB` \| null | default `null` |
 | `Position` | int \| null | default `null` |
@@ -713,11 +728,11 @@ Não há padrão de mercado para a folga — fica tipicamente entre 6 e 10 dias,
 
 ### `PUT /PaymentMethods/IdPaymentMethod=:IdPaymentMethod`
 
-`Name` obrigatório; `DueDay`, `ClosingOffsetDays`, `IconPath`, `Color`, `Position` opcionais.
+`Name` obrigatório; `DueDay`, `ClosingOffsetDays`, `CompetenceMode`, `IconPath`, `Color`, `Position` opcionais.
 
-**`Kind` e `IdAccount` não são aceitos:** um pix não vira cartão e um cartão não muda de conta — as duas trocas reescreveriam o significado das compras já lançadas nele. Mandar `null` em `DueDay`/`ClosingOffsetDays` de um cartão dá `406`.
+**`Kind` e `IdAccount` não são aceitos:** um pix não vira cartão e um cartão não muda de conta — as duas trocas reescreveriam o significado das compras já lançadas nele. Mandar `null` em `DueDay`/`ClosingOffsetDays`/`CompetenceMode` de um cartão dá `406`, e mandar qualquer um dos três **fora** de um cartão dá `406` também.
 
-**Editar o cartão não recalcula as compras já lançadas.** `ClosingDate`/`DueDate` são gravadas na perna no momento do lançamento (seção 11) e não são revistas depois. Corrigir o vencimento ou a folga vale para o que vier daí em diante; o que já está gravado só muda por um `PUT` no próprio gasto.
+**Editar o cartão não recalcula as compras já lançadas.** `ClosingDate`/`DueDate`/`CompetenceDate`/`CashDate` são gravadas na perna no momento do lançamento (seção 11) e não são revistas depois. Corrigir o vencimento, a folga **ou o `CompetenceMode`** vale para o que vier daí em diante; o que já está gravado só muda por um `PUT` no próprio gasto. Virar a chave em novembro não reescreve agosto — e é de propósito: a alternativa seria mês fechado mudando de número sozinho.
 
 **Resposta:** `{ "msg": "Forma de pagamento atualizada com sucesso" }`.
 
@@ -1148,6 +1163,7 @@ A mesma linha **mais os três filhos**:
     "ClosingDate": "2026-08-20",
     "DueDate": "2026-08-27",
     "CompetenceDate": "2026-08-27",
+    "CashDate": "2026-08-27",
     "Charged": false,
     "ChargedAt": null,
     "Paid": false,
@@ -1174,7 +1190,14 @@ A mesma linha **mais os três filhos**:
 
 > Em cartão, um dia de diferença na compra vira **um mês** de diferença no caixa: a compra entra na **primeira fatura que ainda não fechou**. O fechamento sai do cartão como `DueDay − ClosingOffsetDays` (seção 6), então ele é uma data que muda de mês para mês — não um dia fixo do calendário.
 
-**`CompetenceDate` é a data em que a perna pesa** — `DueDate` quando existe, senão a data do gasto —, congelada no lançamento. É por ela que o saldo da conta, o `Spent` do orçamento e `GET /ExpensePayments` recortam o mês. Ela é informativa para o cliente: não é aceita em corpo nenhum.
+**A perna tem duas datas, e elas discordam de propósito.** As duas são congeladas no lançamento e nenhuma das duas é aceita em corpo nenhum — são informativas.
+
+| Campo | O que é | Quem recorta o mês por ela |
+|---|---|---|
+| `CompetenceDate` | **quando a perna pesa** | o `Spent` do orçamento (seção 13) e `GET /ExpensePayments` (seção 12) |
+| `CashDate` | **quando o dinheiro sai da conta** — `DueDate` quando existe, senão a data do gasto | o `Balance` da conta (seção 5) |
+
+Fora de um cartão `purchase` as duas são **sempre iguais**, e é por isso que elas só nasceram agora: até o `CompetenceMode` existir, "pesar" e "sair" eram a mesma coisa. Num cartão `purchase` a compra de 20/08 pesa em **agosto** e sai da conta em **05/09**, com a fatura — uma data não responde às duas perguntas.
 
 **`Charged` e `Paid` são dois fatos diferentes, e só um move dinheiro:**
 
@@ -1278,7 +1301,9 @@ A perna não tem `POST` de cadastro: ela nasce com o gasto. O que existe aqui é
 
 ### `GET /ExpensePayments`
 
-**A lista do que *sai* no mês.** `GET /Expenses` é a lista do que foi **comprado** (filtra por `ExpenseDate`); esta é a lista do que **cai** — filtra por `coalesce(DueDate, ExpenseDate)`, a mesma data que o `Spent` do orçamento e o `Balance` da conta já usam.
+**A lista do que *pesa* no mês.** `GET /Expenses` é a lista do que foi **comprado** (filtra por `ExpenseDate`); esta filtra pela **`CompetenceDate`** da perna — a mesma data que o `Spent` do orçamento usa, e a que o `CompetenceMode` do cartão governa (seção 6). Num cartão `invoice` ela é o vencimento da fatura; num `purchase`, o mês da compra (avançando por parcela).
+
+> O `Balance` da conta **não** recorta por aqui: ele usa a `CashDate`, que vem na mesma linha. Se a sua tela soma esta lista esperando bater com o saldo, some pela `CashDate` e conte só o que está `Paid`.
 
 **É por isso que ela existe:** uma compra parcelada feita em **março** não aparece em `GET /Expenses?From=2026-08-01&To=2026-08-31`, mas a **6ª parcela dela pesa em agosto**. Quem monta o total do mês a partir da lista de gastos precisa varrer meses para trás atrás de parcelamentos abertos — e o contrato permite 120 parcelas, então acima de qualquer janela que você escolher a parcela **some do total**. Com esta rota a varredura inteira sai: uma requisição devolve tudo que cai no período, parcelas de compras antigas incluídas.
 
@@ -1305,6 +1330,10 @@ A lista vem ordenada pela data em que a perna pesa, não pela data da compra.
   "InstallmentTotal": 6,
   "ClosingDate": "2026-08-20",
   "DueDate": "2026-08-28",
+  "CompetenceDate": "2026-08-28",
+  "CashDate": "2026-08-28",
+  "Charged": false,
+  "ChargedAt": null,
   "Paid": false,
   "PaidAt": null,
   "CreatedAt": "...",
@@ -1409,7 +1438,7 @@ Note que `ReferenceMonth` **volta como `YYYY-MM-01`** (a coluna guarda o dia 1),
 **`Spent` — três regras que mudam o número:**
 
 1. **Soma pernas, não gastos.** 600 em 6× custa 100 ao orçamento de agosto, não 600 — o resto é problema do mês seguinte.
-2. **A data que conta é `coalesce(DueDate, ExpenseDate)`**, então uma compra no cartão cai no mês em que a fatura vence.
+2. **A data que conta é a `CompetenceDate` da perna**, e no cartão quem a decide é o `CompetenceMode` (seção 6): em `invoice` a compra cai no mês em que a fatura vence, em `purchase` no mês da compra. Fora do cartão é a data do gasto (ou o vencimento da parcela, no carnê).
 3. **Conta pendente junto com pago** — ao contrário do saldo da conta. Orçamento é o que você **comprometeu**; saldo é o que você **realizou**. Só o cancelado sai.
 
 **No `Scope: "person"` vale uma quarta regra: o comprometido é rateado pelas parcelas.**
@@ -1608,6 +1637,40 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-07 — `/PaymentMethods`: `CompetenceMode`, o cartão que conta como débito
+
+🟢 **Adição** na seção 6 (um campo no cadastro do cartão) e na 11/12 (a perna ganha `CashDate`) — e 🟡 **Comportamento** na 13: **o mesmo gasto passa a consumir o orçamento de outro mês**, dependendo do cartão. É o caso que esta seção existe para anunciar: o número mantém o nome e muda de significado.
+
+**O problema.** Duas pessoas usam cartão de crédito de dois jeitos incompatíveis. Quem concentra o dia a dia e paga a fatura inteira todo mês trata o cartão como débito: o que passou nele em agosto **é gasto de agosto**. Quem usa como reserva passa no cartão justamente para pagar no mês seguinte. A API atendia só o segundo — e para o primeiro isso produzia exatamente a mentira que o indicador existe para evitar: em 20 de agosto, com metade do salário já passada no cartão, o "posso gastar" ainda mostrava o mês quase inteiro disponível.
+
+**O que entrou.** `CompetenceMode`, só em `Kind='credit_card'`, `null` nas outras formas:
+
+| Modo | A compra de **21/08** num cartão que vence dia 28 | 600 em 6× |
+|---|---|---|
+| `purchase` *(default)* | pesa em **agosto** | 100 por mês a partir de agosto |
+| `invoice` | pesa em **setembro**, com a fatura | 100 por mês a partir de setembro |
+
+**O default é `purchase`**, inclusive nos cartões que já existem — confirmado com o dono: não há base em produção, então nenhum número muda de significado para ninguém. **Se o seu cartão é de reserva, cadastre-o (ou edite-o) com `invoice`.**
+
+**A perna passou a ter duas datas, e elas discordam de propósito:**
+
+| Campo | O que é | Quem lê |
+|---|---|---|
+| `CompetenceDate` | quando a perna **pesa** | `Spent` do orçamento, `GET /ExpensePayments` |
+| `CashDate` *(novo)* | quando o dinheiro **sai da conta** | `Balance` de `GET /Accounts` |
+
+Fora de um cartão `purchase` as duas são idênticas — é por isso que só agora fez falta separá-las.
+
+**O `Balance` não mudou, e não pode mudar.** O modo responde "quanto eu gastei", nunca "quanto eu tenho". Antes desta entrega o saldo cortava pela competência, e isso era inofensivo só porque as duas datas eram a mesma coisa — com `purchase`, uma compra de 20/08 quitada na fatura de 05/09 sairia do saldo **de agosto** e todo saldo de mês passado ficaria errado.
+
+**Trocar o modo vale para o futuro.** As datas são congeladas na perna no lançamento: virar a chave em novembro não reescreve agosto.
+
+**Ação do front:**
+
+1. **um seletor no cadastro/edição do cartão** com os dois modos, e o texto que os separa ("pago a fatura toda todo mês" × "uso o cartão para pagar depois");
+2. se você guarda a perna em cache, **grave a `CashDate` junto** e use-a em qualquer conta de saldo — a `CompetenceDate` só serve para "quanto pesou no mês";
+3. e não estranhe o "posso gastar" e o "tenho em conta" discordarem num cartão `purchase`: eles respondem perguntas diferentes, e é a resposta certa.
 
 ### 2026-09-07 — `POST /Users/login`: sessão de 30 dias, no "manter conectado"
 

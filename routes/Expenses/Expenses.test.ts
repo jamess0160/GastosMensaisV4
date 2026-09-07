@@ -896,6 +896,124 @@ describe("Expenses", () => {
         })
     })
 
+    //  **O cartão que conta como débito.** Duas pessoas usam cartão de dois jeitos
+    //  incompatíveis: quem paga a fatura inteira todo mês espera ver a compra de agosto em
+    //  agosto; quem usa o cartão como reserva passa nele justamente para pagar no mês seguinte.
+    //
+    //  O modo governa **uma** coluna, a CompetenceDate da perna — o mês em que ela pesa no
+    //  orçamento e no "posso gastar". A CashDate, que é o que move saldo, não muda em modo
+    //  nenhum: é sempre o dia em que o dinheiro sai da conta.
+    describe("POST /Expenses — CompetenceMode do cartão", () => {
+
+        //  O mesmo dia, o mesmo cartão, dois modos: em 'purchase' a compra pesa em agosto,
+        //  em 'invoice' ela pesa em setembro, com a fatura. A CashDate é a mesma nos dois.
+        it("conta no mês da compra em 'purchase' e no do vencimento em 'invoice'", async () => {
+            let workspace = await buildWorkspace()
+
+            let everyday = await createCard(workspace, { CompetenceMode: "purchase" })
+            let deferred = await createCard(workspace, { CompetenceMode: "invoice" })
+
+            //  Compra de 21/08 num cartão que vence no dia 28 com folga de 8: já fechou, então
+            //  a fatura é a de setembro
+            let onEveryday = await createExpense(workspace, { ExpenseDate: "2026-08-21", Payments: [{ IdPaymentMethod: everyday, Value: 100 }] })
+            let onDeferred = await createExpense(workspace, { ExpenseDate: "2026-08-21", Payments: [{ IdPaymentMethod: deferred, Value: 100 }] })
+
+            expect((await findPayments(onEveryday.IdExpense))[0]).toMatchObject({
+                DueDate: "2026-09-28",
+                CompetenceDate: "2026-08-21",
+                CashDate: "2026-09-28",
+            })
+
+            expect((await findPayments(onDeferred.IdExpense))[0]).toMatchObject({
+                DueDate: "2026-09-28",
+                CompetenceDate: "2026-09-28",
+                CashDate: "2026-09-28",
+            })
+        })
+
+        //  **O teste da etapa.** Se 'purchase' significasse simplesmente CompetenceDate =
+        //  ExpenseDate, 600 em 6x jogaria 600 inteiros no mês da compra e mataria a regra "a
+        //  parcela pesa 100 por mês", que é a razão de o orçamento somar pernas e não gastos.
+        //  O avanço por parcela é o que impede isso — a mesma fórmula do carnê fora do cartão.
+        it("dá 100 por mês em 600 num cartão 'purchase', não 600 no primeiro", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { CompetenceMode: "purchase" })
+
+            let created = await createExpense(workspace, {
+                TotalValue: 600,
+                ExpenseDate: "2026-08-10",
+                Kind: "installment",
+                InstallmentTotal: 6,
+                Payments: [{ IdPaymentMethod: card, Value: 600 }],
+            })
+
+            let payments = await findPayments(created.IdExpense)
+
+            expect(payments.map((item) => item.Value)).toEqual([100, 100, 100, 100, 100, 100])
+
+            expect(payments.map((item) => item.CompetenceDate)).toEqual([
+                "2026-08-10", "2026-09-10", "2026-10-10", "2026-11-10", "2026-12-10", "2027-01-10",
+            ])
+
+            //  E o caixa continua sendo a fatura de cada parcela, um mês à frente da competência
+            expect(payments.map((item) => item.CashDate)).toEqual([
+                "2026-08-28", "2026-09-28", "2026-10-28", "2026-11-28", "2026-12-28", "2027-01-28",
+            ])
+        })
+
+        //  **Trocar o modo vale para o futuro.** A data é congelada na perna no lançamento, e é
+        //  isso que impede virar a chave em novembro de reescrever agosto.
+        it("não mexe na perna já gravada quando o modo do cartão muda", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { CompetenceMode: "purchase" })
+
+            let created = await createExpense(workspace, { ExpenseDate: "2026-08-21", Payments: [{ IdPaymentMethod: card, Value: 100 }] })
+
+            expect((await findPayments(created.IdExpense))[0].CompetenceDate).toBe("2026-08-21")
+
+            let update = await workspace.client.put(`/PaymentMethods/IdPaymentMethod=${card}`, { Name: "Cartão", CompetenceMode: "invoice" })
+
+            expect(update.status).toBe(200)
+
+            expect((await findPayments(created.IdExpense))[0].CompetenceDate).toBe("2026-08-21")
+
+            //  A compra seguinte já nasce no modo novo: o que é congelado é a perna, não a regra
+            let next = await createExpense(workspace, { ExpenseDate: "2026-08-21", Payments: [{ IdPaymentMethod: card, Value: 100 }] })
+
+            expect((await findPayments(next.IdExpense))[0].CompetenceDate).toBe("2026-09-28")
+        })
+
+        //  **O saldo não pode mudar com o modo** — o parâmetro responde "quanto eu gastei",
+        //  nunca "quanto eu tenho". É a armadilha que a etapa tinha que resolver antes de subir:
+        //  com o saldo cortando pela competência, a compra de agosto quitada na fatura de
+        //  setembro sairia do saldo de agosto e todo mês passado ficaria errado.
+        it("dá o mesmo Balance nos dois modos, antes e depois de a fatura ser paga", async () => {
+            let everydayWorkspace = await buildWorkspace()
+            let deferredWorkspace = await buildWorkspace()
+
+            let everyday = await createCard(everydayWorkspace, { CompetenceMode: "purchase" })
+            let deferred = await createCard(deferredWorkspace, { CompetenceMode: "invoice" })
+
+            await createExpense(everydayWorkspace, { ExpenseDate: "2026-08-21", Payments: [{ IdPaymentMethod: everyday, Value: 100 }] })
+            await createExpense(deferredWorkspace, { ExpenseDate: "2026-08-21", Payments: [{ IdPaymentMethod: deferred, Value: 100 }] })
+
+            //  Fatura em aberto: os 1000 da abertura continuam inteiros nos dois
+            expect(await balanceOfMonth(everydayWorkspace, "2026-08")).toBe(1000)
+            expect(await balanceOfMonth(deferredWorkspace, "2026-08")).toBe(1000)
+
+            await everydayWorkspace.client.post(`/PaymentMethods/IdPaymentMethod=${everyday}/payInvoice`, { DueDate: "2026-09-28" })
+            await deferredWorkspace.client.post(`/PaymentMethods/IdPaymentMethod=${deferred}/payInvoice`, { DueDate: "2026-09-28" })
+
+            //  **Agosto continua com 1000 nos dois**: o dinheiro saiu em setembro, com a fatura,
+            //  por mais que no cartão 'purchase' a compra pese em agosto
+            expect(await balanceOfMonth(everydayWorkspace, "2026-08")).toBe(1000)
+            expect(await balanceOfMonth(deferredWorkspace, "2026-08")).toBe(1000)
+
+            expect(await balanceOfMonth(everydayWorkspace, "2026-09")).toBe(900)
+            expect(await balanceOfMonth(deferredWorkspace, "2026-09")).toBe(900)
+        })
+    })
+
     describe("PUT /Expenses/IdExpense=:IdExpense", () => {
 
         it("recusa sem token", async () => {
@@ -1444,13 +1562,17 @@ async function buildWorkspace(): Promise<TestWorkspace> {
     }
 }
 
-async function createCard(workspace: TestWorkspace, overrides: { DueDay?: number, ClosingOffsetDays?: number } = {}) {
+async function createCard(workspace: TestWorkspace, overrides: { DueDay?: number, ClosingOffsetDays?: number, CompetenceMode?: "invoice" | "purchase" } = {}) {
     let response = await workspace.client.post(`/PaymentMethods`, {
         IdAccount: workspace.IdAccount,
         Name: "Cartão",
         Kind: "credit_card",
         DueDay: overrides.DueDay ?? 28,
         ClosingOffsetDays: overrides.ClosingOffsetDays ?? 8,
+        //  Sem override vale o padrão do cadastro, 'purchase'. As datas de fatura
+        //  (ClosingDate/DueDate) não dependem do modo, então os testes que olham para elas
+        //  seguem valendo em qualquer um — quem muda é só a CompetenceDate.
+        ...(overrides.CompetenceMode ? { CompetenceMode: overrides.CompetenceMode } : {}),
     })
 
     return response.body.IdPaymentMethod as number
@@ -1508,6 +1630,13 @@ function description(item: { Description: string }) {
 
 async function accountBalance(workspace: TestWorkspace) {
     return await balanceOf(workspace.client, workspace.IdAccount)
+}
+
+//  O saldo de um mês fechado — o mesmo cálculo, com o corte que a rota já aceita
+async function balanceOfMonth(workspace: TestWorkspace, ReferenceMonth: string) {
+    let response = await workspace.client.get(`/Accounts?ReferenceMonth=${ReferenceMonth}`)
+
+    return response.body.find((item: { IdAccount: number }) => item.IdAccount === workspace.IdAccount).Balance as number
 }
 
 //  O saldo sai pela rota de contas: ele não é coluna, é calculado a cada leitura

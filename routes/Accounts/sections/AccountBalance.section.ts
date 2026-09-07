@@ -23,10 +23,18 @@ import { Database } from "root/Utils/database"
 //  (`< primeiro dia do mês seguinte`), como em BudgetSpent: não precisa saber quantos dias tem
 //  o mês, e o dia 31 não escapa de um `between` mal montado.
 //
-//  A data que vale é a do lançamento, a mesma das listagens da tela — `CompetenceDate` nos dois
-//  lados: na entrada e na perna de gasto (onde ela é o vencimento da fatura, não o dia da
-//  compra). Não é `ReceivedAt`/`PaidAt`: aqueles são o instante do clique, então quitar hoje a
-//  fatura de setembro jogaria a saída no mês errado.
+//  A data que vale é a do lançamento, nunca `ReceivedAt`/`PaidAt` — aqueles são o instante do
+//  clique, então quitar hoje a fatura de setembro jogaria a saída no mês errado. Mas ela é
+//  **outra em cada lado**, e a diferença nasceu com o `CompetenceMode`:
+//
+//      entrada       ->  CompetenceDate
+//      perna de gasto ->  CashDate, o vencimento quando existe, senão o dia do gasto
+//
+//  Saldo é **caixa**, e caixa é quando o dinheiro sai. Num cartão em modo `purchase` a compra
+//  de 20/08 *pesa* em agosto (é isso que o modo faz) e *sai da conta* em 05/09, com a fatura —
+//  cortar o saldo pela competência tiraria de agosto um dinheiro que só saiu em setembro, e
+//  todo saldo de mês passado ficaria errado. A competência é do orçamento e do "posso gastar";
+//  aqui manda a `CashDate`.
 //
 //  Recebe a lista de contas e devolve um mapa: são três consultas agrupadas, não três por
 //  conta, senão o GET com dez contas viraria trinta consultas.
@@ -117,8 +125,9 @@ class Controller {
             .whereIn("PaymentMethods.IdAccount", ids)
             .where("ExpensePayments.Paid", true)
             .whereNot("Expenses.Status", "canceled")
-            //  A coluna congelada no lançamento, e não mais o coalesce repetido em cada leitor.
-            .where("ExpensePayments.CompetenceDate", "<", NextMonth)
+            //  **CashDate, não CompetenceDate**: aqui é o dinheiro saindo da conta, e num
+            //  cartão em modo 'purchase' as duas datas divergem de propósito. Ver o cabeçalho.
+            .where("ExpensePayments.CashDate", "<", NextMonth)
             .groupBy("PaymentMethods.IdAccount") as Array<{ IdAccount: number, Total: number }>
 
         return new Map(rows.map((row) => [row.IdAccount, Number(row.Total)]))

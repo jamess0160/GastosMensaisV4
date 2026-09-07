@@ -205,6 +205,47 @@ describe("PaymentMethods", () => {
             expect(await findPaymentMethodById(response.body.IdPaymentMethod)).toMatchObject({ DueDay: 10, ClosingOffsetDays: 7 })
         })
 
+        //  **O padrão é 'purchase'**, e o padrão é o que serve a quem não vai configurar nada:
+        //  quem usa o cartão para adiar sabe que está adiando e vai procurar a opção. Nascer
+        //  'invoice' deixaria o "posso gastar" mostrando o mês quase inteiro livre no dia 20,
+        //  com metade do salário já passada no cartão.
+        it("assume CompetenceMode 'purchase' quando o cadastro não manda", async () => {
+            let response = await workspaceClient.post(`/PaymentMethods`, {
+                IdAccount,
+                Name: "Cartão sem modo informado",
+                Kind: "credit_card",
+                DueDay: 10,
+            })
+
+            expect(response.status).toBe(200)
+            expect((await findPaymentMethodById(response.body.IdPaymentMethod)).CompetenceMode).toBe("purchase")
+        })
+
+        it("grava o CompetenceMode escolhido", async () => {
+            let response = await workspaceClient.post(`/PaymentMethods`, {
+                IdAccount,
+                Name: "Cartão de reserva",
+                Kind: "credit_card",
+                DueDay: 10,
+                CompetenceMode: "invoice",
+            })
+
+            expect(response.status).toBe(200)
+            expect((await findPaymentMethodById(response.body.IdPaymentMethod)).CompetenceMode).toBe("invoice")
+        })
+
+        it("recusa CompetenceMode fora de invoice/purchase", async () => {
+            let response = await workspaceClient.post(`/PaymentMethods`, {
+                IdAccount,
+                Name: "Cartão",
+                Kind: "credit_card",
+                DueDay: 10,
+                CompetenceMode: "everyday",
+            })
+
+            expect(response.status).toBe(406)
+        })
+
         //  Uma folga maior que o mês jogaria o fechamento para antes da fatura anterior
         it("recusa folga de fechamento fora de 1..28", async () => {
             let response = await workspaceClient.post(`/PaymentMethods`, {
@@ -336,6 +377,44 @@ describe("PaymentMethods", () => {
             })
 
             expect(response.status).toBe(406)
+        })
+
+        //  Fora do cartão não existe defasagem entre consumo e pagamento, então não há dois
+        //  meses entre os quais escolher: um pix com CompetenceMode seria um valor sem
+        //  significado nenhum
+        it("recusa CompetenceMode em pix", async () => {
+            let [pix] = await findPaymentMethods(IdAccount)
+
+            let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${pix.IdPaymentMethod}`, {
+                Name: "Pix",
+                CompetenceMode: "purchase",
+            })
+
+            expect(response.status).toBe(406)
+            expect((await findPaymentMethodById(pix.IdPaymentMethod)).CompetenceMode).toBeNull()
+        })
+
+        //  Apagar o modo de um cartão é a mesma coisa que apagar a folga: deixa a compra sem
+        //  mês em que pesar
+        it("recusa apagar o CompetenceMode de um cartão", async () => {
+            let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${IdCard}`, {
+                Name: "Cartão",
+                CompetenceMode: null,
+            })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  **Trocar o modo vale para o futuro**: a competência é congelada na perna no
+        //  lançamento, então nenhuma compra já lançada se move. Ver Expenses.test.ts.
+        it("troca o CompetenceMode do cartão", async () => {
+            let response = await workspaceClient.put(`/PaymentMethods/IdPaymentMethod=${IdCard}`, {
+                Name: "Cartão",
+                CompetenceMode: "invoice",
+            })
+
+            expect(response.status).toBe(200)
+            expect((await findPaymentMethodById(IdCard)).CompetenceMode).toBe("invoice")
         })
 
         //  Trocar o Kind mudaria a regra de fatura de todas as compras já lançadas nele

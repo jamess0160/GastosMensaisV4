@@ -137,6 +137,18 @@ export namespace Database {
          * fechamento sai dele por subtracao. Ver InvoiceDates.section.ts.
          */
         ClosingOffsetDays: number | null
+        /**
+         * So em Kind='credit_card'. **Em qual mes a compra deste cartao pesa.**
+         *
+         *     invoice   -> no mes do vencimento da fatura
+         *     purchase  -> no mes da compra, como se o cartao fosse debito
+         *
+         * Quem paga a fatura inteira todo mes usa o cartao como meio de pagamento e
+         * espera ver a compra de agosto no mes de agosto; quem usa como reserva passa
+         * no cartao justamente para pagar no mes seguinte. Governa a CompetenceDate da
+         * perna, e **so ela** - a CashDate, que e o que move saldo, nao muda.
+         */
+        CompetenceMode: "invoice" | "purchase" | null
         IconPath: string | null
         Color: string | null
         Position: number | null
@@ -326,6 +338,17 @@ export namespace Database {
          * (CompetenceMode) nao reescreva mes fechado.
          */
         CompetenceDate: CalendarDate
+        /**
+         * **A data em que o dinheiro SAI DA CONTA** - o vencimento quando existe, senao o
+         * dia do gasto. E sempre coalesce(DueDate, ExpenseDate), sem excecao.
+         *
+         * Coluna propria porque o CompetenceMode separou os dois conceitos que ate a
+         * leva 2 eram um so: com o cartao em 'purchase' a compra de 20/08 PESA em agosto
+         * e SAI da conta em 05/09, e uma data nao responde as duas perguntas. Quem corta
+         * por aqui e o saldo da conta e o extrato; quem corta pela CompetenceDate e o
+         * orcamento e o "posso gastar".
+         */
+        CashDate: CalendarDate
         /**
          * **A cobranca entrou na fatura** - afirmacao do usuario olhando o app do cartao, nunca
          * derivada de "a data ja passou": a lista e olhada justamente para achar onde a

@@ -4,6 +4,7 @@ export namespace PaymentMethodsNamespace {
     export interface CreditCardFields {
         DueDay?: number | null
         ClosingOffsetDays?: number | null
+        CompetenceMode?: "invoice" | "purchase" | null
     }
 
     export interface CreatePaymentMethodPayload extends CreditCardFields {

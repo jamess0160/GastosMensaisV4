@@ -361,8 +361,9 @@ describe("Budgets", () => {
             expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body[0].Spent).toBe(250)
         })
 
-        //  No cartão, o que pesa no mês é a fatura que vence nele — a compra do dia 21 num
-        //  cartão que fecha no 20 já é do mês seguinte
+        //  Num cartão em modo 'invoice', o que pesa no mês é a fatura que vence nele — a compra
+        //  do dia 21 num cartão que fecha no 20 já é do mês seguinte. Num cartão 'purchase' a
+        //  mesma compra pesaria em agosto; ver Expenses.test.ts, que é onde o modo é o objeto.
         it("usa o vencimento da fatura no gasto de cartão", async () => {
             let workspace = await buildWorkspace()
             let card = await createCard(workspace)
@@ -715,7 +716,11 @@ function createCategory(workspace: TestWorkspace, Description: string) {
     return workspace.client.post(`/Categories`, { Description }).then((response) => response.body.IdCategory as number)
 }
 
-async function createCard(workspace: TestWorkspace) {
+//  **O modo é explícito aqui de propósito.** O cadastro nasce 'purchase' — o cartão contado
+//  como débito —, e nos testes de fatura abaixo o que está sob prova é a outra regra: a compra
+//  pesando no mês em que a fatura vence. Deixar o default implícito faria o teste dizer uma
+//  coisa e provar outra no dia em que o padrão mudasse de novo.
+async function createCard(workspace: TestWorkspace, CompetenceMode: "invoice" | "purchase" = "invoice") {
     let account = (await workspace.client.get(`/Accounts`)).body[0]
 
     let response = await workspace.client.post(`/PaymentMethods`, {
@@ -724,6 +729,7 @@ async function createCard(workspace: TestWorkspace) {
         Kind: "credit_card",
         DueDay: 28,
         ClosingOffsetDays: 8,
+        CompetenceMode,
     })
 
     return response.body.IdPaymentMethod as number

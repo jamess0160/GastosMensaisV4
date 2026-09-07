@@ -10,6 +10,16 @@ const day = Joi.number().integer().min(1).max(31)
 //  anterior.
 const closingOffset = Joi.number().integer().min(1).max(28)
 
+//  **Em qual mês a compra do cartão pesa.** Enum e não booleano: `IsEveryday: true` é
+//  ilegível em seis meses.
+//
+//      invoice   -> no mês do vencimento da fatura — quem usa o cartão para adiar
+//      purchase  -> no mês da compra, como se fosse débito — quem paga a fatura inteira
+//
+//  Só governa a competência (o orçamento e o "posso gastar"); o saldo da conta continua
+//  saindo pela `CashDate` da perna, e por isso é idêntico nos dois modos.
+const competenceMode = Joi.string().valid("invoice", "purchase")
+
 //  Exportado porque a forma de pagamento sai embutida na conta (GET /Accounts) e é
 //  daqui que a forma da linha tem que sair — o schema da conta importa este, e não o
 //  contrário: quem embute depende de quem é embutido.
@@ -21,6 +31,8 @@ export const paymentMethodResponse = Joi.object({
     Kind: Joi.string().valid("pix", "debit", "credit_card").required(),
     DueDay: Joi.number().allow(null).required(),
     ClosingOffsetDays: Joi.number().allow(null).required(),
+    //  Nulo fora do cartão: sem fatura não há defasagem entre consumo e pagamento a escolher.
+    CompetenceMode: competenceMode.allow(null).required(),
     IconPath: Joi.string().allow(null).required(),
     Color: Joi.string().allow(null).required(),
     Position: Joi.number().allow(null).required(),
@@ -51,6 +63,11 @@ class Schema {
             //  partir da compra a cada mês, então o grampeamento de fevereiro não arrasta.
             DueDay: day.when("Kind", { is: "credit_card", then: Joi.required(), otherwise: Joi.forbidden() }),
             ClosingOffsetDays: closingOffset.when("Kind", { is: "credit_card", then: closingOffset.default(7), otherwise: Joi.forbidden() }),
+            //  **O padrão é 'purchase'**, e o padrão é o que serve a quem não vai configurar
+            //  nada: quem usa o cartão para adiar sabe que está adiando e vai procurar a opção.
+            //  O caminho contrário — nascer 'invoice' — deixaria o "posso gastar" mostrando o
+            //  mês quase inteiro livre no dia 20, com metade do salário já passada no cartão.
+            CompetenceMode: competenceMode.when("Kind", { is: "credit_card", then: competenceMode.default("purchase"), otherwise: Joi.forbidden() }),
             //  Sem Brand e sem LastDigits: nenhuma regra do sistema lia qualquer um dos dois, e
             //  quem identifica o cartão na tela é o Name, que o usuário escreve. Mandá-los é
             //  406 pelo unknown do Joi.
@@ -75,6 +92,10 @@ class Schema {
             //  o Kind gravado é ela, não o schema. Ver PaymentMethodKind.section.ts.
             DueDay: day.allow(null).optional(),
             ClosingOffsetDays: closingOffset.allow(null).optional(),
+            //  **Trocar o modo vale para o futuro.** A data é congelada na perna no lançamento,
+            //  então virar a chave em novembro não reescreve agosto. Recalcular um cartão
+            //  inteiro, se um dia fizer falta, é ação explícita — nunca efeito de um PUT.
+            CompetenceMode: competenceMode.allow(null).optional(),
             IconPath: Joi.string().trim().max(255).allow(null).optional(),
             Color: color.allow(null).optional(),
             Position: Joi.number().integer().allow(null).optional(),
