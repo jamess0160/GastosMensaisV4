@@ -59,10 +59,29 @@ export async function submitSignUp(context: SignUpContext): Promise<void> {
             // convite não manda a chave.
             ...(context.inviteHash ? { InviteHash: context.inviteHash } : {}),
         });
-
-        context.finishSignUp();
     } catch (cause) {
         context.failSubmit(errorMessage(cause));
         return;
+    }
+
+    /* A SEGUNDA requisição, e ela é obrigatória: o cadastro não devolve
+       cookie. Sem ela, `finishSignUp` navegaria para dentro do app, o
+       `getSelf` responderia 401 e o usuário recém-cadastrado cairia no
+       login sem entender por quê.
+
+       O `try` é separado do de cima de propósito: aqui a conta JÁ EXISTE,
+       e o erro tem outro conserto. Um `catch` só diria "não foi possível
+       criar a conta", e a pessoa tentaria de novo levando "e-mail já em
+       uso" — presa entre duas telas que a mandam uma para a outra.
+
+       O login já seleciona o primeiro workspace, então a sessão nunca
+       começa sem espaço: quem se cadastrou por convite tem só o do
+       convite, e quem se cadastrou sozinho tem só o que nasceu com a
+       conta. Não há `switch` a fazer aqui. */
+    try {
+        await UsersConnection.login({ login: context.email.trim(), password: context.password });
+        context.finishSignUp();
+    } catch {
+        context.failSubmit("Conta criada, mas não foi possível entrar. Tente fazer login.");
     }
 }

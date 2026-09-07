@@ -7,20 +7,33 @@ import { fakeSignUpContext } from "./context";
 const signUp = "*/api/Users";
 const login = "*/api/Users/login";
 
-const bothOk = () => {
-    server.use(msw.post(signUp, () => HttpResponse.json({ IdUser: 1, IdWorkspace: 1 })));
-    server.use(msw.post(login, () => HttpResponse.json({ msg: "ok" })));
-};
-
 describe("submitSignUp", () => {
-    it("cria a conta e entra em seguida", async () => {
-        bothOk();
+    it("cria a conta e CHAMA O LOGIN em seguida", async () => {
+        /* São duas requisições de propósito: o cadastro não devolve
+           cookie. Sem o login, `finishSignUp` navega para dentro do app,
+           o `getSelf` responde 401 e o recém-cadastrado cai no login sem
+           entender por quê.
+
+           O teste espia a requisição, e não só o `finishSignUp`: com os
+           dois handlers de pé, afirmar só o resultado passaria igual se
+           a chamada de login sumisse — foi exatamente assim que ela
+           sumiu uma vez sem ninguém ver. */
+        let loginBody: unknown;
+        server.use(msw.post(signUp, () => HttpResponse.json({ IdUser: 1, IdWorkspace: 1 })));
+        server.use(
+            msw.post(login, async ({ request }) => {
+                loginBody = await request.json();
+                return HttpResponse.json({ msg: "ok" });
+            }),
+        );
         const context = fakeSignUpContext();
 
         await submitSignUp(context);
 
-        // São duas requisições de propósito: o cadastro não devolve
-        // cookie, então sem o login a tela seguinte responderia 401.
+        // O login vai com o MESMO e-mail e a MESMA senha do cadastro —
+        // pedir que o usuário redigite seria pedir duas vezes o que ele
+        // acabou de escrever.
+        expect(loginBody).toEqual({ login: "tiago@exemplo.com", password: "senha-forte-1" });
         expect(context.finishSignUp).toHaveBeenCalledOnce();
         expect(context.failSubmit).not.toHaveBeenCalled();
     });
