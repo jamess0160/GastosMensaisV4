@@ -15,6 +15,12 @@ Users_route.post("/Users/login", Users_schema.validateLogin, AsyncHandler(Users_
 //  rota é apagar um cookie do próprio chamador.
 Users_route.post("/Users/logout", Users_schema.logout, AsyncHandler(Users_controller.logout, false))
 
+//  As duas da recuperacao sao publicas por definicao: quem esqueceu a senha nao tem sessao.
+//  A protecao nao e o token, e o link assinado que chega ao e-mail do dono da conta.
+Users_route.post("/Users/forgotPassword", Users_schema.forgotPassword, AsyncHandler(Users_controller.forgotPassword, false))
+
+Users_route.post("/Users/resetPassword", Users_schema.resetPassword, AsyncHandler(Users_controller.resetPassword, false))
+
 Users_route.get("/Users/getSelf", Users_schema.getSelf, AsyncHandler(Users_controller.getSelf))
 
 Users_route.post("/Users", Users_schema.create, AsyncHandler(Users_controller.create, false))

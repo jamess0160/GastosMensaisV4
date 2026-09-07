@@ -23,6 +23,32 @@ class Schema {
         })),
     ]
 
+    //  O Email normalizado para minusculas pelo mesmo motivo do login: e assim que ele foi
+    //  gravado no cadastro, e "Tiago@X.com" precisa reencontrar a conta.
+    //
+    //  A resposta e uma msg fixa, e e isso que impede a rota de virar um verificador de quais
+    //  e-mails tem conta: ela e a mesma para e-mail cadastrado e para e-mail que nao existe.
+    public readonly forgotPassword = [
+        joiController.validateBody(Joi.object({
+            Email: Joi.string().trim().lowercase().email(emailOptions).required(),
+        })),
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+        })),
+    ]
+
+    //  Token e senha no CORPO, nunca na URL: o path cai no log de acesso do proxy, no
+    //  historico do navegador e no header Referer - e aqui os dois campos sao credencial.
+    public readonly resetPassword = [
+        joiController.validateBody(Joi.object({
+            Token: Joi.string().trim().required(),
+            NewPassword: Joi.string().trim().required(),
+        })),
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+        })),
+    ]
+
     //  Espelha a linha de Users, menos o Password: o hash nunca sai da API.
     //  As datas chegam aqui como Date (o res.json só serializa depois da validação).
     public readonly getSelf = [

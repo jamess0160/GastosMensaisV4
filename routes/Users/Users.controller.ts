@@ -6,6 +6,8 @@ import { Create } from './sections/POST/create'
 import { Update } from './sections/PUT/update'
 import { UpdatePassword } from './sections/PUT/updatePassword'
 import { GetSelf } from './sections/GET/getSelf'
+import { ForgotPassword } from './sections/POST/forgotPassword'
+import { ResetPassword } from './sections/POST/resetPassword'
 
 class Controller {
 
@@ -24,6 +26,14 @@ class Controller {
         AcessControl.clearTokenCookie(res)
 
         res.json({ msg: "Sessão encerrada com sucesso" })
+    }
+
+    forgotPassword = async (req: Request, res: Response) => {
+        res.json(await new ForgotPassword().run(req.body.Email))
+    }
+
+    resetPassword = async (req: Request, res: Response) => {
+        res.json(await new ResetPassword().run(req.body.Token, req.body.NewPassword))
     }
 
     acessMiddleware = (req: Request, res: Response) => {

@@ -155,6 +155,55 @@ O token continua **tecnicamente válido até o `exp`** (24h) para quem tiver cop
 
 ---
 
+### `POST /Users/forgotPassword` *(público)*
+
+Manda para o e-mail da conta um link de recuperação de senha. É o par do "Esqueci minha senha".
+
+**Body**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Email` | string | obrigatório, formato de e-mail, normalizado para minúsculas |
+
+**Resposta `200`** — **sempre**, inclusive para e-mail que não tem conta:
+
+```json
+{ "msg": "Se este e-mail tiver uma conta, enviamos o link de recuperação." }
+```
+
+> **A resposta é idêntica nos dois casos, de propósito.** Responder diferente transformaria a rota num verificador de quais e-mails têm conta — a mesma razão pela qual o login usa a mesma `msg` para e-mail errado e senha errada. **Não tente inferir da resposta se a conta existe**, e não mostre "e-mail não encontrado" na tela: a informação não está aí.
+
+O link do e-mail aponta para **o front**, não para a API: `APP_URL/recuperar-senha?Token=…`. Monte essa tela — é ela que recebe o `Token` da query e chama o `POST /Users/resetPassword`. O link vale **30 minutos** e serve **uma vez só**.
+
+> ⚠️ **O servidor ainda não tem rate limiting.** Enquanto não tiver, segure o botão do seu lado: desabilite-o depois do envio e ofereça o reenvio com um intervalo. Uma rota pública que dispara e-mail é o primeiro lugar onde a falta disso dói.
+
+---
+
+### `POST /Users/resetPassword` *(público)*
+
+Grava a senha nova a partir do token que chegou por e-mail.
+
+**Body**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Token` | string | obrigatório — o que veio na query do link |
+| `NewPassword` | string | obrigatório, **texto puro** (as mesmas regras do cadastro) |
+
+**Resposta `200`**
+
+```json
+{ "msg": "Senha alterada com sucesso" }
+```
+
+Token inválido, expirado, de outra finalidade ou **já usado**: `406` com `{ "msg": "Link de recuperação inválido ou expirado. Peça um novo." }` — uma mensagem só para todos os motivos, porque a ação da tela é a mesma em todos: pedir outro link.
+
+**O link morre no primeiro uso**, sem lista de revogação: o token carrega uma impressão digital da senha atual, e trocar a senha faz ela deixar de casar. Consequência prática: pedir dois links e usar o segundo **invalida o primeiro**.
+
+> **A troca não loga o usuário.** Não vem `Set-Cookie` nenhum — mande para a tela de login com a senha nova.
+
+---
+
 ### `GET /Users/getSelf` 🔒
 
 **Resposta `200`** (`Password` nunca sai):
@@ -1398,6 +1447,8 @@ A **rotina mensal do orçamento passou a existir** (2026-09-07) e roda no servid
 | POST | `/Users` | público |
 | POST | `/Users/login` | público |
 | POST | `/Users/logout` | público |
+| POST | `/Users/forgotPassword` | público |
+| POST | `/Users/resetPassword` | público |
 | GET | `/Users/getSelf` | 🔒 |
 | PUT | `/Users/IdUser=:IdUser` | 🔒 |
 | PUT | `/Users/updatePassword` | 🔒 |
@@ -1485,6 +1536,29 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-07 — `/Users`: recuperação de senha
+
+🟢 **Adição** — duas rotas públicas na seção 2. Nada do que já existe muda.
+
+**O que entrou.**
+
+| Rota | Corpo | O que faz |
+|---|---|---|
+| `POST /Users/forgotPassword` | `{ Email }` | manda o link por e-mail |
+| `POST /Users/resetPassword` | `{ Token, NewPassword }` | grava a senha nova |
+
+Até agora só existia o `updatePassword`, que exige a senha antiga: quem esqueceu não tinha caminho nenhum, e o link "Esqueci minha senha" estava na tela desabilitado.
+
+**A tela que falta é sua.** O e-mail aponta para `APP_URL/recuperar-senha?Token=…` — **o front**, não a API. Essa tela lê o `Token` da query, pede a senha nova e chama o `POST /Users/resetPassword`. O link não é um `GET` que muda estado de propósito: assim o pré-carregador de link de um cliente de e-mail não gasta o token sem ninguém ter clicado.
+
+**Três coisas para acertar na tela:**
+
+1. **`forgotPassword` responde `200` sempre**, inclusive para e-mail sem conta, e com a mesma `msg`. Nunca mostre "e-mail não encontrado" — a resposta não diz isso, e é de propósito que não diga.
+2. **O link vale 30 minutos e uma vez só.** Erro de token é sempre o mesmo `406`, com um texto pronto para a tela: mostre a `msg` e ofereça pedir outro link.
+3. **Não vem `Set-Cookie`**: trocar a senha não abre sessão. Redirecione para o login.
+
+**Ação do front:** habilitar o "Esqueci minha senha", montar a tela `/recuperar-senha` e, enquanto o servidor não tiver rate limiting, segurar o botão de envio com um intervalo do seu lado.
 
 ### 2026-09-07 — `/Budgets`: o mês do orçamento passa a nascer sozinho, e o mês anterior a fechar
 

@@ -1,4 +1,7 @@
-import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
+import jwt from "jsonwebtoken"
+import { TestClient, TestDatabase, TestEnv, TestUser, UsersFactory } from "root/Utils/Tests"
+import { mailer } from "root/Utils/Connections/Mailer"
+import { enviromentManager } from "root/Utils/enviromentManager"
 import { UsersNamespace } from "./sections/types"
 
 //  Testes integrados da feature Users. Um describe por rota de Users.route.ts, na mesma ordem.
@@ -9,6 +12,11 @@ import { UsersNamespace } from "./sections/types"
 //
 //  npm test                                          -> app em memória (supertest)
 //  TEST_BASE_URL=http://localhost:4000 npm test      -> mesmo arquivo, servidor real (end to end)
+
+//  Em modo end to end o Mailer vive no processo do servidor, não neste: a caixa de saída é
+//  inalcançável daqui. O que depende dela fica de fora ali; o que vale nos dois modos — status
+//  e resposta idêntica para e-mail que existe e que não existe — continua rodando.
+const describeMailbox = TestEnv.isE2E() ? describe.skip : describe
 
 describe("Users", () => {
 
@@ -122,6 +130,178 @@ describe("Users", () => {
             let response = await new TestClient("token-invalido").post("/Users/logout")
 
             expect(response.status).toBe(200)
+        })
+    })
+
+    describe("POST /Users/forgotPassword", () => {
+
+        beforeEach(() => {
+            mailer.clearSentMessages()
+        })
+
+        it("recusa corpo sem Email", async () => {
+            expect((await client.anonymous().post("/Users/forgotPassword", {})).status).toBe(406)
+        })
+
+        it("recusa e-mail fora do formato", async () => {
+            expect((await client.anonymous().post("/Users/forgotPassword", { Email: "não-é-e-mail" })).status).toBe(406)
+        })
+
+        //  **O teste que define a rota.** Responder diferente para e-mail que existe e para
+        //  e-mail que não existe transformaria a rota num verificador de quais endereços têm
+        //  conta — é a mesma razão pela qual o login usa uma msg só para e-mail errado e senha
+        //  errada. Aqui as duas respostas são comparadas uma com a outra, e não com um texto
+        //  fixo: assim elas continuam iguais mesmo que a frase mude.
+        it("responde igual para e-mail que existe e para e-mail que não existe", async () => {
+            let owner = await UsersFactory.create()
+
+            let found = await client.anonymous().post("/Users/forgotPassword", { Email: owner.user.Email })
+            let missing = await client.anonymous().post("/Users/forgotPassword", { Email: "ninguem@gastos.local" })
+
+            expect(found.status).toBe(200)
+            expect(missing.status).toBe(200)
+            expect(found.body).toEqual(missing.body)
+        })
+
+        describeMailbox("o e-mail que sai", () => {
+
+            it("manda o link para o dono da conta, com o token dentro", async () => {
+                let owner = await UsersFactory.create({ Name: "Dona da conta" })
+
+                await client.anonymous().post("/Users/forgotPassword", { Email: owner.user.Email })
+
+                let [message] = mailer.getSentMessages()
+
+                expect(mailer.getSentMessages()).toHaveLength(1)
+                expect(message.to[0].address).toBe(owner.user.Email)
+                expect(message.text).toContain("Dona da conta")
+                //  O link aponta para a TELA, montado a partir do APP_URL — nunca para a API,
+                //  e nunca com o Host da requisição, que é forjável
+                expect(message.text).toContain(`${process.env.APP_URL}/recuperar-senha?Token=`)
+                expect(readToken(message.text)).toBeTruthy()
+            })
+
+            it("não manda nada para e-mail que não tem conta", async () => {
+                await client.anonymous().post("/Users/forgotPassword", { Email: "ninguem@gastos.local" })
+
+                expect(mailer.getSentMessages()).toHaveLength(0)
+            })
+
+            //  O cadastro grava o e-mail em minúsculas; sem o lowercase do schema, quem digita
+            //  com a inicial maiúscula na tela de recuperação nunca receberia o link.
+            it("reencontra a conta com o e-mail digitado em caixa alta", async () => {
+                let owner = await UsersFactory.create()
+
+                await client.anonymous().post("/Users/forgotPassword", { Email: owner.user.Email.toUpperCase() })
+
+                expect(mailer.getSentMessages()).toHaveLength(1)
+            })
+        })
+    })
+
+    describe("POST /Users/resetPassword", () => {
+
+        beforeEach(() => {
+            mailer.clearSentMessages()
+        })
+
+        it("recusa corpo incompleto", async () => {
+            expect((await client.anonymous().post("/Users/resetPassword", { Token: "abc" })).status).toBe(406)
+            expect((await client.anonymous().post("/Users/resetPassword", { NewPassword: "NovaSenha@123" })).status).toBe(406)
+        })
+
+        it("recusa um token que não é um JWT", async () => {
+            let response = await client.anonymous().post("/Users/resetPassword", { Token: "não-é-token", NewPassword: "NovaSenha@123" })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  **O desafio da biometria é assinado com o MESMO JWT_SECRET.** Sem o `type` dentro
+        //  do token, ele passaria na verificação de assinatura e viraria uma troca de senha —
+        //  é a mesma razão pela qual o WebAuthnChallenge carrega o dele.
+        it("recusa um token assinado para outra finalidade", async () => {
+            let owner = await UsersFactory.create()
+            let token = forgeToken({ IdUser: owner.user.IdUser, type: "login", fingerprint: "irrelevante" })
+
+            let response = await client.anonymous().post("/Users/resetPassword", { Token: token, NewPassword: "NovaSenha@123" })
+
+            expect(response.status).toBe(406)
+            expect((await client.anonymous().login(owner.user.Email, owner.password)).status).toBe(200)
+        })
+
+        it("recusa um token expirado", async () => {
+            let owner = await UsersFactory.create()
+            let token = forgeToken({ IdUser: owner.user.IdUser, type: "reset", fingerprint: "irrelevante" }, "-1m")
+
+            expect((await client.anonymous().post("/Users/resetPassword", { Token: token, NewPassword: "NovaSenha@123" })).status).toBe(406)
+        })
+
+        //  Assinado de verdade, tipo certo, usuário certo — e mesmo assim recusado, porque a
+        //  impressão digital não é a da senha que está gravada. É o mecanismo do uso único.
+        it("recusa um token cuja impressão digital não bate com a senha atual", async () => {
+            let owner = await UsersFactory.create()
+            let token = forgeToken({ IdUser: owner.user.IdUser, type: "reset", fingerprint: "0000000000000000" })
+
+            expect((await client.anonymous().post("/Users/resetPassword", { Token: token, NewPassword: "NovaSenha@123" })).status).toBe(406)
+        })
+
+        it("recusa um token de um usuário que não existe", async () => {
+            let token = forgeToken({ IdUser: 999999, type: "reset", fingerprint: "0000000000000000" })
+
+            expect((await client.anonymous().post("/Users/resetPassword", { Token: token, NewPassword: "NovaSenha@123" })).status).toBe(406)
+        })
+
+        describeMailbox("com o link que chegou por e-mail", () => {
+
+            it("troca a senha, e a antiga para de valer", async () => {
+                let owner = await UsersFactory.create()
+                let Token = await requestToken(owner.user.Email)
+                let NewPassword = "SenhaRecuperada@123"
+
+                let response = await client.anonymous().post("/Users/resetPassword", { Token, NewPassword })
+
+                expect(response.status).toBe(200)
+                expect((await client.anonymous().login(owner.user.Email, NewPassword)).status).toBe(200)
+                expect((await client.anonymous().login(owner.user.Email, owner.password)).status).toBe(401)
+            })
+
+            it("guarda a nova senha com hash", async () => {
+                let owner = await UsersFactory.create()
+                let Token = await requestToken(owner.user.Email)
+                let NewPassword = "SenhaRecuperada@456"
+
+                await client.anonymous().post("/Users/resetPassword", { Token, NewPassword })
+
+                expect((await findByEmail(owner.user.Email))?.Password).not.toBe(NewPassword)
+            })
+
+            //  **O teste da etapa: uso único sem tabela nenhuma.** Trocar a senha muda o hash,
+            //  e a impressão digital dentro do token deixa de casar — o link morre sozinho, sem
+            //  lista de revogados e sem rotina de limpeza.
+            it("o mesmo link não vale duas vezes", async () => {
+                let owner = await UsersFactory.create()
+                let Token = await requestToken(owner.user.Email)
+
+                expect((await client.anonymous().post("/Users/resetPassword", { Token, NewPassword: "Primeira@123" })).status).toBe(200)
+
+                let second = await client.anonymous().post("/Users/resetPassword", { Token, NewPassword: "Segunda@123" })
+
+                expect(second.status).toBe(406)
+                //  E a senha da primeira troca continua sendo a que vale
+                expect((await client.anonymous().login(owner.user.Email, "Primeira@123")).status).toBe(200)
+            })
+
+            //  Pedir dois links e usar o mais novo é o caminho de quem não achou o primeiro
+            //  e-mail. O primeiro link continua válido até alguém gastar um dos dois.
+            it("dois pedidos seguidos: usar o segundo link invalida o primeiro", async () => {
+                let owner = await UsersFactory.create()
+
+                let first = await requestToken(owner.user.Email)
+                let second = await requestToken(owner.user.Email)
+
+                expect((await client.anonymous().post("/Users/resetPassword", { Token: second, NewPassword: "Segunda@123" })).status).toBe(200)
+                expect((await client.anonymous().post("/Users/resetPassword", { Token: first, NewPassword: "Primeira@123" })).status).toBe(406)
+            })
         })
     })
 
@@ -501,6 +681,32 @@ describe("Users", () => {
         })
     })
 })
+
+//  Pede a recuperação e devolve o token que chegou no e-mail. É o caminho do usuário de
+//  verdade: nenhum token fabricado, nenhuma leitura direta do banco.
+async function requestToken(Email: string) {
+    mailer.clearSentMessages()
+
+    await new TestClient().post("/Users/forgotPassword", { Email })
+
+    let [message] = mailer.getSentMessages()
+    let token = readToken(message.text)
+
+    if (!token) throw new Error(`Nenhum token no e-mail enviado para ${Email}`)
+
+    return token
+}
+
+function readToken(text: string) {
+    return text.match(/[?&]Token=([^\s&]+)/)?.[1] ?? null
+}
+
+//  Assina um token à mão para os casos que a rota não produz: outra finalidade, expirado, ou
+//  com a impressão digital de outra senha. O segredo é o mesmo do app — o que se está provando
+//  é que assinatura válida **não basta**.
+function forgeToken(payload: object, expiresIn: string = "30m") {
+    return jwt.sign(payload, enviromentManager.getEnv("JWT_SECRET"), { expiresIn } as jwt.SignOptions)
+}
 
 //  Corpo do cadastro: com senha
 function buildPayload(overrides: Partial<UsersNamespace.CreateUserPayload> = {}): UsersNamespace.CreateUserPayload {
