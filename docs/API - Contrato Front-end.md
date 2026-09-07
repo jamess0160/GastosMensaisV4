@@ -1568,6 +1568,87 @@ Available = OpeningBalance
 
 `ReferenceMonth` **volta como `YYYY-MM-01`**, como no orçamento: é o mês normalizado que a resposta afirma ter usado.
 
+### `GET /Reports/Statement`
+
+**O extrato de cada conta e de cada cartão, numa rota só** — não uma por conta: a tela é uma, e uma requisição por conta multiplicaria ida e volta para montar tela nenhuma a mais.
+
+| Query | Tipo | Regra |
+|---|---|---|
+| `ReferenceMonth` | `YYYY-MM` | opcional, default o **mês corrente** |
+
+**O extrato é a decomposição do saldo, não uma consulta paralela.** É a promessa inteira da rota:
+
+```
+OpeningBalance (saldo no fim do mês anterior)
+  + entradas recebidas na conta, no mês
+  − transferências recebidas que saíram da conta, no mês
+  − pernas de gasto pagas da conta, no mês
+  = ClosingBalance  ← o mesmo Balance que GET /Accounts devolve para este mês
+```
+
+**Some `OpeningBalance` com os `Value` das linhas e você chega ao `ClosingBalance`, ao centavo.** Se não chegar, é bug da API — não arredonde por conta própria para "fechar" a tela.
+
+```json
+{
+  "ReferenceMonth": "2026-09-01",
+  "Accounts": [{
+    "IdAccount": 1, "Name": "Conta corrente", "Active": true,
+    "OpeningBalance": 1000.00, "ClosingBalance": 4300.00,
+    "Entries": [
+      { "Date": "2026-09-05", "Kind": "inflow",   "Description": "Salário",         "Value":  3000.00, "IdInflow": 12 },
+      { "Date": "2026-09-10", "Kind": "transfer", "Description": "Para a poupança", "Value":  -200.00, "IdInflow": 15 },
+      { "Date": "2026-09-15", "Kind": "invoice",  "Description": "Fatura Nubank",   "Value":  -500.00, "IdPaymentMethod": 7 }
+    ]
+  }],
+  "Cards": [{
+    "IdPaymentMethod": 7, "Name": "Nubank", "DueDate": "2026-09-15",
+    "Total": 500.00,
+    "Entries": [
+      { "Date": "2026-08-20", "Description": "Mercado", "Value": 320.00, "IdExpense": 44, "IdExpensePayment": 61, "InstallmentNumber": null, "InstallmentTotal": null, "Paid": true, "Charged": true }
+    ]
+  }]
+}
+```
+
+**`Value` é assinado, e não duas colunas de débito e crédito.** Com sinal, conferir o extrato é literalmente somar a lista; com duas colunas, vira uma subtração que alguém escreve ao contrário uma hora.
+
+**`Kind` discrimina a origem, e cada linha carrega o id do que a gerou** para a tela navegar do extrato até o lançamento:
+
+| `Kind` | O que é | Ids que vêm |
+|---|---|---|
+| `opening` | o **saldo inicial da conta**, quando o `InitialBalanceDate` cai dentro do mês | nenhum — não é lançamento |
+| `inflow` | entrada recebida | `IdInflow` |
+| `transfer` | transferência recebida — **nas duas contas, com sinais opostos** | `IdInflow` |
+| `expense` | perna de gasto paga **fora do cartão** | `IdExpense`, `IdExpensePayment` |
+| `invoice` | **a fatura inteira do cartão, agregada numa linha** | `IdPaymentMethod` |
+
+**A fatura entra como uma linha, e o detalhe fica no extrato do cartão.** Quarenta compras do cartão viram quarenta linhas no extrato da conta — o que nenhum extrato bancário faz, e o que soterra as linhas que importam. O agrupamento é `(cartão, vencimento)`, e **a soma não muda**: o total do grupo é o mesmo que as pernas somavam.
+
+**A transferência não é filtrada aqui**, ao contrário do "quanto entrou" da rota anterior: para o extrato, ela é uma saída real de uma conta e uma entrada real na outra. Some as duas linhas e o patrimônio não muda — que é o que uma transferência é.
+
+#### As duas assimetrias — leia antes de montar a tela
+
+**1. Extrato da conta é caixa; extrato do cartão é fatura.**
+
+| | Extrato da conta | Extrato do cartão |
+|---|---|---|
+| O que é | o dinheiro que **passou** | a **fatura** — o que foi comprado |
+| Estado | **só liquidado** (entrada recebida, perna paga) | **pago E pendente** |
+| Corte | a `CashDate` da perna / a competência da entrada | o **`DueDate`** — a fatura é o par `(cartão, vencimento)` |
+| Data da linha | a do lançamento | a da **compra** |
+
+Uma fatura existe antes de ser paga — é isso que a torna útil de olhar. Já o extrato da conta só pode conter o que saiu, ou a soma não fecha. Os dois estão certos, e estão certos por motivos opostos.
+
+> **O custo está aceito:** quem abrir o extrato no dia 20 **não** vê a conta de luz lançada para o dia 25. O lugar dela é `GET /Expenses`, que tem filtro de status justamente para isso. Extrato é o que aconteceu; previsão é outra tela.
+
+**2. Detalhada no cartão, agregada na conta — e não é dupla contagem.** É a mesma perna vista dos dois lados: linha a linha na fatura, e uma linha só na conta no mês em que a fatura venceu. `payInvoice` **não cria lançamento**, só vira o `Paid` de pernas que já existem.
+
+**Conta e cartão arquivados continuam tendo extrato.** `Active = false` quer dizer "não use mais", não "não existiu": o mês em que a conta ainda tinha movimento é consultável, e a conta vem com `Active: false` para a tela poder rotular. A arquivada **sem** movimento no mês some da lista — ela não tem o que mostrar.
+
+**Gasto cancelado não aparece em lugar nenhum**, e o mês em que foi cancelado continua fechando: cancelar um gasto quitado é o estorno dele.
+
+**`ReferenceMonth`, e não `From`/`To`.** As duas pontas são posições: um extrato de 15 de agosto a 3 de setembro não tem saldo de abertura que signifique alguma coisa.
+
 ---
 
 ## 16. Utils — `/Utils`
@@ -1687,6 +1768,7 @@ A **rotina mensal do orçamento passou a existir** (2026-09-07) e roda no servid
 | PUT | `/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
 | DELETE | `/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
 | GET | `/Reports/Month` | 🔒 |
+| GET | `/Reports/Statement` | 🔒 |
 | GET | `/Utils/ServerTime` | público |
 | GET | `/Utils/Health` | público |
 | GET | `/Utils/Reload` | 🔒 |
@@ -1711,6 +1793,23 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-07 — `GET /Reports/Statement`: extrato de conta e de cartão
+
+🟢 **Adição** — uma rota nova na seção 15, com duas assimetrias que a seção descreve por extenso. Sem elas, o front monta a tela achando que os dois extratos seguem a mesma regra.
+
+**O que entrou.** `GET /Reports/Statement?ReferenceMonth=YYYY-MM` (opcional, default o mês corrente): o extrato de **todas** as contas e de **todas** as faturas do mês, numa resposta só.
+
+**O que ela promete, e é a única coisa que ela promete:** `OpeningBalance` + a soma dos `Value` das linhas = `ClosingBalance`, ao centavo — e o `ClosingBalance` é o **mesmo** `Balance` que `GET /Accounts?ReferenceMonth=` devolve para o mesmo mês. O extrato é a abertura do saldo, não uma segunda consulta sobre as mesmas tabelas.
+
+**As duas assimetrias:**
+
+1. **o extrato da conta só tem o liquidado; o do cartão tem pago e pendente** — uma fatura existe antes de ser paga, e um extrato de conta que contivesse pendente não fecharia;
+2. **as compras do cartão saem agregadas numa linha `invoice` na conta e detalhadas no cartão** — quarenta compras não viram quarenta linhas no extrato bancário. Não é dupla contagem: é a mesma perna vista dos dois lados.
+
+**Isto não é conciliação.** Não importa arquivo de banco, não casa lançamento com lançamento e não tem estado "conciliado" — é a abertura do que o sistema já calcula.
+
+**Ação do front:** montar a tela de extrato a partir desta rota, e **não** somar `GET /Inflows` + `GET /ExpensePayments` para chegar ao mesmo lugar — as regras de estado e de data das duas listas são outras, e o resultado não fecha com o saldo.
 
 ### 2026-09-07 — `GET /Reports/Month`: os agregados do Dashboard saem do cliente
 

@@ -1,4 +1,5 @@
 import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
+import { Utils } from "root/Utils/Utils"
 
 //  Testes integrados de Reports — a feature que não tem tabela própria: ela lê de todas as
 //  outras. Um describe por rota de Reports.route.ts, mais o fluxo end to end no fim.
@@ -301,6 +302,284 @@ describe("Reports", () => {
         })
     })
 
+    //  **O extrato é a abertura do saldo, não uma consulta paralela.** Toda a suíte gira em
+    //  torno de uma asserção: OpeningBalance + soma das linhas === ClosingBalance, e o
+    //  ClosingBalance é o mesmo Balance que GET /Accounts devolve para o mês.
+    //
+    //  E de uma assimetria que é de propósito, e é a coisa mais fácil de conflatar aqui:
+    //
+    //      extrato da conta  ->  caixa: o dinheiro que passou. SÓ liquidado
+    //      extrato do cartão ->  a fatura: o que foi comprado.  pago E pendente
+    describe("GET /Reports/Statement", () => {
+
+        it("recusa sem token", async () => {
+            expect((await client.anonymous().get(`/Reports/Statement`)).status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/Reports/Statement`)
+
+            expect(response.status).toBe(406)
+        })
+
+        it("recusa mês fora do formato YYYY-MM", async () => {
+            let workspace = await buildWorkspace()
+
+            expect((await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09-01`)).status).toBe(406)
+        })
+
+        it("devolve a conta sem linha nenhuma no mês vazio", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)
+
+            expect(response.status).toBe(200)
+            expect(response.body.Accounts).toHaveLength(1)
+            expect(response.body.Accounts[0]).toMatchObject({
+                IdAccount: workspace.IdAccount,
+                Name: "Conta corrente",
+                OpeningBalance: 1000,
+                ClosingBalance: 1000,
+                Entries: [],
+            })
+            expect(response.body.Cards).toEqual([])
+        })
+
+        //  **O teste da etapa:** ele é a demanda escrita como asserção, e é o único que percebe
+        //  o extrato começando a divergir do saldo.
+        it("fecha em centavos, e o ClosingBalance é o Balance de GET /Accounts", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, "invoice")
+
+            await receive(workspace, await createInflow(workspace, { TotalValue: 3000, CompetenceDate: "2026-09-05" }))
+
+            let power = await createExpense(workspace, { TotalValue: 199.99, ExpenseDate: "2026-09-08" })
+            await pay(workspace, power.IdExpense)
+
+            await createExpense(workspace, {
+                TotalValue: 320.55,
+                ExpenseDate: "2026-09-10",
+                Payments: [{ IdPaymentMethod: card, Value: 320.55 }],
+            })
+
+            await workspace.client.post(`/PaymentMethods/IdPaymentMethod=${card}/payInvoice`, { DueDate: "2026-09-28" })
+
+            let statement = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
+            let [account] = statement.Accounts
+
+            expectClosing(account)
+
+            let balance = (await workspace.client.get(`/Accounts?ReferenceMonth=2026-09`)).body
+                .find((item: { IdAccount: number }) => item.IdAccount === workspace.IdAccount).Balance
+
+            expect(account.ClosingBalance).toBe(balance)
+        })
+
+        //  A abertura da conta é a única linha do extrato que não é lançamento nenhum — e sem
+        //  ela a soma não fecharia no mês em que a conta nasceu
+        it("lança o saldo inicial como linha no mês da abertura", async () => {
+            let user = await UsersFactory.create()
+            let client = new TestClient(user.token)
+
+            let account = await client.post(`/Accounts`, { Name: "Conta nova", InitialBalance: 700, InitialBalanceDate: "2026-09-10" })
+
+            let statement = (await client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
+            let row = statement.Accounts.find((item: { IdAccount: number }) => item.IdAccount === account.body.IdAccount)
+
+            expect(row.OpeningBalance).toBe(0)
+            expect(row.ClosingBalance).toBe(700)
+            expect(row.Entries).toEqual([{ Date: "2026-09-10", Kind: "opening", Description: "Saldo inicial", Value: 700 }])
+
+            expectClosing(row)
+        })
+
+        //  **Aqui NÃO se filtra Kind='transfer'** — o filtro que "quanto entrou no mês" exige é
+        //  justamente o que não vale no extrato: a transferência é saída real de uma conta e
+        //  entrada real na outra
+        it("mostra a transferência nas duas contas, com sinais opostos", async () => {
+            let workspace = await buildWorkspace()
+
+            let second = await workspace.client.post(`/Accounts`, { Name: "Poupança", InitialBalance: 0 })
+
+            await receive(workspace, await createInflow(workspace, {
+                Description: "Para a poupança",
+                TotalValue: 400,
+                Kind: "transfer",
+                IdFromAccount: workspace.IdAccount,
+                IdToAccount: second.body.IdAccount,
+                CompetenceDate: "2026-09-10",
+            }))
+
+            let statement = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
+
+            let origin = statement.Accounts.find((item: { IdAccount: number }) => item.IdAccount === workspace.IdAccount)
+            let destiny = statement.Accounts.find((item: { IdAccount: number }) => item.IdAccount === second.body.IdAccount)
+
+            expect(origin.Entries).toHaveLength(1)
+            expect(origin.Entries[0]).toMatchObject({ Kind: "transfer", Value: -400, Description: "Para a poupança" })
+            expect(destiny.Entries[0]).toMatchObject({ Kind: "transfer", Value: 400 })
+
+            //  A soma das duas não muda o patrimônio
+            expect(origin.ClosingBalance + destiny.ClosingBalance).toBe(1000)
+
+            expectClosing(origin)
+            expectClosing(destiny)
+        })
+
+        //  Uma linha pendente no meio do extrato quebraria a soma, e um extrato que não fecha é
+        //  pior do que extrato nenhum. Na fatura ela aparece, porque uma fatura existe antes de
+        //  ser paga — é isso que a torna útil de olhar.
+        it("esconde o gasto pendente da conta e o mostra no cartão", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, "invoice")
+
+            await createExpense(workspace, { TotalValue: 150, ExpenseDate: "2026-09-08" })
+
+            await createExpense(workspace, {
+                Description: "Mercado",
+                TotalValue: 320,
+                ExpenseDate: "2026-09-10",
+                Payments: [{ IdPaymentMethod: card, Value: 320 }],
+            })
+
+            let statement = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
+
+            expect(statement.Accounts[0].Entries).toEqual([])
+            expectClosing(statement.Accounts[0])
+
+            expect(statement.Cards).toHaveLength(1)
+            expect(statement.Cards[0]).toMatchObject({ Name: "Cartão", DueDate: "2026-09-28", Total: 320 })
+            expect(statement.Cards[0].Entries[0]).toMatchObject({ Date: "2026-09-10", Description: "Mercado", Value: 320, Paid: false })
+        })
+
+        //  Listadas cruas, quarenta compras do cartão viram quarenta linhas no extrato da conta
+        //  — o que nenhum extrato bancário faz, e o que soterra as linhas que importam
+        it("agrupa as compras do cartão numa linha só de fatura na conta", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, "invoice")
+
+            for (let index = 0; index < 40; index++) {
+                await createExpense(workspace, {
+                    Description: `Compra ${index}`,
+                    TotalValue: 10,
+                    ExpenseDate: "2026-09-10",
+                    Payments: [{ IdPaymentMethod: card, Value: 10 }],
+                })
+            }
+
+            await workspace.client.post(`/PaymentMethods/IdPaymentMethod=${card}/payInvoice`, { DueDate: "2026-09-28" })
+
+            let statement = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
+            let [account] = statement.Accounts
+
+            expect(account.Entries).toHaveLength(1)
+            expect(account.Entries[0]).toMatchObject({
+                Date: "2026-09-28",
+                Kind: "invoice",
+                Description: "Fatura Cartão",
+                Value: -400,
+                IdPaymentMethod: card,
+            })
+
+            //  O detalhe fica no extrato do cartão, que a tela mostra ao lado — e o total do
+            //  grupo é o mesmo que as pernas somavam
+            expect(statement.Cards[0].Entries).toHaveLength(40)
+            expect(statement.Cards[0].Total).toBe(400)
+
+            expectClosing(account)
+        })
+
+        it("não mostra o gasto cancelado em lugar nenhum, e o mês continua fechando", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, "invoice")
+
+            let onCard = await createExpense(workspace, {
+                TotalValue: 500,
+                ExpenseDate: "2026-09-10",
+                Payments: [{ IdPaymentMethod: card, Value: 500 }],
+            })
+
+            let onDebit = await createExpense(workspace, { TotalValue: 90, ExpenseDate: "2026-09-12" })
+            await pay(workspace, onDebit.IdExpense)
+
+            await workspace.client.post(`/PaymentMethods/IdPaymentMethod=${card}/payInvoice`, { DueDate: "2026-09-28" })
+
+            //  Cancelar um gasto quitado é o estorno dele: o dinheiro volta para a conta
+            await workspace.client.delete(`/Expenses/IdExpense=${onCard.IdExpense}`)
+
+            let statement = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
+            let [account] = statement.Accounts
+
+            expect(account.Entries).toHaveLength(1)
+            expect(account.Entries[0]).toMatchObject({ Kind: "expense", Value: -90 })
+            expect(statement.Cards).toEqual([])
+
+            expectClosing(account)
+        })
+
+        //  Active = false quer dizer "não use mais", não "não existiu": o mês em que a conta
+        //  ainda tinha movimento tem que ser consultável
+        it("continua devolvendo o extrato da conta arquivada no mês em que teve movimento", async () => {
+            let workspace = await buildWorkspace()
+
+            let second = await workspace.client.post(`/Accounts`, { Name: "Conta antiga", InitialBalance: 0 })
+
+            await receive(workspace, await createInflow(workspace, {
+                TotalValue: 250,
+                IdToAccount: second.body.IdAccount,
+                CompetenceDate: "2026-09-05",
+            }))
+
+            await workspace.client.delete(`/Accounts/IdAccount=${second.body.IdAccount}`)
+
+            let statement = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
+            let archived = statement.Accounts.find((item: { IdAccount: number }) => item.IdAccount === second.body.IdAccount)
+
+            expect(archived).toMatchObject({ Active: false, ClosingBalance: 250 })
+            expect(archived.Entries).toHaveLength(1)
+            expectClosing(archived)
+
+            //  E ela some do mês em que não teve movimento: arquivada e vazia não é linha de tela
+            let empty = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-10`)).body
+
+            expect(empty.Accounts.find((item: { IdAccount: number }) => item.IdAccount === second.body.IdAccount)).toBeUndefined()
+        })
+
+        //  Num cartão 'purchase' a competência é o mês da compra e a fatura é outra: agrupar
+        //  pela competência partiria a fatura em pedaços que o emissor nunca cobrou
+        it("monta a fatura do cartão 'purchase' pelo vencimento, não pela competência", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, "purchase")
+
+            //  Compra de 21/08: pesa em agosto, mas a fatura vence em 28/09
+            await createExpense(workspace, {
+                TotalValue: 200,
+                ExpenseDate: "2026-08-21",
+                Payments: [{ IdPaymentMethod: card, Value: 200 }],
+            })
+
+            expect((await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-08`)).body.Cards).toEqual([])
+
+            let september = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
+
+            expect(september.Cards).toHaveLength(1)
+            expect(september.Cards[0]).toMatchObject({ DueDate: "2026-09-28", Total: 200 })
+            expect(september.Cards[0].Entries[0].Date).toBe("2026-08-21")
+        })
+
+        it("não enxerga a conta de outro workspace", async () => {
+            let mine = await buildWorkspace()
+            let theirs = await buildWorkspace()
+
+            await receive(theirs, await createInflow(theirs, { TotalValue: 5000, CompetenceDate: "2026-09-05" }))
+
+            let statement = (await mine.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
+
+            expect(statement.Accounts).toHaveLength(1)
+            expect(statement.Accounts[0].IdAccount).toBe(mine.IdAccount)
+        })
+    })
+
     describe("Fluxo end to end", () => {
 
         //  O mês inteiro montado por HTTP: abre com o saldo do mês anterior, recebe o salário,
@@ -424,6 +703,15 @@ async function createExpense(workspace: TestWorkspace, overrides: Record<string,
     expect(response.status).toBe(200)
 
     return response.body as { IdExpense: number }
+}
+
+//  **A asserção que carrega o extrato**, em centavos: soma das linhas + abertura = fechamento.
+//  Em ponto flutuante 1000 − 199.99 − 320.55 não bate com o saldo por causa do último bit —
+//  Utils.toCents é o que todo invariante de dinheiro do projeto usa.
+function expectClosing(account: { OpeningBalance: number, ClosingBalance: number, Entries: Array<{ Value: number }> }) {
+    let sum = account.Entries.reduce((total, entry) => total + Utils.toCents(entry.Value), Utils.toCents(account.OpeningBalance))
+
+    expect(sum).toBe(Utils.toCents(account.ClosingBalance))
 }
 
 //  Quita todas as pernas do gasto. Fora do cartão, quitar é perna a perna — no cartão quem

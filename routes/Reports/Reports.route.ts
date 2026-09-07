@@ -19,3 +19,8 @@ export const Reports_route = express()
 //  ?ReferenceMonth=YYYY-MM (opcional, default o mês corrente). Mês, e não From/To das listagens
 //  de movimento: as duas pontas do cálculo são posições, não recortes.
 Reports_route.get("/Reports/Month", Reports_schema.getMonth, AsyncHandler(Reports_controller.getMonth))
+
+//  O extrato de cada conta e de cada cartão do mês, numa rota só — a tela é uma. Ele é a
+//  **abertura do saldo**: OpeningBalance + soma das linhas = ClosingBalance, e o ClosingBalance
+//  é o mesmo Balance que GET /Accounts devolve para o mês.
+Reports_route.get("/Reports/Statement", Reports_schema.getStatement, AsyncHandler(Reports_controller.getStatement))

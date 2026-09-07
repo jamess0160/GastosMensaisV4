@@ -32,6 +32,58 @@ class Schema {
             OpenInvoices: Joi.number().required(),
         })),
     ]
+
+    public readonly getStatement = [
+        joiController.validateQuery(Joi.object({
+            ReferenceMonth: referenceMonth.optional(),
+        })),
+        joiController.validateResponse(Joi.object({
+            ReferenceMonth: isoDate.required(),
+            Accounts: Joi.array().items(Joi.object({
+                IdAccount: Joi.number().required(),
+                Name: Joi.string().required(),
+                /** A conta arquivada continua tendo extrato dos meses em que teve movimento */
+                Active: Joi.boolean().required(),
+                OpeningBalance: Joi.number().required(),
+                ClosingBalance: Joi.number().required(),
+                //  **A soma das linhas fecha com a diferença entre as duas pontas**, e é a
+                //  única coisa que este extrato promete.
+                Entries: Joi.array().items(Joi.object({
+                    Date: isoDate.required(),
+                    Kind: Joi.string().valid("opening", "inflow", "transfer", "expense", "invoice").required(),
+                    Description: Joi.string().required(),
+                    /** Assinado: com sinal, conferir o extrato é somar a lista */
+                    Value: Joi.number().required(),
+                    //  Cada linha carrega o id do que a gerou, para a tela navegar do extrato
+                    //  até o lançamento. Quais vêm depende do Kind.
+                    IdInflow: Joi.number().optional(),
+                    IdExpense: Joi.number().optional(),
+                    IdExpensePayment: Joi.number().optional(),
+                    IdPaymentMethod: Joi.number().optional(),
+                })).required(),
+            })).required(),
+            //  A fatura: o par (cartão, vencimento), que é tudo que uma fatura é neste modelo.
+            Cards: Joi.array().items(Joi.object({
+                IdPaymentMethod: Joi.number().required(),
+                Name: Joi.string().required(),
+                DueDate: isoDate.required(),
+                Total: Joi.number().required(),
+                Entries: Joi.array().items(Joi.object({
+                    /** A data da **compra**, não a do vencimento */
+                    Date: isoDate.required(),
+                    Description: Joi.string().required(),
+                    /** Positivo: é o que a fatura cobra */
+                    Value: Joi.number().required(),
+                    IdExpense: Joi.number().required(),
+                    IdExpensePayment: Joi.number().required(),
+                    InstallmentNumber: Joi.number().allow(null).required(),
+                    InstallmentTotal: Joi.number().allow(null).required(),
+                    Paid: Joi.boolean().required(),
+                    Charged: Joi.boolean().required(),
+                })).required(),
+            })).required(),
+        })),
+    ]
 }
 
 export const Reports_schema = new Schema()

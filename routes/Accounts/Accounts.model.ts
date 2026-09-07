@@ -12,6 +12,19 @@ export class class_Accounts_model extends BaseModel {
         return this.baseQuery.clone().where("IdWorkspace", IdWorkspace)
     }
 
+    //  **Com as arquivadas junto.** Active = false quer dizer "não use mais", não "não
+    //  existiu": o mês em que a conta ainda tinha movimento continua tendo extrato, e o saldo
+    //  daquele mês continua sendo o dela. É o único leitor que precisa disso — as listagens da
+    //  tela usam o getByWorkspace, que filtra.
+    getAllByWorkspace(IdWorkspace: number) {
+        return this.KnexConnection
+            .select("*")
+            .from<Database.Accounts>("Accounts")
+            .where("IdWorkspace", IdWorkspace)
+            .orderBy("Position")
+            .orderBy("IdAccount")
+    }
+
     //  O IdWorkspace entra na cláusula junto com o IdAccount, e não só no assertMember: o id
     //  da conta chega do cliente e é sequencial, então buscar apenas por ele leria a conta de
     //  outro tenant mesmo com a matrícula conferida.
