@@ -173,7 +173,7 @@ falta é o `OpeningBalance` — o saldo realizado no fim do mês anterior, que
 o `AccountBalance` já sabe calcular —, e ele **não pode virar um lançamento
 de entrada**, sob pena de dobrar o saldo e de contar como "entrou no mês"
 dinheiro que nunca chegou. O desenho fechado, com o tratamento do vencido,
-está na [etapa 6 da leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#etapa-6--agregados-do-mês).
+está na [leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md).
 
 ---
 
@@ -202,8 +202,8 @@ não exista, dentro de uma transaction.
 > **A alternativa barata foi descartada (2026-09-07).** Ela materializaria
 > qualquer mês pedido, inclusive passado, congelando o teto de hoje num mês
 > em que ele nunca valeu. Vale o job mensal, na
-> [etapa 1 da leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#etapa-1--a-rotina-mensal-do-orçamento),
-> dentro do motor da etapa 9.
+> [leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md),
+> dentro do motor de rotinas.
 
 ---
 
@@ -246,7 +246,7 @@ e-mail, que hoje o projeto não tem.
 ## 7. Conciliação de extrato
 
 > **Fora do MVP (2026-09-07).** No lugar dela entrou o extrato manual — a
-> [etapa 8 da leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#etapa-8--extrato-de-conta-e-de-cartão),
+> [leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md),
 > que abre linha a linha o saldo que o sistema já calcula, sem importar arquivo
 > nem casar lançamento. As três perguntas abaixo continuam sem resposta.
 
@@ -284,7 +284,7 @@ rota correspondente.
 
 ## 9. Notificações
 
-> **Fora do MVP (2026-09-07).** Era a etapa 4 da leva 3 e saiu inteira; o que
+> **Fora do MVP (2026-09-07).** Saiu inteira da leva 3; o que
 > havia sido levantado está preservado em *O que não entra nesta leva*, no
 > [documento da leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#o-que-não-entra-nesta-leva).
 

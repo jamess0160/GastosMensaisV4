@@ -65,8 +65,8 @@ conteúdo, e uma etapa pode aparecer em mais de um commit.
 
 | Etapa | Por quê | Onde está agora |
 | --- | --- | --- |
-| **8b** — a rotina mensal do orçamento | Precisa de agendador, que o projeto não tinha | [Etapa 1 da leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#etapa-1--a-rotina-mensal-do-orçamento), com o desenho fechado |
-| **9** — compartilhamento de workspace | Fora do MVP, mas com uma pendência de segurança aberta | **Parcialmente feita:** o convite e o aceite viraram a etapa 2 da leva 2, e fecharam a pendência. A gestão de membros (listar, trocar papel, remover, sair, transferir propriedade) continua aberta e não está em leva nenhuma |
+| **8b** — a rotina mensal do orçamento | Precisa de agendador, que o projeto não tinha | Na [leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md), com o desenho fechado e o agendador junto |
+| **9** — compartilhamento de workspace | Fora do MVP, mas com uma pendência de segurança aberta | **Parcialmente feita:** o convite e o aceite foram feitos na leva 2, e fecharam a pendência. A gestão de membros (listar, trocar papel, remover, sair, transferir propriedade) continua aberta e não está em leva nenhuma |
 
 ---
 
@@ -110,31 +110,20 @@ numa leva onde não está.
 
 ## Leva 3 — não iniciada
 
-Nenhuma etapa executada. A lista abaixo é espelho da tabela do
-[documento da leva](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#onde-estamos), e
-existe para que este documento responda "o que falta" sem obrigar a abrir o outro.
+**Nenhuma das dez etapas foi executada**, então não há nada a registrar aqui ainda. Cada uma
+ganha sua linha, com commit e data, no commit em que for concluída.
 
-| Etapa | O que é | Estado |
-| --- | --- | --- |
-| **1** | A rotina mensal do orçamento | pendente — depende da 9; é dentro do motor dela que a rotina roda |
-| **2** | Duração de sessão configurável | pendente — desenho fechado, nada a travando |
-| **3** | Recuperação de senha | pendente — sobe junto com a etapa 10, como primeiro consumidor dela |
-| **5** | `CompetenceMode`: o cartão que conta como débito | pendente — desenho fechado |
-| **6** | Agregados do mês (`GET /Reports/Month`, com o saldo de abertura) | pendente — desenho fechado |
-| **7** | Exportar para Excel | pendente — depois da 6 |
-| **8** | Extrato de conta e de cartão | pendente — depende da 5, que decide por qual data o saldo corta |
-| **9** | O motor de rotinas | pendente — desenho fechado; primeira da fila, porque a 1 roda dentro dela |
-| **10** | A infra de e-mail | pendente — desenho fechado; sobe junto com a 3. O **provedor** com SPF/DKIM é dependência externa |
-| **11** | Confirmação de e-mail | pendente — desenho fechado; depois da 10 |
+**O que falta se lê no [documento da leva](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md)** — a tabela dele é a fonte, e este documento
+não a copia. O espelho que existia aqui foi removido em 2026-09-07: ele duplicava dez linhas que
+mudam sozinhas, e a renumeração daquele dia mostrou o preço — duas tabelas dizendo números
+diferentes sobre a mesma etapa, sem que nada avisasse qual estava velha.
 
-**O número 4 não existe nesta leva e não será reaproveitado.** Era das notificações, que saíram
-do MVP em 2026-09-07; a conciliação de extrato saiu junto, e a etapa 8 passou a ser o extrato
-manual. As duas estão registradas em *O que não entra nesta leva*, no documento da leva, com tudo
-o que já havia sido levantado sobre elas.
+**Os números da leva 3 mudaram em 2026-09-07, e mudam uma vez só.** Ela foi renumerada para que a
+ordem dos números **seja** a ordem de execução, o que só pôde ser feito porque nada dela tinha
+sido executado. Do primeiro commit `Fase #3 | Etapa N` em diante o número congela: é ele que o
+commit cita, e reordenar depois faria a citação apontar para outra etapa.
 
-A ordem de execução **não** é a ordem dos números: está na seção
-[Ordem das etapas e por quê](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#ordem-das-etapas-e-por-quê)
-do documento da leva.
+Notificações e conciliação de extrato **saíram do MVP** na mesma data e não têm número nenhum.
 
 ---
 
