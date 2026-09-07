@@ -213,6 +213,17 @@ export namespace Utils {
     }
 
     /**
+     * "2026-08-10" -> "10/08/2026". **Só para exibição**, e hoje só a planilha usa.
+     *
+     * Continua sendo string em string, pelo mesmo motivo de todo o resto deste bloco: um
+     * `new Date("2026-08-10")` no meio do caminho traria de volta o fuso que os pgTypeParsers
+     * existem para tirar, e a data sairia um dia atrás em UTC-3.
+     */
+    export function toBrazilianDate(date: string) {
+        return toCalendar(date).format("DD/MM/YYYY")
+    }
+
+    /**
      * O primeiro dia do mês de referência: "2026-08" vira "2026-08-01".
      *
      * A coluna `ReferenceMonth` é `date` e guarda sempre o dia 1 — é o que faz duas linhas do

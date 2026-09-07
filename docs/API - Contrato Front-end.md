@@ -1649,6 +1649,42 @@ Uma fatura existe antes de ser paga — é isso que a torna útil de olhar. Já 
 
 **`ReferenceMonth`, e não `From`/`To`.** As duas pontas são posições: um extrato de 15 de agosto a 3 de setembro não tem saldo de abertura que signifique alguma coisa.
 
+### `GET /Reports/Export`
+
+**A planilha do período, gerada pelo servidor.** É a **única rota do contrato que não responde JSON**.
+
+| Query | Tipo | Regra |
+|---|---|---|
+| `From` | CalendarDate | opcional, inclusivo |
+| `To` | CalendarDate | opcional, inclusivo |
+
+`From`/`To`, como todas as listagens de movimento — não `ReferenceMonth`: exportar é recortar, e um recorte de exportação não precisa ser um mês civil. **Sem nenhuma das duas pontas, sai o histórico inteiro.**
+
+**Resposta:** o arquivo, não um JSON.
+
+| Cabeçalho | Valor |
+|---|---|
+| `Content-Type` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` |
+| `Content-Disposition` | `attachment; filename="Gastos Mensais - 2026-09-01 a 2026-09-30.xlsx"` |
+
+> **Não trate a resposta como JSON.** No `fetch`, use `response.blob()`; no `axios`, `responseType: "blob"`. E **a chamada precisa mandar o cookie** (`credentials: "include"` no `fetch`) — uma `<a href>` simples funciona no mesmo domínio, mas não deixa você tratar o `401`.
+
+**Três abas:**
+
+| Aba | O que tem |
+|---|---|
+| `Resumo` | total de entradas, total de gastos e o resultado — **como fórmula**, não como número somado no servidor |
+| `Entradas` | uma linha por entrada, com as contas de origem e destino pelo nome |
+| `Gastos` | uma linha por **perna**, não por compra |
+
+**A aba de gastos lista pernas.** 600 em 6× são seis linhas de 100, cada uma no mês em que pesa — a mesma unidade do `Spent` do orçamento e do `Expenses` de `GET /Reports/Month`. Uma planilha por compra jogaria 600 no mês da compra e não bateria com número nenhum da tela.
+
+**O resumo é fórmula de propósito:** apagar uma linha dentro do Excel não pode deixar o total mentindo, e uma planilha exportada existe justamente para ser mexida.
+
+**As datas saem como texto `dd/MM/yyyy`.** As colunas de data do sistema são dias de calendário, não instantes (seção 1.5): convertê-las para data do Excel reintroduziria o fuso e a planilha sairia com todo lançamento um dia atrás. O custo é que o Excel não ordena a coluna como data — é o lado certo do erro.
+
+O período recorta pela **competência** nas duas abas, e o cancelado fica de fora.
+
 ---
 
 ## 16. Utils — `/Utils`
@@ -1769,6 +1805,7 @@ A **rotina mensal do orçamento passou a existir** (2026-09-07) e roda no servid
 | DELETE | `/BudgetPeriods/IdBudgetPeriod=:Id` | 🔒 |
 | GET | `/Reports/Month` | 🔒 |
 | GET | `/Reports/Statement` | 🔒 |
+| GET | `/Reports/Export` | 🔒 |
 | GET | `/Utils/ServerTime` | público |
 | GET | `/Utils/Health` | público |
 | GET | `/Utils/Reload` | 🔒 |
@@ -1793,6 +1830,21 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-07 — `GET /Reports/Export`: a planilha passa a ser gerada pelo servidor
+
+🟢 **Adição** — uma rota nova na seção 15, e **a primeira do contrato que não responde JSON**.
+
+**O que entrou.** `GET /Reports/Export?From=&To=` devolve um `.xlsx` com três abas (Resumo, Entradas, Gastos). Sem `From`/`To`, sai o histórico inteiro.
+
+**Quem monta o arquivo agora é a API.** No V3 o cliente pedia os dados e montava a planilha no navegador, o que significa **replicar as regras de agregação** — exatamente o risco que criou a seção 15. A planilha sai com os mesmos números da tela porque lê do mesmo lugar.
+
+**Ação do front:**
+
+1. **trate a resposta como binário** — `response.blob()` no `fetch`, `responseType: "blob"` no `axios`. Um `.json()` aqui estoura;
+2. **mande o cookie** (`credentials: "include"`), como em qualquer rota 🔒;
+3. use o `filename` do `Content-Disposition` ao salvar, ou monte o seu — mas o do servidor já carrega o período;
+4. **apague o código de geração de planilha do cliente**, junto com a dependência que ele usava.
 
 ### 2026-09-07 — `GET /Reports/Statement`: extrato de conta e de cartão
 

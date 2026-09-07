@@ -1,6 +1,6 @@
 import Joi from "joi"
 import { joiController } from "root/Utils/joiController"
-import { isoDate, referenceMonth } from "root/Utils/joiSchemas"
+import { isoDate, periodQuery, referenceMonth } from "root/Utils/joiSchemas"
 
 class Schema {
 
@@ -82,6 +82,17 @@ class Schema {
                     Charged: Joi.boolean().required(),
                 })).required(),
             })).required(),
+        })),
+    ]
+
+    //  **Sem validateResponse, e é a primeira rota do projeto assim:** a resposta é um arquivo,
+    //  não um JSON — o Joi não descreve bytes. O AsyncHandler continua igual.
+    public readonly getExport = [
+        //  From/To, como todas as listagens de movimento — não ReferenceMonth: exportar é
+        //  recortar, e um recorte de exportação não precisa ser um mês civil. As duas pontas
+        //  são opcionais; sem nenhuma, a planilha sai com o histórico inteiro.
+        joiController.validateQuery(Joi.object({
+            ...periodQuery,
         })),
     ]
 }

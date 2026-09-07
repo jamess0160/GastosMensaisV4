@@ -1,4 +1,5 @@
 import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
+import ExcelJS from "exceljs"
 import { Utils } from "root/Utils/Utils"
 
 //  Testes integrados de Reports — a feature que não tem tabela própria: ela lê de todas as
@@ -580,6 +581,134 @@ describe("Reports", () => {
         })
     })
 
+    //  **A primeira rota do projeto que não responde JSON.** A suíte não olha bytes: ela abre a
+    //  planilha com a mesma biblioteca que a escreveu e lê as células — é o equivalente, aqui,
+    //  de conferir o corpo da resposta.
+    describe("GET /Reports/Export", () => {
+
+        it("recusa sem token", async () => {
+            expect((await client.anonymous().get(`/Reports/Export`)).status).toBe(401)
+        })
+
+        it("recusa data fora do formato", async () => {
+            let workspace = await buildWorkspace()
+
+            expect((await workspace.client.get(`/Reports/Export?From=2026-09`)).status).toBe(406)
+        })
+
+        it("responde com o arquivo e o nome do período", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await download(workspace, `?From=2026-09-01&To=2026-09-30`)
+
+            expect(response.status).toBe(200)
+            expect(response.headers["content-type"]).toContain("spreadsheetml.sheet")
+            expect(response.headers["content-disposition"]).toBe('attachment; filename="Gastos Mensais - 2026-09-01 a 2026-09-30.xlsx"')
+
+            let workbook = await open(response)
+
+            expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(["Resumo", "Entradas", "Gastos"])
+        })
+
+        it("imprime as entradas e os gastos do período, com os nomes resolvidos", async () => {
+            let workspace = await buildWorkspace()
+
+            await receive(workspace, await createInflow(workspace, {
+                Description: "Salário",
+                TotalValue: 3000,
+                CompetenceDate: "2026-09-05",
+            }))
+
+            await createExpense(workspace, { Description: "Mercado", TotalValue: 250.5, ExpenseDate: "2026-09-10" })
+
+            let workbook = await open(await download(workspace, `?From=2026-09-01&To=2026-09-30`))
+
+            let inflow = rowValues(workbook, "Entradas", 2)
+
+            expect(inflow).toEqual(["05/09/2026", "Salário", "Entrada", "", "Conta corrente", "Recebida", 3000])
+
+            let expense = rowValues(workbook, "Gastos", 2)
+
+            expect(expense).toEqual([
+                "10/09/2026", "10/09/2026", "10/09/2026",
+                "Mercado", "Categoria do teste", "Conta corrente", "Débito",
+                "", "Pendente", "Não", 250.5,
+            ])
+        })
+
+        //  **A aba de gastos lista pernas, não compras** — a mesma unidade do resto do projeto.
+        //  Uma planilha por compra jogaria 600 no mês da compra e não bateria com número nenhum
+        //  da tela.
+        it("traz uma linha de 100 no mês, e não a compra de 600", async () => {
+            let workspace = await buildWorkspace()
+
+            await createExpense(workspace, {
+                Description: "Notebook",
+                TotalValue: 600,
+                ExpenseDate: "2026-09-10",
+                Kind: "installment",
+                InstallmentTotal: 6,
+            })
+
+            let workbook = await open(await download(workspace, `?From=2026-09-01&To=2026-09-30`))
+            let sheet = workbook.getWorksheet("Gastos")!
+
+            expect(sheet.rowCount).toBe(2)
+            expect(sheet.getCell("H2").value).toBe("1/6")
+            expect(sheet.getCell("K2").value).toBe(100)
+
+            //  E as seis aparecem quando o recorte é o semestre inteiro
+            let whole = await open(await download(workspace, `?From=2026-09-01&To=2027-03-31`))
+
+            expect(whole.getWorksheet("Gastos")!.rowCount).toBe(7)
+        })
+
+        //  O resumo é fórmula e não número congelado: apagar uma linha dentro do Excel não
+        //  pode deixar o total mentindo, e a planilha existe para ser mexida
+        it("resume com fórmula, não com número somado no servidor", async () => {
+            let workspace = await buildWorkspace()
+
+            await createInflow(workspace, { TotalValue: 3000, CompetenceDate: "2026-09-05" })
+            await createExpense(workspace, { TotalValue: 250, ExpenseDate: "2026-09-10" })
+
+            let workbook = await open(await download(workspace, `?From=2026-09-01&To=2026-09-30`))
+            let sheet = workbook.getWorksheet("Resumo")!
+
+            expect(sheet.getCell("A1").value).toBe("Total de entradas")
+            expect(sheet.getCell("B1").value).toMatchObject({ formula: "SUM(Entradas!G2:G2)" })
+            expect(sheet.getCell("B2").value).toMatchObject({ formula: "SUM(Gastos!K2:K2)" })
+            expect(sheet.getCell("B3").value).toMatchObject({ formula: "B1-B2" })
+        })
+
+        it("deixa de fora o cancelado, o fora do período e o de outro workspace", async () => {
+            let workspace = await buildWorkspace()
+            let neighbour = await buildWorkspace()
+
+            let canceled = await createExpense(workspace, { TotalValue: 400, ExpenseDate: "2026-09-10" })
+            await workspace.client.delete(`/Expenses/IdExpense=${canceled.IdExpense}`)
+
+            await createExpense(workspace, { TotalValue: 90, ExpenseDate: "2026-10-10" })
+            await createExpense(neighbour, { TotalValue: 700, ExpenseDate: "2026-09-10" })
+
+            let workbook = await open(await download(workspace, `?From=2026-09-01&To=2026-09-30`))
+
+            //  Só o cabeçalho
+            expect(workbook.getWorksheet("Gastos")!.rowCount).toBe(1)
+        })
+
+        it("exporta o histórico inteiro quando o período não vem", async () => {
+            let workspace = await buildWorkspace()
+
+            await createExpense(workspace, { TotalValue: 10, ExpenseDate: "2026-03-10" })
+            await createExpense(workspace, { TotalValue: 20, ExpenseDate: "2026-11-10" })
+
+            let response = await download(workspace, ``)
+
+            expect(response.headers["content-disposition"]).toBe('attachment; filename="Gastos Mensais - completo.xlsx"')
+            expect((await open(response)).getWorksheet("Gastos")!.rowCount).toBe(3)
+        })
+    })
+
     describe("Fluxo end to end", () => {
 
         //  O mês inteiro montado por HTTP: abre com o saldo do mês anterior, recebe o salário,
@@ -703,6 +832,35 @@ async function createExpense(workspace: TestWorkspace, overrides: Record<string,
     expect(response.status).toBe(200)
 
     return response.body as { IdExpense: number }
+}
+
+//  A planilha volta como binário, e o supertest só entrega um Buffer com um parser explícito —
+//  sem ele o corpo de um content-type que ele não conhece chega vazio.
+function download(workspace: TestWorkspace, query: string) {
+    return workspace.client.get(`/Reports/Export${query}`).buffer(true).parse((res, callback) => {
+        let chunks: Buffer[] = []
+
+        res.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)))
+        res.on("end", () => callback(null, Buffer.concat(chunks)))
+    })
+}
+
+//  Abre o arquivo com a mesma biblioteca que o escreveu: é assim que a suíte lê o "corpo" de
+//  uma resposta que não é JSON.
+async function open(response: { body: Buffer }) {
+    let workbook = new ExcelJS.Workbook()
+
+    //  O cast existe por desencontro de tipagem, não por gambiarra: o exceljs declara o
+    //  parâmetro com o Buffer de uma versão anterior do @types/node, e o Buffer que o supertest
+    //  devolve é o desta. Em runtime é o mesmo objeto.
+    await workbook.xlsx.load(response.body as never)
+
+    return workbook
+}
+
+//  Os valores de uma linha, sem o índice 0 que o exceljs reserva
+function rowValues(workbook: ExcelJS.Workbook, sheet: string, row: number) {
+    return (workbook.getWorksheet(sheet)!.getRow(row).values as unknown[]).slice(1)
 }
 
 //  **A asserção que carrega o extrato**, em centavos: soma das linhas + abertura = fechamento.

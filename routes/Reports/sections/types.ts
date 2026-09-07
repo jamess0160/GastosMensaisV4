@@ -49,4 +49,36 @@ export namespace ReportsNamespace {
         Total: number
         Entries: CardEntry[]
     }
+
+    /** Uma linha da aba "Entradas" da planilha, com os nomes já resolvidos. */
+    export interface ExportInflowRow {
+        IdInflow: number
+        Description: string
+        Kind: "inflow" | "transfer"
+        TotalValue: number
+        Status: "pending" | "received" | "canceled"
+        CompetenceDate: string
+        ExpectedDate: string | null
+        FromAccountName: string | null
+        ToAccountName: string | null
+    }
+
+    /** Uma linha da aba "Gastos": **a perna**, não a compra. */
+    export interface ExportPaymentRow {
+        IdExpensePayment: number
+        IdExpense: number
+        Value: number
+        CompetenceDate: string
+        CashDate: string
+        DueDate: string | null
+        InstallmentNumber: number | null
+        InstallmentTotal: number | null
+        Paid: boolean
+        Description: string
+        ExpenseDate: string
+        ExpenseStatus: "pending" | "paid" | "canceled"
+        CategoryName: string | null
+        PaymentMethodName: string
+        AccountName: string
+    }
 }

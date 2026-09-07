@@ -24,3 +24,7 @@ Reports_route.get("/Reports/Month", Reports_schema.getMonth, AsyncHandler(Report
 //  **abertura do saldo**: OpeningBalance + soma das linhas = ClosingBalance, e o ClosingBalance
 //  é o mesmo Balance que GET /Accounts devolve para o mês.
 Reports_route.get("/Reports/Statement", Reports_schema.getStatement, AsyncHandler(Reports_controller.getStatement))
+
+//  A exportação para Excel: ?From=&To=, como todas as listagens de movimento. **Não responde
+//  JSON** — é um .xlsx escrito direto no res, com Content-Type e Content-Disposition.
+Reports_route.get("/Reports/Export", Reports_schema.getExport, AsyncHandler(Reports_controller.getExport))
