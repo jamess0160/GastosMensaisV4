@@ -199,6 +199,12 @@ a tela ao mesmo tempo disputariam a criação.
 mais barata: `GET /Budgets` materializar o mês pedido caso ele ainda
 não exista, dentro de uma transaction.
 
+> **A alternativa barata foi descartada (2026-09-07).** Ela materializaria
+> qualquer mês pedido, inclusive passado, congelando o teto de hoje num mês
+> em que ele nunca valeu. Vale o job mensal, na
+> [etapa 1 da leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#etapa-1--a-rotina-mensal-do-orçamento),
+> dentro do motor da etapa 9.
+
 ---
 
 ## 5. Duração de sessão configurável
@@ -239,6 +245,11 @@ e-mail, que hoje o projeto não tem.
 
 ## 7. Conciliação de extrato
 
+> **Fora do MVP (2026-09-07).** No lugar dela entrou o extrato manual — a
+> [etapa 8 da leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#etapa-8--extrato-de-conta-e-de-cartão),
+> que abre linha a linha o saldo que o sistema já calcula, sem importar arquivo
+> nem casar lançamento. As três perguntas abaixo continuam sem resposta.
+
 **O problema.** A tela `08 - Contas` desenha um frame B inteiro de
 conciliação: faixa de saldo, itens "a resolver", comparação com extrato.
 Não há rota nenhuma para isso.
@@ -272,6 +283,10 @@ rota correspondente.
 ---
 
 ## 9. Notificações
+
+> **Fora do MVP (2026-09-07).** Era a etapa 4 da leva 3 e saiu inteira; o que
+> havia sido levantado está preservado em *O que não entra nesta leva*, no
+> [documento da leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#o-que-não-entra-nesta-leva).
 
 **O problema.** O Dashboard tem "Avisos" na topbar. O contrato registra
 que a tabela `Notifications` existe no banco **sem rota**.
