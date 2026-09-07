@@ -126,6 +126,7 @@ E-mail já em uso: `406`.
 |---|---|---|
 | `login` | string | obrigatório, normalizado para minúsculas (é o e-mail) |
 | `password` | string | obrigatório |
+| `RememberDevice` | boolean | opcional, default `false` — o "manter conectado" |
 
 **Resposta `200`** — e o `Set-Cookie: token=...`, que é o que importa.
 
@@ -136,6 +137,17 @@ E-mail já em uso: `406`.
 Credencial errada: `406` com `{ "msg": "Login inválido" }` — a mesma mensagem para e-mail inexistente e senha errada, de propósito.
 
 O login já seleciona o primeiro workspace do usuário, então a sessão nunca começa sem workspace.
+
+**A duração da sessão sai daqui, e é uma escolha entre duas:**
+
+| `RememberDevice` | Duração | `Max-Age` do cookie |
+|---|---|---|
+| ausente ou `false` | **24 horas** | `86400` |
+| `true` | **30 dias** | `2592000` |
+
+O cookie e o token têm sempre a **mesma** duração — não há como sobrar um sem o outro. A escolha viaja dentro do token, então `POST /Workspaces/switch` reemite a credencial **sem rebaixar** uma sessão de 30 dias.
+
+> **Marque a caixa "manter conectado" da sua tela neste campo**, e só nele: não guarde nada do lado do cliente para "lembrar" a sessão. O que mantém o usuário logado é o cookie, e ele é `HttpOnly`.
 
 ---
 
@@ -355,6 +367,7 @@ O desafio **não fixa usuário**: duas pessoas podem ter passkey no mesmo aparel
 |---|---|---|
 | `ChallengeToken` | string | obrigatório, o que veio do passo 1 |
 | `Response` | object | obrigatório, o retorno do `startAuthentication()` — precisa ter `id`; o resto passa como veio |
+| `RememberDevice` | boolean | opcional, default `false` — o mesmo campo e as mesmas duas durações do `POST /Users/login` |
 
 **Resposta `200`** — mesma do login por senha, com o `Set-Cookie`:
 
@@ -1595,6 +1608,25 @@ teste, índice de banco) **não** entra aqui.
 | 🟢 **Adição** | Campo, rota ou parâmetro novo. Compatível com o que já existe |
 
 ---
+
+### 2026-09-07 — `POST /Users/login`: sessão de 30 dias, no "manter conectado"
+
+🟢 **Adição** — um campo opcional no corpo do login (seção 2) e o mesmo campo no `POST /UsersAuth/authenticate` (seção 3). Nada do que já existe muda: sem o campo, a sessão continua sendo a de 24 horas.
+
+**O que entrou.** `RememberDevice`, booleano, default `false`:
+
+| `RememberDevice` | Duração da sessão | `Max-Age` do cookie |
+|---|---|---|
+| ausente ou `false` | 24 horas | `86400` |
+| `true` | 30 dias | `2592000` |
+
+**O número que a tela já prometia agora é verdade.** A caixa "manter conectado" existia no login e não mudava nada: toda sessão morria em 24 horas.
+
+**Vale para os dois logins.** O campo é o mesmo, com o mesmo nome e o mesmo default, no login por senha e no por biometria.
+
+**Trocar de workspace não rebaixa a sessão.** `POST /Workspaces/switch` reemite a credencial, e a duração escolhida viaja dentro do token — uma sessão de 30 dias continua de 30 dias depois do switch. (Antes desta etapa não havia o que rebaixar: tudo era 24h.)
+
+**Ação do front:** ligar a caixa "manter conectado" neste campo. Nada mais — não guarde nada do lado do cliente para lembrar a sessão: quem mantém o usuário logado é o cookie `HttpOnly`, e o JavaScript da página não o alcança.
 
 ### 2026-09-07 — `/Users`: confirmação de e-mail
 

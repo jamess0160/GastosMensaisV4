@@ -61,6 +61,9 @@ class Schema {
         joiController.validateBody(Joi.object({
             ChallengeToken: Joi.string().trim().required(),
             Response: authenticatorResponse,
+            //  O mesmo campo do POST /Users/login: os dois caminhos de login escolhem a
+            //  mesma duração, com o mesmo nome e o mesmo default.
+            RememberDevice: Joi.boolean().optional().default(false),
         })),
     ]
 

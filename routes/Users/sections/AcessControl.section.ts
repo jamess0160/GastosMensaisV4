@@ -22,18 +22,44 @@ Utils.configEnv()
 export interface TokenPayload {
     id: number
     IdWorkspace: number
+    /**
+     * A duração escolhida no login, **dentro do token**.
+     *
+     * Ela precisa viajar aqui porque o `POST /Workspaces/switch` reemite a credencial: se ele
+     * reemitisse com o default, trocar de workspace rebaixaria em silêncio uma sessão de 30
+     * dias para 24h, e o usuário seria deslogado sem entender por quê.
+     */
+    RememberDevice?: boolean
 }
 
 class Controller {
 
+    /**
+     * As duas durações da sessão, em segundos — **e o único lugar onde elas existem**.
+     *
+     * O `expiresIn` do token e o `maxAge` do cookie eram dois literais neste mesmo arquivo, que
+     * coincidiam por sorte. Mudar um sem o outro não dá erro nenhum na hora: deixa cookie vivo
+     * com token morto (401 com a credencial na mão) ou cookie morto com token válido. Agora as
+     * duas saem daqui, e o cookie só converte para milissegundos.
+     *
+     * Os números são os que a tela de login já promete: 24h por padrão, 30 dias no "manter
+     * conectado".
+     */
+    private readonly durations = {
+        default: 24 * 60 * 60,
+        remembered: 30 * 24 * 60 * 60,
+    }
+
     //  Fim de linha de todo login, seja por senha ou por biometria: é o único ponto que
     //  transforma uma credencial já validada em sessão. Quem valida a credencial não emite
     //  token por conta própria, para os dois caminhos não divergirem no que gravam.
-    async startSession(res: Response, IdUser: number) {
+    async startSession(res: Response, IdUser: number, RememberDevice = false) {
         //  Selecionar aqui é o que evita um switch obrigatório depois de todo login.
         let IdWorkspace = await new SelectDefault().run(IdUser)
 
-        this.setTokenCookie(res, IdUser, IdWorkspace)
+        //  O RememberDevice chega dos DOIS caminhos de login — senha e biometria —, e é essa
+        //  convergência num ponto só que impede os dois de divergirem no que gravam.
+        this.setTokenCookie(res, IdUser, IdWorkspace, RememberDevice)
 
         await this.updateLastLogin(IdUser)
     }
@@ -48,8 +74,19 @@ class Controller {
     }
 
     //  IdWorkspace undefined não vira chave no payload: o JSON.stringify do jwt.sign descarta.
-    generateToken(IdUser: number, IdWorkspace?: number): string {
-        return jwt.sign({ id: IdUser, IdWorkspace }, enviromentManager.getEnv("JWT_SECRET"), { expiresIn: "24h" })
+    //  O RememberDevice false segue o mesmo caminho, e é o que se quer: o token sem a chave é
+    //  o token de 24h, que continua sendo o default de quem não pediu nada.
+    generateToken(IdUser: number, IdWorkspace?: number, RememberDevice = false): string {
+        return jwt.sign(
+            { id: IdUser, IdWorkspace, RememberDevice: RememberDevice || undefined },
+            enviromentManager.getEnv("JWT_SECRET"),
+            { expiresIn: this.duration(RememberDevice) },
+        )
+    }
+
+    /** Em segundos, que é o que o `expiresIn` do jsonwebtoken entende quando é número. */
+    private duration(RememberDevice: boolean) {
+        return RememberDevice ? this.durations.remembered : this.durations.default
     }
 
     verifyJwtToken(token: string): null | TokenPayload {
@@ -60,13 +97,15 @@ class Controller {
         }
     }
 
-    setTokenCookie(res: Response, IdUser: number, IdWorkspace: number): void {
-        const token = this.generateToken(IdUser, IdWorkspace)
+    setTokenCookie(res: Response, IdUser: number, IdWorkspace: number, RememberDevice = false): void {
+        const token = this.generateToken(IdUser, IdWorkspace, RememberDevice)
         res.cookie('token', token, {
             httpOnly: true,
             secure: this.isProduction(),
             sameSite: 'strict',
-            maxAge: 24 * 60 * 60 * 1000
+            //  Mesmo número do expiresIn do token, convertido: os dois saem de `durations`, e
+            //  é isso que os impede de divergir.
+            maxAge: this.duration(RememberDevice) * 1000
         })
     }
 

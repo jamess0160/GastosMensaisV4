@@ -12,6 +12,9 @@ class Schema {
         joiController.validateBody(Joi.object({
             login: Joi.string().trim().lowercase().required(),
             password: Joi.string().trim().required(),
+            //  O "manter conectado": 30 dias em vez das 24h. Default false, e opcional - um
+            //  cliente que nao conhece o campo continua ganhando a sessao de sempre.
+            RememberDevice: Joi.boolean().optional().default(false),
         })),
     ]
 

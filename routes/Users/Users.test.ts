@@ -79,6 +79,46 @@ describe("Users", () => {
             expect(raw).toContain("SameSite=Strict")
             expect(raw).toContain("Max-Age=86400")
         })
+
+        //  **O RememberDevice, e as duas armadilhas dele.**
+        //
+        //  A primeira é esta: o `expiresIn` do token e o `maxAge` do cookie eram dois literais
+        //  soltos que coincidiam por sorte. Um cookie que vive mais que o token responde 401
+        //  com a credencial na mão; um que vive menos derruba uma sessão ainda válida. Por
+        //  isso os dois números são conferidos **um contra o outro** aqui, e não contra uma
+        //  constante escrita no teste.
+        it("mantém a sessão por 30 dias quando RememberDevice vem true, com cookie e token na mesma duração", async () => {
+            let response = await client.anonymous().post("/Users/login", { login: root.user.Email, password: root.password, RememberDevice: true })
+
+            expect(response.status).toBe(200)
+            expect(TestClient.cookieMaxAge(response)).toBe(30 * 24 * 60 * 60)
+            expect(tokenLifetime(TestClient.extractCookieToken(response)!)).toBe(TestClient.cookieMaxAge(response))
+        })
+
+        //  Sem o campo é a sessão de sempre: um cliente que não conhece o RememberDevice
+        //  continua ganhando 24h, e o campo é uma adição, não uma quebra.
+        it("mantém as 24h quando o RememberDevice não vem, e o cookie acompanha", async () => {
+            let response = await client.anonymous().post("/Users/login", { login: root.user.Email, password: root.password })
+
+            expect(TestClient.cookieMaxAge(response)).toBe(24 * 60 * 60)
+            expect(tokenLifetime(TestClient.extractCookieToken(response)!)).toBe(TestClient.cookieMaxAge(response))
+        })
+
+        it("recusa RememberDevice que não é booleano", async () => {
+            let response = await client.anonymous().post("/Users/login", { login: root.user.Email, password: root.password, RememberDevice: "talvez" })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  A duração viaja DENTRO do token, e é isso que o switch lê para não rebaixar a
+        //  sessão — a asserção do outro lado está em Workspaces.test.ts.
+        it("grava a escolha dentro do token", async () => {
+            let remembered = await client.anonymous().post("/Users/login", { login: root.user.Email, password: root.password, RememberDevice: true })
+            let plain = await client.anonymous().post("/Users/login", { login: root.user.Email, password: root.password })
+
+            expect(decodePayload(TestClient.extractCookieToken(remembered)!).RememberDevice).toBe(true)
+            expect(decodePayload(TestClient.extractCookieToken(plain)!).RememberDevice).toBeUndefined()
+        })
     })
 
     describe("POST /Users/logout", () => {
@@ -996,6 +1036,20 @@ function readToken(text: string) {
     return text.match(/[?&]Token=([^\s&]+)/)?.[1] ?? null
 }
 
+//  A vida do token, em segundos — para ser comparada com o Max-Age do cookie que o carrega.
+//  Os dois eram literais soltos no mesmo arquivo, coincidindo por sorte, e uma diferença entre
+//  eles não dá erro nenhum na hora: só um 401 com a credencial na mão, dias depois.
+function tokenLifetime(token: string) {
+    let { exp, iat } = decodePayload(token)
+
+    return exp - iat
+}
+
+//  Lê o payload sem verificar assinatura, que é o que qualquer cliente consegue fazer: o JWT
+//  é assinado, não criptografado.
+function decodePayload(token: string): { exp: number, iat: number, RememberDevice?: boolean } {
+    return JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"))
+}
 
 //  Assina um token à mão para os casos que a rota não produz: outra finalidade, expirado, ou
 //  com a impressão digital de outra senha. O segredo é o mesmo do app — o que se está provando

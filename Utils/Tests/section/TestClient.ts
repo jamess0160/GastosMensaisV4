@@ -33,8 +33,10 @@ export class TestClient {
     //  Autentica pela rota real e guarda a sessão para as próximas chamadas. O login não
     //  devolve o token no corpo: ele sai como cookie httpOnly, exatamente como chega ao
     //  navegador, e é de lá que este cliente o tira.
-    public async login(login: string, password: string) {
-        let response = await this.anonymous().post("/Users/login", { login, password })
+    //  O RememberDevice é opcional aqui pelo mesmo motivo que é opcional na rota: sem ele a
+    //  sessão é a de 24h, que é o que a maior parte das suítes quer.
+    public async login(login: string, password: string, RememberDevice?: boolean) {
+        let response = await this.anonymous().post("/Users/login", { login, password, RememberDevice })
 
         this.token = TestClient.extractCookieToken(response)
 
@@ -64,6 +66,16 @@ export class TestClient {
 
     public static extractCookieToken(response: Response) {
         return TestClient.extractCookie(response, "token")
+    }
+
+    //  O Max-Age do cookie de sessão, em segundos. Fica aqui, e não numa suíte, porque duas
+    //  precisam dele: o login, que escolhe a duração, e o switch, que reemite o token e não
+    //  pode rebaixá-la.
+    public static cookieMaxAge(response: Response) {
+        let cookies: string[] = response.headers["set-cookie"] ?? []
+        let raw = cookies.find((cookie) => cookie.startsWith("token="))
+
+        return Number(raw?.match(/Max-Age=(\d+)/)?.[1])
     }
 
     public static extractCookie(response: Response, name: string) {

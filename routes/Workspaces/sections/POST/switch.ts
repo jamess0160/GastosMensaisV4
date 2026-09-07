@@ -16,7 +16,7 @@ import { WorkspacesNamespace } from "../types"
 //  continua válido até expirar, apontando para o workspace antigo — o que é correto: ele prova
 //  a mesma identidade e uma seleção que na época era legítima.
 export class Switch {
-    public async run(res: Response, IdUser: number, body: WorkspacesNamespace.SwitchWorkspacePayload) {
+    public async run(res: Response, IdUser: number, RememberDevice: boolean, body: WorkspacesNamespace.SwitchWorkspacePayload) {
         await WorkspacesAcessControl.assertMember(body.IdWorkspace, IdUser)
 
         let workspace = await Workspaces_model.getUnique(body.IdWorkspace)
@@ -31,7 +31,11 @@ export class Switch {
             })
         }
 
-        AcessControl.setTokenCookie(res, IdUser, workspace.IdWorkspace)
+        //  A duração vem do token que chegou, nunca do default: reemitir com 24h aqui
+        //  rebaixaria em silêncio uma sessão de 30 dias, e o usuário seria deslogado dias
+        //  depois sem entender por quê. O relógio recomeça, e isso é o esperado — quem está
+        //  usando o app agora não deve perder a sessão por ter trocado de workspace.
+        AcessControl.setTokenCookie(res, IdUser, workspace.IdWorkspace, RememberDevice)
 
         return workspace
     }

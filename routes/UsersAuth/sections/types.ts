@@ -14,6 +14,8 @@ export namespace UsersAuthNamespace {
     export interface AuthenticatePayload {
         ChallengeToken: string
         Response: AuthenticationResponseJSON
+        /** O "manter conectado", igual ao do login por senha. Ausente = 24h. */
+        RememberDevice?: boolean
     }
 
     export interface SkipDevicePayload {

@@ -5,7 +5,7 @@ import { PasswordHasher } from '../PasswordHasher.section'
 import { Response } from 'express'
 
 export class ValidateLogin {
-    public async run(res: Response, login: string, password: string) {
+    public async run(res: Response, login: string, password: string, RememberDevice = false) {
 
         const user = await Users_model.getByLogin(login)
 
@@ -27,7 +27,10 @@ export class ValidateLogin {
             })
         }
 
-        await AcessControl.startSession(res, user.IdUser)
+        //  O "manter conectado" da tela: 30 dias em vez de 24h. Quem valida a credencial nao
+        //  decide a duracao - so repassa o que o usuario pediu para o unico lugar que emite
+        //  sessao, que e por onde o login por biometria passa tambem.
+        await AcessControl.startSession(res, user.IdUser, RememberDevice)
 
         return { msg: "Login realizado com sucesso" }
     }

@@ -181,6 +181,34 @@ describe("Workspaces", () => {
             })
         })
 
+        //  **A armadilha da sessão de 30 dias, e ela mora aqui e não no login.** O switch é o
+        //  único lugar que reemite a credencial: se reemitisse com o default, trocar de
+        //  workspace rebaixaria em silêncio uma sessão de 30 dias para 24h, e o usuário seria
+        //  deslogado dias depois sem nada explicar por quê. A duração viaja dentro do token,
+        //  que é o que o switch lê aqui.
+        it("preserva a sessão de 30 dias ao reemitir o token", async () => {
+            let owner = await UsersFactory.create()
+            let session = new TestClient()
+
+            await session.login(owner.user.Email, owner.password, true)
+
+            let response = await session.post("/Workspaces/switch", { IdWorkspace: owner.workspace.IdWorkspace })
+
+            expect(response.status).toBe(200)
+            expect(TestClient.cookieMaxAge(response)).toBe(30 * 24 * 60 * 60)
+        })
+
+        it("mantém as 24h da sessão que não pediu para ser lembrada", async () => {
+            let owner = await UsersFactory.create()
+            let session = new TestClient()
+
+            await session.login(owner.user.Email, owner.password)
+
+            let response = await session.post("/Workspaces/switch", { IdWorkspace: owner.workspace.IdWorkspace })
+
+            expect(TestClient.cookieMaxAge(response)).toBe(24 * 60 * 60)
+        })
+
         //  O token é credencial: não pode ficar ao alcance de script na tela
         it("reemite o token como httpOnly", async () => {
             let owner = await UsersFactory.create()

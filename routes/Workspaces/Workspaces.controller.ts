@@ -22,7 +22,7 @@ class Controller {
 
     //  O res vai junto porque trocar de workspace reemite o token da sessão
     switch = async (req: Request, res: Response) => {
-        res.json(await new Switch().run(res, res.locals.IdUser, req.body))
+        res.json(await new Switch().run(res, res.locals.IdUser, res.locals.RememberDevice, req.body))
     }
 
     createInvite = async (req: Request, res: Response) => {

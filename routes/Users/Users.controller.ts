@@ -14,9 +14,9 @@ import { ResendConfirmation } from './sections/POST/resendConfirmation'
 class Controller {
 
     validateLogin = async (req: Request, res: Response) => {
-        let { login, password } = req.body
+        let { login, password, RememberDevice } = req.body
 
-        res.json(await new ValidateLogin().run(res, login, password))
+        res.json(await new ValidateLogin().run(res, login, password, RememberDevice))
     }
 
     //  Chama o AcessControl direto, sem section: a regra do projeto é que nada além dele emita
@@ -78,6 +78,11 @@ class Controller {
         //  continua passando pelo assertMember/assertRole antes de ler ou escrever.
         res.locals.IdUser = result.id
         res.locals.IdWorkspace = result.IdWorkspace
+
+        //  A duracao vem do token, e nao de um default: e ela que o switch reemite. Token
+        //  antigo, emitido antes desta etapa, nao tem a chave - e ai o default e 24h, que e o
+        //  que aquele token realmente vale.
+        res.locals.RememberDevice = result.RememberDevice === true
 
         return true
     }

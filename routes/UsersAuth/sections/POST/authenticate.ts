@@ -42,7 +42,9 @@ export class Authenticate {
         //  gravar o novo valor é o que mantém a checagem valendo na próxima vez.
         await UsersAuth_model.update(credential.IdUserAuth, { Counter: verification.authenticationInfo.newCounter })
 
-        await AcessControl.startSession(res, user.IdUser)
+        //  O mesmo booleano do login por senha, e o mesmo default false: os dois caminhos
+        //  terminam neste ponto, e e essa convergencia que os impede de divergirem na duracao.
+        await AcessControl.startSession(res, user.IdUser, body.RememberDevice)
 
         return { msg: "Login realizado com sucesso" }
     }
