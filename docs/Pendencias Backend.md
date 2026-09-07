@@ -150,11 +150,14 @@ GET /Reports/Month?ReferenceMonth=YYYY-MM        🔒
 ```json
 {
     "ReferenceMonth": "2026-05-01",
+    "OpeningBalance": 1000.00,
     "TotalReceived": 8623.10,
     "TotalSpent": 6592.66,
     "FixedSpent": 2213.42,
     "InstallmentSpent": 1349.88,
     "AvailableBalance": 2030.44,
+    "OverdueReceivable": 0.00,
+    "OverduePayable": 180.00,
     "ReceivedCount": 5,
     "SpentCount": 47
 }
@@ -162,6 +165,15 @@ GET /Reports/Month?ReferenceMonth=YYYY-MM        🔒
 
 Com esse endpoint, as regras acima passam a existir **num lugar só** — o
 mesmo lugar que já calcula `Balance` e `Spent`.
+
+**Deixou de ser só performance (2026-09-07).** O `AvailableBalance` somado
+no cliente ignora o dinheiro que já estava em conta no dia 1º: quem começa
+setembro com 1000 e recebe 3000 de salário vê 3000, tendo 4000. O termo que
+falta é o `OpeningBalance` — o saldo realizado no fim do mês anterior, que
+o `AccountBalance` já sabe calcular —, e ele **não pode virar um lançamento
+de entrada**, sob pena de dobrar o saldo e de contar como "entrou no mês"
+dinheiro que nunca chegou. O desenho fechado, com o tratamento do vencido,
+está na [etapa 6 da leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#etapa-6--agregados-do-mês).
 
 ---
 
