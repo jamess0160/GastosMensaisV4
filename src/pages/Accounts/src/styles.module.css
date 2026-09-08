@@ -191,6 +191,15 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* O `CompetenceMode`, ao lado do ciclo: é a única configuração do
+   cadastro que muda um número já exibido na tela, e ela precisa ser
+   legível sem abrir o formulário. */
+.cardMode {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 1px;
+}
+
 /* O cartão de crédito no slide-over deixou de ser uma linha só: embaixo
    do nome vem a FATURA do mês exibido, que é a unidade em que ele custa
    dinheiro. */

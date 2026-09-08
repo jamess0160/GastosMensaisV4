@@ -6,6 +6,7 @@ import {
     daysOfMonth,
     formatDate,
     formatMonthLabel,
+    formatMonthShort,
     monthRange,
     monthsBetween,
     parts,
@@ -151,6 +152,18 @@ describe("formatMonthLabel", () => {
 
     it("aceita o formato que a API devolve", () => {
         expect(formatMonthLabel("2026-05-01")).toBe("Maio · 2026");
+    });
+});
+
+describe("formatMonthShort", () => {
+    it("cabe na linha que já tem uma data", () => {
+        expect(formatMonthShort("2026-05")).toBe("mai/2026");
+    });
+
+    it("aceita a CalendarDate inteira — é a competência da perna", () => {
+        // A perna de um cartão `purchase`: ela vence em setembro e PESA
+        // em agosto, e a linha do gasto mostra as duas coisas.
+        expect(formatMonthShort("2026-08-21")).toBe("ago/2026");
     });
 });
 

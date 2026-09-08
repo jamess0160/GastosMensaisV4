@@ -24,7 +24,19 @@ import type { AccountsContext } from "../controller";
  *  antes dele a fatura fecha. A conversão é a de `src/lib/card.ts`.
  *  Mandar `null` em qualquer um dos dois no PUT responde 406, daí a
  *  conferência local antes. Eles não são detalhe: em cartão, um dia de
- *  diferença na compra vira um mês de diferença no caixa. */
+ *  diferença na compra vira um mês de diferença no caixa.
+ *
+ *  O `CompetenceMode` vai nos DOIS corpos, sempre. Ele tem default
+ *  `purchase` no servidor, então omiti-lo no POST daria no mesmo — mas
+ *  aqui a tela PERGUNTA, e o que ela pergunta ela manda. No PUT ele é
+ *  opcional e omiti-lo manteria o valor, o que também não serve: o
+ *  seletor existe para trocar.
+ *
+ *  E TROCAR O MODO VALE PARA O FUTURO. `ClosingDate`, `DueDate`,
+ *  `CompetenceDate` e `CashDate` são congeladas na perna no lançamento e
+ *  ninguém as revisita: virar a chave em novembro não reescreve agosto —
+ *  a alternativa seria mês fechado mudando de número sozinho. É a mesma
+ *  regra que já valia para o vencimento e a folga. */
 export async function saveCard(context: AccountsContext): Promise<void> {
     const draft = context.cardDraft;
     if (!draft) return;
@@ -55,6 +67,7 @@ export async function saveCard(context: AccountsContext): Promise<void> {
     const common = {
         Name: draft.Name.trim(),
         ...cycle,
+        CompetenceMode: draft.CompetenceMode,
         Color: draft.Color,
     };
 
@@ -69,7 +82,9 @@ export async function saveCard(context: AccountsContext): Promise<void> {
         } else {
             // Sem `Kind` e sem `IdAccount`: a API não os aceita aqui.
             await PaymentMethodsConnection.update(draft.IdPaymentMethod, common);
-            context.finishSubmit("Cartão atualizado.");
+            context.finishSubmit(
+                "Cartão atualizado — vale para o que vier daqui em diante; as compras já lançadas não mudam de mês.",
+            );
         }
         context.closeCardForm();
     } catch (cause) {

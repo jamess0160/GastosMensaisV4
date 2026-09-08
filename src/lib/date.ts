@@ -99,6 +99,17 @@ export function formatMonthLabel(month: ApiTypes.ReferenceMonth | ApiTypes.Calen
     return `${name[0].toUpperCase()}${name.slice(1)} · ${year}`;
 }
 
+/** "ago/2026" — o mês compacto, para a linha que já carrega uma data e
+ *  não tem espaço para "Agosto · 2026".
+ *
+ *  Nasceu do `CompetenceMode`: uma perna de cartão `purchase` tem duas
+ *  datas verdadeiras — "vence 05 set" e "pesa em ago/2026" —, e a linha
+ *  do gasto mostra as duas quando elas discordam. */
+export function formatMonthShort(month: ApiTypes.ReferenceMonth | ApiTypes.CalendarDate): string {
+    const [year, monthNumber] = month.slice(0, 7).split("-").map(Number);
+    return `${MESES_CURTOS[monthNumber - 1]}/${year}`;
+}
+
 /** DateTime é instante de verdade: aqui `new Date()` é correto. */
 export function formatDateTime(value: ApiTypes.DateTime): string {
     return new Intl.DateTimeFormat("pt-BR", {

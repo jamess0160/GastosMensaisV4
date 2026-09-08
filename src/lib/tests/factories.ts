@@ -27,9 +27,14 @@ export function anExpense(overrides: Partial<ApiTypes.Expense> = {}): ApiTypes.E
     };
 }
 
-/** `CompetenceDate` segue o `DueDate` quando ele existe, que é o que a
- *  API congela no lançamento — informar as duas coisas separadas num
- *  teste seria poder escrever uma perna que não existe. */
+/** `CompetenceDate` e `CashDate` seguem o `DueDate` quando ele existe,
+ *  que é o que a API congela no lançamento — informar as três coisas
+ *  separadas num teste seria poder escrever uma perna que não existe.
+ *
+ *  As duas nascem IGUAIS de propósito: fora de um cartão `purchase` elas
+ *  sempre são. Quem quiser a perna do cartão que pesa num mês e sai da
+ *  conta noutro passa a `CompetenceDate` por cima — é exatamente o caso
+ *  que faz valer a pena as duas existirem. */
 export function aPayment(
     overrides: Partial<ApiTypes.ExpensePayment> = {},
 ): ApiTypes.ExpensePayment {
@@ -44,6 +49,7 @@ export function aPayment(
         ClosingDate: null,
         DueDate: null,
         CompetenceDate: overrides.DueDate ?? "2026-08-10",
+        CashDate: overrides.DueDate ?? "2026-08-10",
         // `null` é o padrão porque a maioria das pernas não é de cartão:
         // é a nulidade que diz que a linha não tem conferência de fatura.
         Charged: null,
@@ -68,6 +74,7 @@ export function aLegRow(
             IdExpense: expense.IdExpense,
             Value: expense.TotalValue,
             CompetenceDate: expense.ExpenseDate,
+            CashDate: expense.ExpenseDate,
             ...payment,
         }),
         Expense: expense,
@@ -144,6 +151,7 @@ export function installmentRows({
                 InstallmentTotal: parts,
                 DueDate,
                 CompetenceDate: DueDate,
+                CashDate: DueDate,
                 Paid: index < paidUntil,
             },
             persons,

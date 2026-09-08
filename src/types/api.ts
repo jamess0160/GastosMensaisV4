@@ -218,6 +218,25 @@ export namespace ApiTypes {
 
     export type PaymentMethodKind = "pix" | "debit" | "credit_card";
 
+    /** Em qual mês a compra do cartão PESA — a única configuração do
+     *  cadastro que muda um número já mostrado na tela.
+     *
+     *  | Modo | A compra de 21/08 num cartão que vence dia 28 | 600 em 6× |
+     *  |---|---|---|
+     *  | `purchase` *(default)* | pesa em **agosto** | 100/mês a partir de agosto |
+     *  | `invoice` | pesa em **setembro**, com a fatura | 100/mês a partir de setembro |
+     *
+     *  Ele governa a COMPETÊNCIA, nunca o caixa: o `Balance` da conta é
+     *  idêntico nos dois modos, porque o dinheiro sai quando a fatura é
+     *  paga e isso não muda. O que muda é o `Spent` do orçamento e o mês
+     *  em que a perna aparece em `GET /ExpensePayments`.
+     *
+     *  Duas pessoas usam cartão de dois jeitos incompatíveis: quem paga
+     *  a fatura inteira todo mês trata o cartão como débito
+     *  (`purchase`), e quem passa nele justamente para pagar depois
+     *  planeja pelo mês da fatura (`invoice`). */
+    export type CompetenceMode = "purchase" | "invoice";
+
     export interface PaymentMethod {
         IdPaymentMethod: number;
         IdWorkspace: number;
@@ -234,6 +253,11 @@ export namespace ApiTypes {
          *  vencendo dia 5 com folga de 7, a fatura fecha em 26/02 e em
          *  29/03. Ver `src/lib/card.ts`. */
         ClosingOffsetDays: number | null;
+        /** Só em `credit_card`; `null` nas outras formas. O default do
+         *  servidor é `purchase`, inclusive nos cartões que já existiam
+         *  — então todo cartão tem um modo, mesmo os que ninguém
+         *  escolheu. Ver `CompetenceMode`. */
+        CompetenceMode: CompetenceMode | null;
         IconPath: string | null;
         Color: Color | null;
         Position: number | null;
@@ -291,19 +315,29 @@ export namespace ApiTypes {
          *  não pergunta por ela. */
         DueDay: number;
         ClosingOffsetDays?: number;
+        /** Default **`purchase`** no servidor: omitir é o caminho certo
+         *  quando o formulário não pergunta — e mandar `purchase`
+         *  explicitamente é o mesmo cartão. */
+        CompetenceMode?: CompetenceMode;
         IconPath?: string | null;
         Color?: Color | null;
         Position?: number | null;
     }
 
     /** `Kind` e `IdAccount` não são aceitos no PUT. Editar o cartão
-     *  também NÃO recalcula as compras já lançadas: `ClosingDate` e
-     *  `DueDate` são gravadas na perna no lançamento e ninguém as
-     *  revisita. */
+     *  também NÃO recalcula as compras já lançadas: `ClosingDate`,
+     *  `DueDate`, `CompetenceDate` e `CashDate` são gravadas na perna no
+     *  lançamento e ninguém as revisita — virar a chave do
+     *  `CompetenceMode` em novembro não reescreve agosto.
+     *
+     *  As duas recusas do trio `DueDay`/`ClosingOffsetDays`/
+     *  `CompetenceMode`: mandar `null` em qualquer um deles num cartão é
+     *  406, e mandar qualquer um deles FORA de um cartão é 406 também. */
     export interface PaymentMethodUpdateBody {
         Name: string;
         DueDay?: number;
         ClosingOffsetDays?: number;
+        CompetenceMode?: CompetenceMode;
         IconPath?: string | null;
         Color?: Color | null;
         Position?: number | null;
@@ -475,12 +509,27 @@ export namespace ApiTypes {
         /** Vivem na perna, não no gasto — cada parcela cai numa fatura. */
         ClosingDate: CalendarDate | null;
         DueDate: CalendarDate | null;
-        /** A data em que a perna PESA: `DueDate` quando existe, senão a
-         *  data do gasto. Congelada no lançamento, e é por ela que o
-         *  saldo da conta, o `Spent` do orçamento e
-         *  `GET /ExpensePayments` recortam o mês. Não é aceita em corpo
-         *  nenhum — o servidor a escreve. */
+        /** A perna tem DUAS datas, e elas discordam de propósito. As
+         *  duas são congeladas no lançamento e nenhuma é aceita em corpo
+         *  nenhum — o servidor as escreve.
+         *
+         *  | Campo | O que é | Quem lê |
+         *  |---|---|---|
+         *  | `CompetenceDate` | quando a perna **pesa** | `Spent` do orçamento, `GET /ExpensePayments`, `Expenses` do relatório |
+         *  | `CashDate` | quando o dinheiro **sai da conta** | `Balance` da conta, `CurrentBalance` do relatório |
+         *
+         *  Fora de um cartão `purchase` as duas são SEMPRE iguais — é
+         *  por isso que só agora fez falta separá-las. Num cartão
+         *  `purchase`, a compra de 20/08 pesa em agosto e sai da conta em
+         *  05/09, com a fatura: uma data não responde às duas
+         *  perguntas. */
         CompetenceDate: CalendarDate;
+        /** Ver `CompetenceDate`. Ela NÃO vira conta nenhuma no cliente:
+         *  o que o cliente agrega é competência, e o caixa vem pronto em
+         *  `Balance` e em `CurrentBalance`. Recalculá-lo aqui seria
+         *  reintroduzir a regra que a seção 15 acabou de devolver ao
+         *  servidor. */
+        CashDate: CalendarDate;
         /** "A cobrança entrou na fatura" — a conferência de assinatura,
          *  afirmada pelo usuário olhando o app do cartão. NÃO move saldo
          *  e não mexe no `Status` do gasto.

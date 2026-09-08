@@ -31,6 +31,10 @@ export interface CardDraft {
      *  fechou e quando ela venceu. */
     ClosingDate: ApiTypes.CalendarDate | null;
     DueDate: ApiTypes.CalendarDate | null;
+    /** Em qual mês a compra deste cartão PESA. Nasce em `purchase`, que
+     *  é o default do servidor — e não uma escolha nossa diferente da
+     *  dele. Ver `ApiTypes.CompetenceMode`. */
+    CompetenceMode: ApiTypes.CompetenceMode;
     Color: ApiTypes.Color | null;
 }
 

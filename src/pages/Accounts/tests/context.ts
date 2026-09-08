@@ -19,6 +19,9 @@ export const aCardDraft = (overrides: Partial<CardDraft> = {}): CardDraft => ({
     // Fechou 29/08 e venceu 05/09: vencimento dia 5, folga de 7 dias.
     ClosingDate: "2026-08-29",
     DueDate: "2026-09-05",
+    // O default do servidor — um cartão criado sem tocar no seletor tem
+    // que sair igual a um criado sem o campo no corpo.
+    CompetenceMode: "purchase",
     Color: null,
     ...overrides,
 });

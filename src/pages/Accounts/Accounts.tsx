@@ -98,8 +98,21 @@ const newCardDraft = (idAccount: number): CardDraft => ({
     Name: "",
     ClosingDate: null,
     DueDate: null,
+    // O default do SERVIDOR, e não uma escolha nossa diferente da dele:
+    // um cartão criado sem tocar no seletor tem que sair igual a um
+    // criado sem o campo no corpo.
+    CompetenceMode: "purchase",
     Color: null,
 });
+
+/** O modo, em uma palavra que cabe no chip. É a única configuração do
+ *  cadastro que muda um número já exibido na tela, então ela precisa ser
+ *  legível sem abrir o formulário — ao lado do ciclo, que o chip já
+ *  mostra. */
+const COMPETENCE_LABEL: Record<ApiTypes.CompetenceMode, string> = {
+    purchase: "pesa no mês da compra",
+    invoice: "pesa no mês da fatura",
+};
 
 /** "fecha 03 ago · vence 10 ago" — a fatura DAQUELE mês. */
 const cardCycle = (method: ApiTypes.PaymentMethod, month: ApiTypes.ReferenceMonth): string => {
@@ -122,6 +135,11 @@ const editCardDraft = (
         Name: method.Name,
         ClosingDate: closing,
         DueDate: due,
+        // `CompetenceMode` é `null` FORA do cartão, e este caminho só
+        // abre em cartão — o `??` fecha o tipo, não é leitura defensiva
+        // de formato: todo cartão tem modo, inclusive os que existiam
+        // antes do campo (o servidor aplicou `purchase` neles).
+        CompetenceMode: method.CompetenceMode ?? "purchase",
         Color: method.Color,
     };
 };
@@ -628,6 +646,20 @@ export function Accounts() {
                                                         <div className={styles.cardSub}>
                                                             {cardCycle(method, month)}
                                                         </div>
+                                                        {/* O modo, sem precisar abrir o
+                                                        formulário: ele muda o mês em que a
+                                                        compra pesa, e é o que explica o
+                                                        "Restante" e o "Saldo nas contas"
+                                                        do Início discordarem. */}
+                                                        {method.CompetenceMode && (
+                                                            <div className={styles.cardMode}>
+                                                                {
+                                                                    COMPETENCE_LABEL[
+                                                                        method.CompetenceMode
+                                                                    ]
+                                                                }
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <IconButton
                                                         label="Editar cartão"
@@ -959,6 +991,53 @@ export function Accounts() {
                             fechamento não é um dia fixo do calendário, e a
                             conta fica auditável em vez de mágica. */}
                             <CycleHint draft={cardDraft} month={month} />
+
+                            {/* A ÚNICA configuração daqui que muda um número já
+                            exibido na tela. O `help` mostra a consequência em
+                            vez do nome do campo: ninguém escolhe entre
+                            "competência da compra" e "competência da fatura",
+                            mas todo mundo sabe dizer se paga a fatura inteira
+                            todo mês. */}
+                            <FormField
+                                label="Quando a compra deste cartão pesa"
+                                help={
+                                    cardDraft.CompetenceMode === "purchase"
+                                        ? "A compra de 21/08 pesa em agosto, no orçamento e no “posso gastar” de agosto. O dinheiro continua saindo da conta só quando a fatura for paga."
+                                        : "A compra de 21/08 pesa em setembro, com a fatura — é o mês em que ela vence que conta."
+                                }
+                            >
+                                {() => (
+                                    <SegmentedControl
+                                        value={cardDraft.CompetenceMode}
+                                        ariaLabel="Quando a compra deste cartão pesa"
+                                        onChange={(CompetenceMode) =>
+                                            setCardDraft((c) => (c ? { ...c, CompetenceMode } : c))
+                                        }
+                                        options={[
+                                            {
+                                                value: "purchase",
+                                                label: "Pago a fatura toda todo mês",
+                                            },
+                                            {
+                                                value: "invoice",
+                                                label: "Uso o cartão para pagar depois",
+                                            },
+                                        ]}
+                                    />
+                                )}
+                            </FormField>
+
+                            {/* Trocar o modo vale para o FUTURO, e a tela diz
+                            isso: as datas são congeladas na perna no
+                            lançamento. A alternativa seria mês fechado mudando
+                            de número sozinho. */}
+                            {cardDraft.IdPaymentMethod !== null && (
+                                <div className={styles.cycleHint}>
+                                    Trocar o modo vale para as compras novas. As datas de cada
+                                    parcela são congeladas no lançamento — virar a chave agora não
+                                    reescreve o mês de nada que já foi lançado.
+                                </div>
+                            )}
 
                             <FormField label="Cor">
                                 {() => (

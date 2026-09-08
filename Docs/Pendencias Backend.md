@@ -31,7 +31,7 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | ~~14~~ | [Desfazer recebimento de entrada](#14-desfazer-recebimento-de-entrada) | Produto | ✅ **Entregue** em 04/09 |
 | ~~15~~ | [Criação de entradas em lote](#15-criação-de-entradas-em-lote) | Produto | ✅ **Entregue** em 04/09 |
 | ~~16~~ | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | ✅ **Entregue** em 04/09 |
-| 17 | [`Charged` e `CompetenceDate` em `GET /ExpensePayments`](#17-charged-e-competencedate-em-get-expensepayments) | Contrato | Botão "entrou na fatura" na lista |
+| ~~17~~ | [`Charged` e `CompetenceDate` em `GET /ExpensePayments`](#17-charged-e-competencedate-em-get-expensepayments) | Contrato | ✅ **Confirmado** em 07/09 |
 | ~~18~~ | [Criar um workspace novo](#18-criar-um-workspace-novo) | Produto | ✅ **Entregue** em 06/09 |
 | 19 | [Saber em qual workspace a sessão está](#19-saber-em-qual-workspace-a-sessão-está) | Contrato | O seletor de espaço do chassi |
 | 20 | [Gestão de membros](#20-gestão-de-membros) | Produto | Tirar alguém de um espaço |
@@ -55,12 +55,14 @@ desenhado para viver sem eles —, e o 11 virou registro histórico quando o
 primeiro como `GET /Reports/Month`, na forma preferida desta seção; o
 segundo com as duas rotinas de orçamento do dia 1º.
 
-**Os itens 17 a 21 nasceram da leva 4**, e o **18 já subiu**: `POST
-/Workspaces` entrou no mesmo dia, na forma proposta aqui. O 17 é uma
-divergência entre o changelog e o exemplo de resposta da seção 12; o 19,
-o 20 e o 21 são o que a tela de espaços pediu e não encontrou — e o
-**19 é o mais incômodo**, porque o chassi passou a afirmar em toda tela
-uma coisa que o cliente não tem como saber.
+**Os itens 17 a 21 nasceram da leva 4**, e dois já saíram: o **18**
+subiu no mesmo dia (`POST /Workspaces`, na forma proposta aqui) e o
+**17** foi confirmado em 07/09 — a divergência entre o changelog e o
+exemplo de resposta da seção 12 era do documento, não da rota, e o
+exemplo foi corrigido. O 19, o 20 e o 21 são o que a tela de espaços
+pediu e não encontrou — e o **19 é o mais incômodo**, porque o chassi
+passou a afirmar em toda tela uma coisa que o cliente não tem como
+saber.
 
 ---
 
@@ -773,6 +775,22 @@ documento ser atualizado — a fonte da verdade é este item.
 ---
 
 ## 17. `Charged` e `CompetenceDate` em `GET /ExpensePayments`
+
+> ✅ **Confirmado em 07/09**, e exatamente na forma que esta seção
+> pedia: o exemplo de resposta da seção 12 foi atualizado e agora lista
+> `Charged`, `ChargedAt`, `CompetenceDate` — e `CashDate`, que nasceu
+> junto com o `CompetenceMode` do cartão. O que o frontend assumiu era o
+> que a rota devolvia; nenhuma tela mudou para pior.
+>
+> **E veio uma quarta data.** `CompetenceDate` diz quando a perna
+> **pesa**; `CashDate` diz quando o dinheiro **sai da conta**. Fora de um
+> cartão `purchase` as duas são sempre iguais — é por isso que só agora
+> fez falta separá-las. `CashDate` não vira conta nenhuma no cliente: o
+> que o cliente agrega é competência, e o caixa vem pronto em `Balance` e
+> em `CurrentBalance`. O uso dela é outro — no slide-over do gasto, a
+> perna de um cartão `purchase` tem **duas datas verdadeiras** ("vence 05
+> set" e "pesa em ago/2026"), e a linha passou a mostrar as duas quando
+> elas discordam.
 
 **O problema.** A entrada de 06/09 do changelog diz que a perna ganhou
 **três campos novos** na resposta — `Charged`, `ChargedAt` e

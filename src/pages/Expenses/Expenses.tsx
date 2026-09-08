@@ -63,7 +63,7 @@ import { isCardLeg } from "@/lib/card";
 import { accentColor, categoryColor } from "@/lib/categoryColor";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatMoney } from "@/lib/money";
-import { formatDate, formatDateTime, formatMonthLabel, today } from "@/lib/date";
+import { formatDate, formatDateTime, formatMonthLabel, formatMonthShort, today } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
 const KIND_LABEL: Record<ApiTypes.ExpenseKind, string> = {
@@ -947,6 +947,16 @@ export function Expenses() {
                                                         {leg.DueDate
                                                             ? `Vence ${formatDate(leg.DueDate)}`
                                                             : "Sem vencimento próprio"}
+                                                        {/* As DUAS datas da perna, e só quando
+                                                            elas discordam: num cartão
+                                                            `purchase` a compra pesa em agosto
+                                                            e sai da conta em 05/09, e uma data
+                                                            só não responde às duas perguntas.
+                                                            Fora dele as duas são idênticas — e
+                                                            é por isso que só agora fez falta
+                                                            separá-las. */}
+                                                        {leg.CompetenceDate !== leg.CashDate &&
+                                                            ` · pesa em ${formatMonthShort(leg.CompetenceDate)}`}
                                                         {/* No cartão, `Charged` e `Paid` são
                                                             fatos diferentes: um diz que a
                                                             cobrança entrou na fatura, o outro

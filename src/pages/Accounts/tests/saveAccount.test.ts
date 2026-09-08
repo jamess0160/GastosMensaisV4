@@ -194,6 +194,46 @@ describe("saveCard", () => {
         expect(context.beginSubmit).not.toHaveBeenCalled();
     });
 
+    it("manda CompetenceMode no POST — a tela pergunta, e o que ela pergunta ela manda", async () => {
+        let body: Record<string, unknown> | undefined;
+        server.use(
+            msw.post("*/api/PaymentMethods", async ({ request }) => {
+                body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ IdPaymentMethod: 9 });
+            }),
+        );
+
+        await saveCard(fakeAccountsContext());
+
+        // `purchase` é o default do SERVIDOR: um cartão criado sem tocar
+        // no seletor sai igual a um criado sem o campo no corpo.
+        expect(body?.CompetenceMode).toBe("purchase");
+    });
+
+    it("manda CompetenceMode no PUT também — o seletor existe para trocar", async () => {
+        let body: Record<string, unknown> | undefined;
+        server.use(
+            msw.put("*/api/PaymentMethods/IdPaymentMethod=9", async ({ request }) => {
+                body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ msg: "ok" });
+            }),
+        );
+
+        const context = fakeAccountsContext({
+            cardDraft: aCardDraft({ IdPaymentMethod: 9, CompetenceMode: "invoice" }),
+        });
+
+        await saveCard(context);
+
+        // Omitir manteria o valor, o que não serve aqui. E a tela avisa
+        // que a troca vale para o futuro: as datas da perna são
+        // congeladas no lançamento e ninguém as revisita.
+        expect(body?.CompetenceMode).toBe("invoice");
+        expect(context.finishSubmit).toHaveBeenCalledWith(
+            "Cartão atualizado — vale para o que vier daqui em diante; as compras já lançadas não mudam de mês.",
+        );
+    });
+
     it("não manda bandeira nem final do cartão — eles saíram do cadastro", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
