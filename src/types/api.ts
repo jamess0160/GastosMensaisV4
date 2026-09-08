@@ -663,7 +663,14 @@ export namespace ApiTypes {
      *  pode é somar os dois num total. */
     export type BudgetScope = "category" | "person";
 
-    /** O mês congelado. Nunca leia o limite de um mês passado da definição. */
+    /** O mês congelado. Nunca leia o limite de um mês passado da definição.
+     *
+     *  O MÊS NASCE SOZINHO: todo dia 1º uma rotina do servidor
+     *  materializa o mês novo a partir de cada definição ativa, com o
+     *  teto que valia naquele dia, e nunca sobrescreve um mês que já
+     *  existe. `POST /Budgets` continua sendo o caminho de orçar AGORA
+     *  em vez de esperar a virada — e orçar de novo um alvo que a rotina
+     *  já criou responde 406. */
     export interface BudgetPeriod {
         IdBudgetPeriod: number;
         IdWorkspace: number;
@@ -672,6 +679,18 @@ export namespace ApiTypes {
         ReferenceMonth: CalendarDate;
         LimitValue: Money;
         AlertPercent: number;
+        /** Quem escreve este campo é a ROTINA do servidor, não a tela:
+         *  todo dia 1º ela carimba `closed` e `ClosedAt` em cada período
+         *  do mês que acabou. Ele muda sozinho entre duas leituras — um
+         *  período lido como `open` em 31 de agosto volta `closed` em 1º
+         *  de setembro, sem nenhuma chamada nossa.
+         *
+         *  **Fechado NÃO é travado**, e é por isso que a tela não desenha
+         *  nada a partir dele: `PUT /BudgetPeriods` de um mês `closed`
+         *  continua funcionando, porque corrigir o teto de um mês passado
+         *  é exatamente o que a tabela do mês congelado existe para
+         *  permitir. Um carimbo de "fechado" em todo mês passado não
+         *  informaria nada e sugeriria uma trava que não existe. */
         Status: BudgetPeriodStatus;
         ClosedAt: DateTime | null;
         CreatedAt: DateTime;

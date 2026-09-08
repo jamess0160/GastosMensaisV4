@@ -18,7 +18,7 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | ~~1~~ | [Logout](#1-logout) | Segurança | ✅ **Entregue** em 04/09 |
 | ~~2~~ | [`IdWorkspace` no cadastro](#2-idworkspace-no-cadastro-aceito-sem-convite) | Segurança | ✅ **Entregue** em 04/09 |
 | 3 | [Agregados do mês](#3-agregados-do-mês-para-o-dashboard) | Performance | Escala do Dashboard |
-| 4 | [Rotina mensal de orçamento](#4-rotina-mensal-de-orçamento) | Produto | Orçamento sem trabalho manual |
+| ~~4~~ | [Rotina mensal de orçamento](#4-rotina-mensal-de-orçamento) | Produto | ✅ **Entregue** em 07/09 |
 | 5 | [Duração de sessão configurável](#5-duração-de-sessão-configurável) | Produto | "Lembrar deste navegador" |
 | 6 | [Recuperação de senha](#6-recuperação-de-senha) | Produto | Usuário que esqueceu a senha |
 | 7 | [Conciliação de extrato](#7-conciliação-de-extrato) | Produto | Tela 08, frame B |
@@ -49,9 +49,10 @@ O **1** e o **2** também subiram, na forma proposta: o contorno de
 logout que o cliente mantinha no `localStorage` foi apagado junto, e o
 `IdWorkspace` do cadastro virou `InviteHash`.
 
-Do 3 ao 9 são cortes conscientes do MVP — o frontend já está desenhado
-para viver sem eles —, e o 11 virou registro histórico quando o 15
-substituiu a forma dele.
+Do 3 ao 9 eram cortes conscientes do MVP — o frontend já estava
+desenhado para viver sem eles —, e o 11 virou registro histórico quando o
+15 substituiu a forma dele. **O 4 saiu da fila em 07/09**, com as duas
+rotinas de orçamento do dia 1º.
 
 **Os itens 17 a 21 nasceram da leva 4**, e o **18 já subiu**: `POST
 /Workspaces` entrou no mesmo dia, na forma proposta aqui. O 17 é uma
@@ -212,6 +213,28 @@ mesmo lugar que já calcula `Balance` e `Spent`.
 ---
 
 ## 4. Rotina mensal de orçamento
+
+> ✅ **Entregue em 07/09**, na forma proposta — o job mensal, e não o
+> `GET /Budgets` que materializa na leitura. São **duas** rotinas, todo
+> dia 1º: uma **materializa** o mês novo a partir de cada definição
+> ativa, com o teto que valia naquele dia (e **nunca sobrescreve** um mês
+> que já existe: o teto ajustado na mão fica); a outra **fecha** o mês
+> que acabou, carimbando `Status: "closed"` e `ClosedAt`.
+>
+> Duas coisas do jeito que ela subiu importam para a tela. O **vazio
+> mudou de significado** — ele quer dizer "não há definição nenhuma", e
+> não "o mês ainda não foi cadastrado" —, e o `EmptyState` do painel de
+> orçamento do Início passou a dizer isso. E o **`Status` muda sozinho
+> entre duas leituras**: um período lido como `open` em 31 de agosto
+> volta `closed` em 1º de setembro. A tela não desenha nada a partir
+> dele, e continua não desenhando — **fechado não é travado**: o `PUT`
+> de um mês fechado continua funcionando, que é justamente para o que a
+> tabela do mês congelado existe. O docstring de `BudgetPeriod.Status`
+> registra as duas coisas.
+>
+> **Mês passado que a rotina não pegou continua sem período**, e a tela
+> não inventa um: "esse mês não tem teto" é a resposta certa para "qual
+> era meu limite em março".
 
 **O problema.** O contrato diz explicitamente que a entrega é reduzida de
 propósito: `Budgets` é a definição vigente e `BudgetPeriods` é o mês

@@ -397,7 +397,12 @@ export function Dashboard() {
                         <EmptyState
                             inline
                             title="Nenhum teto neste mês"
-                            description="O cadastro do mês é manual: a rotina que copiaria os tetos de um mês para o outro ainda não existe no servidor."
+                            /* O vazio MUDOU DE SIGNIFICADO: desde que a
+                               rotina do dia 1º materializa o mês a partir
+                               das definições ativas, não ver nada aqui
+                               quer dizer "não há definição nenhuma" — e
+                               não "o mês ainda não foi cadastrado". */
+                            description="Nenhum teto cadastrado ainda. A partir do primeiro, o mês novo nasce sozinho: todo dia 1º o servidor copia os tetos ativos para o mês que começa."
                             action={
                                 <Button
                                     variant="primary"
