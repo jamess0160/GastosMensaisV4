@@ -16,6 +16,11 @@ class Schema {
             ReferenceMonth: isoDate.required(),
             /** O saldo realizado no fim do mês anterior — a abertura do "posso gastar" */
             OpeningBalance: Joi.number().required(),
+            /**
+             * O saldo inicial das contas **abertas dentro do mês**, que o `OpeningBalance` não
+             * pode conter: em 01/09 elas ainda não existiam. Mesma linha `opening` do extrato.
+             */
+            InitialBalances: Joi.number().required(),
             /** Entradas com competência no mês, pendentes e recebidas, sem transferência */
             Inflows: Joi.number().required(),
             /** Pernas com competência no mês, pendentes e pagas */

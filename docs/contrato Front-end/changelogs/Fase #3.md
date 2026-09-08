@@ -21,6 +21,46 @@ aqui e do que não entra.
 
 ---
 
+### 2026-09-08 — `GET /Reports/Month`: o `Available` passa a contar a abertura da conta criada no mês
+
+🟡 **Comportamento**, e **corrige um número errado em produção** — mais um campo na resposta da
+seção 15, e o `Available` muda de valor no mês em que uma conta é cadastrada.
+
+**O que estava errado.** O `OpeningBalance` é o saldo realizado no **fim do mês anterior**, então
+uma conta com `InitialBalanceDate` dentro do mês pedido não entra nele — em 01/09 ela ainda não
+existia. E não entrava em mais lugar nenhum: o saldo inicial dela **sumia do `Available`**. Quem
+começa a usar o app em 05/09 com 1500 na conta e lança 3000 de salário via **3000**, tendo 4500 —
+o mesmo buraco que o `OpeningBalance` fecha nos meses seguintes, aberto justamente no mês de
+estreia. O `CurrentBalance` e o `Balance` de `GET /Accounts` sempre estiveram certos, porque o
+corte deles é o fim do mês; só o `Available` errava.
+
+**Pega todo cliente que grava a data de cadastro no `InitialBalanceDate`** — que é o
+comportamento certo, e o que o front faz hoje. E o erro **não passava com o mês**: quem abrisse
+setembro em janeiro continuaria vendo o mês de estreia sem o dinheiro que tinha.
+
+**O que entrou.** `InitialBalances`, a soma do `InitialBalance` das contas ativas cujo
+`InitialBalanceDate` cai **dentro** do mês pedido, somado ao `Available`:
+
+```
+Available = OpeningBalance
+          + InitialBalances    ← novo
+          + Inflows − Expenses + OverdueReceivable − OverduePayable
+```
+
+Ele é **fluxo, não posição**: aparece no mês da estreia e nos seguintes já vem dentro do
+`OpeningBalance`, sem dobrar. É a mesma linha `opening` que `GET /Reports/Statement` já mostrava
+no extrato, com o mesmo filtro.
+
+**Ação do front:**
+
+1. **nada a fazer para o `Available` ficar certo** — ele já vem corrigido, e se você mostrava
+   esse número no Dashboard ele vai mudar sozinho no mês em que a conta foi criada;
+2. se você **replicava a fórmula no cliente**, some o `InitialBalances` também — ou, melhor,
+   pare de replicá-la: é a razão de a seção 15 existir;
+3. **continue mandando o `InitialBalanceDate`** com o dia do cadastro. Mandar `null` para
+   "consertar" o número é jogar fora quando o saldo foi medido, e faz a conta ter saldo em meses
+   anteriores à existência dela.
+
 ### 2026-09-07 — `GET /Reports/Export`: a planilha passa a ser gerada pelo servidor
 
 🟢 **Adição** — uma rota nova na seção 15, e **a primeira do contrato que não responde JSON**.

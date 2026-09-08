@@ -79,6 +79,7 @@ describe("Reports", () => {
             expect(response.body).toEqual({
                 ReferenceMonth: "2026-09-01",
                 OpeningBalance: 1000,
+                InitialBalances: 0,
                 Inflows: 0,
                 Expenses: 0,
                 OverdueReceivable: 0,
@@ -107,6 +108,50 @@ describe("Reports", () => {
             expect(response.body.Inflows).toBe(3000)
             //  1500 que já estavam + 3000 do mês: **4500, não 3000**
             expect(response.body.Available).toBe(4500)
+        })
+
+        //  **O mesmo erro um mês antes, e este estava em produção.** O front grava o
+        //  InitialBalanceDate com o dia do cadastro, então a conta aberta no dia 05 "não existia"
+        //  em 01/09 e o corte do OpeningBalance zera a abertura dela — o dinheiro que a pessoa
+        //  tem some do indicador que responde quanto ela pode gastar. É a mesma linha `opening`
+        //  que o extrato já monta, com o mesmo filtro.
+        it("conta no mês de estreia a abertura da conta aberta dentro dele", async () => {
+            let workspace = await buildWorkspace({ InitialBalance: 1500, InitialBalanceDate: "2026-09-05" })
+
+            await createInflow(workspace, { TotalValue: 3000, CompetenceDate: "2026-09-10" })
+
+            let response = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-09`)
+
+            //  Em 31/08 a conta realmente não existia: o OpeningBalance está certo em zero, e é
+            //  por isso que a correção não é no AccountBalance
+            expect(response.body.OpeningBalance).toBe(0)
+            expect(response.body.InitialBalances).toBe(1500)
+            //  1500 que a pessoa tem + 3000 do salário: **4500, não 3000**
+            expect(response.body.Available).toBe(4500)
+        })
+
+        //  A outra metade da regra: no mês seguinte a abertura já é posição, e contá-la de novo
+        //  como fluxo dobraria o dinheiro — o erro que a correção mais fácil de escrever faria.
+        it("não conta a abertura de novo no mês seguinte ao da estreia", async () => {
+            let workspace = await buildWorkspace({ InitialBalance: 1500, InitialBalanceDate: "2026-09-05" })
+
+            let response = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-10`)
+
+            expect(response.body.OpeningBalance).toBe(1500)
+            expect(response.body.InitialBalances).toBe(0)
+            expect(response.body.Available).toBe(1500)
+        })
+
+        //  E o mês anterior à estreia continua sem nada: a conta não existia, e inventar a
+        //  abertura ali seria dizer que a pessoa tinha dinheiro num mês em que não tinha conta.
+        it("não conta a abertura no mês anterior ao da estreia", async () => {
+            let workspace = await buildWorkspace({ InitialBalance: 1500, InitialBalanceDate: "2026-09-05" })
+
+            let response = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-08`)
+
+            expect(response.body.OpeningBalance).toBe(0)
+            expect(response.body.InitialBalances).toBe(0)
+            expect(response.body.Available).toBe(0)
         })
 
         //  A linha "Entradas" da tabela de decisões: o indicador é de planejamento, e contar
@@ -740,6 +785,9 @@ describe("Reports", () => {
             expect(response.body).toEqual({
                 ReferenceMonth: "2026-09-01",
                 OpeningBalance: 1500,
+                //  A conta do fluxo nasceu sem InitialBalanceDate: a abertura dela é posição
+                //  em todos os meses, e não fluxo de nenhum
+                InitialBalances: 0,
                 Inflows: 3000,
                 Expenses: 500,
                 OverdueReceivable: 0,
@@ -767,11 +815,18 @@ interface TestWorkspace {
 
 //  Cada teste arruma o seu workspace, porque tudo aqui é soma de tudo que existe no tenant —
 //  reaproveitar faria um teste enxergar o lançamento do outro.
-async function buildWorkspace(): Promise<TestWorkspace> {
+async function buildWorkspace(account_: { InitialBalance?: number, InitialBalanceDate?: string } = {}): Promise<TestWorkspace> {
     let user = await UsersFactory.create()
     let client = new TestClient(user.token)
 
-    let account = await client.post(`/Accounts`, { Name: "Conta corrente", InitialBalance: 1000 })
+    //  **Sem InitialBalanceDate por padrão**: a conta "sempre existiu", que é o caso em que a
+    //  abertura é posição em todo mês. Os testes da estreia mandam a data, que é o que o front
+    //  faz de verdade — ele grava o dia do cadastro.
+    let account = await client.post(`/Accounts`, {
+        Name: "Conta corrente",
+        InitialBalance: account_.InitialBalance ?? 1000,
+        InitialBalanceDate: account_.InitialBalanceDate ?? null,
+    })
 
     let list = await client.get(`/Accounts`)
     let methods = list.body.find((item: { IdAccount: number }) => item.IdAccount === account.body.IdAccount).PaymentMethods

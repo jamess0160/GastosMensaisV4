@@ -19,6 +19,7 @@ import { MonthTotals } from "../MonthTotals.section"
 //  | Unidade        | a perna, nunca o TotalValue da compra    | a perna paga                   |
 //
 //      Available = OpeningBalance
+//                + InitialBalances                   (contas abertas dentro do mês)
 //                + entradas com competência no mês   (pendentes + recebidas)
 //                − pernas   com competência no mês   (pendentes + pagas)
 //                + OverdueReceivable − OverduePayable
@@ -41,6 +42,31 @@ export class GetMonth {
         //  **Só conta ativa entra**, o mesmo filtro de GET /Accounts (o model já o aplica):
         //  senão a soma do Dashboard discorda da lista de contas na mesma tela.
         let accounts = await Accounts_model.getByWorkspace(IdWorkspace)
+
+        //  **A abertura da conta é um fato com data, e quando essa data cai dentro do mês pedido
+        //  ela é fluxo, não posição.** O front grava o `InitialBalanceDate` com o dia em que a
+        //  conta foi cadastrada, então quem começa a usar o app no dia 08 tem uma conta que
+        //  ainda "não existia" em 01/09: o corte zera a abertura dela no `OpeningBalance`, e o
+        //  dinheiro que a pessoa tem some justamente do indicador que responde quanto ela pode
+        //  gastar. Quem abre setembro com 1500 e lança 3000 de salário via 3000, tendo 4500 —
+        //  o mesmo erro que o `OpeningBalance` nasceu para consertar, um mês antes.
+        //
+        //  **O `AccountBalance` está certo**, e é por isso que a correção não é lá: cortado em
+        //  01/09 ele responde "quanto eu tinha em 31/08", e naquele dia a conta realmente não
+        //  existia. Errada era esta fórmula, que usava aquela resposta para outra pergunta.
+        //
+        //  **É a mesma regra que o extrato já aplica**, com este mesmo filtro — ver a linha
+        //  `opening` do StatementEntries, que existe exatamente porque sem ela o mês de estreia
+        //  fica com abertura zero e nenhum lançamento explicando a diferença. O extrato topou
+        //  nisso e resolveu; aqui, chamando o mesmo `AccountBalance`, ficou passando.
+        //
+        //  E o erro **não passa com o mês**: quem olhar setembro em janeiro continua vendo o mês
+        //  de estreia sem o dinheiro que tinha. É história errada, não um transiente.
+        let InitialBalances = this.round(accounts
+            .filter((account) => Boolean(account.InitialBalanceDate)
+                && account.InitialBalanceDate! >= month
+                && account.InitialBalanceDate! < nextMonth)
+            .reduce((total, account) => total + account.InitialBalance, 0))
 
         let [opening, current, totals] = await Promise.all([
             //  **O saldo de abertura não é consulta nova.** O corte do saldo é meio aberto,
@@ -68,12 +94,14 @@ export class GetMonth {
             //  o que a resposta afirma ter usado.
             ReferenceMonth: month,
             OpeningBalance,
+            InitialBalances,
             Inflows: totals.Inflows,
             Expenses: totals.Expenses,
             OverdueReceivable: totals.OverdueReceivable,
             OverduePayable: totals.OverduePayable,
             Available: this.round(
                 OpeningBalance
+                + InitialBalances
                 + totals.Inflows
                 - totals.Expenses
                 + totals.OverdueReceivable
