@@ -1,23 +1,18 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { DashboardController, type BudgetDraft, type DashboardContext } from "./controller";
 import { useMonthScope } from "@/app/monthScope";
 import { useOpenModal } from "@/app/modalRoute";
 import { useSession } from "@/app/session";
 import {
-    useAccounts,
     useCategories,
     useCategoryIndex,
     usePaymentMethodIndex,
     usePersonIndex,
     usePersons,
 } from "@/data/catalogs";
-import {
-    useInvalidateMovement,
-    useMonthBudgets,
-    useMonthInflows,
-    useMonthLegs,
-} from "@/data/month";
+import { useInvalidateMovement, useMonthBudgets, useMonthLegs, useMonthReport } from "@/data/month";
 import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { HideOnMobile, Topbar } from "@/ui/topbar";
 import { BreakdownRow, BudgetBar, DeltaPill, KpiCard, ProgressMeter } from "@/ui/budget";
@@ -35,15 +30,12 @@ import {
     spentByPaymentMethod,
     spentByPerson,
     sumMoney,
-    totalBalance,
-    totalExpectedInflow,
-    totalPending,
-    totalReceived,
     totalSpent,
 } from "@/lib/aggregate";
 import { accentColor, categoryColor, paletteColor } from "@/lib/categoryColor";
 import { formatMoney, fromCents, toCents } from "@/lib/money";
 import { formatMonthLabel } from "@/lib/date";
+import type { ApiTypes } from "@/types/api";
 
 const newBudgetDraft = (month: string): BudgetDraft => ({
     IdBudgetPeriod: null,
@@ -101,6 +93,7 @@ function Breakdown({
 export function Dashboard() {
     const { user } = useSession();
     const openModal = useOpenModal();
+    const navigate = useNavigate();
 
     const [month, setMonth] = useMonthScope();
     const [budgetDraft, setBudgetDraft] = useState<BudgetDraft | null>(null);
@@ -115,9 +108,16 @@ export function Dashboard() {
         isError: legsError,
         error: legsErrorValue,
     } = useMonthLegs(month);
-    const inflows = useMonthInflows(month);
+    /* Os nove números do mês, somados no servidor. A tela deixou de
+       pedir `useMonthInflows`: ela puxava o mês inteiro de entradas
+       para somar dois números que agora vêm prontos. */
+    const report = useMonthReport(month);
     const budgets = useMonthBudgets(month);
-    const accounts = useAccounts();
+    /* `useAccounts` continua sendo lido nesta tela — por dentro de
+       `usePaymentMethodIndex`, que é quem dá nome à fatia "Por forma de
+       pagamento". O que saiu foi a leitura DIRETA, que existia só para
+       somar o `totalBalance`: esse número agora é o `CurrentBalance` da
+       rota. Mesma chave de cache, nenhuma requisição a mais. */
     const categories = useCategories();
     const categoryIndex = useCategoryIndex();
     const persons = usePersons();
@@ -147,21 +147,37 @@ export function Dashboard() {
         [budgetDraft, invalidateMovement],
     );
 
-    /* ── Os números. Nenhum deles tem endpoint. ────────────── */
+    /* ── Os números do mês, e todos vêm da rota ──────────────
+       Nenhum deles se soma aqui — nem para conferir. As quatro regras
+       de agregação se contradizem de propósito, e era a réplica delas
+       no cliente que fazia a mesma pergunta ter dois totais na mesma
+       tela. Se um número daqui divergir do da tela dele, é bug da API.
 
-    const balance = totalBalance(accounts.data ?? []);
-    const received = totalReceived(inflows.data ?? []);
-    const expected = totalExpectedInflow(inflows.data ?? []);
-    const spent = totalSpent(legs);
-    const stillToPay = totalPending(legs);
+       O "Restante" era `recebido − gasto`, e faltava nele o
+       `OpeningBalance`: somar só as entradas do mês para dizer quanto
+       ainda dá para gastar ignora o dinheiro que já estava na conta no
+       dia 1º. Não era questão de escala — dava errado com dois
+       lançamentos no banco. */
+    const available = report.data?.Available ?? 0;
+    const inflows = report.data?.Inflows ?? 0;
+    const expenses = report.data?.Expenses ?? 0;
+    const currentBalance = report.data?.CurrentBalance ?? 0;
+    const openInvoices = report.data?.OpenInvoices ?? 0;
+    const overdueReceivable = report.data?.OverdueReceivable ?? 0;
+    const overduePayable = report.data?.OverduePayable ?? 0;
+
+    /** Enquanto a rota não respondeu, o traço — um zero aqui seria um
+     *  número, e um número errado. */
+    const money = (value: ApiTypes.Money): string => (report.isPending ? "—" : formatMoney(value));
+
+    /* O que FICA no cliente: os dois recortes por tipo de gasto e as
+       três quebras de baixo. A rota não responde nenhum deles, e todos
+       saem da lista de pernas que a tela já tem em cache. O que mudou é
+       o DENOMINADOR — o total dos painéis passou a ser o `Expenses` da
+       rota, e não o `totalSpent` das pernas: dois totais de gasto na
+       mesma tela é exatamente o que ela veio evitar. */
     const fixed = totalSpent(legsOfKind(legs, "fixed"));
     const installments = totalSpent(legsOfKind(legs, "installment"));
-
-    /** "Saldo restante do mês": o que entrou menos o que o mês custou.
-     *  Note que ele NÃO é o saldo da conta — o saldo já descontou o que
-     *  foi pago e ignora o que está em aberto; este número olha o mês
-     *  inteiro, pago e pendente juntos. */
-    const leftover = fromCents(toCents(received) - toCents(spent));
 
     const periods = budgets.data ?? [];
     const overBudget = periods.filter((period) => budgetState(period) === "over");
@@ -188,8 +204,8 @@ export function Dashboard() {
     const hasBudget = budgetLimit > 0;
     const usedPercent = hasBudget
         ? (budgetSpent / budgetLimit) * 100
-        : received > 0
-          ? (spent / received) * 100
+        : inflows > 0
+          ? (expenses / inflows) * 100
           : 0;
 
     /* ── As três quebras do layout ───────────────────────────
@@ -234,9 +250,14 @@ export function Dashboard() {
                         <div className={styles.heroValue}>
                             <span className={styles.heroCurrency}>R$</span>
                             <span
-                                className={`${styles.heroBig} ${leftover < 0 ? styles.heroNegative : ""}`}
+                                className={`${styles.heroBig} ${available < 0 ? styles.heroNegative : ""}`}
                             >
-                                {formatMoney(leftover).replace("R$", "").replace("-", "").trim()}
+                                {report.isPending
+                                    ? "—"
+                                    : formatMoney(available)
+                                          .replace("R$", "")
+                                          .replace("-", "")
+                                          .trim()}
                             </span>
                         </div>
 
@@ -260,13 +281,19 @@ export function Dashboard() {
                                     <span className={`${styles.arrow} ${styles.arrowUp}`}>
                                         <IconArrowUp />
                                     </span>
-                                    <span className={styles.flowName}>Recebido</span>
+                                    {/* O rótulo mudou junto com o número: a rota
+                                        conta a entrada PENDENTE junto com a
+                                        recebida — é competência, não caixa.
+                                        Trocar o número por baixo de um rótulo
+                                        que diz "Recebido" seria a mentira que
+                                        esta rota veio consertar. */}
+                                    <span className={styles.flowName}>Entradas do mês</span>
                                 </div>
                                 <span
                                     className={styles.flowValue}
                                     style={{ color: "var(--pos-ink)" }}
                                 >
-                                    {formatMoney(received)}
+                                    {money(inflows)}
                                 </span>
                             </div>
                             <div className={styles.flow}>
@@ -277,32 +304,79 @@ export function Dashboard() {
                                     <span className={styles.flowName}>Gasto</span>
                                 </div>
                                 <span className={styles.flowValue} style={{ color: "var(--neg)" }}>
-                                    {formatMoney(spent)}
+                                    {money(expenses)}
                                 </span>
                             </div>
                         </div>
+
+                        {/* ── O atrasado, exposto ────────────────────
+                            Os dois vencidos entram no "Restante" de propósito:
+                            sem eles, a perna de julho que ninguém honrou some
+                            do indicador — ela não está no saldo de julho (não
+                            foi paga) nem na janela de agosto (a competência é
+                            de julho). O custo está aceito de olhos abertos, e
+                            é por isso que eles não ficam escondidos dentro do
+                            total: uma previsão que nunca chega infla o número
+                            PARA SEMPRE se ninguém a resolver. Daí cada linha
+                            levar para onde se resolve. */}
+                        {(overdueReceivable > 0 || overduePayable > 0) && (
+                            <div className={styles.overdue}>
+                                {overdueReceivable > 0 && (
+                                    <button
+                                        type="button"
+                                        className={styles.overdueRow}
+                                        onClick={() => navigate("/renda")}
+                                    >
+                                        <span className={styles.overdueName}>
+                                            A receber vencido
+                                        </span>
+                                        <span className={styles.overdueValue}>
+                                            {formatMoney(overdueReceivable)}
+                                        </span>
+                                    </button>
+                                )}
+                                {overduePayable > 0 && (
+                                    <button
+                                        type="button"
+                                        className={styles.overdueRow}
+                                        onClick={() => navigate("/gastos?status=pending")}
+                                    >
+                                        <span className={styles.overdueName}>A pagar vencido</span>
+                                        <span
+                                            className={`${styles.overdueValue} ${styles.overdueNeg}`}
+                                        >
+                                            {formatMoney(overduePayable)}
+                                        </span>
+                                    </button>
+                                )}
+                                <div className={styles.overdueNote}>
+                                    Já contam no Restante, e continuam contando enquanto ninguém os
+                                    receber ou cancelar.
+                                </div>
+                            </div>
+                        )}
                     </Card>
 
                     <div className={styles.kpiGrid}>
                         <KpiCard
                             label="Saldo nas contas"
-                            value={balance}
-                            caption={`Posição em ${formatMonthLabel(month)} — por isso ele muda ao trocar de mês. O que está em aberto não entra.`}
+                            value={report.isPending ? "—" : currentBalance}
+                            caption={`Posição em ${formatMonthLabel(month)} — só o realizado, pelo dia em que o dinheiro saiu da conta. O que está em aberto não entra.`}
                         />
                         <KpiCard
-                            label="Ainda a pagar"
-                            value={stillToPay}
-                            tone={stillToPay > 0 ? "neg" : "neutral"}
-                            caption="Parcelas deste mês que ainda não foram quitadas."
+                            label="Faturas em aberto"
+                            value={report.isPending ? "—" : openInvoices}
+                            tone={openInvoices > 0 ? "neg" : "neutral"}
+                            caption="Compras de cartão que vencem até o fim do mês e ainda não foram pagas — quanto do saldo já tem dono."
                         />
                         <KpiCard
                             label="Fixos do mês"
                             value={fixed}
                             caption="Aluguel, assinaturas — o que se repete."
                             badge={
-                                spent > 0 ? (
+                                expenses > 0 ? (
                                     <DeltaPill tone="mute">
-                                        {Math.round((fixed / spent) * 100)}%
+                                        {Math.round((fixed / expenses) * 100)}%
                                     </DeltaPill>
                                 ) : undefined
                             }
@@ -311,16 +385,29 @@ export function Dashboard() {
                             label="Parcelas do mês"
                             value={installments}
                             caption="Só a fatia que vence neste mês, não a compra inteira."
-                            badge={
-                                expected > 0 ? (
-                                    <DeltaPill tone="mute" direction="up">
-                                        {formatMoney(expected)} a receber
-                                    </DeltaPill>
-                                ) : undefined
-                            }
                         />
                     </div>
                 </div>
+
+                {/* A legenda do par. Sem ela a tela parece ter um erro de
+                    soma: os dois números discordam DE PROPÓSITO. */}
+                <div className={styles.pairNote}>
+                    <b>Restante</b> é o mês que você está vivendo — abre com o saldo do mês passado,
+                    conta o pendente junto com o pago e usa a data em que cada lançamento{" "}
+                    <b>pesa</b>. <b>Saldo nas contas</b> é o dinheiro que já saiu, pela data em que
+                    ele <b>saiu</b>.
+                    {openInvoices > 0 && (
+                        <>
+                            {" "}
+                            Quem liga os dois é <b>faturas em aberto</b>:{" "}
+                            {formatMoney(openInvoices)} do saldo já tem dono.
+                        </>
+                    )}
+                </div>
+
+                {report.isError && (
+                    <ErrorState error={report.error} onRetry={() => void report.refetch()} />
+                )}
 
                 {legsError && <ErrorState error={legsErrorValue} />}
 
@@ -455,7 +542,13 @@ export function Dashboard() {
                     )}
                 </Card>
 
-                {/* ── As três quebras do mês ───────────────────── */}
+                {/* ── As três quebras do mês ─────────────────────
+                    As LINHAS saem das pernas que a tela já tem em cache — a
+                    rota não responde nenhuma delas. O TOTAL de cada painel é
+                    o `Expenses` da rota: dois totais de gasto na mesma tela é
+                    exatamente o que ela veio evitar, e se eles divergirem é
+                    bug da API, não duas leituras legítimas. Nada é
+                    arredondado para "fechar" a soma. */}
                 {legsPending ? (
                     <Card padded={false}>
                         <LoadingRows rows={4} />
@@ -464,7 +557,7 @@ export function Dashboard() {
                     <div className={styles.breakdowns}>
                         <Breakdown
                             title="Por categoria"
-                            total={spent}
+                            total={expenses}
                             empty="Nenhum gasto neste mês."
                             rows={byCategory.map((slice) => {
                                 const category = categoryIndex.get(slice.IdCategory);
@@ -482,7 +575,7 @@ export function Dashboard() {
 
                         <Breakdown
                             title="Por forma de pagamento"
-                            total={spent}
+                            total={expenses}
                             empty="Nenhum gasto neste mês."
                             rows={byMethod.map((slice) => {
                                 const option = methodIndex.get(slice.IdPaymentMethod);
@@ -501,7 +594,7 @@ export function Dashboard() {
 
                         <Breakdown
                             title="Por destino"
-                            total={spent}
+                            total={expenses}
                             empty="Nenhum gasto neste mês."
                             rows={byPerson.map((slice) => ({
                                 key: `p${slice.IdPerson ?? "none"}`,

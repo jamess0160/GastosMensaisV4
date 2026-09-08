@@ -736,7 +736,91 @@ export namespace ApiTypes {
         AlertPercent?: number;
     }
 
-    /* ── 15. Utils ────────────────────────────────────────────── */
+    /* ── 15. Reports ──────────────────────────────────────────── */
+
+    /** Os dois indicadores do Início, somados no SERVIDOR.
+     *
+     *  A feature não guarda nada: ela lê das outras e devolve o número.
+     *  Existe porque as quatro regras de agregação **se contradizem de
+     *  propósito** — a transferência conta no saldo e não conta no
+     *  "quanto entrou", o orçamento conta o pendente e o saldo não, o
+     *  gasto se soma por perna e não por compra —, e enquanto elas
+     *  viviam replicadas no cliente, duas implementações da mesma
+     *  pergunta terminavam mostrando dois totais diferentes na mesma
+     *  tela. Se um número daqui divergir do da tela dele, é bug da API,
+     *  não duas leituras legítimas: não arredonde nada para "fechar".
+     *
+     *  **`Available` e `CurrentBalance` não são duas versões do mesmo
+     *  fato**, e é por isso que a tela mostra os dois lado a lado:
+     *
+     *  |                | `Available` ("posso gastar")     | `CurrentBalance` ("tenho em conta") |
+     *  |----------------|----------------------------------|-------------------------------------|
+     *  | Abertura       | `OpeningBalance`                 | nenhuma — o saldo já é acumulado    |
+     *  | Base de data   | competência (`CompetenceDate`)   | caixa (`CashDate`)                  |
+     *  | Base de estado | pendente **e** pago              | só o realizado                      |
+     *  | Entradas       | as pendentes **entram**          | só as recebidas                     |
+     *  | Unidade        | a **perna**, nunca o `TotalValue`| a perna paga                        |
+     *
+     *  ```
+     *  Available = OpeningBalance + Inflows − Expenses
+     *            + OverdueReceivable − OverduePayable
+     *  ```
+     *
+     *  Só conta `Active` entra no `OpeningBalance` e no
+     *  `CurrentBalance` — o mesmo filtro de `GET /Accounts`, senão a
+     *  soma do Início discordaria da lista de contas na mesma tela. */
+    export interface MonthReport {
+        /** Volta como "YYYY-MM-01" — o mês normalizado que a resposta
+         *  afirma ter usado. */
+        ReferenceMonth: CalendarDate;
+        /** O saldo REALIZADO no fim do mês anterior. É o termo que
+         *  faltava no cliente, e a ausência dele era erro de verdade:
+         *  quem começa setembro com 1000 e recebe 3000 tem 4000, não
+         *  3000. */
+        OpeningBalance: Money;
+        /** Competência no mês, **pendentes junto com recebidas**, sem
+         *  transferência. NÃO é "quanto recebi": é competência, não
+         *  caixa — e é por isso que o rótulo da tela não diz
+         *  "Recebido". */
+        Inflows: Money;
+        /** Pernas com competência no mês, pendentes **e** pagas. */
+        Expenses: Money;
+        /** O atrasado, e ele entra no `Available` dos dois lados: uma
+         *  perna com competência em julho e ainda pendente não está no
+         *  saldo de julho (não foi paga) nem na janela de agosto (a
+         *  competência é de julho) — sem isto ela SOME do indicador, e
+         *  some justamente o compromisso que ninguém honrou.
+         *
+         *  O custo está aceito de olhos abertos: uma previsão que nunca
+         *  chega infla o `Available` **para sempre**. É por isso que os
+         *  dois vão EXPOSTOS na tela, cada um com o caminho de resolver
+         *  o que ficou para trás — e não escondidos dentro do total. */
+        OverdueReceivable: Money;
+        OverduePayable: Money;
+        /** "Quanto ainda posso gastar" — o mês que a pessoa está
+         *  vivendo. */
+        Available: Money;
+        /** "Quanto tenho em conta" — o dinheiro que já saiu. */
+        CurrentBalance: Money;
+        /** O que LIGA os dois: quanto do saldo já tem dono. A soma das
+         *  pernas de cartão que vencem até o fim do mês e ainda não
+         *  foram pagas.
+         *
+         *  E a dupla contagem que não existe: `payInvoice` não cria
+         *  lançamento, só vira o `Paid` de pernas que já existem — a
+         *  compra de agosto contada em agosto não volta a contar em
+         *  setembro. */
+        OpenInvoices: Money;
+    }
+
+    /** Mês, e não `From`/`To` das listagens de movimento: as duas pontas
+     *  do cálculo são POSIÇÕES, não recortes. Omitido, a API devolve o
+     *  mês corrente. */
+    export interface MonthReportQuery {
+        ReferenceMonth?: ReferenceMonth;
+    }
+
+    /* ── 16. Utils ────────────────────────────────────────────── */
 
     export type LogType = "info" | "error" | "userError" | "untracked" | "telemetry";
 

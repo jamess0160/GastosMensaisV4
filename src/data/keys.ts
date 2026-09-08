@@ -36,6 +36,12 @@ export const queryKeys = {
     inflow: (idInflow: number) => ["inflow", idInflow] as const,
     budgets: (month: ApiTypes.ReferenceMonth) => ["budgets", month] as const,
 
+    /* Relatórios — o número já somado pelo servidor. Mesma unidade de
+       cache, o MÊS, para o Início e quem mais vier lerem a mesma
+       resposta. */
+    /** Os nove indicadores do mês. */
+    monthReport: (month: ApiTypes.ReferenceMonth) => ["reports", "month", month] as const,
+
     /* Raízes, para invalidar tudo de um domínio depois de uma escrita
        que atravessa meses (parcelado, série de fixo, estorno). */
     allAccounts: ["accounts"] as const,
@@ -43,4 +49,8 @@ export const queryKeys = {
     allLegs: ["legs"] as const,
     allInflows: ["inflows"] as const,
     allBudgets: ["budgets"] as const,
+    /** A raiz de TODO relatório, e ela é invalidada junto com o
+     *  movimento: quitar uma parcela muda seis dos nove números do mês,
+     *  e em todos os meses em cache. */
+    allReports: ["reports"] as const,
 };

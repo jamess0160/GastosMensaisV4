@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { ExpensesController, type ExpensesContext, type SeriesDraft } from "./controller";
 import { useMonthScope } from "@/app/monthScope";
@@ -89,6 +90,22 @@ const KIND_BADGE: Record<ApiTypes.ExpenseKind, string> = {
  *  O padrão é explícito, e é para ele que "limpar filtros" volta. */
 const LIVE_STATUSES: ApiTypes.ExpenseStatus[] = ["pending", "paid"];
 
+/** O status que a URL pode pedir — é como o Início manda "me mostre o
+ *  que ficou em aberto" ao clicar no vencido a pagar do mês.
+ *
+ *  Só na MONTAGEM: daí em diante quem manda são os chips. Reagir à
+ *  query depois disso desfaria a escolha do usuário a cada render, e a
+ *  URL não é o dono do filtro — ela é a porta de entrada dele. */
+function statusesFromUrl(search: URLSearchParams): ApiTypes.ExpenseStatus[] | null {
+    const asked = search
+        .getAll("status")
+        .filter(
+            (value): value is ApiTypes.ExpenseStatus =>
+                value === "pending" || value === "paid" || value === "canceled",
+        );
+    return asked.length > 0 ? asked : null;
+}
+
 const KIND_ICON: Record<ApiTypes.ExpenseKind, ReactNode> = {
     single: <IconTag />,
     installment: <IconCard />,
@@ -113,7 +130,10 @@ export function Expenses() {
     /* Os cinco filtros são multi-seleção: ver "em aberto + pago" sem ver
        cancelado, ou duas categorias juntas, é a pergunta que se faz de
        verdade. Vazio = sem recorte. */
-    const [statuses, setStatuses] = useState<ApiTypes.ExpenseStatus[]>(LIVE_STATUSES);
+    const [urlQuery] = useSearchParams();
+    const [statuses, setStatuses] = useState<ApiTypes.ExpenseStatus[]>(
+        () => statusesFromUrl(urlQuery) ?? LIVE_STATUSES,
+    );
     const [kinds, setKinds] = useState<ApiTypes.ExpenseKind[]>([]);
     const [idCategories, setIdCategories] = useState<number[]>([]);
     const [idPersons, setIdPersons] = useState<number[]>([]);

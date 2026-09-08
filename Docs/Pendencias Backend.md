@@ -17,7 +17,7 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 |---|---|---|---|
 | ~~1~~ | [Logout](#1-logout) | Segurança | ✅ **Entregue** em 04/09 |
 | ~~2~~ | [`IdWorkspace` no cadastro](#2-idworkspace-no-cadastro-aceito-sem-convite) | Segurança | ✅ **Entregue** em 04/09 |
-| 3 | [Agregados do mês](#3-agregados-do-mês-para-o-dashboard) | Performance | Escala do Dashboard |
+| ~~3~~ | [Agregados do mês](#3-agregados-do-mês-para-o-dashboard) | Performance | ✅ **Entregue** em 07/09 |
 | ~~4~~ | [Rotina mensal de orçamento](#4-rotina-mensal-de-orçamento) | Produto | ✅ **Entregue** em 07/09 |
 | 5 | [Duração de sessão configurável](#5-duração-de-sessão-configurável) | Produto | "Lembrar deste navegador" |
 | 6 | [Recuperação de senha](#6-recuperação-de-senha) | Produto | Usuário que esqueceu a senha |
@@ -51,8 +51,9 @@ logout que o cliente mantinha no `localStorage` foi apagado junto, e o
 
 Do 3 ao 9 eram cortes conscientes do MVP — o frontend já estava
 desenhado para viver sem eles —, e o 11 virou registro histórico quando o
-15 substituiu a forma dele. **O 4 saiu da fila em 07/09**, com as duas
-rotinas de orçamento do dia 1º.
+15 substituiu a forma dele. **O 3 e o 4 saíram da fila em 07/09** — o
+primeiro como `GET /Reports/Month`, na forma preferida desta seção; o
+segundo com as duas rotinas de orçamento do dia 1º.
 
 **Os itens 17 a 21 nasceram da leva 4**, e o **18 já subiu**: `POST
 /Workspaces` entrou no mesmo dia, na forma proposta aqui. O 17 é uma
@@ -164,6 +165,41 @@ Hoje o contrato não descreve papéis.
 ---
 
 ## 3. Agregados do mês para o Dashboard
+
+> ✅ **Entregue em 07/09**, e na forma **preferida** desta seção — a de
+> tirar as regras do cliente, não a de só economizar requisição.
+> `GET /Reports/Month?ReferenceMonth=YYYY-MM`, numa seção própria do
+> contrato (a 15), com **nove** números e não os sete propostos aqui.
+>
+> **Os nomes não são os que estão abaixo, e um número a mais conserta um
+> erro que o cliente tinha.** `Available` abre com o `OpeningBalance` —
+> o saldo realizado no fim do mês anterior —, e era exatamente ele que
+> faltava no "Restante" da tela: somar só as entradas do mês para dizer
+> quanto ainda dá para gastar ignora o dinheiro que já estava na conta no
+> dia 1º. Não era problema de escala; dava errado com dois lançamentos no
+> banco.
+>
+> E vieram dois números que ninguém tinha como somar no cliente:
+> `OverdueReceivable` e `OverduePayable`. Uma perna com competência em
+> julho e ainda pendente não está no saldo de julho (não foi paga) nem na
+> janela de agosto (a competência é de julho) — ela **sumia** do
+> indicador, e sumia justamente o compromisso que ninguém honrou. Eles
+> entram no `Available` de propósito, e por isso vão **expostos** na
+> tela, cada um com o caminho de resolver o que ficou para trás.
+>
+> **`Available` e `CurrentBalance` discordam de propósito**, e a tela diz
+> isso numa linha: um é o mês que a pessoa está vivendo (competência,
+> pendente conta), o outro é o dinheiro que já saiu (caixa, só o
+> realizado). `OpenInvoices` é a ponte — quanto do saldo já tem dono.
+>
+> **O que ficou no cliente**, e não é contradição: as três quebras
+> (categoria, forma de pagamento, destino) e os recortes "Fixos do mês" e
+> "Parcelas do mês". A rota não responde nenhum deles, e todos saem da
+> lista de pernas que a tela já tem em cache — o que mudou é o
+> DENOMINADOR, que passou a ser o `Expenses` da rota. As funções de
+> `aggregate.ts` também ficaram: Renda e Contas somam com elas **a lista
+> que elas próprias mostram**, o que é decomposição de uma tela e não uma
+> segunda implementação de um indicador.
 
 **O problema.** Nenhum número do Dashboard tem endpoint próprio. Saldo
 restante, total recebido, total gasto, fixos do mês e parcelas saem de

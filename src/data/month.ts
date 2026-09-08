@@ -5,6 +5,7 @@ import { BudgetsConnection } from "@/api/Budgets.connection";
 import { ExpensePaymentsConnection } from "@/api/ExpensePayments.connection";
 import { ExpensesConnection } from "@/api/Expenses.connection";
 import { InflowsConnection } from "@/api/Inflows.connection";
+import { ReportsConnection } from "@/api/Reports.connection";
 import { paymentLegs, type ExpenseLeg } from "@/lib/aggregate";
 import { monthRange, monthsBetween } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
@@ -54,6 +55,25 @@ export function useMonthInflows(
         queryKey: queryKeys.inflows(month),
         queryFn: () => InflowsConnection.list(monthRange(month)),
         enabled,
+    });
+}
+
+/** Os nove números do mês, somados pelo servidor.
+ *
+ *  Nenhum deles se recalcula aqui para conferir: as quatro regras de
+ *  agregação se contradizem de propósito, e era justamente a réplica
+ *  delas no cliente que fazia a mesma pergunta ter dois totais na mesma
+ *  tela. Se um número daqui divergir do da tela dele, é bug da API.
+ *
+ *  O mês vai SEMPRE, mesmo sendo opcional na rota: omitir devolveria o
+ *  mês corrente enquanto o usuário olha março — o mesmo erro que o
+ *  `ReferenceMonth` de `GET /Accounts` já consertou. */
+export function useMonthReport(
+    month: ApiTypes.ReferenceMonth,
+): UseQueryResult<ApiTypes.MonthReport> {
+    return useQuery({
+        queryKey: queryKeys.monthReport(month),
+        queryFn: () => ReportsConnection.month(month),
     });
 }
 
@@ -246,5 +266,10 @@ export function useInvalidateMovement() {
         // TODOS os meses em cache, não só no visível, porque quitar hoje
         // uma parcela de novembro sai do saldo de novembro.
         void queryClient.invalidateQueries({ queryKey: queryKeys.allAccounts });
+        // E os relatórios, pela MESMA razão do saldo: quitar uma parcela
+        // muda seis dos nove números do mês — o gasto, o disponível, o
+        // saldo, o vencido, a fatura em aberto — e muda em todos os meses
+        // em cache, não só no visível.
+        void queryClient.invalidateQueries({ queryKey: queryKeys.allReports });
     };
 }
