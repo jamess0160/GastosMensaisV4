@@ -82,6 +82,7 @@ describe("Reports", () => {
                 InitialBalances: 0,
                 Inflows: 0,
                 Expenses: 0,
+                PastCommitments: 0,
                 OverdueReceivable: 0,
                 OverduePayable: 0,
                 Available: 1000,
@@ -233,6 +234,8 @@ describe("Reports", () => {
 
             expect(response.body.OverdueReceivable).toBe(800)
             expect(response.body.OverduePayable).toBe(300)
+            //  Vencida de verdade: as duas datas no passado, então não é compromisso a vencer
+            expect(response.body.PastCommitments).toBe(0)
             //  Nada disso está no mês de setembro, e nada disso está no saldo
             expect(response.body.Inflows).toBe(0)
             expect(response.body.Expenses).toBe(0)
@@ -256,6 +259,89 @@ describe("Reports", () => {
             //  Os dois viraram saldo: 1000 + 800 − 300
             expect(response.body.OpeningBalance).toBe(1500)
             expect(response.body.Available).toBe(1500)
+        })
+
+        //  **O defeito que o CompetenceMode abriu.** A abertura é caixa e o fluxo é competência:
+        //  enquanto as duas datas coincidiam a soma fechava por acidente, e o cartão em modo
+        //  'purchase' — que é o default de todo cartão — fez elas divergirem em toda compra.
+        it("desconta da abertura a compra que pesou no mês passado e vence neste", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, "purchase")
+
+            //  Vence dia 28 com folga de 8, então fecha dia 20: a compra de 25/08 cai na fatura
+            //  de 28/09. Competência 25/08 — pesou em agosto; caixa 28/09 — sai em setembro.
+            await createExpense(workspace, {
+                TotalValue: 500,
+                ExpenseDate: "2026-08-25",
+                Payments: [{ IdPaymentMethod: card, Value: 500 }],
+            })
+
+            //  Agosto: a compra pesa aqui, que é para isso que o modo 'purchase' existe
+            expect((await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-08`)).body.Available).toBe(500)
+
+            let response = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-09`)
+
+            //  O saldo de 31/08 ainda contém os 500: a fatura não tinha vencido
+            expect(response.body.OpeningBalance).toBe(1000)
+            expect(response.body.PastCommitments).toBe(500)
+            //  **E não é atrasado nenhum**: a fatura vence em 28/09. Antes, toda compra de
+            //  cartão do mês passado caía no vencido e a tela anunciava "R$ 500 vencidos"
+            expect(response.body.OverduePayable).toBe(0)
+            //  Contada uma vez só: 1000 − 500
+            expect(response.body.Available).toBe(500)
+        })
+
+        //  **Pagar a fatura não pode aumentar o quanto a pessoa pode gastar**, e era exatamente
+        //  o que acontecia: a perna paga com competência anterior sumia dos três termos de uma
+        //  vez — não estava na abertura (a CashDate é depois do corte), nem no Expenses (a
+        //  competência é de antes), nem no vencido (estava paga). É por isso que o
+        //  PastCommitments não filtra Paid: o que decide é a data, nunca o estado.
+        it("não mexe no Available quando a fatura do mês passado é paga", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, "purchase")
+
+            await createExpense(workspace, {
+                TotalValue: 500,
+                ExpenseDate: "2026-08-25",
+                Payments: [{ IdPaymentMethod: card, Value: 500 }],
+            })
+
+            let before = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-09`)
+
+            await workspace.client.post(`/PaymentMethods/IdPaymentMethod=${card}/payInvoice`, { DueDate: "2026-09-28" })
+
+            let after = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-09`)
+
+            expect(before.body.Available).toBe(500)
+            expect(after.body.Available).toBe(500)
+
+            //  Quem se mexe é o outro indicador, que é o que ele existe para mostrar
+            expect(before.body.CurrentBalance).toBe(1000)
+            expect(after.body.CurrentBalance).toBe(500)
+        })
+
+        //  Os dois lado a lado: o que venceu e não foi pago, e o que ainda vai vencer. Os
+        //  termos não podem se sobrepor, ou a mesma perna desce o indicador duas vezes.
+        it("separa a dívida vencida do compromisso que ainda vai vencer", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, "purchase")
+
+            //  Débito em julho, nunca pago: as duas datas no passado
+            await createExpense(workspace, { TotalValue: 300, ExpenseDate: "2026-07-10" })
+
+            //  Cartão em agosto, fatura em 28/09: pesou antes, o dinheiro ainda está na conta
+            await createExpense(workspace, {
+                TotalValue: 500,
+                ExpenseDate: "2026-08-25",
+                Payments: [{ IdPaymentMethod: card, Value: 500 }],
+            })
+
+            let response = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-09`)
+
+            expect(response.body.OverduePayable).toBe(300)
+            expect(response.body.PastCommitments).toBe(500)
+            //  1000 − 300 − 500, cada perna descontada uma vez
+            expect(response.body.Available).toBe(200)
         })
 
         it("ignora gasto e entrada cancelados", async () => {
@@ -790,6 +876,9 @@ describe("Reports", () => {
                 InitialBalances: 0,
                 Inflows: 3000,
                 Expenses: 500,
+                //  Cartão 'invoice' e tudo em setembro: competência e caixa coincidem, então
+                //  não há nada pesando antes e saindo depois
+                PastCommitments: 0,
                 OverdueReceivable: 0,
                 OverduePayable: 0,
                 //  1500 + 3000 − 500

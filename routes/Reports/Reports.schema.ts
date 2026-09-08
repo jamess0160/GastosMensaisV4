@@ -25,6 +25,12 @@ class Schema {
             Inflows: Joi.number().required(),
             /** Pernas com competência no mês, pendentes e pagas */
             Expenses: Joi.number().required(),
+            /**
+             * Pernas que **pesaram num mês anterior mas cujo dinheiro ainda não saiu** — a
+             * compra de agosto no cartão que vence em setembro. É o que costura a abertura
+             * (caixa) com o fluxo do mês (competência).
+             */
+            PastCommitments: Joi.number().required(),
             /** Entradas de meses anteriores nunca recebidas */
             OverdueReceivable: Joi.number().required(),
             /** Pernas de meses anteriores nunca pagas */

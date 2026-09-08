@@ -28,15 +28,16 @@ class Controller {
      * @param NextMonth primeiro dia do mês seguinte — limite exclusivo, corte meio aberto
      */
     public async run(IdWorkspace: number, ReferenceMonth: string, NextMonth: string) {
-        let [Inflows, Expenses, OverdueReceivable, OverduePayable, OpenInvoices] = await Promise.all([
+        let [Inflows, Expenses, PastCommitments, OverdueReceivable, OverduePayable, OpenInvoices] = await Promise.all([
             this.sumInflows(IdWorkspace, ReferenceMonth, NextMonth),
             this.sumExpenses(IdWorkspace, ReferenceMonth, NextMonth),
+            this.sumPastCommitments(IdWorkspace, ReferenceMonth),
             this.sumOverdueReceivable(IdWorkspace, ReferenceMonth),
             this.sumOverduePayable(IdWorkspace, ReferenceMonth),
             this.sumOpenInvoices(IdWorkspace, NextMonth),
         ])
 
-        return { Inflows, Expenses, OverdueReceivable, OverduePayable, OpenInvoices }
+        return { Inflows, Expenses, PastCommitments, OverdueReceivable, OverduePayable, OpenInvoices }
     }
 
     //  **Quanto entrou no mês — e aqui a transferência NÃO conta.** É a regra oposta à do
@@ -67,6 +68,40 @@ class Controller {
     }
 
     /**
+     * **A ponte entre as duas bases de data, e sem ela a fórmula não fecha.**
+     *
+     * O `OpeningBalance` é **caixa** (o `AccountBalance` corta pela `CashDate`) e o fluxo do mês
+     * é **competência**. Enquanto as duas datas coincidiam a soma fechava por acidente; o
+     * `CompetenceMode` fez elas divergirem de propósito, e `purchase` é o default de todo
+     * cartão — então a divergência é a regra, não a exceção.
+     *
+     * Estas são as pernas que **já pesaram num mês anterior mas cujo dinheiro ainda está na
+     * conta**: a compra de 25/08 no cartão que vence em 28/09. Ela foi descontada do "posso
+     * gastar" de agosto (é o que a competência faz), e o saldo de 31/08 ainda a contém (a fatura
+     * não tinha vencido). Sem descontá-la aqui, setembro abre com um dinheiro que já tem dono.
+     *
+     * **Sem filtro de `Paid`, e é isso que conserta o pior sintoma.** Antes, a perna paga dentro
+     * do mês pedido não estava em lugar nenhum — nem na abertura (a `CashDate` é depois do
+     * corte), nem no `Expenses` (a competência é de antes), nem no vencido (estava paga). Ela
+     * **sumia**, e quitar a fatura *aumentava* o quanto a pessoa podia gastar. Paga ou não, o
+     * dinheiro está comprometido do mesmo jeito: o que decide é a data, nunca o estado.
+     *
+     * Com isto, cada perna é contada **exatamente uma vez**: competência no mês vai para o
+     * `Expenses`; competência anterior se divide entre caixa anterior (paga → já está na
+     * abertura; não paga → `OverduePayable`) e caixa daqui para a frente (→ aqui).
+     */
+    private sumPastCommitments(IdWorkspace: number, ReferenceMonth: string) {
+        return this.total(KnexConnection
+            .sum({ Total: "ExpensePayments.Value" })
+            .from("ExpensePayments")
+            .innerJoin("Expenses", "Expenses.IdExpense", "ExpensePayments.IdExpense")
+            .where("ExpensePayments.IdWorkspace", IdWorkspace)
+            .whereNot("Expenses.Status", "canceled")
+            .where("ExpensePayments.CompetenceDate", "<", ReferenceMonth)
+            .where("ExpensePayments.CashDate", ">=", ReferenceMonth))
+    }
+
+    /**
      * **O atrasado, que sem isto sumiria do indicador.**
      *
      * Uma entrada com competência em julho e nunca recebida não está no saldo de julho (não foi
@@ -90,6 +125,16 @@ class Controller {
             .where("CompetenceDate", "<", ReferenceMonth))
     }
 
+    /**
+     * **Vencido é a perna cujo dinheiro já devia ter saído e não saiu** — as duas datas no
+     * passado, não só a competência.
+     *
+     * O filtro pela `CashDate` é o que separa este número do `PastCommitments`, e sem ele os
+     * dois se sobrepõem: a perna de competência anterior com vencimento à frente seria
+     * subtraída duas vezes. Ele também conserta o rótulo, que estava errado desde que o
+     * `CompetenceMode` existe — **toda** compra do mês passado no cartão caía aqui, e a tela
+     * anunciava como "R$ X vencidos" uma fatura que vence semana que vem.
+     */
     private sumOverduePayable(IdWorkspace: number, ReferenceMonth: string) {
         return this.total(KnexConnection
             .sum({ Total: "ExpensePayments.Value" })
@@ -98,7 +143,8 @@ class Controller {
             .where("ExpensePayments.IdWorkspace", IdWorkspace)
             .whereNot("Expenses.Status", "canceled")
             .where("ExpensePayments.Paid", false)
-            .where("ExpensePayments.CompetenceDate", "<", ReferenceMonth))
+            .where("ExpensePayments.CompetenceDate", "<", ReferenceMonth)
+            .where("ExpensePayments.CashDate", "<", ReferenceMonth))
     }
 
     /**

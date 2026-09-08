@@ -20,9 +20,14 @@ import { MonthTotals } from "../MonthTotals.section"
 //
 //      Available = OpeningBalance
 //                + InitialBalances                   (contas abertas dentro do mês)
+//                − PastCommitments                   (pesou antes, o dinheiro ainda está lá)
 //                + entradas com competência no mês   (pendentes + recebidas)
 //                − pernas   com competência no mês   (pendentes + pagas)
 //                + OverdueReceivable − OverduePayable
+//
+//  **A abertura é caixa e o fluxo é competência**, e é o `PastCommitments` que costura as duas:
+//  sem ele a perna cuja compra pesa num mês e cuja fatura vence no outro é contada duas vezes
+//  ou nenhuma. Ver a section, que carrega a partição inteira.
 //
 //  **As sections delegam, não recalculam.** O `AccountBalance` já contém as regras do saldo, e
 //  o `MonthTotals` as do mês: esta section é a fórmula, e mais nada. Uma segunda implementação
@@ -97,11 +102,13 @@ export class GetMonth {
             InitialBalances,
             Inflows: totals.Inflows,
             Expenses: totals.Expenses,
+            PastCommitments: totals.PastCommitments,
             OverdueReceivable: totals.OverdueReceivable,
             OverduePayable: totals.OverduePayable,
             Available: this.round(
                 OpeningBalance
                 + InitialBalances
+                - totals.PastCommitments
                 + totals.Inflows
                 - totals.Expenses
                 + totals.OverdueReceivable

@@ -21,6 +21,56 @@ aqui e do que não entra.
 
 ---
 
+### 2026-09-08 — `GET /Reports/Month`: o `Available` para de perder e de rotular errado a perna do mês passado
+
+🟡 **Comportamento**, e **corrige dois números errados** — mais um campo na resposta da seção 15,
+o `Available` muda de valor e o `OverduePayable` muda de significado.
+
+**O que estava errado.** O `OpeningBalance` é **caixa** (corta pela `CashDate`) e o resto do
+`Available` é **competência**. Enquanto as duas datas coincidiam a soma fechava por acidente; o
+`CompetenceMode` fez elas divergirem de propósito, e `purchase` é o **default de todo cartão** —
+então toda compra no cartão caía na fresta. Com a compra de 25/08 numa fatura que vence em 28/09:
+
+| | antes | agora |
+|---|---|---|
+| `OverduePayable` em setembro, fatura **em aberto** | **500** — anunciado na tela como "R$ 500 vencidos", com a fatura vencendo dia 28 | **0** |
+| `Available` em setembro, **depois de pagar a fatura** | **1000** — pagar a conta *aumentava* o quanto dava para gastar | **500** |
+
+O segundo é o pior: a perna paga com competência anterior não estava em termo nenhum — nem na
+abertura (a `CashDate` é depois do corte), nem no `Expenses` (a competência é de antes), nem no
+vencido (estava paga). Ela simplesmente **sumia**.
+
+**O que entrou.** `PastCommitments`, as pernas que **pesaram num mês anterior mas cujo dinheiro
+ainda não saiu**, subtraído do `Available`; e o `OverduePayable` passa a exigir que a `CashDate`
+**também** esteja no passado:
+
+```
+Available = OpeningBalance + InitialBalances
+          − PastCommitments   ← novo
+          + Inflows − Expenses + OverdueReceivable
+          − OverduePayable    ← agora só o que venceu de verdade
+```
+
+Cada perna passa a ser contada **exatamente uma vez**: competência no mês → `Expenses`;
+competência anterior com caixa anterior → `OpeningBalance` se paga, `OverduePayable` se não;
+competência anterior com caixa daqui para a frente → `PastCommitments`.
+
+**A sobra do mês atravessa sozinha.** Com os termos fechando, vale
+`Available(mês 2) = Available(mês 1) + entradas do mês 2 − pernas do mês 2`. Terminar setembro com
+500 e abrir outubro com 500 + o salário é consequência da fórmula, não feature.
+
+**Ação do front:**
+
+1. **não ofereça "lançar a sobra do mês anterior como entrada"** — o transporte é automático, e
+   cadastrar a sobra à mão conta o mesmo dinheiro duas vezes: o indicador vai a 4000 com 500 na
+   conta;
+2. **revise a tela de "vencidos"** se você a montava com o `OverduePayable`: o número encolhe, e
+   é para encolher — o que saiu dele nunca esteve atrasado;
+3. **não subtraia o `OpenInvoices` do `Available`.** Ele anota o `CurrentBalance` ("você tem 1000,
+   mas 500 já têm dono"); o `Available` já descontou esse dinheiro;
+4. se você **replicava a fórmula no cliente**, pare — foi para isso que a seção 15 nasceu, e este
+   é o segundo defeito em duas semanas que só existia por causa da réplica.
+
 ### 2026-09-08 — `GET /Reports/Month`: o `Available` passa a contar a abertura da conta criada no mês
 
 🟡 **Comportamento**, e **corrige um número errado em produção** — mais um campo na resposta da
