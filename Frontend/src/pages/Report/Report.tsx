@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
 import styles from "./src/styles.module.css";
+import { ReportController, type ReportContext } from "./controller";
 import { useCategories, useCategoryIndex, usePaymentMethods, usePersons } from "@/data/catalogs";
 import { useRangeLegs } from "@/data/month";
-import { Card, PageHead, Workspace as Page } from "@/ui/primitives";
+import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { ClearFilters, FilterBar, FilterMultiSelect, SearchInput } from "@/ui/controls";
 import { DateInput } from "@/ui/form";
 import { EChart, token } from "@/ui/echart";
 import { KpiCard } from "@/ui/budget";
 import { CategoryIcon } from "@/ui/iconCatalog";
 import { IconCard, IconRepeat, IconTag, METHOD_ICON } from "@/ui/icons";
+import { IconExport } from "@/app/icons";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import {
     legCompetence,
@@ -105,6 +107,8 @@ export function Report() {
     const [view, setView] = useState<View>("line");
 
     const [search, setSearch] = useState("");
+    const [exporting, setExporting] = useState(false);
+    const [exportError, setExportError] = useState<string | null>(null);
     const [kinds, setKinds] = useState<ApiTypes.ExpenseKind[]>([]);
     const [idCategories, setIdCategories] = useState<number[]>([]);
     const [idPersons, setIdPersons] = useState<number[]>([]);
@@ -158,6 +162,26 @@ export function Report() {
             return true;
         });
     }, [legs, range, kinds, idCategories, idPersons, idMethods, search]);
+
+    /* O contexto do único evento da tela. O período é o mesmo que os
+       gráficos estão mostrando — é dele que sai o recorte da planilha. */
+    const context = useMemo<ReportContext>(
+        () => ({
+            range,
+            beginExport() {
+                setExporting(true);
+                setExportError(null);
+            },
+            failExport(message) {
+                setExporting(false);
+                setExportError(message);
+            },
+            finishExport() {
+                setExporting(false);
+            },
+        }),
+        [range],
+    );
 
     const days = useMemo(() => daysBetween(range.From, range.To), [range]);
     const byDay = useMemo(() => spentByDay(shown, days), [shown, days]);
@@ -362,7 +386,26 @@ export function Report() {
             <PageHead
                 title="Relatório"
                 subtitle={`${formatDate(range.From)} a ${formatDate(range.To)} · soma de parcelas pela data em que cada uma pesa`}
+                actions={
+                    /* Este botão exporta O PERÍODO QUE ESTÁ NA TELA, e o
+                       item da sidebar exporta o histórico inteiro. São
+                       dois significados, e nenhum dos dois abre um
+                       segundo seletor: aqui o seletor é a tela. */
+                    <Button
+                        onClick={() => void ReportController.exportSpreadsheet(context)}
+                        disabled={exporting}
+                    >
+                        <IconExport />
+                        {exporting ? "Exportando…" : "Exportar para Excel"}
+                    </Button>
+                }
             />
+
+            {exportError && (
+                <div className={styles.exportError} role="alert">
+                    {exportError}
+                </div>
+            )}
 
             {/* ── Filtros do período ─────────────────────────── */}
             <div className={styles.filterbar}>

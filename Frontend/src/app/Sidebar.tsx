@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import styles from "./Sidebar.module.css";
+import { useExportSpreadsheet } from "./exportSpreadsheet";
 import { useSession, useSignOut } from "./session";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import {
@@ -26,6 +27,7 @@ const settings = [{ to: "/personalizacao", label: "Personalização", Icon: Icon
 export function Sidebar() {
     const { user } = useSession();
     const signOut = useSignOut();
+    const exportSpreadsheet = useExportSpreadsheet();
 
     return (
         <aside className={styles.sidebar}>
@@ -69,16 +71,29 @@ export function Sidebar() {
                                 {label}
                             </NavLink>
                         ))}
-                        {/* Sem API: a exportação ainda não existe no contrato. */}
+                        {/* O item do menu exporta o HISTÓRICO INTEIRO —
+                            é o que a rota faz sem `From`/`To`. Quem quer
+                            recortar vai ao Relatório, onde recortar é a
+                            tela: um menu global não tem período, e um
+                            modal só para perguntá-lo duplicaria o
+                            seletor que já existe lá. */}
                         <button
                             type="button"
                             className={styles.item}
-                            disabled
-                            title="Ainda sem API"
+                            onClick={() => exportSpreadsheet.run()}
+                            disabled={exportSpreadsheet.exporting}
+                            title="Baixa o histórico inteiro em .xlsx"
                         >
                             <IconExport />
-                            Exportar para Excel
+                            {exportSpreadsheet.exporting ? "Exportando…" : "Exportar para Excel"}
                         </button>
+                        {/* O erro aparece onde o botão está: a `msg` do
+                            servidor já vem pronta para a tela. */}
+                        {exportSpreadsheet.error && (
+                            <div className={styles.itemError} role="alert">
+                                {exportSpreadsheet.error}
+                            </div>
+                        )}
                     </div>
                 </div>
             </nav>

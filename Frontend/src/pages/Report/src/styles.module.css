@@ -202,3 +202,14 @@
         max-width: none;
     }
 }
+
+/* O erro da exportação, logo abaixo do botão que o produziu. */
+.exportError {
+    padding: 10px 12px;
+    border: 1px solid var(--neg);
+    border-radius: var(--r-md);
+    background: var(--neg-soft);
+    color: var(--neg);
+    font-size: 13px;
+    line-height: 1.4;
+}

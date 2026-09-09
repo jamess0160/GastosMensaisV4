@@ -14,6 +14,7 @@ import {
     IconSettings,
     IconSignOut,
 } from "./icons";
+import { useExportSpreadsheet } from "./exportSpreadsheet";
 import { useSession, useSignOut } from "./session";
 import { useOpenModal } from "./modalRoute";
 import { SheetMenu, type SheetMenuItem } from "@/ui/overlay";
@@ -49,6 +50,7 @@ export function TabBar() {
     const signOut = useSignOut();
     const { workspace } = useSession();
     const openModal = useOpenModal();
+    const exportSpreadsheet = useExportSpreadsheet();
     const [menuOpen, setMenuOpen] = useState(false);
 
     const item = ({
@@ -110,13 +112,13 @@ export function TabBar() {
             onSelect: () => navigate("/perfil"),
         },
         {
-            /* Sem API: a exportação ainda não existe no contrato — o
-               mesmo desligado da sidebar. */
-            label: "Exportar para Excel",
+            /* O histórico INTEIRO, como na sidebar: sem `From`/`To`.
+               Quem quer recortar vai ao Relatório. */
+            label: exportSpreadsheet.exporting ? "Exportando…" : "Exportar para Excel",
+            description: "Todo o histórico em .xlsx",
             icon: <IconExport />,
-            onSelect: () => {},
-            disabled: true,
-            reason: "Ainda sem API",
+            onSelect: () => exportSpreadsheet.run(),
+            disabled: exportSpreadsheet.exporting,
         },
         {
             label: "Sair",
@@ -128,6 +130,18 @@ export function TabBar() {
 
     return (
         <>
+            {/* Escolher no sheet FECHA o sheet, então o estado da
+                exportação não pode morar lá dentro: ele vive acima da
+                barra, que é o que continua na tela depois. */}
+            {(exportSpreadsheet.exporting || exportSpreadsheet.error) && (
+                <div
+                    className={exportSpreadsheet.error ? styles.noteError : styles.note}
+                    role="status"
+                >
+                    {exportSpreadsheet.error ?? "Montando sua planilha…"}
+                </div>
+            )}
+
             <nav className={styles.tabbar} aria-label="Navegação principal">
                 {left.map((entry) => item(entry))}
 

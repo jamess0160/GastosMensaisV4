@@ -67,11 +67,36 @@ export class ApiNetworkError extends Error {
  *  que cada tela precise tratar isso. Ouça em um lugar só. */
 export const UNAUTHORIZED_EVENT = "api:unauthorized";
 
+/** O corpo do erro, já legível.
+ *
+ *  **`GET /Reports/Export` obriga a isto.** Ela é a primeira rota que não
+ *  responde JSON, e a connection dela pede `responseType: "blob"` — o
+ *  que vale para a resposta de sucesso E para a de erro: um `406` chega
+ *  aqui com o corpo empacotado num `Blob`, e ler `data.msg` dele devolve
+ *  `undefined` sem estourar nada. O usuário veria "Dados de entrada
+ *  inválidos." no lugar da frase pronta que o servidor escreveu.
+ *
+ *  O conserto mora aqui, e não na connection, porque este é o único
+ *  lugar que traduz status em erro tipado: qualquer rota binária futura
+ *  herda o comportamento sem fazer nada. */
+export async function readErrorBody(data: unknown): Promise<ApiTypes.ApiError | undefined> {
+    if (data instanceof Blob) {
+        try {
+            return JSON.parse(await data.text()) as ApiTypes.ApiError;
+        } catch {
+            /* Um binário que não é JSON não tem `msg` a extrair — cai no
+               texto padrão de cada status, como qualquer corpo vazio. */
+            return undefined;
+        }
+    }
+    return data as ApiTypes.ApiError | undefined;
+}
+
 /** O interceptor é o único lugar que traduz status em erro tipado: as
  *  connections abaixo só falam de rotas e corpos. */
 http.interceptors.response.use(
     (response) => response,
-    (error: unknown) => {
+    async (error: unknown) => {
         if (!(error instanceof AxiosError)) {
             return Promise.reject(error);
         }
@@ -95,13 +120,13 @@ http.interceptors.response.use(
             /* A seção 1.3 do contrato não lista o 403 — ele aparece só na
                4.1, nas rotas de convite. Lemos a `msg` quando ela vier, e
                temos uma frase própria quando não vier: ver a pendência 21. */
-            const msg = (data as ApiTypes.ApiError | undefined)?.msg;
-            return Promise.reject(new ApiForbiddenError(msg));
+            const body = await readErrorBody(data);
+            return Promise.reject(new ApiForbiddenError(body?.msg));
         }
 
         if (status === 406) {
-            const msg = (data as ApiTypes.ApiError | undefined)?.msg;
-            return Promise.reject(new ApiBusinessError(msg ?? "Dados de entrada inválidos."));
+            const body = await readErrorBody(data);
+            return Promise.reject(new ApiBusinessError(body?.msg ?? "Dados de entrada inválidos."));
         }
 
         return Promise.reject(new ApiServerError(status));

@@ -88,8 +88,39 @@
     height: 24px;
 }
 
+/* O aviso da exportação, logo acima da barra. Ele mora aqui e não no
+   sheet porque escolher uma linha FECHA o sheet: o que o usuário
+   continua vendo depois do toque é a barra. */
+.note,
+.noteError {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    z-index: 31;
+    display: none;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    font-size: 12px;
+    line-height: 1.4;
+    box-shadow: var(--sh-raised);
+    background: var(--fill);
+    color: #fff;
+}
+
+.noteError {
+    background: var(--neg-soft);
+    color: var(--neg);
+    border: 1px solid var(--neg);
+}
+
 @media (max-width: 900px) {
     .tabbar {
         display: flex;
+    }
+
+    .note,
+    .noteError {
+        display: block;
     }
 }

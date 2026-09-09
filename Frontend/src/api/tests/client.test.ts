@@ -9,6 +9,7 @@ import {
     UNAUTHORIZED_EVENT,
     errorMessage,
     http,
+    readErrorBody,
 } from "../client";
 
 const route = "*/api/Accounts";
@@ -132,5 +133,44 @@ describe("errorMessage", () => {
         expect(errorMessage("string solta")).toBe(
             "Não foi possível concluir. Tente de novo em instantes.",
         );
+    });
+});
+
+/* ════════════════════════════════════════════════════════════
+   O erro que vem como BLOB.
+
+   `GET /Reports/Export` é a primeira rota do projeto que não responde
+   JSON, e o `responseType: "blob"` da connection vale também para a
+   resposta de ERRO: sem desempacotar o corpo, `data.msg` sai
+   `undefined` sem estourar nada, e o usuário vê o texto genérico no
+   lugar da frase que o servidor escreveu.
+
+   Este é o único caminho do interceptor testado FORA da rede: o
+   interceptor de XHR do MSW não entrega `responseType: "blob"` dentro
+   do jsdom, e a regra que interessa — desempacotar antes de ler a
+   `msg` — é a função abaixo, não o transporte.
+   ════════════════════════════════════════════════════════════ */
+
+describe("readErrorBody", () => {
+    it("desempacota a msg de um corpo que chegou como Blob", async () => {
+        const blob = new Blob([JSON.stringify({ msg: "Período inválido!" })], {
+            type: "application/json",
+        });
+
+        await expect(readErrorBody(blob)).resolves.toEqual({ msg: "Período inválido!" });
+    });
+
+    // Um .xlsx de verdade não é JSON: aí não há `msg` a extrair, e cada
+    // status cai no seu texto padrão — o mesmo caminho do corpo vazio.
+    it("devolve undefined quando o binário não é JSON", async () => {
+        const blob = new Blob(["PK"], { type: "application/octet-stream" });
+
+        await expect(readErrorBody(blob)).resolves.toBeUndefined();
+    });
+
+    it("deixa passar o corpo JSON de sempre", async () => {
+        await expect(readErrorBody({ msg: "Conta não encontrada!" })).resolves.toEqual({
+            msg: "Conta não encontrada!",
+        });
     });
 });

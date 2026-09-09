@@ -55,6 +55,39 @@ class Connection {
         });
         return data;
     }
+
+    /** A planilha do período — a ÚNICA rota do projeto que não responde
+     *  JSON.
+     *
+     *  Quem monta o `.xlsx` é o servidor, e é a escolha certa: ele lê os
+     *  números do mesmo lugar que a tela, então a planilha não pode
+     *  discordar dela. Montar o arquivo no navegador replicaria as
+     *  regras de agregação — o problema que criou a feature de Reports.
+     *
+     *  **Sem `From` e sem `To` sai o histórico inteiro.** É o
+     *  comportamento da rota, não uma omissão daqui: é ele que faz o
+     *  item de menu global funcionar sem um seletor de período próprio.
+     *
+     *  A resposta inteira volta, e não só o corpo: o nome do arquivo
+     *  vive no `Content-Disposition`, e quem o traduz é
+     *  `filenameFromDisposition`. */
+    async exportXlsx(range?: { From: ApiTypes.CalendarDate; To: ApiTypes.CalendarDate }): Promise<{
+        blob: Blob;
+        disposition: string | undefined;
+    }> {
+        const response = await http.get<Blob>(`${this.route}/Export`, {
+            params: range ?? {},
+            /* Vale para o erro também: um 406 chega como `Blob`, e é por
+               isso que o interceptor de `client.ts` desempacota o corpo
+               antes de ler a `msg`. */
+            responseType: "blob",
+        });
+
+        return {
+            blob: response.data,
+            disposition: response.headers["content-disposition"] as string | undefined,
+        };
+    }
 }
 
 export const ReportsConnection = new Connection();
