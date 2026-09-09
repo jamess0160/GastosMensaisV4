@@ -7,6 +7,7 @@ import type { Knex } from "knex";
 // remover a migration.
 
 const categories = [
+    { Description: "Casa", IconKey: "House", Color: "#36da0d", Position: 1 },
     { Description: "Alimentacao", IconKey: "Utensils", Color: "#F4511E", Position: 2 },
     { Description: "Mercado", IconKey: "ShoppingCart", Color: "#EF6C00", Position: 3 },
     { Description: "Transporte", IconKey: "Car", Color: "#1565C0", Position: 4 },
