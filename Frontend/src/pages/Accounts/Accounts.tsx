@@ -262,7 +262,7 @@ export function Accounts() {
     const accounts = useAccounts();
     /* O extrato do mês, sob a mesma chave de cache que a tela de Extrato
        já buscou: é dele que sai a fatura de cada cartão — quanto vence e
-       quanto já foi conferido.
+       quanto ainda está só previsto.
        NÃO são as pernas do mês: elas vêm recortadas por competência, e
        num cartão em modo `purchase` a compra de agosto vence em
        setembro. Perguntando por competência e mandando quitar por
@@ -782,7 +782,17 @@ export function Accounts() {
                                                                   ? "Nenhum lançamento nesta fatura"
                                                                   : invoice.paid
                                                                     ? `Quitada · ${invoice.entries.length} lançamento${invoice.entries.length === 1 ? "" : "s"}`
-                                                                    : `${formatMoney(invoice.charged)} já conferidos · ${invoice.entries.length} lançamento${invoice.entries.length === 1 ? "" : "s"}`}
+                                                                    : /* O gasto no cartão já nasce
+                                                                       na fatura, então "conferido"
+                                                                       deixou de ser notícia — o que
+                                                                       sobra de interessante é o
+                                                                       previsto, que é o que o
+                                                                       emissor ainda não registrou.
+                                                                       Zero previsto não vira linha:
+                                                                       é o caso comum. */
+                                                                      invoice.expected !== 0
+                                                                      ? `${formatMoney(invoice.expected)} previsto · ${invoice.entries.length} lançamento${invoice.entries.length === 1 ? "" : "s"}`
+                                                                      : `${invoice.entries.length} lançamento${invoice.entries.length === 1 ? "" : "s"}`}
                                                         </div>
                                                     </div>
                                                     <span className={styles.invoiceActions}>

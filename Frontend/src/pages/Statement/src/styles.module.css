@@ -83,6 +83,33 @@
     font-size: 18px;
 }
 
+/* O cabeçalho do segundo bloco da fatura — o previsto. Ele é uma faixa
+   dentro do mesmo card, e não outro card: as duas listas são a MESMA
+   fatura, e é o ciclo inteiro que sai da conta quando ela é quitada. O
+   que muda entre os blocos é só o que entra no total. */
+.group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-alt);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.groupValue {
+    font-size: 13px;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+}
+
 .kind {
     display: inline-flex;
     align-items: center;
@@ -128,6 +155,10 @@
 @media (max-width: 900px) {
     .sectionHead {
         padding: 16px;
+    }
+
+    .group {
+        padding: 12px 16px;
     }
 
     .ends {

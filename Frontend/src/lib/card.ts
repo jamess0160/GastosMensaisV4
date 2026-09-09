@@ -141,17 +141,22 @@ export const isCardLeg = (payment: ApiTypes.ExpensePayment): boolean => payment.
 export interface Invoice {
     closing: ApiTypes.CalendarDate;
     due: ApiTypes.CalendarDate;
-    /** As linhas da fatura, como o extrato as devolveu — a `Date` de
-     *  cada uma é a da COMPRA, não a do vencimento. */
+    /** TODAS as linhas do ciclo — as que estão na fatura e as previstas
+     *  —, como o extrato as devolveu. A `Date` de cada uma é a da
+     *  COMPRA, não a do vencimento.
+     *
+     *  As duas juntas porque é o ciclo inteiro que o `payInvoice` quita:
+     *  quem separa os dois grupos na tela é o Extrato, que lê o `Cards`
+     *  direto. Aqui o que interessa é quantas linhas saem da conta. */
     entries: readonly ApiTypes.StatementCardEntry[];
     /** O que a fatura cobra — já com o sinal do estorno, que a reduz.
      *  Vem somado do servidor: é o mesmo número da linha `Fatura` do
      *  extrato, e não uma segunda soma que pode divergir dela. */
     total: ApiTypes.Money;
-    /** Quanto do total o usuário já conferiu como lançado na fatura. A
-     *  diferença para o total é o que ele esperava e o cartão ainda não
-     *  registrou. */
-    charged: ApiTypes.Money;
+    /** O que foi lançado no cartão e o usuário desmarcou porque ainda
+     *  não apareceu na fatura do emissor. **Fica fora do `total`** e sai
+     *  da conta junto com ele quando a fatura for quitada. */
+    expected: ApiTypes.Money;
     /** A fatura já saiu da conta? No cartão, quem escreve o `Paid` das
      *  pernas é só o `payInvoice`. */
     paid: boolean;
@@ -181,7 +186,10 @@ export function invoiceOf(
     month: ApiTypes.ReferenceMonth,
 ): Invoice {
     const { closing, due } = invoiceDates(month, method.DueDay, method.ClosingOffsetDays);
-    const entries = card?.Entries ?? [];
+    const expected = card?.Expected ?? [];
+    /* O ciclo inteiro: é ele que o `payInvoice` quita, e é por ele que
+       o painel conta as linhas e decide se a fatura já saiu da conta. */
+    const entries = [...(card?.Entries ?? []), ...expected];
 
     return {
         closing,
@@ -190,7 +198,10 @@ export function invoiceOf(
         due: card?.DueDate ?? due,
         entries,
         total: card?.Total ?? 0,
-        charged: sumMoney(entries.filter((entry) => entry.Charged).map((entry) => entry.Value)),
+        /* O previsto é somado aqui porque não é o que a fatura cobra:
+           o servidor manda o `Total` do que ESTÁ na fatura, e este é o
+           outro grupo. */
+        expected: sumMoney(expected.map((entry) => entry.Value)),
         paid: entries.length > 0 && entries.every((entry) => entry.Paid),
     };
 }

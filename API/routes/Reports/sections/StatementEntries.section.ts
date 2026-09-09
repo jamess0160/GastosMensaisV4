@@ -240,6 +240,17 @@ class Controller {
      * na fatura** lá, no mês em que a fatura venceu. É a mesma perna, vista dos dois lados.
      *
      * **Sem filtro de `Active`:** o cartão arquivado continua tendo tido faturas.
+     *
+     * **A fatura sai em dois grupos, e o `Total` é o do primeiro.** `Charged` quer dizer "está
+     * na fatura" e nasce `true` na perna de cartão, então `Entries` é o caso comum inteiro e
+     * `Expected` só tem o que o usuário desmarcou — a compra que ele esperava e o emissor ainda
+     * não registrou. A perna desmarcada **continua na resposta**, e isso é deliberado: o
+     * `payInvoice` quita o ciclo inteiro, e uma perna que some da tela mas continua sendo
+     * quitada é dinheiro saindo da conta sem linha que o explique.
+     *
+     * O preço disso é que o `Total` daqui pode ficar **abaixo** da linha "Fatura X" do extrato
+     * da conta enquanto houver perna desmarcada — e é a leitura certa dos dois lados: a conta
+     * lista o que saiu dela, a fatura lista o que o emissor cobrou.
      */
     public async getByCards(IdWorkspace: number, ReferenceMonth: string, NextMonth: string) {
         let rows = await KnexConnection
@@ -282,14 +293,13 @@ class Controller {
                     DueDate: row.DueDate,
                     Total: 0,
                     Entries: [],
+                    Expected: [],
                 }
 
                 invoices.set(key, invoice)
             }
 
-            invoice.Total = this.round(invoice.Total + Number(row.Value))
-
-            invoice.Entries.push({
+            let entry: ReportsNamespace.CardEntry = {
                 //  A data da linha da fatura é a da **compra**, não a do vencimento: é ela que
                 //  o usuário reconhece ao conferir com o app do cartão.
                 Date: row.ExpenseDate,
@@ -301,7 +311,20 @@ class Controller {
                 InstallmentTotal: row.InstallmentTotal,
                 Paid: row.Paid,
                 Charged: Boolean(row.Charged),
-            })
+            }
+
+            //  Só o que está na fatura entra no total dela. O previsto fica na resposta, em
+            //  outra lista: ele vai ser quitado junto quando a fatura for paga, e uma perna
+            //  invisível que mesmo assim tira dinheiro da conta é o defeito que esta separação
+            //  existe para não criar.
+            if (entry.Charged) {
+                invoice.Total = this.round(invoice.Total + entry.Value)
+                invoice.Entries.push(entry)
+
+                continue
+            }
+
+            invoice.Expected.push(entry)
         }
 
         return [...invoices.values()]

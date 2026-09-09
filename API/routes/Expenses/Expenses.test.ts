@@ -335,6 +335,26 @@ describe("Expenses", () => {
             expect((await findPayments(after.IdExpense))[0]).toMatchObject({ ClosingDate: "2026-09-20", DueDate: "2026-09-28" })
         })
 
+        //  **O gasto no cartão já nasce lançado na fatura.** `Charged` quer dizer "está na
+        //  fatura", não "já conferi": lançar num cartão é justamente dizer que a compra vai para
+        //  a fatura dele. O caso raro — o emissor não registrou — é o que merece o clique, e é o
+        //  `uncharge` que existe para ele. `ChargedAt` fica nulo porque não houve clique nenhum.
+        it("nasce lançada na fatura, sem instante de conferência", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            let created = await createExpense(workspace, {
+                Payments: [{ IdPaymentMethod: card, Value: 100 }],
+            })
+
+            let [leg] = await findPayments(created.IdExpense)
+
+            expect(leg.Charged).toBe(true)
+            expect(leg.ChargedAt).toBeNull()
+            //  E nada do que o Paid governa se mexeu: estar na fatura não é ter saído da conta
+            expect(leg.Paid).toBe(false)
+        })
+
         //  **A fronteira do fechamento, no dia exato.** O teste acima olha para o dia anterior e
         //  o posterior; o que decide a regra é o próprio dia. A comparação é estritamente maior
         //  (`ExpenseDate > closingOf(...)`), então a compra **no** dia do fechamento ainda entra
@@ -808,9 +828,10 @@ describe("Expenses", () => {
             let [leg] = await findPayments(created.IdExpense)
 
             expect(leg.Value).toBe(-150)
-            //  O estorno cai numa fatura como qualquer compra: as datas saem do mesmo cálculo
+            //  O estorno cai numa fatura como qualquer compra: as datas saem do mesmo cálculo,
+            //  e ele nasce na fatura pelo mesmo motivo que a compra nasce
             expect(leg.DueDate).toBe("2026-08-28")
-            expect(leg.Charged).toBe(false)
+            expect(leg.Charged).toBe(true)
         })
 
         //  **A fatura é que encolhe.** Nenhum dinheiro entra na conta num estorno: o que muda é

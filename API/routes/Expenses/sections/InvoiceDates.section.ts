@@ -81,14 +81,24 @@ class Controller {
     }
 
     /**
-     * O estado inicial do `Charged` de uma perna: `false` no cartão, **nulo fora dele**.
+     * O estado inicial do `Charged` de uma perna: **`true` no cartão**, nulo fora dele.
      *
-     * Nulo porque não há fatura em que entrar, exatamente como as datas — e é essa nulidade que
-     * as rotas leem depois para saber se a perna é de cartão, sem reler a forma de pagamento
-     * (que pode ter sido arquivada nesse meio-tempo).
+     * **O campo diz "está na fatura", não "já conferi".** Lançar num cartão *quer dizer* que a
+     * compra vai para a fatura daquele cartão — é o caso comum, e o caso comum não pode custar
+     * um clique por linha: uma fatura de cartão concentrador tem dezenas delas, ninguém marca
+     * dezenas, e um campo que ninguém marca para de significar coisa alguma. É a mesma falha
+     * que o `payInvoice` corrigiu no `Paid`, um campo ao lado.
+     *
+     * O caso raro é o contrário — a compra que o emissor ainda não registrou, ou registrou com
+     * outro valor —, e é ele que merece o clique: `uncharge` passa a ser o gesto de "isto ainda
+     * não caiu na fatura de verdade".
+     *
+     * Nulo fora do cartão porque não há fatura em que entrar, exatamente como as datas — e é
+     * essa nulidade que as rotas leem depois para saber se a perna é de cartão, sem reler a
+     * forma de pagamento (que pode ter sido arquivada nesse meio-tempo).
      */
     public initialCharged(paymentMethod: Database.PaymentMethods) {
-        return paymentMethod.Kind === "credit_card" ? false : null
+        return paymentMethod.Kind === "credit_card" ? true : null
     }
 
     /**

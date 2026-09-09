@@ -1021,6 +1021,9 @@ export namespace ApiTypes {
         InstallmentNumber: number | null;
         InstallmentTotal: number | null;
         Paid: boolean;
+        /** "Está na fatura". Nasce `true` na perna de cartão — lançar num
+         *  cartão é dizer que a compra vai para a fatura dele —, e é o
+         *  que separa `Entries` de `Expected`. */
         Charged: boolean;
     }
 
@@ -1030,13 +1033,23 @@ export namespace ApiTypes {
      *  Ela segue regras OPOSTAS às da conta, e é a assimetria inteira do
      *  extrato: a conta mostra o que já passou (só liquidado, cortado
      *  pelo `CashDate`), a fatura mostra o que foi comprado (pago E
-     *  pendente, cortado pelo `DueDate` do ciclo). */
+     *  pendente, cortado pelo `DueDate` do ciclo).
+     *
+     *  E ela vem em DOIS grupos: `Entries` é o que está na fatura,
+     *  `Expected` é o que foi lançado no cartão e o usuário desmarcou
+     *  porque o emissor ainda não registrou. **O `Total` é só do
+     *  primeiro** — mas o segundo continua vindo, porque quitar a fatura
+     *  quita o ciclo inteiro, e uma saída da conta sem linha que a
+     *  explique é o que o extrato não pode ter. */
     export interface StatementCard {
         IdPaymentMethod: number;
         Name: string;
         DueDate: CalendarDate;
+        /** Só o que está na fatura: o previsto ainda não é cobrado. */
         Total: Money;
         Entries: StatementCardEntry[];
+        /** Previsto: lançado no cartão e ainda não visto na fatura. */
+        Expected: StatementCardEntry[];
     }
 
     /** `GET /Reports/Statement` — a decomposição do saldo do mês.

@@ -127,7 +127,9 @@ const entry = (values: Partial<ApiTypes.StatementCardEntry> = {}): ApiTypes.Stat
     InstallmentNumber: null,
     InstallmentTotal: null,
     Paid: false,
-    Charged: false,
+    /* A perna de cartão nasce NA FATURA: lançar num cartão é dizer que a
+       compra vai para a fatura dele. O `false` é o clique raro. */
+    Charged: true,
     ...values,
 });
 
@@ -145,9 +147,10 @@ describe("invoiceOf", () => {
                 DueDate: "2026-09-04",
                 Total: 320,
                 Entries: [
-                    entry({ Value: 200, Charged: true }),
+                    entry({ Value: 200 }),
                     entry({ Date: "2026-08-28", Value: 120, IdExpense: 2, IdExpensePayment: 2 }),
                 ],
+                Expected: [],
             },
             card,
             "2026-09",
@@ -156,9 +159,32 @@ describe("invoiceOf", () => {
         expect(invoice.due).toBe("2026-09-04");
         expect(invoice.closing).toBe("2026-08-28");
         expect(invoice.total).toBe(320);
-        expect(invoice.charged).toBe(200);
+        expect(invoice.expected).toBe(0);
         expect(invoice.entries).toHaveLength(2);
         expect(invoice.paid).toBe(false);
+    });
+
+    it("soma o previsto à parte, e ele não entra no total da fatura", () => {
+        // O grupo `Expected` é o caso RARO: a compra que o usuário
+        // desmarcou porque o emissor ainda não registrou. Ela fica fora
+        // do que a fatura cobra — mas dentro das linhas, porque quitar a
+        // fatura quita o ciclo inteiro e ela sai da conta junto.
+        const invoice = invoiceOf(
+            {
+                IdPaymentMethod: 7,
+                Name: "Nubank",
+                DueDate: "2026-09-04",
+                Total: 200,
+                Entries: [entry({ Value: 200 })],
+                Expected: [entry({ Value: 50, Charged: false, IdExpense: 2, IdExpensePayment: 2 })],
+            },
+            card,
+            "2026-09",
+        );
+
+        expect(invoice.total).toBe(200);
+        expect(invoice.expected).toBe(50);
+        expect(invoice.entries).toHaveLength(2);
     });
 
     it("dá fatura vazia no mês em que o cartão não tem nada vencendo", () => {
@@ -183,6 +209,7 @@ describe("invoiceOf", () => {
             DueDate: "2026-09-04",
             Total: 200,
             Entries,
+            Expected: [],
         });
 
         expect(
@@ -204,6 +231,7 @@ describe("invoiceOf", () => {
                 DueDate: "2026-09-04",
                 Total: 80,
                 Entries: [entry({ Value: 200 }), entry({ Value: -120, Description: "Estorno" })],
+                Expected: [],
             },
             card,
             "2026-09",

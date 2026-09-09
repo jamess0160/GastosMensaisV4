@@ -2,6 +2,23 @@ import Joi from "joi"
 import { joiController } from "root/Utils/joiController"
 import { isoDate, periodQuery, referenceMonth } from "root/Utils/joiSchemas"
 
+//  A linha da fatura, descrita uma vez: ela sai em duas listas — o que está na fatura e o que
+//  ainda é previsto —, e duas cópias do mesmo objeto divergiriam na primeira coluna nova.
+const cardEntry = Joi.object({
+    /** A data da **compra**, não a do vencimento */
+    Date: isoDate.required(),
+    Description: Joi.string().required(),
+    /** Positivo: é o que a fatura cobra */
+    Value: Joi.number().required(),
+    IdExpense: Joi.number().required(),
+    IdExpensePayment: Joi.number().required(),
+    InstallmentNumber: Joi.number().allow(null).required(),
+    InstallmentTotal: Joi.number().allow(null).required(),
+    Paid: Joi.boolean().required(),
+    /** "Está na fatura" — nasce `true` na perna de cartão, e é o que separa as duas listas */
+    Charged: Joi.boolean().required(),
+})
+
 class Schema {
 
     public readonly getMonth = [
@@ -78,20 +95,16 @@ class Schema {
                 IdPaymentMethod: Joi.number().required(),
                 Name: Joi.string().required(),
                 DueDate: isoDate.required(),
+                /** **Só o que está na fatura** — o previsto ainda não é cobrado */
                 Total: Joi.number().required(),
-                Entries: Joi.array().items(Joi.object({
-                    /** A data da **compra**, não a do vencimento */
-                    Date: isoDate.required(),
-                    Description: Joi.string().required(),
-                    /** Positivo: é o que a fatura cobra */
-                    Value: Joi.number().required(),
-                    IdExpense: Joi.number().required(),
-                    IdExpensePayment: Joi.number().required(),
-                    InstallmentNumber: Joi.number().allow(null).required(),
-                    InstallmentTotal: Joi.number().allow(null).required(),
-                    Paid: Joi.boolean().required(),
-                    Charged: Joi.boolean().required(),
-                })).required(),
+                /** O que está na fatura */
+                Entries: Joi.array().items(cardEntry).required(),
+                /**
+                 * **Previsto:** lançado no cartão e desmarcado porque o emissor ainda não
+                 * registrou. Fica fora do `Total` e **dentro** da resposta: o `payInvoice`
+                 * quita o ciclo inteiro, então essa perna sai da conta junto.
+                 */
+                Expected: Joi.array().items(cardEntry).required(),
             })).required(),
         })),
     ]

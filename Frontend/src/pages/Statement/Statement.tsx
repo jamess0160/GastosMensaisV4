@@ -20,6 +20,7 @@ import {
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import { formatDate, formatMonthLabel } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
+import { sumMoney } from "@/lib/aggregate";
 import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
@@ -205,6 +206,61 @@ export function Statement() {
         </Card>
     );
 
+    /* A tabela de um dos dois grupos da fatura. As colunas são as mesmas
+       nos dois: o que muda entre eles é se a linha entra no total. */
+    const cardTable = (entries: ApiTypes.StatementCardEntry[]) => (
+        <Table columns={COLUMNS}>
+            <TableHead>
+                <Cell>Compra</Cell>
+                <Cell>Descrição</Cell>
+                <Cell>Situação</Cell>
+                <CellAmount>Valor</CellAmount>
+            </TableHead>
+
+            {entries.map((entry) => (
+                <TableRow
+                    key={entry.IdExpensePayment}
+                    onClick={() => navigate(`/gastos?IdExpense=${entry.IdExpense}`)}
+                >
+                    <Cell>
+                        {/* A data da COMPRA, não a do vencimento: é
+                            por ela que se reconhece o lançamento. */}
+                        <CellMute>{formatDate(entry.Date)}</CellMute>
+                    </Cell>
+                    <Cell>
+                        <RowTrigger label={`Ver o gasto ${entry.Description}`}>
+                            <CellName>{entry.Description}</CellName>
+                        </RowTrigger>
+                        {entry.InstallmentNumber !== null && entry.InstallmentTotal !== null && (
+                            <CellSub>
+                                Parcela {entry.InstallmentNumber} de {entry.InstallmentTotal}
+                            </CellSub>
+                        )}
+                    </Cell>
+                    <Cell>
+                        {/* A fatura mostra pago E pendente — é o que
+                            foi COMPRADO no ciclo, não o que já saiu
+                            da conta. */}
+                        <Badge tone={entry.Paid ? "pos" : "neutral"}>
+                            {entry.Paid ? "Paga" : "Em aberto"}
+                        </Badge>
+                    </Cell>
+                    <CellAmount>{formatMoney(entry.Value)}</CellAmount>
+                </TableRow>
+            ))}
+        </Table>
+    );
+
+    /* ── A fatura, em DOIS blocos ────────────────────────────
+       `Charged` quer dizer "está na fatura", e a perna de cartão já
+       nasce assim: lançar num cartão É dizer que a compra vai para a
+       fatura dele. O que sobra desmarcado é o caso raro — o emissor
+       ainda não registrou —, e é ele que vira o segundo bloco.
+
+       O TOTAL É O DO PRIMEIRO BLOCO. O previsto continua na tela, e
+       não some: `payInvoice` quita o CICLO INTEIRO, então essa perna
+       sai da conta junto. Uma linha invisível que mesmo assim tira
+       dinheiro da conta é exatamente o que um extrato não pode ter. */
     const cardSection = (card: ApiTypes.StatementCard) => (
         <Card
             key={`${card.IdPaymentMethod}-${card.DueDate}`}
@@ -232,48 +288,27 @@ export function Statement() {
                 </div>
             </div>
 
-            <Table columns={COLUMNS}>
-                <TableHead>
-                    <Cell>Compra</Cell>
-                    <Cell>Descrição</Cell>
-                    <Cell>Situação</Cell>
-                    <CellAmount>Valor</CellAmount>
-                </TableHead>
+            {card.Entries.length === 0 ? (
+                <EmptyState
+                    inline
+                    title="Nada nesta fatura ainda"
+                    description="Todo o ciclo está marcado como previsto — nenhuma compra foi dada como lançada na fatura."
+                />
+            ) : (
+                cardTable(card.Entries)
+            )}
 
-                {card.Entries.map((entry) => (
-                    <TableRow
-                        key={entry.IdExpensePayment}
-                        onClick={() => navigate(`/gastos?IdExpense=${entry.IdExpense}`)}
-                    >
-                        <Cell>
-                            {/* A data da COMPRA, não a do vencimento: é
-                                por ela que se reconhece o lançamento. */}
-                            <CellMute>{formatDate(entry.Date)}</CellMute>
-                        </Cell>
-                        <Cell>
-                            <RowTrigger label={`Ver o gasto ${entry.Description}`}>
-                                <CellName>{entry.Description}</CellName>
-                            </RowTrigger>
-                            {entry.InstallmentNumber !== null &&
-                                entry.InstallmentTotal !== null && (
-                                    <CellSub>
-                                        Parcela {entry.InstallmentNumber} de{" "}
-                                        {entry.InstallmentTotal}
-                                    </CellSub>
-                                )}
-                        </Cell>
-                        <Cell>
-                            {/* A fatura mostra pago E pendente — é o que
-                                foi COMPRADO no ciclo, não o que já saiu
-                                da conta. */}
-                            <Badge tone={entry.Paid ? "pos" : "neutral"}>
-                                {entry.Paid ? "Paga" : "Em aberto"}
-                            </Badge>
-                        </Cell>
-                        <CellAmount>{formatMoney(entry.Value)}</CellAmount>
-                    </TableRow>
-                ))}
-            </Table>
+            {card.Expected.length > 0 && (
+                <>
+                    <div className={styles.group}>
+                        <span>Previsto · ainda não apareceu na fatura</span>
+                        <span className={styles.groupValue}>
+                            {formatMoney(sumMoney(card.Expected.map((entry) => entry.Value)))}
+                        </span>
+                    </div>
+                    {cardTable(card.Expected)}
+                </>
+            )}
         </Card>
     );
 

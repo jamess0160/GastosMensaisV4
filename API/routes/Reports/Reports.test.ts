@@ -621,6 +621,55 @@ describe("Reports", () => {
             expectClosing(account)
         })
 
+        //  **`Charged` quer dizer "está na fatura", e a perna de cartão nasce assim.** Desmarcar
+        //  é o gesto raro de "o emissor ainda não registrou isto": a linha sai do total e vai
+        //  para o grupo de previstos — mas **continua na resposta**, porque o `payInvoice` quita
+        //  o ciclo inteiro e uma saída da conta sem linha que a explique é o que um extrato não
+        //  pode ter.
+        it("tira a perna desmarcada do total da fatura sem tirá-la da resposta", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, "invoice")
+
+            await createExpense(workspace, {
+                Description: "Mercado",
+                TotalValue: 200,
+                ExpenseDate: "2026-09-10",
+                Payments: [{ IdPaymentMethod: card, Value: 200 }],
+            })
+
+            let unseen = await createExpense(workspace, {
+                Description: "Assinatura",
+                TotalValue: 50,
+                ExpenseDate: "2026-09-11",
+                Payments: [{ IdPaymentMethod: card, Value: 50 }],
+            })
+
+            let [leg] = await TestDatabase.connection().select("IdExpensePayment").from("ExpensePayments").where("IdExpense", unseen.IdExpense)
+
+            expect((await workspace.client.post(`/ExpensePayments/IdExpensePayment=${leg.IdExpensePayment}/uncharge`)).status).toBe(200)
+
+            let [invoice] = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body.Cards
+
+            //  As duas nasceram na fatura; só a desmarcada saiu do total
+            expect(invoice.Total).toBe(200)
+            expect(invoice.Entries).toHaveLength(1)
+            expect(invoice.Entries[0]).toMatchObject({ Description: "Mercado", Charged: true })
+            expect(invoice.Expected).toHaveLength(1)
+            expect(invoice.Expected[0]).toMatchObject({ Description: "Assinatura", Charged: false })
+
+            //  E quitar a fatura quita as duas: quem sai da conta é o ciclo inteiro, e é por
+            //  isso que a prevista não pode sumir da tela
+            await workspace.client.post(`/PaymentMethods/IdPaymentMethod=${card}/payInvoice`, { DueDate: "2026-09-28" })
+
+            let statement = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
+
+            expect(statement.Accounts[0].Entries[0]).toMatchObject({ Kind: "invoice", Value: -250 })
+            expectClosing(statement.Accounts[0])
+
+            expect(statement.Cards[0].Entries[0].Paid).toBe(true)
+            expect(statement.Cards[0].Expected[0].Paid).toBe(true)
+        })
+
         it("não mostra o gasto cancelado em lugar nenhum, e o mês continua fechando", async () => {
             let workspace = await buildWorkspace()
             let card = await createCard(workspace, "invoice")

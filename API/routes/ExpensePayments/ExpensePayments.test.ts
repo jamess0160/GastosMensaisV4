@@ -462,10 +462,15 @@ describe("ExpensePayments", () => {
 
         //  **O teste que sustenta a etapa.** "Entrou na fatura" e "o dinheiro saiu da conta" são
         //  dois fatos: marcar o primeiro não pode mexer no segundo.
+        //
+        //  A perna já nasce na fatura, então o caminho até o `charge` passa pelo `uncharge`: é o
+        //  caso raro inteiro — o emissor não tinha registrado a compra, e depois registrou.
         it("marca a cobrança sem tocar no saldo da conta", async () => {
             let workspace = await buildWorkspace()
             let created = await createInstallment(workspace)
             let [payment] = await findPayments(created.IdExpense)
+
+            await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/uncharge`)
 
             expect(await accountBalance(workspace, "2026-08")).toBe(1000)
 
@@ -494,12 +499,12 @@ describe("ExpensePayments", () => {
             expect(response.status).toBe(406)
         })
 
-        it("recusa marcar duas vezes", async () => {
+        //  E como a perna de cartão nasce na fatura, marcar sem ter desmarcado antes já é marcar
+        //  duas vezes: o caso comum não precisa de clique nenhum
+        it("recusa marcar o que já nasceu na fatura", async () => {
             let workspace = await buildWorkspace()
             let created = await createInstallment(workspace)
             let [payment] = await findPayments(created.IdExpense)
-
-            await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/charge`)
 
             let response = await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/charge`)
 
@@ -527,13 +532,22 @@ describe("ExpensePayments", () => {
             expect(response.status).toBe(401)
         })
 
-        //  Conferiu errado: a marcação volta, e o instante vai junto
+        //  **É este o clique que a inversão deixou de ser raro:** a compra que o emissor ainda
+        //  não registrou sai do total da fatura sem sumir da lista. E o instante vai junto.
         it("desmarca a cobrança e apaga o instante", async () => {
             let workspace = await buildWorkspace()
             let created = await createInstallment(workspace)
             let [payment] = await findPayments(created.IdExpense)
 
+            //  Nasce na fatura, e sem instante: não houve clique nenhum
+            expect((await findPayments(created.IdExpense))[0]).toMatchObject({ Charged: true, ChargedAt: null })
+
+            expect((await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/uncharge`)).status).toBe(200)
+
+            //  Remarcar é que carimba o instante — e desmarcar de novo o apaga
             await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/charge`)
+
+            expect((await findPayments(created.IdExpense))[0].ChargedAt).not.toBeNull()
 
             let response = await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/uncharge`)
 
@@ -549,6 +563,8 @@ describe("ExpensePayments", () => {
             let workspace = await buildWorkspace()
             let created = await createInstallment(workspace)
             let [payment] = await findPayments(created.IdExpense)
+
+            await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/uncharge`)
 
             let response = await workspace.client.post(`/ExpensePayments/IdExpensePayment=${payment.IdExpensePayment}/uncharge`)
 
@@ -570,10 +586,10 @@ describe("ExpensePayments", () => {
 
             expect(detail.status).toBe(200)
             expect(detail.body.Payments).toHaveLength(6)
-            //  A perna nasce em aberto **e não cobrada**: no cartão nada saiu da conta no ato da
-            //  compra, e nada foi conferido na fatura ainda
+            //  A perna nasce **na fatura e em aberto**: lançar no cartão é dizer que a compra vai
+            //  para a fatura dele, mas nada saiu da conta no ato da compra
             expect(detail.body.Payments.every((item: { Paid: boolean }) => item.Paid === false)).toBe(true)
-            expect(detail.body.Payments.every((item: { Charged: boolean }) => item.Charged === false)).toBe(true)
+            expect(detail.body.Payments.every((item: { Charged: boolean }) => item.Charged === true)).toBe(true)
             expect(await accountBalance(workspace, "2026-08")).toBe(1000)
 
             let payments = detail.body.Payments as Array<{ IdExpensePayment: number, DueDate: string }>
@@ -587,7 +603,9 @@ describe("ExpensePayments", () => {
             expect(months).toEqual(["2026-08", "2026-09", "2026-10", "2026-11", "2026-12", "2027-01"])
 
             //  **Conferir a fatura não mexe em dinheiro nenhum:** "entrou na fatura" e "o
-            //  dinheiro saiu da conta" são dois fatos, e este é o primeiro
+            //  dinheiro saiu da conta" são dois fatos, e este é o primeiro — nos dois sentidos
+            expect((await workspace.client.post(`/ExpensePayments/IdExpensePayment=${ids[0]}/uncharge`)).status).toBe(200)
+            expect(await accountBalance(workspace, "2026-08")).toBe(1000)
             expect((await workspace.client.post(`/ExpensePayments/IdExpensePayment=${ids[0]}/charge`)).status).toBe(200)
             expect(await accountBalance(workspace, "2026-08")).toBe(1000)
 
