@@ -1,0 +1,333 @@
+/* Transcrito de Layout/Hi-fi Desktop/08 - Contas e Conciliação.html,
+   frame A (.acols, .ckpi, o card grande de saldo) e do slide-over da
+   folha compartilhada. */
+
+.summary {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 16px;
+}
+
+.total {
+    padding: 24px;
+}
+
+.totalValue {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.totalCurrency {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--ink-2);
+}
+
+.totalBig {
+    font-size: 44px;
+    font-weight: 700;
+    letter-spacing: -1.5px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.totalCaption {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 10px;
+}
+
+.kpi {
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+}
+
+.kpiLabel {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.kpiValue {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-top: 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+.kpiCaption {
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: var(--ink-2);
+}
+
+/* ── Linha da conta ───────────────────────────────────────── */
+.account {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    background: var(--fill);
+    color: #fff;
+}
+
+.accountName {
+    font-size: 13.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.accountSub {
+    font-size: 11px;
+    color: var(--ink-2);
+    margin-top: 1px;
+}
+
+.methods {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.method {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: var(--r-pill);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    white-space: nowrap;
+}
+
+.method svg {
+    width: 11px;
+    height: 11px;
+}
+
+.totalRow {
+    background: var(--surface-alt);
+    border-top: 1px solid var(--border-strong);
+    font-weight: 700;
+}
+
+/* ── Slide-over da conta ──────────────────────────────────── */
+.cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.cardMark {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: var(--fill-soft);
+    color: var(--ink);
+}
+
+.cardMark svg {
+    width: 17px;
+    height: 17px;
+}
+
+.cardBody {
+    flex: 1;
+    min-width: 0;
+}
+
+.cardName {
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cardSub {
+    font-size: 11.5px;
+    color: var(--ink-2);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* O `CompetenceMode`, ao lado do ciclo: é a única configuração do
+   cadastro que muda um número já exibido na tela, e ela precisa ser
+   legível sem abrir o formulário. */
+.cardMode {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 1px;
+}
+
+/* O cartão de crédito no slide-over deixou de ser uma linha só: embaixo
+   do nome vem a FATURA do mês exibido, que é a unidade em que ele custa
+   dinheiro. */
+.cardStack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.cardStack .card {
+    padding: 0;
+    border: 0;
+    background: none;
+    border-radius: 0;
+}
+
+.invoice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+}
+
+.invoiceBody {
+    flex: 1;
+    min-width: 140px;
+}
+
+.invoiceLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.invoiceValue {
+    font-size: 17px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+}
+
+.invoiceCaption {
+    font-size: 11.5px;
+    color: var(--ink-2);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.invoiceActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sectionLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+@media (max-width: 1100px) {
+    .summary {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 900px) {
+    .totalBig {
+        font-size: 34px;
+    }
+
+    .total {
+        padding: 18px;
+    }
+}
+
+/* ── Lista de cards (mobile) ──────────────────────────────── */
+
+/* As duas ações da conta ficam sob o saldo, na coluna direita do
+   cartão. */
+.cardActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* O par do rodapé da tabela — a linha de total, que fora dela não
+   existe. */
+.cardFoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 2px 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink-2);
+}
+
+/* O que o formulário de cartão DERIVOU das duas datas — vencimento,
+   folga e a fatura resultante. Fica sob os campos porque é resultado,
+   não instrução. */
+.cycleHint {
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: -4px;
+}
+
+.cycleHintBad {
+    color: var(--neg);
+    border-color: var(--neg);
+}

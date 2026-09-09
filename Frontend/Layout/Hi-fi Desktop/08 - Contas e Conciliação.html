@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gastos mensais — Contas e Conciliação (Hi-fi Desktop)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ════════════════════════════════════════════════════════════
+   Gastos mensais · Hi-fi Desktop · folha compartilhada
+   Aplica o Design System (laranja pontual sobre base neutra quente)
+   ════════════════════════════════════════════════════════════ */
+:root{
+  /* Marca */
+  --brand:#FF6A00; --brand-press:#E85F00; --brand-soft:#FFF8EA; --brand-tint:#FFE9D6;
+  /* Semânticas */
+  --neg:#FF001A; --neg-soft:#FFE9EB; --pos:#00DC8C; --pos-soft:#DDF8EE; --pos-ink:#009C63;
+  /* Categorias */
+  --cat-azul:#0084FF; --cat-roxo:#7238D7; --cat-amarelo:#F4D800; --cat-magenta:#F40092;
+  --cat-verde:#36DA0D; --cat-ciano:#00B4D8; --cat-coral:#FF5247; --cat-grafite:#6E6A66;
+  /* Neutros quentes */
+  --page:#EEEDEA; --screen:#F6F5F2; --surface:#FFFFFF; --surface-alt:#FAFAF8;
+  --border:#E2E0DA; --border-strong:#CFCDC6; --border-dashed:#BFBDB6;
+  --ink:#1B1B1B; --ink-2:#6B6864; --ink-3:#9B9893;
+  --fill:#2A2826; --fill-soft:#EAE8E2;
+  --font:"Inter",-apple-system,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background:radial-gradient(1200px 700px at 50% -8%, #F4F2EE, transparent 70%), var(--page);
+  min-height:100vh; font-family:var(--font); color:var(--ink); -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column; align-items:center; padding:48px 24px 80px;
+}
+.num{ font-variant-numeric:tabular-nums; }
+
+/* ── Cabeçalho da página de apresentação ───────────────────── */
+.deck-head{ text-align:center; margin-bottom:34px; max-width:760px; }
+.deck-head .kick{ font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:1.6px; text-transform:uppercase; color:var(--brand); }
+.deck-head h1{ font-size:23px; font-weight:700; letter-spacing:-0.4px; margin:8px 0 0; }
+.deck-head p{ font-size:13.5px; color:var(--ink-2); margin:8px 0 0; line-height:1.5; }
+
+.stage{ display:flex; flex-direction:column; align-items:center; gap:52px; width:100%; }
+.frame-wrap{ display:flex; flex-direction:column; align-items:center; gap:14px; }
+.frame-cap{ font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:0.8px; text-transform:uppercase; color:var(--ink-3); display:flex; align-items:center; gap:8px; }
+.frame-cap b{ color:var(--ink); font-weight:700; }
+
+/* ── O frame 1440×900 ──────────────────────────────────────── */
+.frame{
+  width:1440px; height:900px; flex-shrink:0;
+  background:var(--screen);
+  border:1px solid var(--border-strong); border-radius:16px;
+  box-shadow:0 1px 0 rgba(0,0,0,0.03), 0 30px 70px -24px rgba(40,30,20,0.30);
+  overflow:hidden; display:flex; position:relative;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────── */
+.sidebar{ width:240px; flex-shrink:0; border-right:1px solid var(--border); background:var(--surface); display:flex; flex-direction:column; padding:20px 0; }
+.brandrow{ padding:0 20px 22px; display:flex; align-items:center; gap:10px; }
+.brandrow .mk{ width:34px; height:34px; border-radius:9px; background:var(--brand); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; letter-spacing:-0.5px; box-shadow:0 5px 13px -3px rgba(255,106,0,0.5); }
+.brandrow .nm{ font-size:14px; font-weight:700; }
+.brandrow .sb{ font-size:11px; color:var(--ink-2); margin-top:1px; }
+.nav{ padding:0 12px; flex:1; display:flex; flex-direction:column; gap:14px; }
+.nav-sec-h{ padding:6px 8px 6px; font-size:10.5px; font-weight:600; letter-spacing:0.8px; text-transform:uppercase; color:var(--ink-3); }
+.nav-group{ display:flex; flex-direction:column; gap:2px; }
+.nav-item{ display:flex; align-items:center; gap:12px; padding:9px 11px; border-radius:9px; font-size:13.5px; font-weight:500; color:var(--ink-2); position:relative; cursor:pointer; }
+.nav-item svg{ width:18px; height:18px; }
+.nav-item:hover{ background:var(--surface-alt); }
+.nav-item.active{ background:var(--brand-soft); color:var(--brand); font-weight:600; }
+.nav-item.active:hover{ background:var(--brand-soft); }
+.nav-item.active::before{ content:""; position:absolute; left:-4px; top:8px; bottom:8px; width:3px; border-radius:2px; background:var(--brand); }
+.side-user{ padding:12px 14px 2px; margin:0 4px; border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.side-user .un{ font-size:13px; font-weight:600; }
+.side-user .ue{ font-size:11px; color:var(--ink-2); }
+
+/* ── TopBar ────────────────────────────────────────────────── */
+.main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+.topbar{ flex-shrink:0; height:72px; padding:0 28px; border-bottom:1px solid var(--border); background:var(--surface); display:flex; align-items:center; gap:16px; }
+.topbar .greet{ font-size:16px; font-weight:700; }
+.month-pill{ display:inline-flex; align-items:center; gap:7px; padding:5px 9px 5px 8px; border-radius:8px; background:transparent; border:1px solid var(--border); font-family:var(--font); font-size:12px; font-weight:600; color:var(--ink-2); cursor:pointer; margin-top:3px; }
+.month-pill svg{ width:15px; height:15px; }
+
+/* ── Workspace ─────────────────────────────────────────────── */
+.workspace{ flex:1; overflow:auto; padding:24px 28px 32px; display:flex; flex-direction:column; gap:20px; }
+.workspace::-webkit-scrollbar{ width:10px; }
+.workspace::-webkit-scrollbar-thumb{ background:var(--border-strong); border-radius:6px; border:3px solid var(--screen); }
+
+/* ── Page header ───────────────────────────────────────────── */
+.page-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; }
+.page-head .ttl{ font-size:22px; font-weight:700; letter-spacing:-0.3px; }
+.page-head .sub{ font-size:12.5px; color:var(--ink-2); margin-top:4px; }
+.head-actions{ display:flex; gap:8px; }
+
+/* ── Buttons ───────────────────────────────────────────────── */
+.btn{ height:36px; padding:0 14px; border-radius:9px; background:var(--surface); color:var(--ink); border:1px solid var(--border); font-family:var(--font); font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
+.btn svg{ width:16px; height:16px; }
+.btn:hover{ background:var(--surface-alt); }
+.btn.primary{ background:var(--brand); color:#fff; border-color:var(--brand); box-shadow:0 7px 16px -5px rgba(255,106,0,0.5); }
+.btn.primary:hover{ background:var(--brand-press); border-color:var(--brand-press); }
+.btn.sm{ height:30px; padding:0 11px; border-radius:7px; font-size:12px; gap:5px; }
+.btn.sm svg{ width:13px; height:13px; }
+.btn.ghost{ border-color:transparent; background:transparent; }
+.btn.ghost:hover{ background:var(--surface-alt); }
+
+/* ── Cards ─────────────────────────────────────────────────── */
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:14px; }
+.card.pad{ padding:18px; }
+.ov{ font-size:11px; font-weight:600; letter-spacing:0.7px; text-transform:uppercase; color:var(--ink-2); }
+.ov.tiny{ font-size:10.5px; letter-spacing:0.6px; }
+
+/* money */
+.money{ font-variant-numeric:tabular-nums; font-weight:700; }
+.money.neg{ color:var(--neg); }
+.money.pos{ color:var(--pos-ink); }
+
+/* delta pill (neutral brand-soft) */
+.delta{ display:inline-flex; align-items:center; gap:3px; padding:3px 8px; border-radius:999px; background:var(--brand-soft); color:var(--brand); font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
+.delta svg{ width:11px; height:11px; }
+.delta.up{ background:var(--pos-soft); color:var(--pos-ink); }
+.delta.dn{ background:var(--neg-soft); color:var(--neg); }
+.delta.mute{ background:var(--surface-alt); color:var(--ink-2); border:1px solid var(--border); }
+
+/* flow arrow chips */
+.flowstat .lab{ display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+.flowstat .arw{ width:17px; height:17px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+.flowstat .arw svg{ width:11px; height:11px; }
+.flowstat .arw.up{ background:var(--pos-soft); color:var(--pos-ink); }
+.flowstat .arw.dn{ background:var(--neg-soft); color:var(--neg); }
+.flowstat .lab .n{ font-size:11.5px; color:var(--ink-2); font-weight:500; }
+
+/* bars (neutral) */
+.bar{ width:100%; background:var(--fill-soft); border-radius:999px; overflow:hidden; }
+.bar > i{ display:block; height:100%; background:var(--fill); border-radius:999px; }
+.bar > i.over{ background:var(--neg); }
+
+/* avatar */
+.av{ border-radius:50%; background:var(--fill); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-weight:600; flex-shrink:0; line-height:1; }
+.av.rounded{ border-radius:7px; }
+.av.out{ background:var(--surface); border:1px solid var(--border-strong); color:var(--ink); }
+
+/* category dot + tag + icon tile */
+.cdot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.chip{ display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; border-radius:999px; font-size:12px; font-weight:500; color:var(--ink); background:var(--surface); border:1px solid var(--border); white-space:nowrap; }
+.chip.brand-on{ background:var(--brand); color:#fff; border-color:var(--brand); font-weight:600; }
+.tipo{ width:22px; height:22px; border-radius:6px; background:var(--surface-alt); color:var(--ink-2); display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+.tipo svg{ width:14px; height:14px; }
+.tipo.lg{ width:28px; height:28px; border-radius:7px; }
+.tipo.lg svg{ width:16px; height:16px; }
+
+/* badges */
+.badge{ display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 7px; border-radius:5px; font-size:10.5px; font-weight:700; letter-spacing:0.2px; }
+.badge svg{ width:11px; height:11px; }
+.badge.pos{ background:var(--pos-soft); color:var(--pos-ink); }
+.badge.neg{ background:var(--neg-soft); color:var(--neg); }
+.badge.brand{ background:var(--brand-soft); color:var(--brand); }
+.badge.neutral{ background:var(--surface-alt); color:var(--ink-2); border:1px solid var(--border); }
+.badge.pill{ border-radius:999px; height:19px; }
+
+/* ── KPI summary strip (bordered grid) ─────────────────────── */
+.strip{ display:grid; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.strip .cell{ padding:18px 20px; border-left:1px solid var(--border); position:relative; }
+.strip .cell:first-child{ border-left:none; }
+.strip .cell.attn{ background:var(--surface-alt); }
+.strip .cell.attn::before{ content:""; position:absolute; top:0; left:0; right:0; height:3px; background:var(--brand); }
+.strip .cell .k{ font-size:10.5px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; color:var(--ink-2); margin-bottom:6px; }
+.strip .cell .v{ display:flex; align-items:baseline; gap:4px; }
+.strip .cell .v .cur{ font-size:13px; color:var(--ink-2); font-weight:500; }
+.strip .cell .v .big{ font-size:22px; font-weight:700; letter-spacing:-0.4px; font-variant-numeric:tabular-nums; }
+.strip .cell .cap{ margin-top:4px; font-size:11px; color:var(--ink-3); }
+
+/* ── Table ─────────────────────────────────────────────────── */
+.tbl{ background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.tbl .thead{ display:grid; gap:12px; align-items:center; padding:14px 20px; font-size:10.5px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; color:var(--ink-3); border-bottom:1px solid var(--border); }
+.tbl .trow{ display:grid; gap:12px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--border); font-size:13px; border-left:3px solid transparent; }
+.tbl .trow:hover{ background:var(--surface-alt); }
+.tbl .trow.sel{ background:var(--brand-soft); border-left-color:var(--brand); }
+.tbl .trow.sel:hover{ background:var(--brand-soft); }
+.tbl .trow.last{ border-bottom:none; }
+.tbl .trow.faded{ opacity:0.55; }
+.r-amt{ text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+.r-mute{ color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cellflex{ display:flex; align-items:center; gap:8px; min-width:0; }
+.cellflex .nm{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.grp-h{ padding:12px 20px; background:var(--surface-alt); border-top:1px solid var(--border); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.grp-h .l{ display:flex; align-items:center; gap:8px; }
+.grp-h .t{ font-size:11px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; color:var(--ink); }
+.grp-h .ct{ padding:2px 8px; border-radius:999px; background:var(--surface); border:1px solid var(--border); font-size:10px; font-weight:700; color:var(--ink-2); }
+.grp-h .pend{ padding:2px 8px; border-radius:999px; background:var(--neg-soft); color:var(--neg); font-size:10px; font-weight:700; display:inline-flex; align-items:center; gap:4px; }
+.grp-h .pend .d{ width:5px; height:5px; border-radius:50%; background:var(--neg); }
+.grp-h .tot{ font-size:12px; color:var(--ink-2); font-weight:600; font-variant-numeric:tabular-nums; }
+.tbl-foot{ padding:14px 20px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--ink-2); }
+
+/* due date text */
+.due{ font-size:12px; font-variant-numeric:tabular-nums; color:var(--ink-2); }
+.due.warn{ color:var(--neg); font-weight:700; }
+
+/* pay / receber inline */
+.pay-btn{ height:26px; padding:0 9px; border-radius:6px; background:var(--brand); color:#fff; border:none; display:inline-flex; align-items:center; gap:4px; font-family:var(--font); font-size:11px; font-weight:700; cursor:pointer; }
+.pay-btn svg{ width:10px; height:10px; }
+.pay-done{ width:28px; height:28px; border-radius:6px; background:transparent; border:none; cursor:pointer; color:var(--pos-ink); display:inline-flex; align-items:center; justify-content:center; }
+.icon-btn{ width:28px; height:28px; border-radius:6px; background:transparent; border:none; cursor:pointer; color:var(--ink-3); display:inline-flex; align-items:center; justify-content:center; }
+.icon-btn:hover{ background:var(--surface-alt); color:var(--ink); }
+
+/* ── Slide-over ────────────────────────────────────────────── */
+.scrim{ position:absolute; inset:72px 0 0 0; background:rgba(20,18,15,0.34); z-index:5; }
+.scrim.full{ inset:0; }
+.dim{ filter:blur(0.4px); opacity:0.5; pointer-events:none; }
+.slideover{ position:absolute; top:0; right:0; bottom:0; z-index:10; background:var(--screen); border-left:1px solid var(--border-strong); box-shadow:-16px 0 40px -8px rgba(20,18,15,0.22); display:flex; flex-direction:column; }
+.so-head{ flex-shrink:0; padding:20px 28px; border-bottom:1px solid var(--border); }
+.so-body{ flex:1; overflow-y:auto; padding:20px 28px 28px; }
+.so-foot{ flex-shrink:0; padding:14px 28px; border-top:1px solid var(--border); background:var(--surface); display:flex; align-items:center; gap:10px; }
+.x-btn{ width:32px; height:32px; border-radius:8px; background:transparent; border:1px solid var(--border); color:var(--ink-2); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+
+/* ── Modal ─────────────────────────────────────────────────── */
+.modal{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10; background:var(--screen); border:1px solid var(--border-strong); border-radius:16px; box-shadow:0 30px 80px rgba(20,18,15,0.34); display:flex; flex-direction:column; overflow:hidden; max-height:86%; }
+
+/* ── Forms ─────────────────────────────────────────────────── */
+.field-lab{ font-size:11px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; color:var(--ink-2); margin-bottom:7px; }
+.inp{ height:42px; padding:0 14px; border-radius:10px; background:var(--surface); border:1px solid var(--border); display:flex; align-items:center; gap:10px; font-size:14px; font-weight:500; color:var(--ink); cursor:pointer; }
+.inp.focus{ border-color:var(--brand); box-shadow:0 0 0 4px var(--brand-soft); }
+.inp .ph{ color:var(--ink-3); font-weight:400; }
+.inp .grow{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.inp .car{ color:var(--ink-3); display:inline-flex; }
+.inp .car svg{ width:18px; height:18px; }
+.inbox{ display:flex; flex-direction:column; padding:10px 14px; border-radius:12px; background:var(--surface); border:1px solid var(--border); }
+.inbox .l{ font-size:10.5px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; color:var(--ink-2); margin-bottom:5px; }
+.seg{ display:inline-flex; gap:2px; padding:3px; border-radius:9px; background:var(--fill-soft); width:100%; }
+.seg button{ flex:1; padding:7px 12px; border-radius:7px; background:transparent; border:none; font-family:var(--font); font-size:13px; font-weight:600; color:var(--ink-2); cursor:pointer; }
+.seg button.on{ background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,0.06); }
+.seg.brand button.on{ background:var(--brand); color:#fff; box-shadow:0 4px 10px -3px rgba(255,106,0,0.5); }
+.toggle{ width:44px; height:26px; border-radius:99px; background:var(--border-strong); position:relative; flex-shrink:0; cursor:pointer; transition:background .15s; }
+.toggle.on{ background:var(--brand); }
+.toggle i{ position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.25); transition:left .15s; }
+.toggle.on i{ left:21px; }
+.stepper{ display:inline-flex; align-items:center; border:1px solid var(--border-strong); border-radius:9px; overflow:hidden; }
+.stepper button{ width:34px; height:32px; border:none; background:var(--surface-alt); font-family:var(--font); font-size:18px; font-weight:600; color:var(--ink); cursor:pointer; }
+.stepper .val{ width:40px; text-align:center; font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; }
+
+/* dashed helper notes / dropzones */
+.dashbox{ border:1.5px dashed var(--border-dashed); border-radius:12px; background:var(--surface-alt); }
+.info-note{ padding:12px 16px; border:1px dashed var(--border-dashed); border-radius:12px; font-size:12px; color:var(--ink-2); line-height:1.5; display:flex; align-items:flex-start; gap:10px; }
+.info-note .i{ width:22px; height:22px; border-radius:11px; flex-shrink:0; background:var(--brand-soft); color:var(--brand); display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; }
+
+/* tabs underline */
+.tabs{ margin-top:18px; border-bottom:1px solid var(--border); display:flex; gap:4px; }
+.tab{ position:relative; padding:10px 14px 12px; display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--ink-2); font-size:13.5px; font-weight:500; }
+.tab .ct{ display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--fill-soft); color:var(--ink-2); font-size:11px; font-weight:700; }
+.tab.active{ color:var(--brand); font-weight:700; }
+.tab.active .ct{ background:var(--brand); color:#fff; }
+.tab.active::after{ content:""; position:absolute; left:14px; right:14px; bottom:-1px; height:2.5px; background:var(--brand); border-radius:2px; }
+
+/* generic helpers */
+.row{ display:flex; align-items:center; }
+.grow{ flex:1; min-width:0; }
+.muted{ color:var(--ink-2); }
+.mono{ font-family:var(--mono); }
+
+</style>
+<style>
+  .fit{ position:relative; }
+  .acols{ grid-template-columns:1.5fr 112px 104px 104px 132px 158px 44px; }
+  .ccols{ grid-template-columns:1.7fr 120px 110px 120px 260px; }
+  .tbl .trow.ccols{ align-items:flex-start; }
+  .tbl .trow.ccols > div:last-child{ padding-top:1px; }
+  .ckpi{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px; position:relative; overflow:hidden; }
+  .ckpi.attn::before{ content:""; position:absolute; top:0; left:0; right:0; height:3px; background:var(--brand); }
+  .ckpi .k{ font-size:11px; font-weight:600; letter-spacing:0.6px; text-transform:uppercase; color:var(--ink-2); }
+  .ckpi .v{ font-size:26px; font-weight:700; letter-spacing:-0.5px; margin-top:14px; font-variant-numeric:tabular-nums; }
+  .ckpi .c{ margin-top:8px; font-size:11.5px; color:var(--ink-2); }
+  .checkpill{ display:inline-flex; align-items:center; gap:5px; height:24px; padding:0 10px; border-radius:999px; font-size:11.5px; font-weight:600; }
+  .checkpill.ok{ background:transparent; color:var(--ink-2); border:1px solid var(--border); }
+  .checkpill.due{ background:var(--brand); color:#fff; }
+  .checkpill svg{ width:11px; height:11px; }
+  .saldostrip{ display:grid; grid-template-columns:repeat(5,1fr); }
+  .saldostrip .c{ padding:16px 20px; border-left:1px solid var(--border); }
+  .saldostrip .c:first-child{ border-left:none; }
+  .saldostrip .c.strong{ background:var(--surface-alt); }
+  .saldostrip .c .k{ font-size:10.5px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; color:var(--ink-2); margin-bottom:6px; }
+  .saldostrip .c .v{ display:flex; align-items:baseline; gap:4px; }
+  .saldostrip .c .v .cur{ font-size:12px; color:var(--ink-2); font-weight:500; }
+  .saldostrip .c .v .big{ font-weight:700; letter-spacing:-0.4px; font-variant-numeric:tabular-nums; }
+  .saldostrip .c .cap{ margin-top:4px; font-size:11px; color:var(--ink-3); }
+  .reconchip{ display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:10px; background:var(--surface); border:1px solid var(--border); }
+  .reconchip.strong{ background:var(--brand); border:none; color:#fff; }
+  .reconchip .n{ font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .reconchip .l{ font-size:12px; color:var(--ink-2); }
+  .reconchip.strong .l{ color:rgba(255,255,255,0.78); }
+  .stmtsuggest{ margin-top:5px; display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:7px; background:var(--surface-alt); border:1px solid var(--border); font-size:11px; color:var(--ink-2); }
+  .origin{ display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; font-size:10.5px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; background:var(--surface-alt); color:var(--ink-2); border:1px solid var(--border); }
+  .breadcrumb{ display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-2); margin-bottom:6px; }
+  .breadcrumb svg{ width:12px; height:12px; }
+  .saldomrow{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-radius:12px; margin-bottom:4px; border:1.5px solid var(--border); background:var(--surface-alt); }
+  .saldomrow.active{ border-color:var(--brand); background:var(--surface); }
+</style>
+</head>
+<body>
+
+  <div class="deck-head">
+    <div class="kick">Gastos mensais · Hi-fi Desktop · 08</div>
+    <h1>Contas &amp; Conciliação bancária</h1>
+    <p>Visão geral com saldo calculado de cada banco e página de conciliação do extrato com faixa de saldo (âncora inicial → atual). Marca em ações de conferência e "a resolver".</p>
+  </div>
+
+  <div class="stage">
+
+    <!-- ══════════ A · VISÃO GERAL ══════════ -->
+    <div class="frame-wrap">
+      <div class="frame-cap">A · <b>Visão geral</b> — tabela de contas</div>
+      <div class="fit">
+        <div class="frame" data-screen-label="08 · Contas · visão geral">
+          <div class="sidebar">
+            <div class="brandrow"><img class="mk" src="../assets/logo.png" alt="Gastos mensais" style="object-fit:cover"><div><div class="nm">Gastos mensais</div><div class="sb">Tiago + Luana</div></div></div>
+            <div class="nav"><div class="nav-group">
+              <div class="nav-item"><svg viewBox="0 0 18 18" fill="none"><path d="M3 9l6-5 6 5v6H3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 15v-4h4v4" stroke="currentColor" stroke-width="1.5"/></svg>Início</div>
+              <div class="nav-item"><svg viewBox="0 0 18 18" fill="none"><path d="M5 5h10M5 9h10M5 13h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Gastos</div>
+              <div class="nav-item"><svg viewBox="0 0 18 18" fill="none"><path d="M9 3v10M5 9l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Renda</div>
+              <div class="nav-item active"><svg viewBox="0 0 18 18" fill="none"><rect x="2.5" y="4" width="13" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 7h13" stroke="currentColor" stroke-width="1.5"/><circle cx="12.5" cy="10.5" r="1" fill="currentColor"/></svg>Contas</div>
+              <div class="nav-item"><svg viewBox="0 0 18 18" fill="none"><path d="M3 14V8M8 14V4M13 14v-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Relatório</div>
+            </div></div>
+            <div class="side-user"><span class="av rounded" style="width:36px;height:36px;font-size:13px">T</span><div class="grow"><div class="un">Tiago</div><div class="ue">tiago@email.com</div></div></div>
+          </div>
+
+          <div class="main">
+            <div class="topbar"><div class="grow"><div class="greet">Olá, Tiago + Luana</div><button class="month-pill"><svg viewBox="0 0 18 18" fill="none"><rect x="3" y="4" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 7h12M6 2v3M12 2v3" stroke="currentColor" stroke-width="1.5"/></svg>Maio · 2026<svg viewBox="0 0 18 18" fill="none"><path d="M5 7l4 4 4-4" stroke="currentColor" stroke-width="1.5"/></svg></button></div></div>
+            <div class="workspace">
+              <div class="page-head"><div><div class="ttl">Contas</div><div class="sub">Maio · 2026 · 5 contas · saldo calculado dos lançamentos</div></div><div class="head-actions"><button class="btn"><svg viewBox="0 0 18 18" fill="none"><path d="M9 3v9M5 8l4 4 4-4M3 15h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Exportar</button><button class="btn primary"><svg viewBox="0 0 18 18" fill="none"><path d="M3.5 9.5l3 3 8-8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferir todas</button></div></div>
+
+              <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:16px">
+                <div class="card" style="padding:24px">
+                  <div class="ov">Saldo em todas as contas</div>
+                  <div style="display:flex; align-items:baseline; gap:8px; margin-top:8px"><span style="font-size:20px; font-weight:500; color:var(--ink-2)">R$</span><span class="num" style="font-size:48px; font-weight:700; letter-spacing:-1.5px; line-height:1">12.477,60</span></div>
+                  <div style="font-size:12px; color:var(--ink-2); margin-top:10px">Somando as 5 contas · sem separar por pessoa</div>
+                  <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border); display:grid; grid-template-columns:1fr 1fr; gap:16px">
+                    <div class="flowstat"><div class="lab"><span class="arw up"><svg viewBox="0 0 12 12"><path d="M6 10V2M2 6l4-4 4 4" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="n">Entrou no mês</span></div><span class="money pos num" style="font-size:18px">R$ 14.840,10</span></div>
+                    <div class="flowstat"><div class="lab"><span class="arw dn"><svg viewBox="0 0 12 12"><path d="M6 2v8M2 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="n">Saiu no mês</span></div><span class="money neg num" style="font-size:18px">R$ 9.912,66</span></div>
+                  </div>
+                </div>
+                <div class="ckpi"><div class="k">Maior conta</div><div class="v">R$ 4.120,00</div><div class="c">Itaú Conjunta</div></div>
+                <div class="ckpi attn"><div class="k">A conferir</div><div class="v">2 contas</div><div class="c">Nubank Luana · C6 Tiago</div></div>
+                <div class="ckpi"><div class="k">Última conferência</div><div class="v">há 2 dias</div><div class="c">3 de 5 contas conferidas</div></div>
+              </div>
+
+              <div class="tbl">
+                <div class="thead acols"><span>Conta</span><span style="text-align:right">Saldo inicial</span><span style="text-align:right">+ Entrou</span><span style="text-align:right">− Saiu</span><span style="text-align:right">= Saldo atual</span><span>Conferência</span><span></span></div>
+                <div class="trow acols"><div class="cellflex"><span class="av rounded" style="width:32px;height:32px;font-size:10px">NU</span><div style="min-width:0"><div class="nm" style="font-size:13.5px">Nubank Tiago</div><div style="font-size:11px; color:var(--ink-2)">Tiago</div></div></div><span class="r-mute num" style="text-align:right; font-size:12.5px">R$ 2.940,00</span><span class="r-mute num" style="text-align:right; font-size:12.5px">4.240,44</span><span class="r-mute num" style="text-align:right; font-size:12.5px">4.000,00</span><span class="r-amt num">R$ 3.180,44</span><span><span class="checkpill ok"><svg viewBox="0 0 14 14"><path d="M3 7.5l2.5 2.5L11 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferida 2 dias</span></span><span style="display:flex; justify-content:flex-end"><button class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="3" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="11" cy="7" r="1.2" fill="currentColor"/></svg></button></span></div>
+                <div class="trow acols"><div class="cellflex"><span class="av rounded" style="width:32px;height:32px;font-size:9px">ITA</span><div style="min-width:0"><div class="nm" style="font-size:13.5px">Itaú Tiago</div><div style="font-size:11px; color:var(--ink-2)">Tiago</div></div></div><span class="r-mute num" style="text-align:right; font-size:12.5px">R$ 2.811,86</span><span class="r-mute num" style="text-align:right; font-size:12.5px">1.520,00</span><span class="r-mute num" style="text-align:right; font-size:12.5px">1.800,00</span><span class="r-amt num">R$ 2.531,86</span><span><span class="checkpill ok"><svg viewBox="0 0 14 14"><path d="M3 7.5l2.5 2.5L11 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferida 2 dias</span></span><span style="display:flex; justify-content:flex-end"><button class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="3" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="11" cy="7" r="1.2" fill="currentColor"/></svg></button></span></div>
+                <div class="trow acols"><div class="cellflex"><span class="av rounded" style="width:32px;height:32px;font-size:9px">ITA</span><div style="min-width:0"><div class="nm" style="font-size:13.5px">Itaú Conjunta</div><div style="font-size:11px; color:var(--ink-2)">Conjunta</div></div></div><span class="r-mute num" style="text-align:right; font-size:12.5px">R$ 3.000,00</span><span class="r-mute num" style="text-align:right; font-size:12.5px">5.620,00</span><span class="r-mute num" style="text-align:right; font-size:12.5px">4.500,00</span><span class="r-amt num">R$ 4.120,00</span><span><span class="checkpill ok"><svg viewBox="0 0 14 14"><path d="M3 7.5l2.5 2.5L11 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferida 5 dias</span></span><span style="display:flex; justify-content:flex-end"><button class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="3" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="11" cy="7" r="1.2" fill="currentColor"/></svg></button></span></div>
+                <div class="trow acols"><div class="cellflex"><span class="av rounded" style="width:32px;height:32px;font-size:10px">NU</span><div style="min-width:0"><div class="nm" style="font-size:13.5px">Nubank Luana</div><div style="font-size:11px; color:var(--ink-2)">Luana</div></div></div><span class="r-mute num" style="text-align:right; font-size:12.5px">R$ 1.745,30</span><span class="r-mute num" style="text-align:right; font-size:12.5px">1.500,00</span><span class="r-mute num" style="text-align:right; font-size:12.5px">1.300,00</span><span class="r-amt num">R$ 1.945,30</span><span><span class="checkpill due"><svg viewBox="0 0 14 14"><path d="M7 3.5v4l2.5 1.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferir · 9 dias</span></span><span style="display:flex; justify-content:flex-end"><button class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="3" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="11" cy="7" r="1.2" fill="currentColor"/></svg></button></span></div>
+                <div class="trow acols"><div class="cellflex"><span class="av rounded" style="width:32px;height:32px;font-size:10px">C6</span><div style="min-width:0"><div class="nm" style="font-size:13.5px">C6 Tiago</div><div style="font-size:11px; color:var(--ink-2)">Tiago</div></div></div><span class="r-mute num" style="text-align:right; font-size:12.5px">R$ 1.200,00</span><span class="r-mute num" style="text-align:right; font-size:12.5px">0,00</span><span class="r-mute num" style="text-align:right; font-size:12.5px">500,00</span><span class="r-amt num">R$ 700,00</span><span><span class="checkpill due"><svg viewBox="0 0 14 14"><path d="M7 3.5v4l2.5 1.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferir · 12 dias</span></span><span style="display:flex; justify-content:flex-end"><button class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="3" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="11" cy="7" r="1.2" fill="currentColor"/></svg></button></span></div>
+                <div class="trow acols last" style="background:var(--surface-alt); border-top:1px solid var(--border-strong)"><span style="font-size:12.5px; font-weight:700">Total · 5 contas</span><span class="r-mute num" style="text-align:right; font-size:12px">R$ 11.697,16</span><span class="r-mute num" style="text-align:right; font-size:12px">14.840,10</span><span class="r-mute num" style="text-align:right; font-size:12px">9.912,66</span><span class="r-amt num">R$ 12.477,60</span><span></span><span></span></div>
+              </div>
+
+              <div class="info-note"><span class="i">i</span><span>O saldo de cada conta é estimado a partir dos gastos e entradas registrados. Abra uma conta para conciliar o extrato com o banco e ajustar a âncora (saldo inicial ou atual).</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ B · CONCILIAÇÃO ══════════ -->
+    <div class="frame-wrap">
+      <div class="frame-cap">B · <b>Conciliar extrato</b> — faixa de saldo + a resolver</div>
+      <div class="fit">
+        <div class="frame" data-screen-label="08 · Contas · conciliação">
+          <div class="sidebar">
+            <div class="brandrow"><img class="mk" src="../assets/logo.png" alt="Gastos mensais" style="object-fit:cover"><div><div class="nm">Gastos mensais</div><div class="sb">Tiago + Luana</div></div></div>
+            <div class="nav"><div class="nav-group">
+              <div class="nav-item"><svg viewBox="0 0 18 18" fill="none"><path d="M3 9l6-5 6 5v6H3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 15v-4h4v4" stroke="currentColor" stroke-width="1.5"/></svg>Início</div>
+              <div class="nav-item"><svg viewBox="0 0 18 18" fill="none"><path d="M5 5h10M5 9h10M5 13h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Gastos</div>
+              <div class="nav-item"><svg viewBox="0 0 18 18" fill="none"><path d="M9 3v10M5 9l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Renda</div>
+              <div class="nav-item active"><svg viewBox="0 0 18 18" fill="none"><rect x="2.5" y="4" width="13" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 7h13" stroke="currentColor" stroke-width="1.5"/><circle cx="12.5" cy="10.5" r="1" fill="currentColor"/></svg>Contas</div>
+              <div class="nav-item"><svg viewBox="0 0 18 18" fill="none"><path d="M3 14V8M8 14V4M13 14v-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Relatório</div>
+            </div></div>
+            <div class="side-user"><span class="av rounded" style="width:36px;height:36px;font-size:13px">T</span><div class="grow"><div class="un">Tiago</div><div class="ue">tiago@email.com</div></div></div>
+          </div>
+
+          <div class="main">
+            <div class="topbar"><div class="grow"><div class="greet">Olá, Tiago + Luana</div></div></div>
+            <div class="workspace">
+              <div class="page-head">
+                <div>
+                  <div class="breadcrumb"><span>Contas</span><svg viewBox="0 0 12 12" fill="none"><path d="M4 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="color:var(--ink); font-weight:600">Nubank Tiago</span></div>
+                  <div style="display:flex; align-items:center; gap:10px"><span class="av rounded" style="width:30px;height:30px;font-size:10px">NU</span><div class="ttl">Conciliar extrato</div></div>
+                  <div class="sub">Extrato de <b style="color:var(--ink)">01–17 mai</b> importado · comparado com o que você registrou</div>
+                </div>
+                <div class="head-actions"><button class="btn"><svg viewBox="0 0 18 18" fill="none"><path d="M9 3v9M5 8l4 4 4-4M3 15h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Importar extrato</button><button class="btn primary"><svg viewBox="0 0 18 18" fill="none"><path d="M3.5 9.5l3 3 8-8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Marcar tudo conferido</button></div>
+              </div>
+
+              <div class="tbl">
+                <div style="padding:12px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between"><div class="ov tiny">Saldo da conta · âncora do cálculo</div><button class="btn sm"><svg viewBox="0 0 14 14" fill="none"><path d="M10 2l2 2-7 7H3v-2l7-7z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Editar saldo inicial / atual</button></div>
+                <div class="saldostrip">
+                  <div class="c"><div class="k">Saldo inicial</div><div class="v"><span class="cur">R$</span><span class="big" style="font-size:19px">2.940,00</span></div><div class="cap">01/mai</div></div>
+                  <div class="c"><div class="k">+ Entrou no mês</div><div class="v"><span class="cur">R$</span><span class="big" style="font-size:19px; color:var(--pos-ink)">4.240,44</span></div><div class="cap">calculado</div></div>
+                  <div class="c"><div class="k">− Saiu no mês</div><div class="v"><span class="cur">R$</span><span class="big" style="font-size:19px; color:var(--neg)">4.000,00</span></div><div class="cap">calculado</div></div>
+                  <div class="c strong"><div class="k">= Saldo atual</div><div class="v"><span class="cur">R$</span><span class="big" style="font-size:22px">3.180,44</span></div><div class="cap">hoje · calculado</div></div>
+                  <div class="c"><div class="k">Conferência</div><span class="checkpill ok" style="margin-top:2px"><svg viewBox="0 0 14 14"><path d="M3 7.5l2.5 2.5L11 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>Conferida há 2 dias</span><div style="font-size:11px; color:var(--ink-3); margin-top:6px">contra o saldo real do banco</div></div>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:12px; align-items:center">
+                <div class="reconchip"><span class="n">28</span><span class="l">batem</span></div>
+                <div class="reconchip strong"><span class="n">4</span><span class="l">a resolver</span></div>
+                <span class="grow"></span>
+                <span class="chip brand-on">A resolver · 4</span><span class="chip">Conferidos · 28</span>
+              </div>
+
+              <div class="tbl">
+                <div class="thead ccols"><span>Lançamento</span><span>Origem</span><span>Data</span><span style="text-align:right">Valor</span><span style="text-align:right">Ações</span></div>
+
+                <div class="grp-h"><div class="l"><span class="t">No banco, mas não no app</span><span class="ct num">3</span></div></div>
+                <div class="trow ccols"><div style="min-width:0"><div class="mono" style="font-size:13px; font-weight:700; letter-spacing:0.2px">PIX ENVIADO · MERC. LEBES</div></div><div><span class="origin">Banco</span></div><span class="r-mute num">12/mai</span><span class="r-amt num">R$ 86,00</span><div style="display:flex; gap:8px; justify-content:flex-end"><button class="btn sm primary">Registrar gasto</button><button class="btn sm">Ignorar</button></div></div>
+                <div class="trow ccols"><div style="min-width:0"><div class="mono" style="font-size:13px; font-weight:700; letter-spacing:0.2px">COMPRA DEBITO · POSTO BR</div><span class="stmtsuggest">≈ seu gasto "Posto Shell" R$ 130,00</span></div><div><span class="origin">Banco</span></div><span class="r-mute num">14/mai</span><span class="r-amt num">R$ 130,00</span><div style="display:flex; gap:8px; justify-content:flex-end"><button class="btn sm primary">Vincular</button><button class="btn sm">Não é</button></div></div>
+                <div class="trow ccols"><div style="min-width:0"><div class="mono" style="font-size:13px; font-weight:700; letter-spacing:0.2px">TARIFA PACOTE SERVIÇOS</div></div><div><span class="origin">Banco</span></div><span class="r-mute num">15/mai</span><span class="r-amt num">R$ 34,90</span><div style="display:flex; gap:8px; justify-content:flex-end"><button class="btn sm primary">Registrar gasto</button><button class="btn sm">Ignorar</button></div></div>
+
+                <div class="grp-h"><div class="l"><span class="t">No app, mas não no extrato</span><span class="ct num">1</span></div></div>
+                <div class="trow ccols last"><div style="min-width:0"><div style="font-size:13px; font-weight:700">Cantina · você registrou</div><div style="margin-top:4px; font-size:11.5px; color:var(--ink-2)">Não encontrei no extrato do banco</div></div><div><span class="origin">App</span></div><span class="r-mute num">13/mai</span><span class="r-amt num">R$ 36,00</span><div style="display:flex; gap:8px; justify-content:flex-end"><button class="btn sm primary">Manter</button><button class="btn sm">Excluir</button></div></div>
+              </div>
+
+              <div class="info-note"><span class="i">i</span><span>Conciliação por extrato é o jeito mais preciso, mas exige importar o arquivo. A âncora de saldo acima é o que mantém o cálculo confiável mês a mês.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function fitFrames(){
+      var scale = Math.min(1,(window.innerWidth-48)/1440);
+      document.querySelectorAll('.fit').forEach(function(fit){
+        var fr=fit.querySelector('.frame');
+        fit.style.width=(1440*scale)+'px'; fit.style.height=(900*scale)+'px';
+        fr.style.transformOrigin='top left'; fr.style.transform='scale('+scale+')';
+      });
+    }
+    window.addEventListener('resize',fitFrames); fitFrames();
+  </script>
+</body>
+</html>

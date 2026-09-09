@@ -1,0 +1,337 @@
+/* Transcrito de .tbl / .thead / .trow / .grp-h / .tbl-foot e cia da
+   folha compartilhada do layout. A tabela é uma grade CSS, não um
+   <table>: as colunas do layout são proporcionais e precisam alinhar
+   entre grupos separados por cabeçalho. */
+
+.table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+
+/* Rolagem horizontal fica presa à tabela: o corpo da página nunca rola
+   de lado, nem em 390px. */
+.scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+}
+
+.track {
+    min-width: 100%;
+}
+
+/* Num telefone as colunas não cabem, e espremê-las até caber deixaria
+   valores em duas linhas e nomes cortados no meio. A tabela mantém a
+   medida legível e rola dentro de si — a página, não. */
+@media (max-width: 900px) {
+    .track {
+        min-width: 640px;
+    }
+}
+
+.head {
+    display: grid;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 20px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border-bottom: 1px solid var(--border);
+}
+
+.row {
+    display: grid;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    border-left: 3px solid transparent;
+    width: 100%;
+    background: none;
+    text-align: left;
+    color: inherit;
+    font-family: inherit;
+}
+
+.row:last-child {
+    border-bottom: none;
+}
+
+.clickable:hover {
+    background: var(--surface-alt);
+}
+
+.selected,
+.selected:hover {
+    background: var(--brand-soft);
+    border-left-color: var(--brand);
+}
+
+/* Cancelado continua na lista, apagado: sumir esconderia o estorno. */
+.faded {
+    opacity: 0.55;
+}
+
+/* ── Células ──────────────────────────────────────────────── */
+.amount {
+    text-align: right;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.mute {
+    color: var(--ink-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.name {
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sub {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    justify-content: flex-end;
+}
+
+/* ── Cabeçalho de grupo ───────────────────────────────────── */
+.group {
+    padding: 12px 20px;
+    background: var(--surface-alt);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.group:first-child {
+    border-top: none;
+}
+
+.groupLeft {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.groupTitle {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink);
+}
+
+.count {
+    padding: 2px 8px;
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--ink-2);
+}
+
+.pending {
+    padding: 2px 8px;
+    border-radius: var(--r-pill);
+    background: var(--neg-soft);
+    color: var(--neg);
+    font-size: 10px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.pending i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--neg);
+}
+
+.groupTotal {
+    font-size: 12px;
+    color: var(--ink-2);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.foot {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--ink-2);
+}
+
+/* ── Ladrilho de tipo ─────────────────────────────────────── */
+.tile {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--surface-alt);
+    color: var(--ink-2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tile svg {
+    width: 14px;
+    height: 14px;
+}
+
+.tileLarge {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+}
+
+.tileLarge svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ── Botões de linha ──────────────────────────────────────── */
+.iconButton {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    color: var(--ink-3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.iconButton:hover:not(:disabled) {
+    background: var(--surface-alt);
+    color: var(--ink);
+}
+
+.iconButton:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.iconButton svg {
+    width: 16px;
+    height: 16px;
+}
+
+.payButton {
+    height: 26px;
+    padding: 0 9px;
+    border-radius: 6px;
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.payButton:hover:not(:disabled) {
+    background: var(--brand-press);
+}
+
+.payButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.payButton svg {
+    width: 10px;
+    height: 10px;
+}
+
+.payDone {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    color: var(--pos-ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.payDone:hover:not(:disabled) {
+    background: var(--pos-soft);
+}
+
+.payDone svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ── Vencimento ───────────────────────────────────────────── */
+.due {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+    white-space: nowrap;
+}
+
+.dueWarn {
+    color: var(--neg);
+    font-weight: 700;
+}
+
+/* Alvo de foco da linha clicável: invisível, mas focável. */
+.trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+}

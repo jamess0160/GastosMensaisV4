@@ -1,0 +1,79 @@
+/* Transcrito de `.topbar` da folha compartilhada do layout
+   (Layout/Hi-fi Desktop/*.html): a faixa branca acima da área de
+   trabalho, com a saudação, a troca de mês e a ação principal da tela. */
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    min-height: 72px;
+    padding: 12px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.left {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.greet {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+/* `contents` e não `inline`: o filho continua sendo item direto do
+   flex do `.actions`, então envolver um botão não muda nada no
+   desktop. */
+.hideMobile {
+    display: contents;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+    .topbar {
+        position: static;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 14px 16px;
+    }
+
+    /* Três ações lado a lado ("Clonar mês anterior", "Transferir",
+       "Nova renda") viram três botões de 100px com o texto cortado. Em
+       coluna, cada uma continua legível. */
+    .actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    /* SEM `flex: 1` aqui. Em coluna, o eixo principal é a altura, e
+       `flex: 1` traz `flex-basis: 0` junto: os botões perdiam os 36px do
+       `.btn` e viravam três fios. Quem os alarga é o `stretch` do
+       contêiner; a altura é a do próprio botão. */
+    .actions > * {
+        flex-shrink: 0;
+        justify-content: center;
+    }
+
+    .hideMobile {
+        display: none;
+    }
+}

@@ -1,0 +1,353 @@
+/* Seletor padrão do sistema — o desenho de Layout/prints/select.webp:
+   ícone à esquerda, rótulo, seta à direita, e a lista aberta repetindo o
+   mesmo ícone em cada linha.
+
+   As medidas de `.field` são as do `.inp` de form.module.css: o seletor
+   tem que fechar altura e raio com o `<input>` ao lado dele na grade. */
+
+.wrap {
+    display: block;
+    min-width: 0;
+}
+
+/* ── Gatilho ──────────────────────────────────────────────── */
+.trigger {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    font-family: var(--font);
+    text-align: left;
+    cursor: pointer;
+}
+
+.trigger:disabled {
+    cursor: not-allowed;
+}
+
+.text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Sem valor escolhido o texto é tinta fraca — é o mesmo peso visual do
+   `::placeholder` de um input vazio. */
+.placeholder {
+    color: var(--ink-3);
+    font-weight: 400;
+}
+
+.icon,
+.caret {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.caret {
+    color: var(--ink-3);
+}
+
+/* ── Variante `field` (dentro de FormField) ───────────────── */
+.field {
+    height: 42px;
+    gap: 9px;
+    padding: 0 12px 0 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.field .icon svg,
+.field .caret svg {
+    width: 18px;
+    height: 18px;
+}
+
+.field:disabled {
+    background: var(--surface-alt);
+    color: var(--ink-3);
+}
+
+/* ── Variante `compact` (linhas do rateio) ────────────────── */
+.compact {
+    height: 34px;
+    gap: 8px;
+    padding: 0 8px 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.compact .icon svg,
+.compact .caret svg {
+    width: 15px;
+    height: 15px;
+}
+
+.compact:disabled {
+    background: var(--surface-alt);
+    color: var(--ink-3);
+}
+
+/* ── Variante `plain` (dentro de uma caixa que já tem moldura) ── */
+.plain {
+    gap: 8px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.plain .icon svg,
+.plain .caret svg {
+    width: 16px;
+    height: 16px;
+}
+
+.plain:disabled {
+    color: var(--ink-3);
+}
+
+/* ── Variante `filter` (pílula da barra de filtros) ───────── */
+.filter {
+    height: 28px;
+    gap: 6px;
+    padding: 0 8px 0 11px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink);
+    white-space: nowrap;
+}
+
+.filter .icon svg,
+.filter .caret svg {
+    width: 14px;
+    height: 14px;
+}
+
+.filter:hover:not(:disabled) {
+    background: var(--surface-alt);
+}
+
+/* Filtro sem valor mostra "Todas as categorias", que é uma escolha
+   legítima e não um vazio — por isso aqui o texto não empalidece. */
+.filter .placeholder {
+    color: var(--ink);
+    font-weight: 500;
+}
+
+/* Filtro ligado se destaca na marca: é o sinal de que a lista atrás
+   está recortada. */
+.filterOn {
+    border-color: var(--brand);
+    color: var(--brand);
+    font-weight: 600;
+}
+
+.filterOn .caret {
+    color: var(--brand);
+}
+
+/* ── Estados comuns ───────────────────────────────────────── */
+.trigger:focus-visible,
+.open {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: var(--ring-brand);
+}
+
+/* `.plain` não tem moldura para acender, então o foco vira um anel no
+   texto — sem isso, quem navega por teclado perde o seletor de vista. */
+.plain:focus-visible,
+.plain.open {
+    box-shadow: none;
+    outline: 2px solid var(--brand);
+    outline-offset: 3px;
+    border-radius: var(--r-xs);
+}
+
+.invalid,
+.invalid.open,
+.invalid:focus-visible {
+    border-color: var(--neg);
+    box-shadow: 0 0 0 4px var(--neg-soft);
+}
+
+/* ── Lista ────────────────────────────────────────────────── */
+
+/* `position: fixed` e portal no `<body>`: o seletor vive dentro de
+   painéis com `overflow-y: auto` (SlideOver, Modal), e uma lista
+   posicionada dentro deles seria recortada na primeira linha que
+   passasse da borda. */
+.popup {
+    position: fixed;
+    z-index: 60;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 5px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: 0 18px 40px -12px rgba(20, 18, 15, 0.28);
+}
+
+.option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    font-family: var(--font);
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+}
+
+.option + .option {
+    margin-top: 1px;
+}
+
+.optionIcon {
+    display: inline-flex;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+}
+
+.optionIcon svg {
+    width: 18px;
+    height: 18px;
+}
+
+.optionText {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A linha sob o cursor do teclado e a do mouse são a MESMA marcação:
+   quem navega com as setas e quem passa o mouse veem o mesmo destaque,
+   e nunca dois ao mesmo tempo. */
+.optionActive {
+    background: var(--fill-soft);
+}
+
+.optionOn {
+    color: var(--brand);
+    font-weight: 600;
+}
+
+.optionOff {
+    color: var(--ink-3);
+    font-weight: 400;
+}
+
+.option:disabled {
+    color: var(--ink-3);
+    cursor: not-allowed;
+}
+
+.empty {
+    padding: 10px;
+    font-size: 12.5px;
+    color: var(--ink-3);
+    text-align: center;
+}
+
+/* ── Caixinha da multi-seleção ────────────────────────────── */
+
+/* A marca é um quadradinho, e não um `<input type=checkbox>`: a linha
+   inteira já é o `role="option"` que o leitor de tela anuncia com
+   `aria-selected`, e um checkbox de verdade ali dentro seria um
+   segundo alvo de foco dizendo a mesma coisa. */
+.check {
+    width: 16px;
+    height: 16px;
+    border-radius: 5px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.check svg {
+    width: 11px;
+    height: 11px;
+}
+
+.checkOn {
+    background: var(--brand);
+    border-color: var(--brand);
+}
+
+/* ── Lista como sheet (mobile) ────────────────────────────── */
+
+/* Ancorar uma lista num gatilho de 28px que fica no meio de uma faixa
+   que rola de lado dá uma caixa estreita e fora do alcance do polegar.
+   No telefone ela sobe do rodapé, com o mesmo miolo. */
+.sheetScrim {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    background: rgba(20, 18, 15, 0.34);
+}
+
+.sheet {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 62vh;
+    padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    border: 1px solid var(--border-strong);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -12px 40px rgba(20, 18, 15, 0.18);
+    animation: sheetup 0.16s ease-out;
+}
+
+@keyframes sheetup {
+    from {
+        transform: translateY(16px);
+        opacity: 0.6;
+    }
+}
+
+/* Alvo de dedo, não de mouse. */
+.sheet .option {
+    height: 44px;
+    font-size: 14.5px;
+}
+
+@media (max-width: 900px) {
+    /* A mesma altura do `.chip` da barra de filtros — os dois dividem a
+       faixa que rola de lado. */
+    .filter {
+        height: 32px;
+    }
+}

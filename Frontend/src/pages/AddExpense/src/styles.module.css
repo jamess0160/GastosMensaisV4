@@ -1,0 +1,269 @@
+/* Transcrito de Layout/Hi-fi Desktop/03 - Adicionar Gasto.html
+   (.so-body do slide-over: .inbox, .grp-lab, .splitcard, .valid,
+   .pchip). O formulário é um painel à direita, não uma tela — foi o
+   que a revisão dos ajustes corrigiu. */
+
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* ── Grades do painel ─────────────────────────────────────── */
+.rowValue {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    gap: 12px;
+}
+
+.rowKind {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 12px;
+}
+
+.rowPair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+}
+
+.rowThree {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+/* ── Caixa de campo (.inbox) ──────────────────────────────── */
+.box {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    min-width: 0;
+}
+
+.boxLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    margin-bottom: 5px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+/* O rótulo tem altura fixa; o resto da caixa é do controle, e ele se
+   centraliza nesse espaço. Numa grade em que as caixas esticam para a
+   altura da mais alta, é isto que alinha os controles entre elas. */
+.boxContent {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.boxHint {
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-3);
+}
+
+/* O valor é o campo mais alto do painel de propósito: é o número que o
+   usuário confere antes de salvar, e o que o rateio tem que fechar. */
+.amountField {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.amountPrefix {
+    font-size: 16px;
+    color: var(--ink-2);
+    font-weight: 500;
+}
+
+.amountInput {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-family: var(--font);
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.6px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+}
+
+.amountInput:focus {
+    outline: none;
+}
+
+.plainInput {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ink);
+    width: 100%;
+    min-width: 0;
+}
+
+.plainInput:focus {
+    outline: none;
+}
+
+.plainInput::placeholder {
+    color: var(--ink-3);
+    font-weight: 400;
+}
+
+/* O dia do mês é o único campo do painel com moldura própria: são dois
+   dígitos, e sem caixa ele se lê como texto e não como campo. A moldura
+   preenche a caixa, como a de "Repetir até" ao lado — um campo estreito
+   no canto de uma caixa larga deixa um vazio que parece falta. */
+.dayInput {
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    font-size: 15px;
+}
+
+/* ── Rótulo de grupo (.grp-lab) ───────────────────────────── */
+.groupLabel {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.groupLabelText {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.groupLabelHint {
+    font-size: 11.5px;
+    color: var(--ink-3);
+}
+
+.linkButton {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: var(--font);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.linkButton:hover {
+    color: var(--brand);
+}
+
+/* ── Resumo (.pchip) ──────────────────────────────────────── */
+.summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.chipMoney {
+    font-variant-numeric: tabular-nums;
+    color: var(--neg);
+}
+
+.blockLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.blockHint {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    line-height: 1.45;
+}
+
+.stack {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.extras {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.paidRow {
+    margin-top: 8px;
+}
+
+/* O aviso do estorno, sob o campo de valor: ele muda o significado do
+   lançamento inteiro e o erro previsível (juros e anuidade lançados
+   como negativo) só se evita dizendo o que é. */
+.refundNote {
+    margin-top: 8px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+}
+
+/* No cartão não há "já foi pago": a linha explica por quê, no lugar
+   exato onde o checkbox estaria. */
+.paidNote {
+    margin-top: 8px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+}
+
+@media (max-width: 720px) {
+    .rowValue,
+    .rowKind,
+    .rowPair,
+    .rowThree {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .amountInput {
+        font-size: 26px;
+    }
+}
