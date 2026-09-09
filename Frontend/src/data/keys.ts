@@ -41,6 +41,11 @@ export const queryKeys = {
        resposta. */
     /** Os nove indicadores do mês. */
     monthReport: (month: ApiTypes.ReferenceMonth) => ["reports", "month", month] as const,
+    /** O extrato do mês — a decomposição do mesmo saldo. Debaixo da
+     *  mesma raiz `reports` de propósito: quitar uma parcela muda o
+     *  indicador e a linha do extrato ao mesmo tempo, e uma raiz só é o
+     *  que garante que os dois sejam invalidados juntos. */
+    statement: (month: ApiTypes.ReferenceMonth) => ["reports", "statement", month] as const,
 
     /* Raízes, para invalidar tudo de um domínio depois de uma escrita
        que atravessa meses (parcelado, série de fixo, estorno). */

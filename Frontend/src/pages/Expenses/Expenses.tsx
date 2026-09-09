@@ -142,7 +142,11 @@ export function Expenses() {
     /* Os parcelados em que o usuário pediu para ver o total da compra no
        lugar da parcela do mês. */
     const [revealed, setRevealed] = useState<number[]>([]);
-    const [openExpense, setOpenExpense] = useState<number | null>(null);
+    /* O extrato manda para cá com `?IdExpense=`, e é a URL que decide o
+       PRIMEIRO painel: depois disso quem manda é o clique na lista. */
+    const [openExpense, setOpenExpense] = useState<number | null>(
+        () => Number(urlQuery.get("IdExpense")) || null,
+    );
     const [seriesDraft, setSeriesDraft] = useState<SeriesDraft | null>(null);
     const [confirming, setConfirming] = useState<"cancel" | "cancelSeries" | null>(null);
     const [error, setError] = useState<string | null>(null);

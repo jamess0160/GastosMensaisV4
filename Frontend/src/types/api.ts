@@ -874,6 +874,103 @@ export namespace ApiTypes {
         ReferenceMonth?: ReferenceMonth;
     }
 
+    /* ── 15.1 Extrato ─────────────────────────────────────────── */
+
+    /** De onde a linha do extrato da conta veio.
+     *
+     *  `invoice` é a fatura do cartão entrando na conta como UMA linha —
+     *  quarenta compras não viram quarenta lançamentos bancários. Não é
+     *  dupla contagem com o `Cards`: é a mesma perna vista dos dois
+     *  lados, e por isso ela não tem um lançamento único para onde
+     *  navegar. */
+    export type StatementEntryKind = "opening" | "inflow" | "transfer" | "expense" | "invoice";
+
+    /** Uma linha do extrato de uma conta.
+     *
+     *  `Value` é ASSINADO, e é o que faz conferir o extrato ser somar a
+     *  lista. Duas colunas de débito e crédito virariam uma subtração
+     *  que alguém escreve ao contrário uma hora.
+     *
+     *  Os ids são o caminho de volta ao lançamento, e QUAIS vêm depende
+     *  do `Kind`: nenhum na `opening`, `IdInflow` na entrada e na
+     *  transferência, `IdExpense`/`IdExpensePayment` no gasto, e
+     *  `IdPaymentMethod` na fatura. */
+    export interface StatementEntry {
+        Date: CalendarDate;
+        Kind: StatementEntryKind;
+        Description: string;
+        Value: Money;
+        IdInflow?: number;
+        IdExpense?: number;
+        IdExpensePayment?: number;
+        IdPaymentMethod?: number;
+    }
+
+    /** O extrato de uma conta no mês — o que o dinheiro FEZ.
+     *
+     *  `OpeningBalance` + a soma dos `Value` = `ClosingBalance`, ao
+     *  centavo, e esse `ClosingBalance` é o MESMO `Balance` que
+     *  `GET /Accounts` devolve para o mês. A tela EXIBE o número que a
+     *  API afirmou e não o recalcula: se a soma não fechar, é bug da
+     *  API, e é lá que se conserta.
+     *
+     *  `Active: false` aparece aqui: arquivada quer dizer "não use
+     *  mais", não "não existiu". A arquivada SEM movimento no mês não
+     *  vem na resposta. */
+    export interface StatementAccount {
+        IdAccount: number;
+        Name: string;
+        Active: boolean;
+        OpeningBalance: Money;
+        ClosingBalance: Money;
+        Entries: StatementEntry[];
+    }
+
+    /** Uma compra dentro da fatura. A `Date` é a da COMPRA, não a do
+     *  vencimento — é assim que se reconhece o lançamento. */
+    export interface StatementCardEntry {
+        Date: CalendarDate;
+        Description: string;
+        /** Positivo: é o que a fatura cobra. */
+        Value: Money;
+        IdExpense: number;
+        IdExpensePayment: number;
+        InstallmentNumber: number | null;
+        InstallmentTotal: number | null;
+        Paid: boolean;
+        Charged: boolean;
+    }
+
+    /** A fatura: o par (cartão, vencimento), que é tudo que uma fatura é
+     *  neste modelo — não há tabela de fatura.
+     *
+     *  Ela segue regras OPOSTAS às da conta, e é a assimetria inteira do
+     *  extrato: a conta mostra o que já passou (só liquidado, cortado
+     *  pelo `CashDate`), a fatura mostra o que foi comprado (pago E
+     *  pendente, cortado pelo `DueDate` do ciclo). */
+    export interface StatementCard {
+        IdPaymentMethod: number;
+        Name: string;
+        DueDate: CalendarDate;
+        Total: Money;
+        Entries: StatementCardEntry[];
+    }
+
+    /** `GET /Reports/Statement` — a decomposição do saldo do mês.
+     *
+     *  Ela NÃO é a conciliação do frame B do layout: não importa arquivo
+     *  de banco, não casa lançamento com lançamento e não tem estado
+     *  "conciliado". */
+    export interface StatementReport {
+        ReferenceMonth: CalendarDate;
+        Accounts: StatementAccount[];
+        Cards: StatementCard[];
+    }
+
+    export interface StatementQuery {
+        ReferenceMonth?: ReferenceMonth;
+    }
+
     /* ── 16. Utils ────────────────────────────────────────────── */
 
     export type LogType = "info" | "error" | "userError" | "untracked" | "telemetry";

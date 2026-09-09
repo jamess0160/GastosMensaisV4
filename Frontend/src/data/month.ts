@@ -77,6 +77,23 @@ export function useMonthReport(
     });
 }
 
+/** O extrato do mês — a decomposição do saldo que a tela de Contas já
+ *  mostra somado.
+ *
+ *  Mesma regra do `useMonthReport`, e aqui ela é ainda mais fácil de
+ *  quebrar: NADA daqui se recalcula no cliente. O `ClosingBalance` é o
+ *  que a API afirmou, e somar a coluna para "conferir" seria construir
+ *  a segunda implementação da mesma pergunta — a que faz duas telas
+ *  discordarem. Se a soma não fechar, é bug da API. */
+export function useMonthStatement(
+    month: ApiTypes.ReferenceMonth,
+): UseQueryResult<ApiTypes.StatementReport> {
+    return useQuery({
+        queryKey: queryKeys.statement(month),
+        queryFn: () => ReportsConnection.statement(month),
+    });
+}
+
 export function useMonthBudgets(
     month: ApiTypes.ReferenceMonth,
 ): UseQueryResult<ApiTypes.BudgetPeriod[]> {

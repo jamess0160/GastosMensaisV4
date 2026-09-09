@@ -1,0 +1,137 @@
+/* A tela de extrato não existe no layout: ela nasce da rota, não do
+   frame B de "Conciliação" — que é outra coisa e continua sem
+   especificação. O que se reaproveita são as medidas da folha
+   compartilhada (o card, o cabeçalho de seção do slide-over e a
+   tabela), para ela não parecer de outro produto. */
+
+.notice {
+    background: var(--brand-soft);
+    border: 1px solid var(--brand-tint);
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-2);
+}
+
+.noticeLink {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--brand);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.section {
+    overflow: hidden;
+}
+
+.sectionHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.sectionTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.sectionSub {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 4px;
+}
+
+/* As duas pontas do mês, lado a lado e na ordem em que se lê a conta:
+   de onde partiu, para onde chegou. O fechamento é o número que a API
+   afirmou — nunca a soma da coluna feita aqui. */
+.ends {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.end {
+    text-align: right;
+}
+
+.endValue {
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin-top: 4px;
+}
+
+.endStrong {
+    font-size: 20px;
+    letter-spacing: -0.4px;
+}
+
+.endArrow {
+    color: var(--ink-3);
+    font-size: 18px;
+}
+
+.kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ink-2);
+}
+
+.kind svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Uma coluna assinada, e não duas de débito e crédito: com sinal,
+   conferir o extrato é somar a lista. */
+.pos {
+    color: var(--pos-ink);
+}
+
+.neg {
+    color: var(--neg);
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+@media (max-width: 900px) {
+    .sectionHead {
+        padding: 16px;
+    }
+
+    .ends {
+        width: 100%;
+        justify-content: space-between;
+    }
+}

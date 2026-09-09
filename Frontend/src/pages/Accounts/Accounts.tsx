@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import {
     AccountsController,
@@ -236,6 +237,13 @@ export function Accounts() {
     const invalidateCatalogs = useInvalidateCatalogs();
     const invalidateMovement = useInvalidateMovement();
 
+    const navigate = useNavigate();
+    /* O extrato manda para cá com `?IdPaymentMethod=`: a linha "Fatura"
+       dele não tem um lançamento único atrás, então o destino do clique
+       é o CARTÃO. O cartão mora dentro do painel da conta dele, e é por
+       isso que o parâmetro é resolvido em conta antes de abrir. */
+    const [urlQuery] = useSearchParams();
+
     const [accountDraft, setAccountDraft] = useState<AccountDraft | null>(null);
     const [cardDraft, setCardDraft] = useState<CardDraft | null>(null);
     const [openAccount, setOpenAccount] = useState<number | null>(null);
@@ -295,7 +303,26 @@ export function Accounts() {
             account.PaymentMethods.filter((m) => m.Active && m.Kind === "credit_card").length,
         0,
     );
-    const detail = active.find((account) => account.IdAccount === openAccount) ?? null;
+    /* A conta do cartão pedido na URL. Ela abre o painel enquanto o
+       usuário não clicar em outra coisa: `openAccount` continua sendo o
+       estado da tela, e a URL só decide a PRIMEIRA. */
+    const askedMethod = Number(urlQuery.get("IdPaymentMethod")) || null;
+    const askedAccount = askedMethod
+        ? ((accounts.data ?? []).find((account) =>
+              account.PaymentMethods.some((method) => method.IdPaymentMethod === askedMethod),
+          )?.IdAccount ?? null)
+        : null;
+
+    const shownAccount = openAccount ?? askedAccount;
+    const detail = active.find((account) => account.IdAccount === shownAccount) ?? null;
+
+    /* Fechar o painel LIMPA a URL junto. Sem isso, quem chegou pelo
+       extrato fecharia e o `?IdPaymentMethod=` reabriria o painel no
+       mesmo instante — o painel que não fecha. */
+    const closeAccount = () => {
+        setOpenAccount(null);
+        if (askedMethod) navigate("/contas", { replace: true });
+    };
 
     return (
         <>
@@ -305,12 +332,14 @@ export function Accounts() {
                 onMonthChange={setMonth}
                 actions={
                     <>
-                        {/* Sem rota: a conciliação de extrato não existe no
-                            contrato. O botão fica desabilitado e rotulado,
-                            porque faz parte da composição do layout. */}
-                        <Button disabled title="Ainda sem API">
-                            Conciliar extrato
-                        </Button>
+                        {/* O botão TROCOU DE NOME junto com a rota que
+                            o ligou. `GET /Reports/Statement` não é a
+                            conciliação do frame B: não importa arquivo
+                            do banco, não casa lançamento com lançamento
+                            e não tem estado "conciliado". É a abertura
+                            do saldo — e chamá-lo de "Conciliar" seria
+                            prometer o que a tela não faz. */}
+                        <Button onClick={() => navigate("/contas/extrato")}>Extrato</Button>
                         <Button
                             variant="primary"
                             onClick={() => setAccountDraft(newAccountDraft())}
@@ -456,7 +485,7 @@ export function Accounts() {
                                 <TableRow
                                     key={account.IdAccount}
                                     onClick={() => setOpenAccount(account.IdAccount)}
-                                    selected={openAccount === account.IdAccount}
+                                    selected={shownAccount === account.IdAccount}
                                 >
                                     <RowTrigger label={`Abrir ${account.Name}`}>
                                         <span className={styles.mark} style={{ background: color }}>
@@ -534,7 +563,7 @@ export function Accounts() {
                 {/* ── Slide-over: cartões da conta ─────────────────── */}
                 <SlideOver
                     open={detail !== null}
-                    onClose={() => setOpenAccount(null)}
+                    onClose={closeAccount}
                     title={detail?.Name ?? ""}
                     subtitle={
                         detail
@@ -544,7 +573,7 @@ export function Accounts() {
                     footer={
                         <>
                             <FooterSpacer />
-                            <Button onClick={() => setOpenAccount(null)}>Fechar</Button>
+                            <Button onClick={closeAccount}>Fechar</Button>
                             {detail && acceptsCreditCard(detail) && (
                                 <Button
                                     variant="primary"
@@ -1083,7 +1112,7 @@ export function Accounts() {
                         if (!target) return;
                         if (target.kind === "account") {
                             void AccountsController.archiveAccount(context, target.id);
-                            setOpenAccount(null);
+                            closeAccount();
                         } else {
                             void AccountsController.archiveCard(context, target.id);
                         }

@@ -26,6 +26,9 @@ const Income = lazy(() => import("@/pages/Income/Income").then((m) => ({ default
 const Accounts = lazy(() =>
     import("@/pages/Accounts/Accounts").then((m) => ({ default: m.Accounts })),
 );
+const Statement = lazy(() =>
+    import("@/pages/Statement/Statement").then((m) => ({ default: m.Statement })),
+);
 const Report = lazy(() => import("@/pages/Report/Report").then((m) => ({ default: m.Report })));
 const Settings = lazy(() =>
     import("@/pages/Settings/Settings").then((m) => ({ default: m.Settings })),
@@ -48,13 +51,18 @@ export interface ScreenRoute {
     element: ReactNode;
 }
 
-/** As 8 telas do chassi — as 8 do layout menos o login, mais o perfil e
- *  o espaço, que o contrato pede e o layout não desenha. */
+/** As 9 telas do chassi — as 8 do layout menos o login, mais o perfil,
+ *  o espaço e o extrato, que a API pede e o layout não desenha. */
 export const SHELL_SCREENS: ScreenRoute[] = [
     { index: true, element: load(<Dashboard />) },
     { path: "gastos", element: load(<Expenses />) },
     { path: "renda", element: load(<Income />) },
     { path: "contas", element: load(<Accounts />) },
+    /* O extrato é filho de Contas na URL porque é filho dela no
+       produto: ele decompõe o saldo que aquela tela mostra somado, e o
+       mês do chassi é o mesmo nas duas — o extrato de um mês e o saldo
+       daquele mês têm que andar juntos. */
+    { path: "contas/extrato", element: load(<Statement />) },
     { path: "relatorio", element: load(<Report />) },
     { path: "personalizacao", element: load(<Settings />) },
     { path: "perfil", element: load(<Profile />) },

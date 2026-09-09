@@ -34,6 +34,27 @@ class Connection {
         const { data } = await http.get<ApiTypes.MonthReport>(`${this.route}/Month`, { params });
         return data;
     }
+
+    /** O extrato do mês — a DECOMPOSIÇÃO do saldo, não uma consulta
+     *  nova.
+     *
+     *  `OpeningBalance` + a soma das linhas = `ClosingBalance`, e esse
+     *  `ClosingBalance` é o mesmo `Balance` que `GET /Accounts` devolve
+     *  para o mês. Vale para esta rota a regra do cabeçalho: a tela
+     *  EXIBE o fechamento que a API afirmou, e não o recalcula somando
+     *  a coluna.
+     *
+     *  Como em `month`, o mês vai sempre, embora seja opcional na rota:
+     *  omitir devolveria setembro enquanto o usuário olha março. */
+    async statement(referenceMonth?: ApiTypes.ReferenceMonth): Promise<ApiTypes.StatementReport> {
+        const params: ApiTypes.StatementQuery = referenceMonth
+            ? { ReferenceMonth: referenceMonth }
+            : {};
+        const { data } = await http.get<ApiTypes.StatementReport>(`${this.route}/Statement`, {
+            params,
+        });
+        return data;
+    }
 }
 
 export const ReportsConnection = new Connection();

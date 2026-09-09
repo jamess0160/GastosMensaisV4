@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { IncomeController, type IncomeContext, type InflowDraft } from "./controller";
 import { clonable } from "./sections/cloneMonth";
@@ -86,6 +87,7 @@ export function Income() {
     /* Multi-seleção, como em Gastos: vazio = sem recorte. A lista de
        entradas não traz canceladas (a API só as devolve sob pedido), por
        isso aqui não há o chip de "Canceladas" que Gastos tem. */
+    const [urlQuery] = useSearchParams();
     const [statuses, setStatuses] = useState<ApiTypes.InflowStatus[]>([]);
     const [kinds, setKinds] = useState<ApiTypes.InflowKind[]>([]);
     const [idPersons, setIdPersons] = useState<number[]>([]);
@@ -94,7 +96,11 @@ export function Income() {
        TODAS marcadas — que é como o painel abre. */
     const [cloning, setCloning] = useState(false);
     const [cloneChoice, setCloneChoice] = useState<number[] | null>(null);
-    const [openInflow, setOpenInflow] = useState<number | null>(null);
+    /* O extrato manda para cá com `?IdInflow=`, e é a URL que decide o
+       PRIMEIRO painel: depois disso quem manda é o clique na lista. */
+    const [openInflow, setOpenInflow] = useState<number | null>(
+        () => Number(urlQuery.get("IdInflow")) || null,
+    );
     const [draft, setDraft] = useState<InflowDraft | null>(null);
     const [confirming, setConfirming] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
