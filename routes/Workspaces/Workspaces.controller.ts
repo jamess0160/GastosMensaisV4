@@ -16,8 +16,10 @@ class Controller {
         res.json(await new CreateOwn().run(res.locals.IdUser, req.body))
     }
 
+    //  O IdWorkspace vai junto porque a resposta marca qual da lista é o da sessão — e isso é
+    //  informação do token, não da tabela.
     getSelf = async (req: Request, res: Response) => {
-        res.json(await new GetSelf().run(res.locals.IdUser))
+        res.json(await new GetSelf().run(res.locals.IdUser, res.locals.IdWorkspace))
     }
 
     //  O res vai junto porque trocar de workspace reemite o token da sessão

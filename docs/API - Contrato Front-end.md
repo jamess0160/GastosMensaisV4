@@ -453,11 +453,16 @@ Não recebe `IdWorkspace` (ele nasce aqui) nem `IdOwnerUser` (é o usuário do t
 
 ### `GET /Workspaces/getSelf`
 
-Os workspaces em que o usuário é membro.
+Os workspaces em que o usuário é membro, com **o da sessão marcado**.
 
 ```json
-[{ "IdWorkspace": 1, "Name": "Casa", "IdOwnerUser": 1, "CreatedAt": "...", "UpdatedAt": "..." }]
+[{ "IdWorkspace": 1, "Name": "Casa", "IdOwnerUser": 1, "Current": true, "CreatedAt": "...", "UpdatedAt": "..." },
+ { "IdWorkspace": 4, "Name": "Ruah", "IdOwnerUser": 1, "Current": false, "CreatedAt": "...", "UpdatedAt": "..." }]
 ```
+
+**`Current` é o único campo daqui que não descreve o workspace — ele descreve o TOKEN que chegou nesta requisição.** O mesmo workspace vem `true` numa aba e `false` na outra, e ele muda sozinho quando o `POST /Workspaces/switch` reemite o cookie. Exatamente **um** item da lista vem `true`.
+
+> **Leia daqui em qual espaço a sessão está, e não de memória do cliente.** A seleção vive dentro do JWT e o cookie é `HttpOnly`: sem este campo o front não teria como saber, e o chute do primeiro da lista faz a tela **afirmar** um espaço enquanto os lançamentos vão para outro. Um valor guardado no navegador tem o mesmo problema — ele pode discordar do cookie sem que nada acuse.
 
 ### `POST /Workspaces/switch`
 
@@ -465,7 +470,7 @@ Os workspaces em que o usuário é membro.
 
 **Body:** `{ "IdWorkspace": 2 }`
 
-**Resposta:** o workspace escolhido, mesma forma do `getSelf` (objeto único).
+**Resposta:** o workspace escolhido, mesma forma do `getSelf` (objeto único) — com `Current: true`, que é o que ele acabou de se tornar.
 
 ### `PUT /Workspaces`
 

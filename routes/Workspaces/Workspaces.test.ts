@@ -113,6 +113,31 @@ describe("Workspaces", () => {
             })
         })
 
+        //  O Current é a razão de a rota existir para o chassi: sem ele o cliente não tem como
+        //  saber em qual espaço está — a seleção vive dentro do token e o cookie é HttpOnly.
+        it("marca com Current o workspace do token, e só ele", async () => {
+            let creator = await UsersFactory.createClient({ Name: "Dono de dois workspaces" })
+
+            let created = await creator.client.post("/Workspaces", { Name: "Empresa" })
+
+            //  Criar NÃO troca a sessão: o Current continua no workspace do cadastro
+            let self = await creator.client.get("/Workspaces/getSelf")
+
+            expect(self.body).toHaveLength(2)
+            expect(self.body.filter((item: { Current: boolean }) => item.Current)).toHaveLength(1)
+            expect(self.body.find((item: { Current: boolean }) => item.Current).IdWorkspace).toBe(creator.workspace.IdWorkspace)
+
+            //  E acompanha o TOKEN, não o banco: o Current muda quando o switch reemite o
+            //  cookie, e quem continuar mandando o token antigo continua vendo a seleção antiga.
+            let switched = await creator.client.post("/Workspaces/switch", { IdWorkspace: created.body.IdWorkspace })
+
+            creator.client.setToken(TestClient.extractCookieToken(switched))
+
+            let after = await creator.client.get("/Workspaces/getSelf")
+
+            expect(after.body.find((item: { Current: boolean }) => item.Current).IdWorkspace).toBe(created.body.IdWorkspace)
+        })
+
         //  A leitura sai de WorkspaceMembers: quem não é membro não enxerga o tenant
         it("não devolve o workspace de outro usuário", async () => {
             let other = await UsersFactory.create()
@@ -170,6 +195,8 @@ describe("Workspaces", () => {
             expect(response.body).toMatchObject({
                 IdWorkspace: owner.workspace.IdWorkspace,
                 IdOwnerUser: owner.user.IdUser,
+                //  Mesma forma da linha do getSelf: é o workspace que acabou de virar o da sessão
+                Current: true,
             })
 
             let token = TestClient.extractCookieToken(response)

@@ -37,6 +37,9 @@ export class Switch {
         //  usando o app agora não deve perder a sessão por ter trocado de workspace.
         AcessControl.setTokenCookie(res, IdUser, workspace.IdWorkspace, RememberDevice)
 
-        return workspace
+        //  Current: true, na mesma forma da linha do getSelf. O token que acabou de ser emitido
+        //  aponta para ESTE workspace, então não há outro valor possível — e devolver o mesmo
+        //  formato dos dois lados poupa o cliente de ter dois tipos para a mesma coisa.
+        return { ...workspace, Current: true }
     }
 }

@@ -1,7 +1,7 @@
 # Changelog do contrato — fora de leva
 
 Mudanças que o front enxergou e que **não pertencem a leva nenhuma**: correções e acréscimos
-aplicados soltos, entre 2026-08-31 e 2026-09-06.
+aplicados soltos, entre 2026-08-31 e 2026-09-08.
 
 Elas existem pelo mesmo motivo pelo qual
 [Levas executadas](../../Levas%20executadas.md#fora-de-leva) tem uma seção com esse nome — não
@@ -9,8 +9,9 @@ adianta fingir que todo commit nasce dentro de um plano. Ficam aqui para não se
 numa leva onde não estão.
 
 Duas delas são ajustes sobre a etapa 1 da leva 1 (o cadastro de conta e de cartão), uma é a
-correção do saldo — que é maior do que "ajuste pontual", e mesmo assim não era etapa de ninguém —
-e uma é a criação de workspace, que encosta na etapa 9 da leva 1 sem ser ela.
+correção do saldo — que é maior do que "ajuste pontual", e mesmo assim não era etapa de ninguém —,
+uma é a criação de workspace, que encosta na etapa 9 da leva 1 sem ser ela, e a última é o
+`Current` do `getSelf`, que nasceu de um bug visto na tela depois de a leva 3 já ter fechado.
 
 Os três marcadores (🔴 quebra / 🟡 comportamento / 🟢 adição) estão definidos na seção 19 do
 [contrato](../../API%20-%20Contrato%20Front-end.md#19-changelog), junto com a regra do que entra
@@ -21,6 +22,20 @@ aqui e do que não entra.
 > isso que toda entrada aponta para a seção do contrato que ela alterou.
 
 ---
+
+### 2026-09-08 — `GET /Workspaces/getSelf`: `Current` diz em qual workspace a sessão está
+
+🟢 **Adição** — ver a seção 4.
+
+**O que entrou.** Um booleano `Current` em cada item de `GET /Workspaces/getSelf`, e o mesmo campo na resposta do `POST /Workspaces/switch` (lá ele é sempre `true`). Exatamente um item da lista vem `true`: o do token que chegou na requisição.
+
+**Por que ele existe.** A seleção de workspace vive dentro do JWT e o cookie é `HttpOnly` — o cliente **não tinha como saber** em qual espaço estava. A lista vinha sem marcação nenhuma, então o front guardava o que o último `switch` respondeu e, no primeiro carregamento, chutava o primeiro da lista. O chute acerta enquanto o usuário tem um workspace só; com dois, quem entra no segundo e recarrega a página lê o nome do **primeiro** na tela enquanto o cookie continua no segundo. É a pior forma do erro: a tela afirma um espaço e o lançamento vai para outro.
+
+**`Current` não é coluna, e nem podia ser.** Ele não descreve o workspace, descreve o token: o mesmo workspace é `true` numa aba e `false` na outra, e ele vira sozinho quando o `switch` reemite o cookie. Quem continuar mandando o token antigo continua vendo a seleção antiga — o que está certo, porque é nela que aquele token opera.
+
+**Ação do front:** leia `Current` e **apague a memória local de qual era o espaço atual**. A ordenação da lista continua por `IdWorkspace` e não significa nada — o primeiro item não é o atual.
+
+**Nada quebra:** os campos que já existiam continuam iguais, e quem ignorar o `Current` se comporta como antes.
 
 ### 2026-09-06 — `POST /Workspaces`: criar um workspace novo
 

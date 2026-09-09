@@ -24,11 +24,15 @@ class Schema {
         })),
     ]
 
+    //  O Current é o único campo daqui que não sai da tabela: ele responde "é este o workspace
+    //  do token desta requisição?". Sem ele o cliente não teria como saber — a seleção vive
+    //  dentro do JWT e o cookie é HttpOnly —, e acabaria chutando o primeiro da lista.
     public readonly getSelf = [
         joiController.validateResponse(Joi.array().items(Joi.object({
             IdWorkspace: Joi.number().required(),
             Name: Joi.string().trim().required(),
             IdOwnerUser: Joi.number().required(),
+            Current: Joi.boolean().required(),
             CreatedAt: Joi.date().required(),
             UpdatedAt: Joi.date().required(),
         }))),
@@ -39,10 +43,14 @@ class Schema {
         joiController.validateBody(Joi.object({
             IdWorkspace: Joi.number().required(),
         })),
+        //  Mesma forma da linha do getSelf, Current inclusive: é a resposta de quem ACABOU de
+        //  ser selecionado, então ele é sempre true. Um formato só para o mesmo objeto poupa o
+        //  cliente de ter dois tipos de workspace.
         joiController.validateResponse(Joi.object({
             IdWorkspace: Joi.number().required(),
             Name: Joi.string().trim().required(),
             IdOwnerUser: Joi.number().required(),
+            Current: Joi.boolean().required(),
             CreatedAt: Joi.date().required(),
             UpdatedAt: Joi.date().required(),
         })),
