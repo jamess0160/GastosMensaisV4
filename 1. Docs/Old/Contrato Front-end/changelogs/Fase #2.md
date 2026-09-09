@@ -8,16 +8,16 @@ correções sobre rotas que a leva 1 já tinha publicado. Duas entradas estão d
 porque foi quando o contrato foi escrito, um dia depois do commit.
 
 Os três marcadores (🔴 quebra / 🟡 comportamento / 🟢 adição) estão definidos na seção 19 do
-[contrato](../../API%20-%20Contrato%20Front-end.md#19-changelog), junto com a regra do que entra
+[contrato](../API%20-%20Contrato%20Front-end.md#19-changelog), junto com a regra do que entra
 aqui e do que não entra.
 
 > Este arquivo diz **o que mudou**. O que é **verdade hoje** está sempre no
-> [contrato](../../API%20-%20Contrato%20Front-end.md) — os dois não são intercambiáveis, e é por
+> [contrato](../API%20-%20Contrato%20Front-end.md) — os dois não são intercambiáveis, e é por
 > isso que toda entrada aponta para a seção do contrato que ela alterou.
 
 **O que a leva 2 entregou** está em
-[Levas executadas](../../Levas%20executadas.md#leva-2--o-que-sobe-junto-com-o-mvp), e o
-**desenho** dela no [plano](../../levas/2.%20Plano%20de%20Desenvolvimento%20-%20Leva%202.md).
+[Levas executadas](../../API/Levas%20executadas.md#leva-2--o-que-sobe-junto-com-o-mvp), e o
+**desenho** dela no [plano](../../API/levas/2.%20Plano%20de%20Desenvolvimento%20-%20Leva%202.md).
 
 ---
 

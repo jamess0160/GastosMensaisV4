@@ -1,6 +1,12 @@
-# CLAUDE.md
+# CLAUDE.md — API
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for the API side of this repository.
+
+**The rules that span both sides live in the [repository root's CLAUDE.md](../CLAUDE.md)** and
+are not repeated here: the commit convention, where the documentation lives, the money
+invariants both sides assume, and how the session works. Read
+[1. Docs/RoadMap MVP.md](../1.%20Docs/RoadMap%20MVP.md) before starting any work, and write the
+leva's plan before the code.
 
 ## Commands
 
@@ -10,35 +16,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run build` — full build: `build:app` (webpack bundles `index.ts` → `build/bundle.js`, `node_modules` excluded via `webpack-node-externals`) + `build:migrations` (`tsc -p tsconfig.migrations.json` compiles `migrations/*.ts` → `build/migrations`, compiled independently of the app bundle since migrations run through the Knex CLI).
 - Migrations (Knex CLI, `development` environment only, config in `knexfile.ts`): `npx knex migrate:latest`, `npx knex migrate:rollback`, `npx knex migrate:make <name>`.
 - No lint script is configured.
-
-## Commits
-
-**Every commit made by an AI agent in this repository follows this convention. It overrides the
-default "branch before committing to the default branch" behaviour — the repository owner asked
-for it explicitly.**
-
-- **One commit per unit of work, straight onto `main`.** No branch, no merge, no branch cleanup.
-  The branch-per-stage flow was tried through leva 2 and paid for nothing: each branch was born
-  and died without ever existing in parallel with anything.
-- **The message is a single short line naming the work, and nothing else.** No body, no bullet
-  list of decisions, no rationale. When the work is a stage of a development plan
-  (`docs/levas/`), that line is exactly:
-
-  ```
-  Fase #2 | Etapa 2 — Convite para o workspace
-  ```
-
-  `Fase` is the leva, `Etapa` is the stage number inside it, and the title is the stage's own
-  heading in the plan. For work that is not a stage, use the same shape: one line, what changed,
-  no body.
-- **The "why" does not go in the commit message.** It already lives in three places that outlive
-  it — the comments in the code, the stage's section in `docs/levas/`, and the batch's changelog
-  in `docs/contrato Front-end/changelogs/`. A long commit body is a fourth copy that drifts from the
-  other three.
-- **Do not push.** The owner pushes when they want to; `main` sitting a few commits ahead of
-  `origin/main` is the normal state here.
-- Keep the `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` trailer — it is attribution,
-  not part of the message.
 
 ## Environment
 
@@ -166,6 +143,16 @@ Both `Persons` and `Tags` carry `unique(IdWorkspace, Name)`, and **that index do
 
 **There is no hierarchy: a category is never the child of another** (migration `20260829010000_drop_categories_parent`). The column existed and was dropped along with everything it dragged behind it — checking that a client-supplied parent was visible to the workspace, refusing cycles (a cycle leaves the branch with no root, so it vanishes from the rendering while staying live and assignable by id), and cascading the archive down the subtree. None of that paid for itself with a dozen categories per workspace, and the flat list has no such failure modes.
 
+#### PostgreSQL specifics
+
+V3 was MySQL; V4 is PostgreSQL. Knex handles the DDL translation (`tinyint`→`smallint`, `.unsigned()` ignored, `enu`→`text`+`CHECK`, `binary`→`bytea`, `datetime`→`timestamptz`), but three things bite at the query layer:
+
+- **`Active` is a real `boolean`.** Use `.where("Active", true)` / `.update({ Active: false })`. The MySQL habit of `.where("Active", 1)` throws `operator does not exist: boolean = integer`.
+- **`numeric`, `bigint` and `date` are re-typed on read** by `registerPgTypeParsers` (`section/pgTypeParsers.ts`, called from `AppKnex.ts`). Without it node-postgres returns money and bigints as *strings* and `date` as a local-midnight `Date` that shifts the calendar day in UTC-3. Money and counters arrive as `number`; `date` columns (`CompetenceDate`, `DueDate`, `ReferenceMonth`, …) arrive as `"YYYY-MM-DD"` strings — they are calendar dates, not instants, so never wrap them in `new Date()` for display. Note the parsers are registered in the app path only; the Knex CLI (`knexfile.ts`) does not load them, which is fine as long as migrations only do DDL and inserts.
+- **Identifiers are case-sensitive.** Knex always double-quotes, so the PascalCase table/column names work through the query builder. Any raw SQL must quote them explicitly (`select "IdUser" from "Users"`), or Postgres will fold to lowercase and fail.
+
+Postgres has no `ON UPDATE CURRENT_TIMESTAMP`, so every model must set `UpdatedAt: KnexConnection.fn.now()` on update, as `Users.model.ts` does.
+
 ### The movement features
 
 `routes/Inflows/` and `routes/Expenses/` + `routes/ExpensePayments/` are where money actually moves, and they share four rules that no earlier feature needed:
@@ -228,32 +215,6 @@ Four rules hold for every routine here:
 
 Two operational notes: the engine is started **only from `index.ts`, and only outside `NODE_ENV=test`** — a routine firing mid-suite would change the database under a running test, the same failure mode `memoryLog.stop()` had to solve. And `moment` with no timezone uses the server clock, so the process needs `TZ=America/Sao_Paulo`: in UTC a "1st at 00:30" routine fires at 21:30 on the 31st in Brazil and materializes the wrong month. There is deliberately **no manual trigger** (no route, no CLI entry point): routines are convergent and catch-up already covers an outage, so the answer in production is to wait for the next tick.
 
-## The front-end contract, and its changelog
-
-`docs/API - Contrato Front-end.md` is what the front-end reads: every route, its Joi validation as it actually runs, and the shape of every response. It describes the **current** state; the *deltas* live beside it, in `docs/contrato Front-end/changelogs/`.
-
-**The changelog is split by batch — one file per leva** (`Fase #1.md`, `Fase #2.md`, `Fase #3.md`, plus `Fora de leva.md` for what belongs to no plan), and section 19 of the contract is the index plus the rules. Per batch, not one long file, because nobody reads a changelog by date: they read it to answer *what do I have to change to follow the new version*, and the unit of that question is the batch — it ships together and the front-end learns about it at once. The `Fora de leva.md` file exists for the same reason `Levas executadas.md` has a section with that name: pretending every commit is born inside a plan is what makes work disappear between two batches. `Fase #1.md` deliberately holds no entries — the contract was **written with** the MVP, so there was no earlier state to describe a delta from — and it says so, because a missing file reads as a lost one.
-
-**Any change that the front-end can observe gets an entry in the current batch's file, in the same commit as the change.** That means: a new or removed route, a new/removed/renamed field in a request or response, a new query parameter, a changed status code or `msg`, a changed default, and — the case that motivated all of this — **a number that keeps its name but changes its meaning**. A silent semantic change is the worst of the lot, because nothing on the client throws: it just starts showing something else. Internal refactors, tests and indexes are not front-facing and do not belong there. Infrastructure that no route exposes (the rotine engine, the mailer) produces no entry at all: when a routine changes a number on screen, the entry belongs to the routine.
-
-Entries go **newest first inside the batch's file**, under `### YYYY-MM-DD — <route>: <what changed>`, and carry the same four things: the date, the affected route, the severity marker (🔴 breaks / 🟡 behaviour / 🟢 addition, defined in the contract's section 19), and **the action the front-end has to take**. Update the route's own section in the contract too — the changelog says what moved, the section says what is true now, and the two are not interchangeable.
-
-`docs/levas/1. ROADMAP- MVP.md` maps the work in stages, ordered by the foreign keys, and records the cross-cutting decisions plus how each stage actually turned out. All four decisions are now settled: the workspace rides inside the token, the balance is computed and never cached, `Expenses.Status` is written only by `ExpenseStatus.section.ts`, and the period filter is `From`/`To`. Read it before starting a new feature — it also carries what is deliberately left open (workspace sharing, and the `Persons` `unique(IdUser)` constraint that assumes one workspace per user). The later batches live beside it (`docs/levas/2. ...`, `3. ...`), each one a plan for its own stages.
-
-`docs/Levas executadas.md` is the other half of that pair, and the two change on different beats. **A plan document (`docs/levas/`) changes when a *definition* changes** — a design is closed, a decision revisited, a stage is born or dropped. **`Levas executadas.md` changes when a *stage is finished*:** its line moves to the executed table with commit and date, in the same commit as the stage. Finishing a stage is not a reason to edit the plan; if the definition also changed while executing it, that's two edits saying two different things. It is also where a stage deliberately left out is recorded together with **where that work went** — the way the two stages left out of batch 1 are — so nothing falls between two batches.
-
-**No document ever cites another document's stage.** A cross-document reference names the *batch* at most; what needs saying about the stage is said by the name of what it delivers, which does not change when numbers do. Batch 3 was renumbered on 2026-09-07 so that stage order equals execution order, and that renumber silently broke forty-odd pointers across four documents — each one still resolving, each one now aimed at a different stage. Stage numbers are stable only *inside* their own document, and only from the first `Fase #N | Etapa M` commit onward; before that they are free to move. For the same reason `Levas executadas.md` no longer mirrors an unexecuted batch's stage table: the plan document is the single place that lists them.
-
-#### PostgreSQL specifics
-
-V3 was MySQL; V4 is PostgreSQL. Knex handles the DDL translation (`tinyint`→`smallint`, `.unsigned()` ignored, `enu`→`text`+`CHECK`, `binary`→`bytea`, `datetime`→`timestamptz`), but three things bite at the query layer:
-
-- **`Active` is a real `boolean`.** Use `.where("Active", true)` / `.update({ Active: false })`. The MySQL habit of `.where("Active", 1)` throws `operator does not exist: boolean = integer`.
-- **`numeric`, `bigint` and `date` are re-typed on read** by `registerPgTypeParsers` (`section/pgTypeParsers.ts`, called from `AppKnex.ts`). Without it node-postgres returns money and bigints as *strings* and `date` as a local-midnight `Date` that shifts the calendar day in UTC-3. Money and counters arrive as `number`; `date` columns (`CompetenceDate`, `DueDate`, `ReferenceMonth`, …) arrive as `"YYYY-MM-DD"` strings — they are calendar dates, not instants, so never wrap them in `new Date()` for display. Note the parsers are registered in the app path only; the Knex CLI (`knexfile.ts`) does not load them, which is fine as long as migrations only do DDL and inserts.
-- **Identifiers are case-sensitive.** Knex always double-quotes, so the PascalCase table/column names work through the query builder. Any raw SQL must quote them explicitly (`select "IdUser" from "Users"`), or Postgres will fold to lowercase and fail.
-
-Postgres has no `ON UPDATE CURRENT_TIMESTAMP`, so every model must set `UpdatedAt: KnexConnection.fn.now()` on update, as `Users.model.ts` does.
-
 ### Cache subsystem (`routes/Cache/`)
 
 An in-memory, socket-synced cache (`CacheEngine`, singleton `cacheEngine`), not tied to any one feature:
@@ -292,7 +253,3 @@ npm run test:e2e        # terminal 2: mesmas suítes, servidor real
 ```
 
 `Utils.configEnv()` applies the same `.env` + `.env.test` layering, so the server started with `NODE_ENV=test` and the test process read the identical config — without that the factories would seed one database while the server reads another.
-
-## Manual API testing
-
-`bruno/` is a Bruno collection (`bruno.json`, `collection.bru`) for exercising endpoints manually against a running local server.

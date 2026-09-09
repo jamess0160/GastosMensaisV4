@@ -8,18 +8,108 @@ de e-mail** são infra, e infra não muda nada que o front enxergue. Quando a ro
 muda um número na tela, a entrada é da rotina — não do motor.
 
 Os três marcadores (🔴 quebra / 🟡 comportamento / 🟢 adição) estão definidos na seção 19 do
-[contrato](../../API%20-%20Contrato%20Front-end.md#19-changelog), junto com a regra do que entra
+[contrato](../API%20-%20Contrato%20Front-end.md#19-changelog), junto com a regra do que entra
 aqui e do que não entra.
 
 > Este arquivo diz **o que mudou**. O que é **verdade hoje** está sempre no
-> [contrato](../../API%20-%20Contrato%20Front-end.md) — os dois não são intercambiáveis, e é por
+> [contrato](../API%20-%20Contrato%20Front-end.md) — os dois não são intercambiáveis, e é por
 > isso que toda entrada aponta para a seção do contrato que ela alterou.
 
 **O que a leva 3 entregou** está em
-[Levas executadas](../../Levas%20executadas.md#leva-3--o-que-depende-de-infra-ou-de-decisão), e o
-**desenho** dela no [plano](../../levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md).
+[Levas executadas](../../API/Levas%20executadas.md#leva-3--o-que-depende-de-infra-ou-de-decisão), e o
+**desenho** dela no [plano](../../API/levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md).
 
 ---
+
+### 2026-09-08 — `GET /Reports/Month`: o `Available` para de perder e de rotular errado a perna do mês passado
+
+🟡 **Comportamento**, e **corrige dois números errados** — mais um campo na resposta da seção 15,
+o `Available` muda de valor e o `OverduePayable` muda de significado.
+
+**O que estava errado.** O `OpeningBalance` é **caixa** (corta pela `CashDate`) e o resto do
+`Available` é **competência**. Enquanto as duas datas coincidiam a soma fechava por acidente; o
+`CompetenceMode` fez elas divergirem de propósito, e `purchase` é o **default de todo cartão** —
+então toda compra no cartão caía na fresta. Com a compra de 25/08 numa fatura que vence em 28/09:
+
+| | antes | agora |
+|---|---|---|
+| `OverduePayable` em setembro, fatura **em aberto** | **500** — anunciado na tela como "R$ 500 vencidos", com a fatura vencendo dia 28 | **0** |
+| `Available` em setembro, **depois de pagar a fatura** | **1000** — pagar a conta *aumentava* o quanto dava para gastar | **500** |
+
+O segundo é o pior: a perna paga com competência anterior não estava em termo nenhum — nem na
+abertura (a `CashDate` é depois do corte), nem no `Expenses` (a competência é de antes), nem no
+vencido (estava paga). Ela simplesmente **sumia**.
+
+**O que entrou.** `PastCommitments`, as pernas que **pesaram num mês anterior mas cujo dinheiro
+ainda não saiu**, subtraído do `Available`; e o `OverduePayable` passa a exigir que a `CashDate`
+**também** esteja no passado:
+
+```
+Available = OpeningBalance + InitialBalances
+          − PastCommitments   ← novo
+          + Inflows − Expenses + OverdueReceivable
+          − OverduePayable    ← agora só o que venceu de verdade
+```
+
+Cada perna passa a ser contada **exatamente uma vez**: competência no mês → `Expenses`;
+competência anterior com caixa anterior → `OpeningBalance` se paga, `OverduePayable` se não;
+competência anterior com caixa daqui para a frente → `PastCommitments`.
+
+**A sobra do mês atravessa sozinha.** Com os termos fechando, vale
+`Available(mês 2) = Available(mês 1) + entradas do mês 2 − pernas do mês 2`. Terminar setembro com
+500 e abrir outubro com 500 + o salário é consequência da fórmula, não feature.
+
+**Ação do front:**
+
+1. **não ofereça "lançar a sobra do mês anterior como entrada"** — o transporte é automático, e
+   cadastrar a sobra à mão conta o mesmo dinheiro duas vezes: o indicador vai a 4000 com 500 na
+   conta;
+2. **revise a tela de "vencidos"** se você a montava com o `OverduePayable`: o número encolhe, e
+   é para encolher — o que saiu dele nunca esteve atrasado;
+3. **não subtraia o `OpenInvoices` do `Available`.** Ele anota o `CurrentBalance` ("você tem 1000,
+   mas 500 já têm dono"); o `Available` já descontou esse dinheiro;
+4. se você **replicava a fórmula no cliente**, pare — foi para isso que a seção 15 nasceu, e este
+   é o segundo defeito em duas semanas que só existia por causa da réplica.
+
+### 2026-09-08 — `GET /Reports/Month`: o `Available` passa a contar a abertura da conta criada no mês
+
+🟡 **Comportamento**, e **corrige um número errado em produção** — mais um campo na resposta da
+seção 15, e o `Available` muda de valor no mês em que uma conta é cadastrada.
+
+**O que estava errado.** O `OpeningBalance` é o saldo realizado no **fim do mês anterior**, então
+uma conta com `InitialBalanceDate` dentro do mês pedido não entra nele — em 01/09 ela ainda não
+existia. E não entrava em mais lugar nenhum: o saldo inicial dela **sumia do `Available`**. Quem
+começa a usar o app em 05/09 com 1500 na conta e lança 3000 de salário via **3000**, tendo 4500 —
+o mesmo buraco que o `OpeningBalance` fecha nos meses seguintes, aberto justamente no mês de
+estreia. O `CurrentBalance` e o `Balance` de `GET /Accounts` sempre estiveram certos, porque o
+corte deles é o fim do mês; só o `Available` errava.
+
+**Pega todo cliente que grava a data de cadastro no `InitialBalanceDate`** — que é o
+comportamento certo, e o que o front faz hoje. E o erro **não passava com o mês**: quem abrisse
+setembro em janeiro continuaria vendo o mês de estreia sem o dinheiro que tinha.
+
+**O que entrou.** `InitialBalances`, a soma do `InitialBalance` das contas ativas cujo
+`InitialBalanceDate` cai **dentro** do mês pedido, somado ao `Available`:
+
+```
+Available = OpeningBalance
+          + InitialBalances    ← novo
+          + Inflows − Expenses + OverdueReceivable − OverduePayable
+```
+
+Ele é **fluxo, não posição**: aparece no mês da estreia e nos seguintes já vem dentro do
+`OpeningBalance`, sem dobrar. É a mesma linha `opening` que `GET /Reports/Statement` já mostrava
+no extrato, com o mesmo filtro.
+
+**Ação do front:**
+
+1. **nada a fazer para o `Available` ficar certo** — ele já vem corrigido, e se você mostrava
+   esse número no Dashboard ele vai mudar sozinho no mês em que a conta foi criada;
+2. se você **replicava a fórmula no cliente**, some o `InitialBalances` também — ou, melhor,
+   pare de replicá-la: é a razão de a seção 15 existir;
+3. **continue mandando o `InitialBalanceDate`** com o dia do cadastro. Mandar `null` para
+   "consertar" o número é jogar fora quando o saldo foi medido, e faz a conta ter saldo em meses
+   anteriores à existência dela.
 
 ### 2026-09-07 — `GET /Reports/Export`: a planilha passa a ser gerada pelo servidor
 

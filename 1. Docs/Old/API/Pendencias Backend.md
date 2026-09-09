@@ -1,7 +1,7 @@
 # Pendências do backend
 
 Levantadas ao converter o layout do Claude Design contra o contrato em
-[API - Contrato Front-end.md](API%20-%20Contrato%20Front-end.md).
+[API - Contrato Front-end.md](../Contrato%20Front-end/API%20-%20Contrato%20Front-end.md).
 
 Cada item aqui é algo que **o frontend não consegue resolver sozinho** —
 ou porque a informação não existe no cliente, ou porque resolver no
@@ -9,7 +9,7 @@ cliente seria contornar uma decisão de segurança do servidor. Onde faz
 sentido, proponho a forma do endpoint para poupar uma rodada de conversa.
 
 O que é só decisão de produto (tela X ou Y) não está aqui: está no
-[Plano de Desenvolvimento](levas/1.%20Plano%20de%20Desenvolvimento.md).
+[Plano de Desenvolvimento](../Front/levas/1.%20Plano%20de%20Desenvolvimento.md).
 
 ## Prioridade
 

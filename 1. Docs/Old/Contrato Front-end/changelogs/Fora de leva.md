@@ -4,7 +4,7 @@ Mudanças que o front enxergou e que **não pertencem a leva nenhuma**: correç�
 aplicados soltos, entre 2026-08-31 e 2026-09-08.
 
 Elas existem pelo mesmo motivo pelo qual
-[Levas executadas](../../Levas%20executadas.md#fora-de-leva) tem uma seção com esse nome — não
+[Levas executadas](../../API/Levas%20executadas.md#fora-de-leva) tem uma seção com esse nome — não
 adianta fingir que todo commit nasce dentro de um plano. Ficam aqui para não serem procuradas
 numa leva onde não estão.
 
@@ -14,11 +14,11 @@ uma é a criação de workspace, que encosta na etapa 9 da leva 1 sem ser ela, e
 `Current` do `getSelf`, que nasceu de um bug visto na tela depois de a leva 3 já ter fechado.
 
 Os três marcadores (🔴 quebra / 🟡 comportamento / 🟢 adição) estão definidos na seção 19 do
-[contrato](../../API%20-%20Contrato%20Front-end.md#19-changelog), junto com a regra do que entra
+[contrato](../API%20-%20Contrato%20Front-end.md#19-changelog), junto com a regra do que entra
 aqui e do que não entra.
 
 > Este arquivo diz **o que mudou**. O que é **verdade hoje** está sempre no
-> [contrato](../../API%20-%20Contrato%20Front-end.md) — os dois não são intercambiáveis, e é por
+> [contrato](../API%20-%20Contrato%20Front-end.md) — os dois não são intercambiáveis, e é por
 > isso que toda entrada aponta para a seção do contrato que ela alterou.
 
 ---

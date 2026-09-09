@@ -2,7 +2,7 @@
 
 Documento gerado a partir dos `*.route.ts` e `*.schema.ts` do repositório. Ele descreve **o que a API aceita e o que devolve hoje**. Toda validação citada aqui é a que roda de verdade (Joi, em `<Feature>.schema.ts`), não uma intenção.
 
-> **Mudou alguma coisa?** O [changelog](#19-changelog) — um arquivo por leva de desenvolvimento, em [`contrato Front-end/changelogs/`](contrato%20Front-end/changelogs/) — lista toda alteração que afeta o front, dizendo o que quebra e o que fazer. Comece pela leva mais nova.
+> **Mudou alguma coisa?** O [changelog](#19-changelog) — um arquivo por leva de desenvolvimento, em [`contrato Front-end/changelogs/`](changelogs/) — lista toda alteração que afeta o front, dizendo o que quebra e o que fazer. Comece pela leva mais nova.
 
 ---
 
@@ -1837,14 +1837,14 @@ A **rotina mensal do orçamento passou a existir** (2026-09-07) e roda no servid
 ## 19. Changelog
 
 **O changelog não mora mais neste arquivo.** Ele foi quebrado **por leva de desenvolvimento**, um
-arquivo por leva, em [`contrato Front-end/changelogs/`](contrato%20Front-end/changelogs/):
+arquivo por leva, em [`contrato Front-end/changelogs/`](changelogs/):
 
 | Arquivo | O que tem | Quando |
 |---|---|---|
-| [Fase #3](contrato%20Front-end/changelogs/Fase%20%233.md) | a leva 3 — infra, e-mail, sessão, `CompetenceMode` e `/Reports` | 2026-09-07 |
-| [Fase #2](contrato%20Front-end/changelogs/Fase%20%232.md) | a leva 2 — as correções que sobem junto com o MVP | 2026-09-04 → 2026-09-06 |
-| [Fase #1](contrato%20Front-end/changelogs/Fase%20%231.md) | o MVP: **não tem entradas**, e o arquivo explica por quê | até 2026-08-30 |
-| [Fora de leva](contrato%20Front-end/changelogs/Fora%20de%20leva.md) | o que mudou fora de qualquer plano | 2026-08-31 → 2026-09-06 |
+| [Fase #3](changelogs/Fase%20%233.md) | a leva 3 — infra, e-mail, sessão, `CompetenceMode` e `/Reports` | 2026-09-07 |
+| [Fase #2](changelogs/Fase%20%232.md) | a leva 2 — as correções que sobem junto com o MVP | 2026-09-04 → 2026-09-06 |
+| [Fase #1](changelogs/Fase%20%231.md) | o MVP: **não tem entradas**, e o arquivo explica por quê | até 2026-08-30 |
+| [Fora de leva](changelogs/Fora%20de%20leva.md) | o que mudou fora de qualquer plano | 2026-08-31 → 2026-09-06 |
 
 **Por leva, e não num arquivo só, porque é assim que o front atualiza.** Ninguém lê changelog por
 data: lê para saber *o que preciso mexer para acompanhar a versão nova*, e a unidade dessa

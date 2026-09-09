@@ -12,9 +12,9 @@ Este arquivo existe para que quem procurar o changelog da leva 1 encontre a resp
 achar que ele se perdeu.
 
 > Este arquivo diz **o que mudou**. O que é **verdade hoje** está sempre no
-> [contrato](../../API%20-%20Contrato%20Front-end.md) — os dois não são intercambiáveis, e é por
+> [contrato](../API%20-%20Contrato%20Front-end.md) — os dois não são intercambiáveis, e é por
 > isso que toda entrada aponta para a seção do contrato que ela alterou.
 
 **O que a leva 1 entregou** está em
-[Levas executadas](../../Levas%20executadas.md#leva-1--mvp), e o **desenho** dela no
-[ROADMAP](../../levas/1.%20ROADMAP-%20MVP.md).
+[Levas executadas](../../API/Levas%20executadas.md#leva-1--mvp), e o **desenho** dela no
+[ROADMAP](../../API/levas/1.%20ROADMAP-%20MVP.md).
