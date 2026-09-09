@@ -42,7 +42,28 @@ describe("submitLogin", () => {
         await submitLogin(fakeLoginContext({ email: "luana@exemplo.com", password: "1234" }));
 
         // A API chama de `login` e `password`, minúsculos — não de Email/Senha.
-        expect(body).toEqual({ login: "luana@exemplo.com", password: "1234" });
+        expect(body).toEqual({
+            login: "luana@exemplo.com",
+            password: "1234",
+            RememberDevice: false,
+        });
+    });
+
+    /* O "manter conectado": 30 dias em vez das 24h. O default é do
+       SERVIDOR (`false`), e a caixa da tela nasce desmarcada por causa
+       dele — o cliente não escolhe um default diferente do da API. */
+    it("manda o RememberDevice da caixa marcada", async () => {
+        let body: unknown;
+        server.use(
+            msw.post(route, async ({ request }) => {
+                body = await request.json();
+                return HttpResponse.json({ msg: "ok" });
+            }),
+        );
+
+        await submitLogin(fakeLoginContext({ rememberDevice: true }));
+
+        expect((body as { RememberDevice: boolean }).RememberDevice).toBe(true);
     });
 
     it("mostra a mensagem da API quando a credencial está errada", async () => {

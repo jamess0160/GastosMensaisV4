@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AuthLayout, authStyles as styles } from "@/ui/AuthLayout";
 import { Button } from "@/ui/primitives";
 import { ConfirmDialog } from "@/ui/overlay";
-import { FormField, Input, PasswordInput } from "@/ui/form";
+import { Checkbox, FormField, Input, PasswordInput } from "@/ui/form";
 import { IconFingerprint } from "@/ui/icons";
 import { LoginController, type LoginContext } from "./controller";
 import { readDeviceKey, writeDeviceKey } from "@/lib/deviceKey";
@@ -15,6 +15,9 @@ export function Login() {
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    /* DESMARCADA por padrão — que é o default do servidor, e não uma
+       escolha nossa diferente da dele. */
+    const [rememberDevice, setRememberDevice] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [offerBiometrics, setOfferBiometrics] = useState(false);
@@ -26,6 +29,7 @@ export function Login() {
             deviceKey,
             email,
             password,
+            rememberDevice,
             beginSubmit() {
                 setPending(true);
                 setError(null);
@@ -51,7 +55,7 @@ export function Login() {
                 setDeviceKey(next);
             },
         }),
-        [deviceKey, email, password, navigate, queryClient],
+        [deviceKey, email, password, rememberDevice, navigate, queryClient],
     );
 
     /* Chegar ao login limpa o que ficou na memória da tela anterior.
@@ -150,6 +154,19 @@ export function Login() {
                             />
                         )}
                     </FormField>
+
+                    {/* O layout promete "Lembrar deste navegador · sessão
+                        por 30 dias" desde o começo, e o cliente não tinha
+                        o controle: prometer 30 dias e deslogar em 24h é
+                        pior do que não oferecer. Agora as duas durações
+                        existem na API, e a caixa vale para os DOIS
+                        caminhos de login — a biometria manda o mesmo
+                        valor. */}
+                    <Checkbox
+                        label="Manter conectado por 30 dias"
+                        checked={rememberDevice}
+                        onChange={(event) => setRememberDevice(event.target.checked)}
+                    />
 
                     {error && (
                         <div className={styles.error} role="alert">

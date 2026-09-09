@@ -33,12 +33,20 @@ async function shouldInviteBiometrics(deviceKey: string | null): Promise<boolean
  *
  *  Com a sessão de pé, o convite de biometria vem ANTES de sair da tela:
  *  as rotas de registro de passkey são autenticadas, e é aqui que o
- *  cookie acabou de nascer. */
+ *  cookie acabou de nascer.
+ *
+ *  `RememberDevice` decide a DURAÇÃO do cookie que acabou de nascer:
+ *  30 dias marcado, 24h sem. Nada é guardado deste lado — quem mantém a
+ *  sessão é o cookie `HttpOnly`, e a escolha viaja dentro do token. */
 export async function submitLogin(context: LoginContext): Promise<void> {
     context.beginSubmit();
 
     try {
-        await UsersConnection.login({ login: context.email, password: context.password });
+        await UsersConnection.login({
+            login: context.email,
+            password: context.password,
+            RememberDevice: context.rememberDevice,
+        });
 
         if (await shouldInviteBiometrics(context.deviceKey)) {
             context.setInviteBiometrics(true);

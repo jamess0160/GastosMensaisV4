@@ -25,7 +25,15 @@ export async function signInWithBiometrics(context: LoginContext): Promise<void>
             optionsJSON: options as PublicKeyCredentialRequestOptionsJSON,
         });
 
-        await UsersAuthConnection.authenticate({ ChallengeToken, Response: response });
+        /* O MESMO `RememberDevice` do login por senha: uma caixa só na
+           tela, e os dois caminhos mandam o valor dela. Uma biometria
+           que durasse 24h com a caixa marcada seria a promessa dos 30
+           dias quebrada justamente por quem entra mais rápido. */
+        await UsersAuthConnection.authenticate({
+            ChallengeToken,
+            Response: response,
+            RememberDevice: context.rememberDevice,
+        });
         context.finishSignIn();
     } catch (cause) {
         context.failSubmit(errorMessage(cause));

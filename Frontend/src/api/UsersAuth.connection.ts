@@ -29,11 +29,10 @@ class Connection {
     }
 
     /** Público. O usuário é resolvido pela credencial assinada, não pelo
-     *  DeviceKey. Responde igual ao login por senha, com o `Set-Cookie`. */
-    async authenticate(body: {
-        ChallengeToken: string;
-        Response: unknown;
-    }): Promise<{ msg: string }> {
+     *  DeviceKey. Responde igual ao login por senha, com o `Set-Cookie`
+     *  — e com o mesmo `RememberDevice`, que decide se ele dura 24h ou
+     *  30 dias. */
+    async authenticate(body: ApiTypes.BiometricLoginBody): Promise<{ msg: string }> {
         const { data } = await http.post<{ msg: string }>(`${this.route}/authenticate`, body);
         return data;
     }

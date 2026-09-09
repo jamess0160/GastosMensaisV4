@@ -64,6 +64,19 @@ export namespace ApiTypes {
     export interface LoginBody {
         login: string;
         password: string;
+        /** O "manter conectado": 30 dias (`Max-Age` 2592000) em vez das
+         *  24 horas (`86400`).
+         *
+         *  Ausente ou `false` é a sessão de sempre — o default é do
+         *  SERVIDOR, e a caixa da tela nasce desmarcada por causa dele,
+         *  não por escolha do cliente.
+         *
+         *  A escolha viaja DENTRO do token, então
+         *  `POST /Workspaces/switch` não rebaixa uma sessão de 30 dias.
+         *  E nada é guardado aqui: quem mantém o usuário logado é o
+         *  cookie `HttpOnly`, que o JavaScript não alcança — não há
+         *  bandeira em `localStorage` a manter em dia. */
+        RememberDevice?: boolean;
     }
 
     /* ── 3. UsersAuth (WebAuthn) ──────────────────────────────── */
@@ -72,6 +85,18 @@ export namespace ApiTypes {
      *  null = nunca foi perguntado. */
     export interface CheckDeviceResponse {
         UseAuth: boolean | null;
+    }
+
+    /** O corpo de `POST /UsersAuth/authenticate`.
+     *
+     *  `RememberDevice` é o MESMO campo do login por senha, com o mesmo
+     *  nome e o mesmo default: a biometria não pode ganhar uma duração
+     *  diferente da que a pessoa marcou na tela. */
+    export interface BiometricLoginBody {
+        ChallengeToken: string;
+        /** `AuthenticationResponseJSON` — vai direto da lib para a API. */
+        Response: unknown;
+        RememberDevice?: boolean;
     }
 
     export interface WebAuthnChallenge<TOptions = unknown> {

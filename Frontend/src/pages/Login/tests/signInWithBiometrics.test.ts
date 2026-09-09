@@ -41,6 +41,30 @@ describe("signInWithBiometrics", () => {
         expect(context.finishSignIn).toHaveBeenCalledOnce();
     });
 
+    /* Uma caixa para os DOIS caminhos: a biometria manda o mesmo
+       `RememberDevice` do login por senha. Uma sessão de 24h para quem
+       marcou 30 dias seria a promessa quebrada justamente por quem entra
+       mais rápido. */
+    it("manda o RememberDevice da tela, como o login por senha", async () => {
+        server.use(
+            msw.get(optionsRoute, () =>
+                HttpResponse.json({ options: { challenge: "abc" }, ChallengeToken: "jwt-123" }),
+            ),
+        );
+        let body: { RememberDevice?: boolean } = {};
+        server.use(
+            msw.post(authRoute, async ({ request }) => {
+                body = (await request.json()) as { RememberDevice?: boolean };
+                return HttpResponse.json({ msg: "ok" });
+            }),
+        );
+        startAuthentication.mockResolvedValue({ id: "credential-1" });
+
+        await signInWithBiometrics(fakeLoginContext({ rememberDevice: true }));
+
+        expect(body.RememberDevice).toBe(true);
+    });
+
     it("passa as options da API direto para a lib, sem reformatar", async () => {
         const options = { challenge: "abc", rpId: "exemplo.com", timeout: 60000 };
         server.use(

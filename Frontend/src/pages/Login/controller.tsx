@@ -13,6 +13,11 @@ export interface LoginContext {
     deviceKey: string | null;
     email: string;
     password: string;
+    /** A caixa "manter conectado". Ela vale para os DOIS caminhos de
+     *  login — senha e biometria —, porque o campo é o mesmo nos dois e
+     *  a biometria não pode ficar com uma duração diferente da que a
+     *  pessoa marcou na tela. */
+    rememberDevice: boolean;
     /** Entra em "enviando" e limpa o erro anterior. */
     beginSubmit(): void;
     /** Sai de "enviando" mostrando a mensagem. */

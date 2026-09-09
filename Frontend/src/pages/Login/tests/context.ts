@@ -11,6 +11,7 @@ export function fakeLoginContext(overrides: Partial<LoginContext> = {}): LoginCo
         deviceKey: "device-abc",
         email: "tiago@exemplo.com",
         password: "senha-certa",
+        rememberDevice: false,
         beginSubmit: vi.fn(),
         failSubmit: vi.fn(),
         finishSignIn: vi.fn(),
