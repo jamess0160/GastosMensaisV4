@@ -1,5 +1,6 @@
 import { changePassword } from "./sections/changePassword";
 import { removePasskey } from "./sections/removePasskey";
+import { resendConfirmation } from "./sections/resendConfirmation";
 import { saveProfile } from "./sections/saveProfile";
 import type { ApiTypes } from "@/types/api";
 
@@ -23,13 +24,17 @@ export interface ProfileContext {
  *
  *  `workspace` saiu: trocar de espaço virou gesto do CHASSI
  *  (`useSwitchWorkspace`, em `app/session.tsx`), porque ele reescreve o
- *  cookie e o sistema inteiro — não é um bloco de uma tela. */
-export type ProfileScope = "profile" | "password" | "passkey";
+ *  cookie e o sistema inteiro — não é um bloco de uma tela.
+ *
+ *  `confirmation` é o bloco do estado do e-mail: a FAIXA do chassi é o
+ *  lembrete, e o Perfil é onde se vai resolver de propósito. */
+export type ProfileScope = "profile" | "password" | "passkey" | "confirmation";
 
 class Controller {
     readonly saveProfile = saveProfile;
     readonly changePassword = changePassword;
     readonly removePasskey = removePasskey;
+    readonly resendConfirmation = resendConfirmation;
 }
 
 export const ProfileController = new Controller();

@@ -10,6 +10,7 @@ import { FormError, FormField, FormGrid, Input, PasswordInput } from "@/ui/form"
 import { IconFingerprint } from "@/ui/icons";
 import { ConfirmDialog } from "@/ui/overlay";
 import { EmptyState } from "@/ui/states";
+import { useCooldown } from "@/lib/cooldown";
 import { formatDateTime } from "@/lib/date";
 import { readDeviceKey } from "@/lib/deviceKey";
 
@@ -40,6 +41,9 @@ export function Profile() {
     const [errors, setErrors] = useState<Partial<Record<ProfileScope, string>>>({});
     const [done, setDone] = useState<Partial<Record<ProfileScope, string>>>({});
     const [removing, setRemoving] = useState<number | null>(null);
+    /* O mesmo freio da tela pública de confirmação, e do tamanho da
+       janela que a API já usa no reenvio: dois minutos. */
+    const confirmationCooldown = useCooldown(120);
 
     const passkeys = useQuery({
         queryKey: ["passkeys"],
@@ -63,6 +67,10 @@ export function Profile() {
             finishSubmit(scope, message) {
                 setPending(null);
                 setDone((current) => ({ ...current, [scope]: message }));
+                /* A contagem começa no SUCESSO, não no clique: travar
+                   antes de saber se a chamada deu certo faria a pessoa
+                   esperar dois minutos por um e-mail que nunca saiu. */
+                if (scope === "confirmation") confirmationCooldown.start();
             },
             refresh() {
                 void queryClient.invalidateQueries({ queryKey: sessionKeys.user });
@@ -77,7 +85,7 @@ export function Profile() {
                 setPasswordForm({ oldPassword: "", newPassword: "", confirmation: "" });
             },
         }),
-        [user, form, passwordForm, queryClient],
+        [user, form, passwordForm, queryClient, confirmationCooldown],
     );
 
     const onSaveProfile = (event: FormEvent) => {
@@ -172,6 +180,54 @@ export function Profile() {
                                 {done.profile && <span className={styles.ok}>{done.profile}</span>}
                             </div>
                         </form>
+                    </Card>
+
+                    {/* ── E-mail confirmado ──────────────────────
+                        A faixa do chassi é o LEMBRETE; este bloco é onde
+                        se resolve de propósito — e ele fica aqui mesmo
+                        depois de confirmado, porque "quando foi provado"
+                        é informação da conta, não um aviso pendente. */}
+                    <Card>
+                        <div className={styles.section}>
+                            <div className={styles.sectionHead}>
+                                <div>
+                                    <div className={styles.sectionTitle}>Confirmação de e-mail</div>
+                                    <div className={styles.sectionSub}>
+                                        {user.EmailConfirmedAt
+                                            ? `Confirmado em ${formatDateTime(user.EmailConfirmedAt)}.`
+                                            : "Sem isso, a recuperação de senha não chega até você — mas nada no app fica trancado."}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <FormError>{errors.confirmation}</FormError>
+
+                            {!user.EmailConfirmedAt && (
+                                <div className={styles.actions}>
+                                    <Button
+                                        onClick={() =>
+                                            void ProfileController.resendConfirmation(context)
+                                        }
+                                        disabled={
+                                            pending === "confirmation" ||
+                                            confirmationCooldown.blocked
+                                        }
+                                    >
+                                        {pending === "confirmation"
+                                            ? "Enviando…"
+                                            : confirmationCooldown.blocked
+                                              ? `Reenviar em ${confirmationCooldown.remaining}s`
+                                              : "Reenviar confirmação"}
+                                    </Button>
+                                    {/* A `msg` do servidor, como veio: ela
+                                        é a mesma para quem já confirmou e
+                                        para quem não confirmou. */}
+                                    {done.confirmation && (
+                                        <span className={styles.ok}>{done.confirmation}</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </Card>
 
                     {/* ── Senha ─────────────────────────────────── */}

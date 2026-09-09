@@ -52,6 +52,27 @@ class Connection {
         return data;
     }
 
+    /** Público. Carimba o `EmailConfirmedAt` com o token do link.
+     *
+     *  **Idempotente**: chamar de novo responde `200` sem reescrever a
+     *  data. É por isso que a tela não pode tratar o segundo clique como
+     *  erro — o pré-carregador de link do cliente de e-mail é um
+     *  "segundo clique" que ninguém deu. */
+    async confirmEmail(body: ApiTypes.ConfirmEmailBody): Promise<{ msg: string }> {
+        const { data } = await http.post<{ msg: string }>(`${this.route}/confirmEmail`, body);
+        return data;
+    }
+
+    /** Público. Manda o link de confirmação de novo.
+     *
+     *  Responde 200 sempre e com a mesma `msg`, inclusive para e-mail
+     *  sem conta e para quem já confirmou. O freio de 2 minutos da API é
+     *  por endereço e não muda a resposta. */
+    async resendConfirmation(body: ApiTypes.ResendConfirmationBody): Promise<{ msg: string }> {
+        const { data } = await http.post<{ msg: string }>(`${this.route}/resendConfirmation`, body);
+        return data;
+    }
+
     /** `Password` nunca sai na resposta. */
     async getSelf(): Promise<ApiTypes.User> {
         const { data } = await http.get<ApiTypes.User>(`${this.route}/getSelf`);

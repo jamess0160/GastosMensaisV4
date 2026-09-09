@@ -27,6 +27,37 @@ describe("saveProfile", () => {
         });
     });
 
+    /* Trocar o e-mail DERRUBA a confirmação: a API zera o
+       `EmailConfirmedAt` e manda um link para o endereço novo. Sem o
+       recado, o usuário lê "Dados atualizados", a faixa do chassi
+       reaparece do nada e ele não liga uma coisa à outra. */
+    it("avisa que o novo e-mail precisa ser confirmado", async () => {
+        server.use(msw.put(route, () => new HttpResponse(null, { status: 200 })));
+        const context = fakeProfileContext({
+            form: { name: "Tiago", email: "outro@exemplo.com", phone: "11999998888" },
+        });
+
+        await saveProfile(context);
+
+        expect(context.finishSubmit).toHaveBeenCalledWith(
+            "profile",
+            "Dados atualizados. Confirme o novo e-mail: mandamos um link para ele.",
+        );
+    });
+
+    // Quem só mudou o nome não perde a confirmação — e o mesmo endereço
+    // em outra caixa alta continua sendo o mesmo endereço.
+    it("não avisa de confirmação quando o e-mail não mudou", async () => {
+        server.use(msw.put(route, () => new HttpResponse(null, { status: 200 })));
+        const context = fakeProfileContext({
+            form: { name: "Tiago Ribeiro", email: "Tiago@Exemplo.com", phone: "11999998888" },
+        });
+
+        await saveProfile(context);
+
+        expect(context.finishSubmit).toHaveBeenCalledWith("profile", "Dados atualizados.");
+    });
+
     it("recusa telefone sem DDD sem gastar requisição", async () => {
         const context = fakeProfileContext({
             form: { name: "Tiago", email: "tiago@exemplo.com", phone: "99998888" },

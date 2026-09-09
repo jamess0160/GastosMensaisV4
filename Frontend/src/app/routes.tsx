@@ -20,6 +20,9 @@ const ForgotPassword = lazy(() =>
 const ResetPassword = lazy(() =>
     import("@/pages/ResetPassword/ResetPassword").then((m) => ({ default: m.ResetPassword })),
 );
+const ConfirmEmail = lazy(() =>
+    import("@/pages/ConfirmEmail/ConfirmEmail").then((m) => ({ default: m.ConfirmEmail })),
+);
 
 const load = (screen: ReactNode) => (
     <Suspense fallback={<div className={styles.center}>Carregando…</div>}>{screen}</Suspense>
@@ -42,6 +45,10 @@ export const router = createBrowserRouter([
        cliente de e-mail, sem ninguém ter clicado. */
     { path: "/esqueci-senha", element: load(<ForgotPassword />) },
     { path: "/recuperar-senha", element: load(<ResetPassword />) },
+    /* Também pública, e pelo mesmo motivo: quem não confirmou pode não
+       ter sessão nenhuma — o link chega no cadastro e é aberto em outro
+       aparelho. */
+    { path: "/confirmar-email", element: load(<ConfirmEmail />) },
     {
         path: "/",
         element: <AppShell />,

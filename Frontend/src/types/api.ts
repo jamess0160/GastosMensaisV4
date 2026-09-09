@@ -35,6 +35,14 @@ export namespace ApiTypes {
         Name: string;
         Email: string;
         Phone: number;
+        /** Quando o endereço foi PROVADO. `null` = ainda não foi — e é
+         *  este campo que a faixa do chassi lê para saber se aparece.
+         *
+         *  Trocar o e-mail em `PUT /Users` zera este campo e dispara um
+         *  e-mail para o endereço NOVO. Nada é bloqueado por ele estar
+         *  `null`: quem não confirmou continua entrando e usando o app —
+         *  é decisão do produto, não etapa pela metade. */
+        EmailConfirmedAt: DateTime | null;
         LastLogin: DateTime | null;
         TrialStartAt: DateTime | null;
         TrialEndAt: DateTime | null;
@@ -105,6 +113,28 @@ export namespace ApiTypes {
     export interface ResetPasswordBody {
         Token: string;
         NewPassword: string;
+    }
+
+    /** `POST /Users/confirmEmail` — o `?Token=` do link do e-mail.
+     *
+     *  **Confirmar duas vezes responde `200` das duas.** A tela não pode
+     *  amarrar o sucesso a ser a primeira vez: quem reabre o link — ou o
+     *  pré-carregador do cliente de e-mail, que o abre sem ninguém pedir
+     *  — não pode ver erro para algo que deu certo.
+     *
+     *  O link vale 48 horas. */
+    export interface ConfirmEmailBody {
+        Token: string;
+    }
+
+    /** `POST /Users/resendConfirmation`.
+     *
+     *  Como o `forgotPassword`: `200` SEMPRE e com a mesma `msg` —
+     *  inclusive para e-mail sem conta e para quem já confirmou. A API
+     *  tem um freio de 2 minutos por endereço que **não muda a
+     *  resposta**; quem segura o botão na tela é o `useCooldown`. */
+    export interface ResendConfirmationBody {
+        Email: string;
     }
 
     /* ── 3. UsersAuth (WebAuthn) ──────────────────────────────── */

@@ -22,6 +22,50 @@
     font-size: 13.5px;
 }
 
+/* A faixa de "confirme seu e-mail".
+
+   Ela mora no chassi, acima da tela, porque é informação da CONTA e
+   vale em qualquer lugar do app — não é o aviso de uma tela. E não
+   trava nada: quem não confirmou continua usando tudo. */
+.confirmBanner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 10px 24px;
+    background: var(--brand-soft);
+    border-bottom: 1px solid var(--brand-tint);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+}
+
+.confirmActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.confirmLink {
+    font-weight: 600;
+    color: var(--brand);
+}
+
+.confirmDismiss {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--ink-3);
+    cursor: pointer;
+}
+
+.confirmDismiss:hover {
+    color: var(--ink-2);
+}
+
 /* ── Mobile ───────────────────────────────────────────────── */
 @media (max-width: 900px) {
     /* A sidebar sai inteira: a barra inferior a substitui. Escondê-la
@@ -34,5 +78,9 @@
     /* Espaço para a barra inferior não cobrir o fim da lista. */
     .main {
         padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .confirmBanner {
+        padding: 10px 16px;
     }
 }
