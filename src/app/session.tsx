@@ -1,5 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
-import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import {
+    hashKey,
+    useQuery,
+    useQueryClient,
+    type QueryClient,
+    type UseQueryResult,
+} from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ApiUnauthorizedError, UNAUTHORIZED_EVENT } from "@/api/client";
 import { UsersConnection } from "@/api/Users.connection";
@@ -147,23 +153,50 @@ export function useSignOut() {
  *  A consequência é grande e fácil de esquecer: no instante em que o
  *  cookie novo chega, TODO cache de query passa a falar de outro
  *  workspace. Contas, categorias, gastos do mês, orçamentos — nada disso
- *  vale mais, e por isso o cache é descartado inteiro em vez de
- *  invalidado seletivamente. Aqui não há nada que se aproveite.
+ *  vale mais, e por isso o cache é zerado inteiro em vez de invalidado
+ *  seletivamente. Aqui não há nada que se aproveite.
  *
  *  O erro sobe para quem chamou: quem troca de espaço é uma tela, e é
  *  ela que tem onde mostrar a `msg` do 406.
  *
  *  Não depende do `SessionProvider`, de propósito: a tela pública de
  *  aceite de convite precisa dele com o chassi ainda desmontado. */
+export async function switchWorkspace(
+    queryClient: QueryClient,
+    idWorkspace: number,
+): Promise<ApiTypes.Workspace> {
+    const workspace = await WorkspacesConnection.switch(idWorkspace);
+
+    /* `reset`, e NÃO `clear` — e a diferença é a tela inteira.
+
+       `clear` REMOVE as queries do cache, mas não avisa quem está
+       montado: o observer de cada `useQuery` continua segurando o
+       resultado anterior em memória, e a tela só volta ao normal num
+       remount — na prática, só no F5. Trocar de espaço é o único lugar
+       onde isso aparece, porque é o único que descarta o cache SEM sair
+       da tela: nos outros (login, logout, 401) o que vem depois é um
+       `navigate`, que desmonta tudo de qualquer jeito.
+
+       `reset` zera as mesmas queries e REBUSCA as ativas, que é o que faz
+       a tela toda — a lista de espaços inclusive, com o `Current` já no
+       lugar novo — voltar do servidor sem F5. O `await` segura o
+       "Trocando…" até os dados novos chegarem, em vez de piscar o espaço
+       antigo.
+
+       A CONTA FICA DE FORA, e é a única exceção: `GET /Users/getSelf` não
+       tem nada de workspace dentro — quem troca de espaço continua sendo
+       a mesma pessoa. Zerá-la seria pior do que inútil: o guard do chassi
+       lê "sem dados" como `isPending`, então toda troca desmontaria o app
+       inteiro num "Carregando…" para remontá-lo em seguida. */
+    await queryClient.resetQueries({
+        predicate: (query) => query.queryHash !== hashKey(sessionKeys.user),
+    });
+
+    return workspace;
+}
+
 export function useSwitchWorkspace() {
     const queryClient = useQueryClient();
 
-    return async (idWorkspace: number): Promise<ApiTypes.Workspace> => {
-        const workspace = await WorkspacesConnection.switch(idWorkspace);
-        // O cache inteiro descartado inclui a lista de espaços, que volta
-        // do servidor já com o `Current` no lugar novo — não há nada a
-        // lembrar deste lado.
-        queryClient.clear();
-        return workspace;
-    };
+    return (idWorkspace: number) => switchWorkspace(queryClient, idWorkspace);
 }
