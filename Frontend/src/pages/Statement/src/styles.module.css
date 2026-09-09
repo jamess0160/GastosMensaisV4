@@ -53,6 +53,19 @@
     margin-top: 4px;
 }
 
+/* O ciclo que a fatura cobre, com o modo do cartão ao lado. Duas
+   informações que só juntas respondem "estas compras são de quando?" e
+   "em que mês elas pesam?" — e a segunda é a que ninguém adivinha. */
+.cycle {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--ink-2);
+}
+
 /* As duas pontas do mês, lado a lado e na ordem em que se lê a conta:
    de onde partiu, para onde chegou. O fechamento é o número que a API
    afirmou — nunca a soma da coluna feita aqui. */

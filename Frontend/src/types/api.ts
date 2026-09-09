@@ -1045,6 +1045,20 @@ export namespace ApiTypes {
         IdPaymentMethod: number;
         Name: string;
         DueDate: CalendarDate;
+        /** O ciclo que esta fatura cobre: a primeira compra que ela pega
+         *  e a última.
+         *
+         *  O recorte é o VENCIMENTO, então a fatura de setembro é feita
+         *  de compras de agosto — e sem estas duas datas a tela mostra
+         *  essas linhas sob o rótulo do mês errado sem ter como dizer
+         *  que são de outro. Vêm do servidor porque aqui não há o
+         *  cadastro do cartão: `Cards` traz o par (cartão, vencimento),
+         *  não o `DueDay` nem a folga. */
+        CycleStart: CalendarDate;
+        CycleEnd: CalendarDate;
+        /** Em qual mês estas compras pesam — o modo do cartão, junto da
+         *  fatura para a tela não ter que reler o cadastro. */
+        CompetenceMode: CompetenceMode;
         /** Só o que está na fatura: o previsto ainda não é cobrado. */
         Total: Money;
         Entries: StatementCardEntry[];

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
     cardCycleFromDates,
     checkCardCycle,
+    cycleLabel,
     DEFAULT_CLOSING_OFFSET_DAYS,
+    invoiceCycle,
     invoiceDates,
     invoiceOf,
 } from "@/lib/card";
@@ -133,6 +135,36 @@ const entry = (values: Partial<ApiTypes.StatementCardEntry> = {}): ApiTypes.Stat
     ...values,
 });
 
+describe("invoiceCycle", () => {
+    it("abre no dia seguinte ao fechamento da fatura anterior", () => {
+        // Vencendo dia 4 com folga de 7: a fatura de setembro fecha em
+        // 28/08 e a de agosto fechou em 28/07 — a compra do dia 28/07
+        // ainda é da outra, então esta começa no 29.
+        expect(invoiceCycle("2026-09", 4, 7)).toEqual({
+            start: "2026-07-29",
+            end: "2026-08-28",
+        });
+    });
+
+    it("não cabe num mês só, e é isso que a linha do ciclo existe para dizer", () => {
+        // A fatura que a tela de setembro mostra é feita de compras de
+        // julho e agosto. Num cartão em `purchase` foi lá que elas
+        // pesaram — e nada na tela dizia isso.
+        expect(cycleLabel(invoiceCycle("2026-09", 4, 7))).toBe("compras de 29 jul a 28 ago");
+    });
+
+    it("acompanha a virada do mês, porque o fechamento derivado anda junto", () => {
+        // Vencendo dia 5 com folga de 7, o fechamento cai sempre no mês
+        // ANTERIOR ao do vencimento: fevereiro fechou em 29/01 e março
+        // fecha em 26/02 — dias diferentes, porque a folga é uma
+        // subtração de dias corridos e os meses não têm o mesmo tamanho.
+        expect(invoiceCycle("2026-03", 5, 7)).toEqual({
+            start: "2026-01-30",
+            end: "2026-02-26",
+        });
+    });
+});
+
 describe("invoiceOf", () => {
     it("monta a fatura de setembro com a compra de agosto — o caso do modo `purchase`", () => {
         // A compra de 20/08 tem competência 20/08 e vencimento 04/09.
@@ -145,6 +177,9 @@ describe("invoiceOf", () => {
                 IdPaymentMethod: 7,
                 Name: "Nubank",
                 DueDate: "2026-09-04",
+                CycleStart: "2026-07-29",
+                CycleEnd: "2026-08-28",
+                CompetenceMode: "purchase",
                 Total: 320,
                 Entries: [
                     entry({ Value: 200 }),
@@ -158,6 +193,8 @@ describe("invoiceOf", () => {
 
         expect(invoice.due).toBe("2026-09-04");
         expect(invoice.closing).toBe("2026-08-28");
+        //  O ciclo é o que o extrato recortou, não uma segunda conta feita aqui
+        expect(invoice.cycle).toEqual({ start: "2026-07-29", end: "2026-08-28" });
         expect(invoice.total).toBe(320);
         expect(invoice.expected).toBe(0);
         expect(invoice.entries).toHaveLength(2);
@@ -174,6 +211,9 @@ describe("invoiceOf", () => {
                 IdPaymentMethod: 7,
                 Name: "Nubank",
                 DueDate: "2026-09-04",
+                CycleStart: "2026-07-29",
+                CycleEnd: "2026-08-28",
+                CompetenceMode: "purchase",
                 Total: 200,
                 Entries: [entry({ Value: 200 })],
                 Expected: [entry({ Value: 50, Charged: false, IdExpense: 2, IdExpensePayment: 2 })],
@@ -194,6 +234,8 @@ describe("invoiceOf", () => {
         const invoice = invoiceOf(undefined, card, "2026-08");
 
         expect(invoice.due).toBe("2026-08-04");
+        //  Sem fatura não há o que recortar, e o ciclo é o calculado do cadastro
+        expect(invoice.cycle).toEqual({ start: "2026-06-28", end: "2026-07-28" });
         expect(invoice.total).toBe(0);
         expect(invoice.entries).toHaveLength(0);
         expect(invoice.paid).toBe(false);
@@ -207,6 +249,9 @@ describe("invoiceOf", () => {
             IdPaymentMethod: 7,
             Name: "Nubank",
             DueDate: "2026-09-04",
+            CycleStart: "2026-07-29",
+            CycleEnd: "2026-08-28",
+            CompetenceMode: "purchase",
             Total: 200,
             Entries,
             Expected: [],
@@ -229,6 +274,9 @@ describe("invoiceOf", () => {
                 IdPaymentMethod: 7,
                 Name: "Nubank",
                 DueDate: "2026-09-04",
+                CycleStart: "2026-07-29",
+                CycleEnd: "2026-08-28",
+                CompetenceMode: "purchase",
                 Total: 80,
                 Entries: [entry({ Value: 200 }), entry({ Value: -120, Description: "Estorno" })],
                 Expected: [],

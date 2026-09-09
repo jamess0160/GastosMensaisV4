@@ -748,6 +748,33 @@ describe("Reports", () => {
             expect(september.Cards[0].Entries[0].Date).toBe("2026-08-21")
         })
 
+        //  O recorte pelo vencimento é o certo e não muda — o que faltava era a resposta DIZER
+        //  de quais compras a fatura é feita. Em setembro ela é feita de agosto, e num cartão
+        //  'purchase' agosto é o mês em que essas compras pesaram: sem o ciclo, olhar a tela
+        //  não permite saber nem uma coisa nem a outra.
+        it("declara o ciclo que a fatura cobre e o modo do cartão", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, "purchase")
+
+            //  Vence dia 28 com folga de 8: a fatura de 28/09 fecha em 20/09, e a anterior
+            //  fechou em 20/08 — o ciclo abre no dia seguinte. A compra de 21/08 é a primeira
+            //  que ele pega, que é o que amarra o ciclo declarado à regra que postou a perna.
+            await createExpense(workspace, {
+                TotalValue: 200,
+                ExpenseDate: "2026-08-21",
+                Payments: [{ IdPaymentMethod: card, Value: 200 }],
+            })
+
+            let [invoice] = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body.Cards
+
+            expect(invoice).toMatchObject({
+                DueDate: "2026-09-28",
+                CycleStart: "2026-08-21",
+                CycleEnd: "2026-09-20",
+                CompetenceMode: "purchase",
+            })
+        })
+
         it("não enxerga a conta de outro workspace", async () => {
             let mine = await buildWorkspace()
             let theirs = await buildWorkspace()

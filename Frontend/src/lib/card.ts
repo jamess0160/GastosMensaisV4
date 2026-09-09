@@ -1,4 +1,4 @@
-import { addDaysToDate, addMonths, dayInMonth, daysApart, parts } from "./date";
+import { addDaysToDate, addMonths, dayInMonth, daysApart, formatShort, parts } from "./date";
 import { sumMoney } from "./aggregate";
 import type { ApiTypes } from "@/types/api";
 
@@ -42,6 +42,50 @@ export function invoiceDates(
     const due = dayInMonth(month, dueDay ?? 1);
     return { closing: addDaysToDate(due, -(offsetDays ?? DEFAULT_CLOSING_OFFSET_DAYS)), due };
 }
+
+export interface InvoiceCycle {
+    start: ApiTypes.CalendarDate;
+    end: ApiTypes.CalendarDate;
+}
+
+/** O CICLO que a fatura daquele mês cobre — a primeira compra que ela
+ *  pega e a última.
+ *
+ *  É a `invoiceDates` lida ao contrário: lá a fatura declara quando
+ *  fecha, aqui ela declara de quais compras é feita. Ela leva tudo que
+ *  foi comprado DEPOIS do fechamento da fatura anterior — daí o `+1`,
+ *  porque a compra feita NO dia do fechamento ainda entrou naquela
+ *  outra.
+ *
+ *  E é por isso que o ciclo quase nunca cabe num mês só: vencendo dia 04
+ *  com folga de 7, a fatura de setembro cobre de 29/07 a 28/08. Num
+ *  cartão em `purchase` essas compras pesaram em agosto e a fatura está
+ *  na tela de setembro — que é exatamente o que a linha do ciclo existe
+ *  para dizer. */
+export function invoiceCycle(
+    month: ApiTypes.ReferenceMonth,
+    dueDay: number | null,
+    offsetDays: number | null,
+): InvoiceCycle {
+    const { closing } = invoiceDates(month, dueDay, offsetDays);
+    const previous = invoiceDates(addMonths(month, -1), dueDay, offsetDays);
+
+    return { start: addDaysToDate(previous.closing, 1), end: closing };
+}
+
+/** "compras de 29 jul a 28 ago" — a frase mora aqui, e não nas telas,
+ *  porque Contas e Extrato mostram o MESMO ciclo da MESMA fatura: duas
+ *  redações seriam duas respostas para a mesma pergunta. */
+export const cycleLabel = (cycle: InvoiceCycle): string =>
+    `compras de ${formatShort(cycle.start)} a ${formatShort(cycle.end)}`;
+
+/** O modo, em uma frase curta. É a única configuração do cadastro que
+ *  muda um número já exibido na tela, então ela precisa ser legível sem
+ *  abrir o formulário — no painel do cartão e no cabeçalho da fatura. */
+export const COMPETENCE_LABEL: Record<ApiTypes.CompetenceMode, string> = {
+    purchase: "pesa no mês da compra",
+    invoice: "pesa no mês da fatura",
+};
 
 /** O caminho de volta: as duas datas que o usuário leu na fatura viram
  *  o par que a API guarda.
@@ -141,6 +185,10 @@ export const isCardLeg = (payment: ApiTypes.ExpensePayment): boolean => payment.
 export interface Invoice {
     closing: ApiTypes.CalendarDate;
     due: ApiTypes.CalendarDate;
+    /** De quais compras esta fatura é feita. É o que separa "a fatura de
+     *  setembro" de "os gastos de setembro" — num cartão em `purchase`
+     *  os dois nunca são a mesma coisa. */
+    cycle: InvoiceCycle;
     /** TODAS as linhas do ciclo — as que estão na fatura e as previstas
      *  —, como o extrato as devolveu. A `Date` de cada uma é a da
      *  COMPRA, não a do vencimento.
@@ -196,6 +244,12 @@ export function invoiceOf(
         /* O vencimento do extrato ganha do calculado: é dele que as
            linhas vieram, e é ele que o `payInvoice` recebe de volta. */
         due: card?.DueDate ?? due,
+        /* E o ciclo pela mesma razão: quando há fatura, quem diz de que
+           compras ela é feita é quem as recortou. O calculado é o mês
+           sem fatura nenhuma, em que não há linha para explicar. */
+        cycle: card
+            ? { start: card.CycleStart, end: card.CycleEnd }
+            : invoiceCycle(month, method.DueDay, method.ClosingOffsetDays),
         entries,
         total: card?.Total ?? 0,
         /* O previsto é somado aqui porque não é o que a fatura cobra:

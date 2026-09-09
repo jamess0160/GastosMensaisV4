@@ -19,6 +19,7 @@ import {
 } from "@/ui/table";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import { formatDate, formatMonthLabel } from "@/lib/date";
+import { COMPETENCE_LABEL, cycleLabel } from "@/lib/card";
 import { formatMoney } from "@/lib/money";
 import { sumMoney } from "@/lib/aggregate";
 import type { ApiTypes } from "@/types/api";
@@ -275,6 +276,20 @@ export function Statement() {
                     </div>
                     <div className={styles.sectionSub}>
                         Fatura com vencimento em {formatDate(card.DueDate)}
+                    </div>
+                    {/* O QUE ESTA FATURA COBRE, dito na tela.
+
+                        O recorte é o vencimento — é o que uma fatura é —,
+                        então a de setembro é feita de compras de agosto.
+                        Sem esta linha não há como saber, olhando, se
+                        aquelas compras pesam no mês selecionado ou no
+                        anterior; e num cartão em `purchase` a resposta é
+                        o anterior, que é a diferença que o modo produz e
+                        a razão de o "Restante" do Início e o "Saldo nas
+                        contas" discordarem. */}
+                    <div className={styles.cycle}>
+                        <span>{cycleLabel({ start: card.CycleStart, end: card.CycleEnd })}</span>
+                        <Badge tone="neutral">{COMPETENCE_LABEL[card.CompetenceMode]}</Badge>
                     </div>
                 </div>
 

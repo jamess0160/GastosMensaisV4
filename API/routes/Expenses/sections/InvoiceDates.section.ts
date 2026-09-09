@@ -102,6 +102,31 @@ class Controller {
     }
 
     /**
+     * **O ciclo que uma fatura cobre** — a primeira compra que ela pega e a última.
+     *
+     * É a regra de cima lida ao contrário: lá a compra procura a fatura, aqui a fatura declara
+     * quais compras são dela. A fatura que vence em 04/09 fecha `ClosingOffsetDays` dias antes
+     * e leva tudo que foi comprado **depois** do fechamento da fatura anterior — daí o `+1`,
+     * porque a compra feita *no* dia do fechamento ainda entrou naquela outra.
+     *
+     * Existe porque o extrato do cartão é recortado por vencimento: em setembro ele mostra uma
+     * fatura feita de compras de agosto, e sem dizer o ciclo não há como saber, olhando, em
+     * que mês aquelas linhas pesam.
+     *
+     * O vencimento anterior é contado **a partir do próprio vencimento**, com o `DueDay` posto
+     * de volta — o mesmo cuidado do `dueOf`: vencendo dia 31, a fatura de março não pode
+     * herdar o 28 que fevereiro grampeou.
+     */
+    public cycleOf(card: CardCycleSource, DueDate: string) {
+        let previousDue = Utils.setDayOfMonth(Utils.addMonthsToDate(DueDate, -1), card.DueDay!)
+
+        return {
+            CycleStart: Utils.addDaysToDate(this.closingFrom(card, previousDue), 1),
+            CycleEnd: this.closingFrom(card, DueDate),
+        }
+    }
+
+    /**
      * **O vencimento é a âncora; o fechamento nasce dele.** É assim que o emissor funciona — o
      * cliente escolhe o dia de vencer e o banco fecha a fatura N dias antes — e é o que deixa
      * as duas datas sempre coerentes entre si.
@@ -152,7 +177,14 @@ class Controller {
     //  O fechamento é o vencimento menos a folga, e nada mais. Nunca grampeia, porque uma
     //  contagem de dias corridos sempre cai num dia que existe.
     private closingOf(paymentMethod: Database.PaymentMethods, ExpenseDate: string, monthsAhead: number) {
-        return Utils.addDaysToDate(this.dueOf(paymentMethod, ExpenseDate, monthsAhead), -paymentMethod.ClosingOffsetDays!)
+        return this.closingFrom(paymentMethod, this.dueOf(paymentMethod, ExpenseDate, monthsAhead))
+    }
+
+    //  A subtração em si, isolada num lugar só: quem já tem o vencimento na mão — o extrato,
+    //  que lê a fatura gravada em vez de derivá-la da compra — chega ao fechamento por aqui,
+    //  sem uma segunda cópia da regra que este arquivo existe para concentrar.
+    private closingFrom(card: CardCycleSource, DueDate: string) {
+        return Utils.addDaysToDate(DueDate, -card.ClosingOffsetDays!)
     }
 
     //  Cartão sem vencimento ou sem folga de fechamento não existe (o PaymentMethodKind
@@ -161,5 +193,12 @@ class Controller {
         return paymentMethod.Kind === "credit_card" && Boolean(paymentMethod.DueDay) && Boolean(paymentMethod.ClosingOffsetDays)
     }
 }
+
+/**
+ * O que basta para derivar o ciclo de uma fatura: **o cartão é o vencimento e a folga**, e não
+ * há terceira coluna nessa conta. Um `Pick` porque o extrato chega aqui com as duas colunas
+ * vindas de um `join`, não com a linha inteira de `PaymentMethods`.
+ */
+type CardCycleSource = Pick<Database.PaymentMethods, "DueDay" | "ClosingOffsetDays">
 
 export const InvoiceDates = new Controller()

@@ -242,6 +242,16 @@
     color: var(--ink-2);
 }
 
+/* O ciclo que a fatura cobre, logo abaixo do rótulo dela: o vencimento
+   diz quando ela sai da conta, o ciclo diz de que compras ela é feita —
+   e os dois quase nunca caem no mesmo mês. */
+.invoiceCycle {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
 .invoiceValue {
     font-size: 17px;
     font-weight: 800;

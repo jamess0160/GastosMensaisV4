@@ -44,6 +44,8 @@ import {
     cardCycleFromDates,
     checkCardCycle,
     closingDaysLabel,
+    COMPETENCE_LABEL,
+    cycleLabel,
     invoiceDates,
     invoiceOf,
     MAX_CLOSING_OFFSET_DAYS,
@@ -110,15 +112,6 @@ const newCardDraft = (idAccount: number): CardDraft => ({
     // ciclo é sobre elas.
     cycleAcknowledged: false,
 });
-
-/** O modo, em uma palavra que cabe no chip. É a única configuração do
- *  cadastro que muda um número já exibido na tela, então ela precisa ser
- *  legível sem abrir o formulário — ao lado do ciclo, que o chip já
- *  mostra. */
-const COMPETENCE_LABEL: Record<ApiTypes.CompetenceMode, string> = {
-    purchase: "pesa no mês da compra",
-    invoice: "pesa no mês da fatura",
-};
 
 /** "fecha 03 ago · vence 10 ago" — a fatura DAQUELE mês. */
 const cardCycle = (method: ApiTypes.PaymentMethod, month: ApiTypes.ReferenceMonth): string => {
@@ -774,6 +767,14 @@ export function Accounts() {
                                                         </div>
                                                         <div className={styles.invoiceValue}>
                                                             {formatMoney(invoice.total)}
+                                                        </div>
+                                                        {/* De quais compras ela é feita — a
+                                                        mesma linha do Extrato, pelo mesmo
+                                                        motivo: o ciclo não é o mês, e num
+                                                        cartão em `purchase` essas compras
+                                                        pesaram no mês em que foram feitas. */}
+                                                        <div className={styles.invoiceCycle}>
+                                                            {cycleLabel(invoice.cycle)}
                                                         </div>
                                                         <div className={styles.invoiceCaption}>
                                                             {statement.isPending

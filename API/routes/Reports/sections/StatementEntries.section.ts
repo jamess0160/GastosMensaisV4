@@ -1,3 +1,4 @@
+import { InvoiceDates } from "root/routes/Expenses/sections/InvoiceDates.section"
 import { KnexConnection } from "root/Utils/Connections/Knex/KnexConnection"
 import { Database } from "root/Utils/database"
 import { ReportsNamespace } from "./types"
@@ -265,6 +266,11 @@ class Controller {
                 "ExpensePayments.Charged",
                 "ExpensePayments.Paid",
                 { PaymentMethodName: "PaymentMethods.Name" },
+                //  O ciclo sai do cartão, não da perna: o vencimento e a folga são o que
+                //  descreve a fatura, e o modo é o que diz em que mês essas compras pesam.
+                "PaymentMethods.DueDay",
+                "PaymentMethods.ClosingOffsetDays",
+                "PaymentMethods.CompetenceMode",
                 "Expenses.Description",
                 "Expenses.ExpenseDate",
             )
@@ -291,6 +297,13 @@ class Controller {
                     IdPaymentMethod: row.IdPaymentMethod,
                     Name: row.PaymentMethodName,
                     DueDate: row.DueDate,
+                    //  **O recorte não muda, o que a resposta diz é que muda.** A fatura
+                    //  continua sendo o par (cartão, vencimento) — recortá-la por competência
+                    //  a partiria em pedaços que o emissor nunca cobrou. O ciclo vem junto
+                    //  para a tela poder dizer de quais compras ela é feita: em setembro, num
+                    //  cartão em `purchase`, essas linhas pesaram em agosto.
+                    ...InvoiceDates.cycleOf(row, row.DueDate),
+                    CompetenceMode: row.CompetenceMode!,
                     Total: 0,
                     Entries: [],
                     Expected: [],
@@ -376,6 +389,9 @@ interface CardPaymentRow {
     Charged: boolean | null
     Paid: boolean
     PaymentMethodName: string
+    DueDay: number | null
+    ClosingOffsetDays: number | null
+    CompetenceMode: "invoice" | "purchase" | null
     Description: string
     ExpenseDate: string
 }

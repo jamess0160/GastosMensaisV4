@@ -59,6 +59,22 @@ export namespace ReportsNamespace {
         IdPaymentMethod: number
         Name: string
         DueDate: string
+        /**
+         * **O ciclo que esta fatura cobre**, de ponta a ponta e nas datas reais.
+         *
+         * O recorte da fatura é o vencimento, então em setembro ela é feita de compras de
+         * agosto — e sem estas duas datas a tela mostra essas linhas sob o rótulo do mês
+         * errado sem ter como dizer que são de outro. Derivadas do vencimento e da folga
+         * pelo `InvoiceDates`, que é onde a regra do fechamento mora.
+         */
+        CycleStart: string
+        CycleEnd: string
+        /**
+         * **Em qual mês estas compras pesam** — `purchase` é o mês da compra, `invoice` o do
+         * vencimento. É a única coisa do cadastro do cartão que muda um número já exibido em
+         * outra tela, e é o que explica o "Restante" do Início discordar do saldo em conta.
+         */
+        CompetenceMode: "invoice" | "purchase"
         /** Só o que está na fatura — o previsto não é cobrado ainda */
         Total: number
         Entries: CardEntry[]

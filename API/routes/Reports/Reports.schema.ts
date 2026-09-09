@@ -95,6 +95,13 @@ class Schema {
                 IdPaymentMethod: Joi.number().required(),
                 Name: Joi.string().required(),
                 DueDate: isoDate.required(),
+                //  O ciclo que a fatura cobre — a primeira compra que ela pega e a última.
+                //  O recorte continua sendo o vencimento; estas duas datas são o que permite
+                //  à tela dizer que a fatura de setembro é feita de compras de agosto.
+                CycleStart: isoDate.required(),
+                CycleEnd: isoDate.required(),
+                /** Em qual mês estas compras pesam — o modo do cartão, sem reler o cadastro */
+                CompetenceMode: Joi.string().valid("invoice", "purchase").required(),
                 /** **Só o que está na fatura** — o previsto ainda não é cobrado */
                 Total: Joi.number().required(),
                 /** O que está na fatura */
