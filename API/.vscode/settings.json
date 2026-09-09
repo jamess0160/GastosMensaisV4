@@ -1,0 +1,7 @@
+{
+    //  Faz o editor usar o TypeScript do node_modules em vez do que vem embutido nele.
+    //  Sem isto as duas versões divergem e o editor acusa erro que o build não vê (e vice-versa),
+    //  que foi o que aconteceu com o Uint8Array<ArrayBuffer> do WebAuthn.
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true
+}

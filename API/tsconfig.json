@@ -1,0 +1,46 @@
+{
+    //  Usado só pelo CLI do knex, que carrega o knexfile.ts por ts-node. O tsconfig-paths
+    //  resolve o alias root/* em tempo de execução, coisa que o ts-node sozinho não faz.
+    "ts-node": {
+        "require": [
+            "tsconfig-paths/register"
+        ]
+    },
+    "compilerOptions": {
+        //  Alvo fixo no que o Node roda hoje (v22), e não ESNext: ESNext é alvo móvel — um
+        //  upgrade do TypeScript mudaria o código emitido sem ninguém ter pedido.
+        "target": "ES2023",
+        //  Sem DOM: isto é backend. O que existe em tempo de execução vem do @types/node.
+        "lib": [
+            "ES2023"
+        ],
+        "module": "commonjs",
+        "moduleResolution": "node10",
+        "rootDir": ".",
+        "outDir": "build",
+        //  Alias root/* -> raiz do repositório. Lido também pelo tsconfig-paths (ts-node)
+        //  e pelo TsconfigPathsPlugin (webpack); o jest repete em moduleNameMapper.
+        "baseUrl": ".",
+        "paths": {
+            "root/*": [
+                "./*"
+            ]
+        },
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "strict": true,
+        //  Cada arquivo tem que ser compilável sozinho: o tsx (esbuild) e o ts-jest
+        //  transpilam arquivo a arquivo, sem enxergar o resto do projeto.
+        "isolatedModules": true,
+        "noImplicitOverride": true,
+        "noFallthroughCasesInSwitch": true,
+        "skipLibCheck": true
+    },
+    "include": [
+        "**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "build"
+    ]
+}

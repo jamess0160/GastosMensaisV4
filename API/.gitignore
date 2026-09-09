@@ -1,0 +1,6 @@
+node_modules/
+Logs/
+build/
+*.zip
+.env
+.env.test

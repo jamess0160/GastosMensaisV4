@@ -1,0 +1,15 @@
+{
+    //  As migrations são compiladas à parte do bundle do app: quem as executa é o CLI do
+    //  knex, que carrega os .js de build/migrations um a um. Herdar do tsconfig principal
+    //  evita as duas configurações divergirem (era o caso: target es2020 contra ESNext).
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        //  rootDir na própria pasta para a saída ser build/migrations/<arquivo>.js, e não
+        //  build/migrations/migrations/<arquivo>.js
+        "rootDir": "./migrations",
+        "outDir": "build/migrations"
+    },
+    "include": [
+        "./migrations/*.ts"
+    ]
+}

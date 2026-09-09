@@ -1,0 +1,34 @@
+import { WorkspacesAcessControl } from "root/routes/Workspaces/sections/AcessControl.section"
+import { APIError } from "root/Utils/Logs"
+import { Categories_model } from "../../Categories.model"
+import { CategoryOwnership } from "../CategoryOwnership.section"
+
+//  Arquiva a categoria (Active = false).
+//
+//  Não é delete físico: Expenses e Budgets apontam para cá, e o gasto de março tem que
+//  continuar apontando para a categoria em que foi lançado. Arquivar tira das listas de
+//  escolha sem tocar no histórico — o mesmo desenho do DELETE de Accounts.
+//
+//  Uma linha só: sem hierarquia não há subárvore para arrastar junto.
+export class Remove {
+    public async run(SelectedIdWorkspace: number, IdCategory: number, IdUser: number) {
+        let { IdWorkspace } = await WorkspacesAcessControl.assertRole(SelectedIdWorkspace, IdUser, ["owner", "editor"])
+
+        let category = await Categories_model.getUnique(IdWorkspace, IdCategory)
+
+        if (!category) {
+            throw new APIError({
+                msg: "Categoria não encontrada!",
+                status: 406,
+                data: { IdWorkspace, IdCategory },
+            })
+        }
+
+        //  Arquivar a global a apagaria da lista de todos os workspaces de uma vez.
+        CategoryOwnership.assertEditable(category)
+
+        await Categories_model.delete(IdWorkspace, IdCategory)
+
+        return { msg: "Categoria arquivada com sucesso" }
+    }
+}
