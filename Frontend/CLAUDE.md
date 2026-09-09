@@ -36,7 +36,7 @@ Layout/        Export do Claude Design — Hi-fi Desktop e Mobile
 src/api/       Um [Rota].connection.ts por rota, sobre axios
 src/app/       Chassi: rotas, sidebar, tab bar, sessão, mês, telemetria
 src/data/      Hooks de React Query: cadastros e movimento do mês
-src/lib/       Dinheiro, datas, agregações, DeviceKey, rascunho
+src/lib/       Dinheiro, datas, agregações, DeviceKey, rascunho, download, cooldown
 src/pages/     Uma pasta por tela (ver Convenções)
 src/test/      Infra de teste: setup, servidor de mentira
 src/styles/    tokens.css (transcrição do :root do layout) + global.css
@@ -141,7 +141,8 @@ const onSubmit = (event: FormEvent) => {
 ```
 
 Páginas sem evento de verdade ficam só com `[Pagina].tsx` e `controller.tsx` — hoje só o
-Relatório, que é leitura e filtro.
+Extrato, que é leitura pura: ele não quita, não concilia e não marca nada, e navegar até o
+lançamento é do roteador, não um evento de negócio.
 
 **Testes ficam em `tests/` ao lado do que testam.** Vitest, porque reaproveita este mesmo
 `vite.config.ts` — o atalho `@/`, os CSS Modules e o TypeScript funcionam no teste sem
@@ -182,18 +183,28 @@ em erro tipado — `401` vira `ApiUnauthorizedError` e dispara o evento que derr
 `406` vira `ApiBusinessError` com a `msg` pronta para a tela, o resto vira `ApiServerError`. As
 connections só falam de rotas e corpos.
 
+**O corpo do erro pode não ser JSON.** `GET /Reports/Export` é a única rota que responde um
+arquivo, e o `responseType: "blob"` da connection vale também para a resposta de erro: um `406`
+chega com a `msg` empacotada num `Blob`, e lê-la direto devolve `undefined` sem estourar nada —
+o usuário veria o texto genérico no lugar da frase do servidor. Quem desempacota é o
+`readErrorBody`, no interceptor, e é lá que ele fica para qualquer rota binária futura herdar.
+
 ## Estado das telas
 
 | Tela | Rota | Estado |
 |---|---|---|
-| Login | `/login` | senha, biometria, convite de passkey |
+| Login | `/login` | senha, biometria, convite de passkey, "manter conectado por 30 dias" |
 | Criar conta | `/cadastro` | com login logo depois do `POST /Users` |
 | Convite | `/convite/:hash` | pública |
+| Esqueci a senha | `/esqueci-senha` | pública, com contador de 2 min no botão |
+| Criar senha nova | `/recuperar-senha` | pública, lê o `?Token=` do link do e-mail |
+| Confirmar e-mail | `/confirmar-email` | pública, confirma na montagem e oferece o reenvio |
 | Início | `/` | indicadores vindos de `GET /Reports/Month`, com o bloco de orçamentos |
 | Gastos | `/gastos` | lista, detalhe, quitação da perna, série, cancelamento |
 | Adicionar / editar gasto | `/gastos/novo`, `/gastos/:id/editar` | mesma página, em modal |
 | Renda | `/renda` | entrada, transferência, e clonar o mês anterior |
 | Contas | `/contas` | contas e cartões, quitação da fatura, com seletor de mês |
+| Extrato | `/contas/extrato` | abertura → linhas assinadas → fechamento, por conta e por fatura |
 | Relatório | `/relatorio` | linha, barras e donut em ECharts, com filtros próprios de período |
 | Personalização | `/personalizacao` | categorias e pessoas |
 | Perfil | `/perfil` | dados, senha, passkeys |
@@ -204,9 +215,24 @@ Todas respondem em 390px. Abaixo de 900px a sidebar sai e entra a barra inferior
 mobile é decisão do frontend, e a barra ganhou de gaveta porque as cinco áreas são de visita
 constante.
 
-**Três botões estão na tela rotulados como "ainda sem API" e a API já existe** desde 07/09:
-conciliar extrato, exportar para Excel e esqueci minha senha. São as etapas abertas da leva 5 —
-ver a [fila do roadmap](../1.%20Docs/RoadMap%20MVP.md#a-fila-até-o-mvp).
+**Os três botões que estavam rotulados "ainda sem API" foram ligados na leva 5.** "Conciliar
+extrato" virou **"Extrato"** — a rota não importa arquivo do banco, não casa lançamento com
+lançamento e não tem estado "conciliado", e chamá-la de conciliação prometeria o que a tela não
+faz. Sobrou **um** desabilitado no produto: o "Continuar com Google" do login, que não tem
+OAuth na API.
+
+**A faixa de "confirme seu e-mail" mora no chassi**, e não numa tela: o estado do e-mail é
+informação da conta e vale em qualquer lugar do app. Ela não trava nada — quem não confirmou
+continua usando tudo, porque bloquear o login é o que custa cadastro. A dispensa dela vive **em
+memória** e volta no reload: um valor persistido no navegador discordaria do servidor sem que
+nada acusasse.
+
+**A exportação para Excel mora no chassi** ([src/app/exportSpreadsheet.ts](src/app/exportSpreadsheet.ts)),
+porque sai de dois lugares com dois significados: a sidebar e o menu do mobile baixam o
+**histórico inteiro** (é o que `GET /Reports/Export` faz sem `From`/`To`), e o botão do
+Relatório baixa **o período que está na tela**. Nenhum dos dois abre um segundo seletor de
+período — quem quer recortar vai ao Relatório, onde recortar é a tela. Nada de planilha montada
+no navegador: o `.xlsx` vem pronto do servidor, que lê os números do mesmo lugar que a tela.
 
 ## Duas decisões que valem saber
 

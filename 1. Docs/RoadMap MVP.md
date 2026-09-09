@@ -42,9 +42,9 @@ que fecha a última pendência que o front tinha contra a API.
 **16 suítes de integração**, sem um único teste unitário e sem nada mockado. A última contagem
 registrada é **654 testes**, no fim da leva 3.
 
-### Front — cinco levas, a quinta aberta
+### Front — cinco levas, todas fechadas
 
-**12 telas**, todas respondendo em 390px, todas ligadas na API de verdade.
+**16 telas**, todas respondendo em 390px, todas ligadas na API de verdade.
 
 | Leva | O que entregou | Estado |
 | --- | --- | --- |
@@ -52,35 +52,27 @@ registrada é **654 testes**, no fim da leva 3.
 | **2 — Ajustes** | A lista crua de correções de layout e de conteúdo das telas | **fechada** |
 | **3 — Ajustes** | Mês compartilhado entre telas, navegação mobile, e a reescrita de Gastos, Renda e Contas | **fechada** |
 | **4 — As mudanças de contrato de setembro** | Cartão por vencimento + folga, saldo do mês, fatura, estorno, orçamento por pessoa, logout, seletor de espaço e convites | **fechada**, 10 de 10 |
-| **5 — Os números saem do cliente** | Orçamento que nasce sozinho, `GET /Reports/Month`, `CompetenceMode` | **ABERTA — 3 de 8** |
+| **5 — Os números saem do cliente, e as telas que faltavam** | Orçamento que nasce sozinho, `GET /Reports/Month`, `CompetenceMode`, extrato, exportação `.xlsx`, sessão de 30 dias, recuperação de senha, confirmação de e-mail | **fechada**, 8 de 8 |
 
 Plano da leva 5: [Old/Front/levas/5. Plano de Ajustes 5.md](Old/Front/levas/5.%20Plano%20de%20Ajustes%205.md).
+
+As cinco etapas que faltavam foram fechadas em 09/09, em cinco commits: `Fase #5 | Etapa 4` a
+`Etapa 8`. Com elas saíram do produto os **três botões rotulados "ainda sem API"** — o de
+conciliar extrato virou **"Extrato"** (a rota não concilia nada, e o nome tinha que dizer
+isso), o de exportar passou a baixar o `.xlsx` do servidor, e "Esqueci minha senha" virou
+navegação de verdade. Nasceram quatro telas: `contas/extrato`, `/esqueci-senha`,
+`/recuperar-senha` e `/confirmar-email`.
 
 ---
 
 ## A fila até o MVP
 
-**Nada nesta fila espera a API.** Toda rota que estes itens consomem já existe e já tem teste —
-a lacuna é inteira do cliente, e foi criada pela junção dos repositórios ter pegado a leva 5 do
-front no meio.
+**A lacuna do cliente acabou.** Toda rota que a leva 5 consumia já existia com teste desde
+07/09, e foi a junção dos repositórios ter pegado a leva no meio que a deixou aberta. O que
+sobra na fila não é dívida de um lado contra o outro: é trabalho que nunca entrou em leva
+nenhuma, dos dois.
 
-### 1. Fechar a leva 5 do front — cinco etapas
-
-É a fila real, e é onde o MVP está travado. As três primeiras são **botões que hoje estão na
-tela rotulados como "ainda sem API"** — e a API existe desde 07/09.
-
-| O que falta | Rota que já existe | Onde está desligado |
-| --- | --- | --- |
-| **Tela de extrato** — `OpeningBalance` + a coluna assinada = `ClosingBalance`, e esse número tem que bater com o saldo da conta no mesmo mês | `GET /Reports/Statement` | botão "Conciliar extrato", na Topbar de Contas |
-| **Exportar para Excel** — o histórico inteiro pelo menu, o período da tela pelo Relatório | `GET /Reports/Export` | item da sidebar e do menu mobile |
-| **Recuperação de senha** — as duas telas, `/recuperar-senha` incluída | `POST /Users/forgotPassword` + `resetPassword` | "Esqueci minha senha", no login |
-| **Sessão de 30 dias** no "manter conectado" | duração de sessão configurável no login | a caixa não existe na tela |
-| **Confirmação de e-mail** | rota da leva 3 | — |
-
-O critério de aceite de cada uma está escrito na seção **Verificação** do plano da leva 5, e
-continua valendo palavra por palavra.
-
-### 2. Gestão de membros — API e front, na mesma leva
+### 1. Gestão de membros — API e front, na mesma leva
 
 É o que sobrou do compartilhamento de workspace: **listar membros, trocar papel, remover, sair
 e transferir propriedade**. O convite e o aceite foram feitos na leva 2 do backend e na leva 4
@@ -92,7 +84,7 @@ acesso — a tabela e a checagem estão prontas, faltam as rotas e a tela.
 **É o primeiro trabalho que nasce unificado**, e por isso é o teste do formato novo de leva: um
 plano só, com as etapas da API e as do front na mesma fila de dependências.
 
-### 3. Produção
+### 2. Produção
 
 Nada aqui é código de feature, e cada item já quebrou alguma coisa uma vez:
 
@@ -107,8 +99,10 @@ Nada aqui é código de feature, e cada item já quebrou alguma coisa uma vez:
 - **SPF/DKIM no domínio** — enviar como `@gastosmensais.com.br` por um SMTP não autorizado cai
   em spam, e nenhuma arquitetura conserta isso;
 - **Rate limiting, que não existe em lugar nenhum do projeto.** A primeira rota que dói é a
-  pública que manda e-mail (`forgotPassword`). O remendo barato quando doer é um cooldown no
-  `cacheEngine`, que já é um cache em memória com bucket por chave.
+  pública que manda e-mail (`forgotPassword`). Hoje há **dois freios parciais e nenhum deles é
+  rate limiting**: o `MailCooldown` da API, que é um `Map` em memória e só protege o
+  `resendConfirmation`, e o `useCooldown` do cliente, que mora no navegador e qualquer um
+  contorna com `curl`. O `forgotPassword` continua sem freio nenhum do lado do servidor.
 
 ---
 
@@ -120,14 +114,15 @@ cliente enquanto não voltar como etapa de leva.**
 | Item | Por que saiu | O que já está levantado |
 | --- | --- | --- |
 | **Notificações** | Fora do MVP em 07/09. Falta **definir o que gera aviso** — parcela vencendo, orçamento estourado, entrada não recebida | A tabela existe com `ReadAt`, `ScheduledFor`/`SentAt` e os índices. O `CHECK` do `Type` só tem `system` e `security`: todo aviso de domínio precisa de valor novo |
-| **Conciliação de extrato** | Fora do MVP em 07/09 — virou o extrato manual, que é o que a tela precisa | Três perguntas sem resposta: **de onde vem o extrato** (OFX/CSV ou Open Finance — um parser contra uma integração com credencial e homologação), **o que é um item "a resolver"**, e **se conciliar cria lançamento ou só marca os existentes** — se cria, é migration em `Inflows` e `Expenses` |
+| **Conciliação de extrato** | Fora do MVP em 07/09 — virou o extrato manual, entregue na leva 5 (`contas/extrato`), que é o que a tela precisa | Três perguntas sem resposta: **de onde vem o extrato** (OFX/CSV ou Open Finance — um parser contra uma integração com credencial e homologação), **o que é um item "a resolver"**, e **se conciliar cria lançamento ou só marca os existentes** — se cria, é migration em `Inflows` e `Expenses` |
 | **`UserDevices`** | Só faz sentido junto com notificações | Tabela existe, rota não |
 | **`Plans` / `Subscriptions`** | Cobrança não faz parte do fluxo de um mês | Tabelas existem, rotas não |
 | **Fatura de cartão como entidade** | As datas da fatura já vivem na perna (`ClosingDate`/`DueDate`), e o extrato mostra a fatura sem precisar de tabela. Só se pagaria com conciliação, que também saiu | — |
 | **"Continuar com Google"** | Não há OAuth na API | Desenhado no layout; o botão fica desabilitado |
 
 Onde um botão faz parte da composição visual, ele fica **desabilitado e rotulado**, nunca
-escondido: some do produto sem sumir do layout.
+escondido: some do produto sem sumir do layout. Depois da leva 5 sobrou **um só**: o "Continuar
+com Google" do login.
 
 ---
 
