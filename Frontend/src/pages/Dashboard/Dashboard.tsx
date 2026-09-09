@@ -205,8 +205,8 @@ export function Dashboard() {
     const usedPercent = hasBudget
         ? (budgetSpent / budgetLimit) * 100
         : inflows > 0
-          ? (expenses / inflows) * 100
-          : 0;
+            ? (expenses / inflows) * 100
+            : 0;
 
     /* ── As três quebras do layout ───────────────────────────
        As três saem da MESMA lista de pernas: categoria vem do gasto,
@@ -255,9 +255,9 @@ export function Dashboard() {
                                 {report.isPending
                                     ? "—"
                                     : formatMoney(available)
-                                          .replace("R$", "")
-                                          .replace("-", "")
-                                          .trim()}
+                                        .replace("R$", "")
+                                        .replace("-", "")
+                                        .trim()}
                             </span>
                         </div>
 
@@ -361,18 +361,18 @@ export function Dashboard() {
                         <KpiCard
                             label="Saldo nas contas"
                             value={report.isPending ? "—" : currentBalance}
-                            caption={`Posição em ${formatMonthLabel(month)} — só o realizado, pelo dia em que o dinheiro saiu da conta. O que está em aberto não entra.`}
+                            caption={`Posição em ${formatMonthLabel(month)}. Só o que foi pago, o que está em aberto não entra.`}
                         />
                         <KpiCard
                             label="Faturas em aberto"
                             value={report.isPending ? "—" : openInvoices}
                             tone={openInvoices > 0 ? "neg" : "neutral"}
-                            caption="Compras de cartão que vencem até o fim do mês e ainda não foram pagas — quanto do saldo já tem dono."
+                            caption="Compras de cartão que vencem até o fim do mês e ainda não foram pagas."
                         />
                         <KpiCard
                             label="Fixos do mês"
                             value={fixed}
-                            caption="Aluguel, assinaturas — o que se repete."
+                            caption="Aluguel, assinaturas e contas gerais."
                             badge={
                                 expenses > 0 ? (
                                     <DeltaPill tone="mute">
@@ -384,25 +384,8 @@ export function Dashboard() {
                         <KpiCard
                             label="Parcelas do mês"
                             value={installments}
-                            caption="Só a fatia que vence neste mês, não a compra inteira."
                         />
                     </div>
-                </div>
-
-                {/* A legenda do par. Sem ela a tela parece ter um erro de
-                    soma: os dois números discordam DE PROPÓSITO. */}
-                <div className={styles.pairNote}>
-                    <b>Restante</b> é o mês que você está vivendo — abre com o saldo do mês passado,
-                    conta o pendente junto com o pago e usa a data em que cada lançamento{" "}
-                    <b>pesa</b>. <b>Saldo nas contas</b> é o dinheiro que já saiu, pela data em que
-                    ele <b>saiu</b>.
-                    {openInvoices > 0 && (
-                        <>
-                            {" "}
-                            Quem liga os dois é <b>faturas em aberto</b>:{" "}
-                            {formatMoney(openInvoices)} do saldo já tem dono.
-                        </>
-                    )}
                 </div>
 
                 {report.isError && (
@@ -483,13 +466,7 @@ export function Dashboard() {
                     ) : periods.length === 0 ? (
                         <EmptyState
                             inline
-                            title="Nenhum teto neste mês"
-                            /* O vazio MUDOU DE SIGNIFICADO: desde que a
-                               rotina do dia 1º materializa o mês a partir
-                               das definições ativas, não ver nada aqui
-                               quer dizer "não há definição nenhuma" — e
-                               não "o mês ainda não foi cadastrado". */
-                            description="Nenhum teto cadastrado ainda. A partir do primeiro, o mês novo nasce sozinho: todo dia 1º o servidor copia os tetos ativos para o mês que começa."
+                            title="Nenhum orçamento neste mês"
                             action={
                                 <Button
                                     variant="primary"
@@ -602,7 +579,7 @@ export function Dashboard() {
                                     slice.IdPerson === null
                                         ? "Sem destino"
                                         : (personIndex.get(slice.IdPerson)?.Name ??
-                                          "Pessoa arquivada"),
+                                            "Pessoa arquivada"),
                                 color:
                                     slice.IdPerson === null
                                         ? "var(--ink-3)"
@@ -776,11 +753,11 @@ export function Dashboard() {
                                                 setBudgetDraft((c) =>
                                                     c
                                                         ? {
-                                                              ...c,
-                                                              AlertPercent: Number(
-                                                                  event.target.value,
-                                                              ),
-                                                          }
+                                                            ...c,
+                                                            AlertPercent: Number(
+                                                                event.target.value,
+                                                            ),
+                                                        }
                                                         : c,
                                                 )
                                             }

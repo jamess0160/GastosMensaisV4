@@ -195,7 +195,7 @@ export function Profile() {
                                     <div className={styles.sectionSub}>
                                         {user.EmailConfirmedAt
                                             ? `Confirmado em ${formatDateTime(user.EmailConfirmedAt)}.`
-                                            : "Sem isso, a recuperação de senha não chega até você — mas nada no app fica trancado."}
+                                            : "Sem isso, a recuperação de senha não chega até você - mas você ainda consegue acessar todas as funcionalidades."}
                                     </div>
                                 </div>
                             </div>

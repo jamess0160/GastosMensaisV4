@@ -309,8 +309,8 @@ export function Accounts() {
     const askedMethod = Number(urlQuery.get("IdPaymentMethod")) || null;
     const askedAccount = askedMethod
         ? ((accounts.data ?? []).find((account) =>
-              account.PaymentMethods.some((method) => method.IdPaymentMethod === askedMethod),
-          )?.IdAccount ?? null)
+            account.PaymentMethods.some((method) => method.IdPaymentMethod === askedMethod),
+        )?.IdAccount ?? null)
         : null;
 
     const shownAccount = openAccount ?? askedAccount;
@@ -354,7 +354,6 @@ export function Accounts() {
             <Page>
                 <PageHead
                     title="Contas"
-                    subtitle={`${active.length} conta${active.length === 1 ? "" : "s"} · a posição é a do mês exibido, não a de hoje`}
                 />
 
                 <div className={styles.summary}>
@@ -630,8 +629,8 @@ export function Accounts() {
                                     description={`${TYPE_LABEL[detail.Type]} é conta de saldo fechado: o gasto sai no ato e não há fatura de onde o cartão pudesse ser pago.`}
                                 />
                             ) : detail.PaymentMethods.filter(
-                                  (method) => method.Active && method.Kind === "credit_card",
-                              ).length === 0 ? (
+                                (method) => method.Active && method.Kind === "credit_card",
+                            ).length === 0 ? (
                                 <EmptyState
                                     inline
                                     icon={<IconCard />}
@@ -656,9 +655,9 @@ export function Accounts() {
                                                         style={
                                                             method.Color
                                                                 ? {
-                                                                      background: `${method.Color}1f`,
-                                                                      color: method.Color,
-                                                                  }
+                                                                    background: `${method.Color}1f`,
+                                                                    color: method.Color,
+                                                                }
                                                                 : undefined
                                                         }
                                                     >
@@ -684,7 +683,7 @@ export function Accounts() {
                                                             <div className={styles.cardMode}>
                                                                 {
                                                                     COMPETENCE_LABEL[
-                                                                        method.CompetenceMode
+                                                                    method.CompetenceMode
                                                                     ]
                                                                 }
                                                             </div>
@@ -736,10 +735,10 @@ export function Accounts() {
                                                             {monthLegs.isPending
                                                                 ? "Carregando os lançamentos do mês…"
                                                                 : invoice.legs.length === 0
-                                                                  ? "Nenhum lançamento nesta fatura"
-                                                                  : invoice.paid
-                                                                    ? `Quitada · ${invoice.legs.length} lançamento${invoice.legs.length === 1 ? "" : "s"}`
-                                                                    : `${formatMoney(invoice.charged)} já conferidos · ${invoice.legs.length} lançamento${invoice.legs.length === 1 ? "" : "s"}`}
+                                                                    ? "Nenhum lançamento nesta fatura"
+                                                                    : invoice.paid
+                                                                        ? `Quitada · ${invoice.legs.length} lançamento${invoice.legs.length === 1 ? "" : "s"}`
+                                                                        : `${formatMoney(invoice.charged)} já conferidos · ${invoice.legs.length} lançamento${invoice.legs.length === 1 ? "" : "s"}`}
                                                         </div>
                                                     </div>
                                                     <span className={styles.invoiceActions}>
@@ -798,7 +797,6 @@ export function Accounts() {
                     open={accountDraft !== null}
                     onClose={() => setAccountDraft(null)}
                     title={accountDraft?.IdAccount === null ? "Nova conta" : "Editar conta"}
-                    subtitle="Cartão de crédito não é conta — ele é forma de pagamento, e vive dentro de uma conta corrente. O tipo Vale é o vale-alimentação: saldo próprio, sem fatura."
                     footer={
                         <>
                             <FooterSpacer />
@@ -942,7 +940,6 @@ export function Accounts() {
                     open={cardDraft !== null}
                     onClose={() => setCardDraft(null)}
                     title={cardDraft?.IdPaymentMethod === null ? "Novo cartão" : "Editar cartão"}
-                    subtitle="Em cartão, um dia de diferença na compra vira um mês de diferença no caixa."
                     footer={
                         <>
                             <FooterSpacer />
@@ -1028,28 +1025,28 @@ export function Accounts() {
                             mas todo mundo sabe dizer se paga a fatura inteira
                             todo mês. */}
                             <FormField
-                                label="Quando a compra deste cartão pesa"
+                                label="Como você usa esse cartão?"
                                 help={
                                     cardDraft.CompetenceMode === "purchase"
-                                        ? "A compra de 21/08 pesa em agosto, no orçamento e no “posso gastar” de agosto. O dinheiro continua saindo da conta só quando a fatura for paga."
-                                        : "A compra de 21/08 pesa em setembro, com a fatura — é o mês em que ela vence que conta."
+                                        ? "As compras nesse cartão diminuem o tanto de dinheiro que você pode gastar nesse mês."
+                                        : "As compras nesse cartão diminuem o tanto de dinheiro que você pode gastar no mês que vêm."
                                 }
                             >
                                 {() => (
                                     <SegmentedControl
                                         value={cardDraft.CompetenceMode}
-                                        ariaLabel="Quando a compra deste cartão pesa"
+                                        ariaLabel="Como você usa esse cartão?"
                                         onChange={(CompetenceMode) =>
                                             setCardDraft((c) => (c ? { ...c, CompetenceMode } : c))
                                         }
                                         options={[
                                             {
                                                 value: "purchase",
-                                                label: "Pago a fatura toda todo mês",
+                                                label: "Para compras do dia a dia",
                                             },
                                             {
                                                 value: "invoice",
-                                                label: "Uso o cartão para pagar depois",
+                                                label: "Para emergências",
                                             },
                                         ]}
                                     />
@@ -1063,8 +1060,7 @@ export function Accounts() {
                             {cardDraft.IdPaymentMethod !== null && (
                                 <div className={styles.cycleHint}>
                                     Trocar o modo vale para as compras novas. As datas de cada
-                                    parcela são congeladas no lançamento — virar a chave agora não
-                                    reescreve o mês de nada que já foi lançado.
+                                    parcela são congeladas no lançamento.
                                 </div>
                             )}
 

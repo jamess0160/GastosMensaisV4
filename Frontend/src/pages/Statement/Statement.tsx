@@ -348,7 +348,6 @@ export function Statement() {
                     >
                         Gastos
                     </button>
-                    , que tem filtro de status justamente para isso.
                 </div>
 
                 {body()}

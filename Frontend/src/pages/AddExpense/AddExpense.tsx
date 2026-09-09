@@ -262,9 +262,9 @@ export function AddExpense() {
             TotalValue,
             payments: splitPayments
                 ? draft.payments.map((line) => ({
-                      ...line,
-                      value: withSignOf(line.value, TotalValue),
-                  }))
+                    ...line,
+                    value: withSignOf(line.value, TotalValue),
+                }))
                 : [{ ...singlePayment, value: TotalValue }],
             persons: draft.persons.map((line) => ({
                 ...line,
@@ -511,11 +511,10 @@ export function AddExpense() {
                         <span className={styles.groupLabelHint}>
                             {personsUsed === 0
                                 ? "opcional"
-                                : `${personsUsed} selecionado${personsUsed === 1 ? "" : "s"} · dividindo ${
-                                      draft.TotalValue === null
-                                          ? "o total"
-                                          : formatMoney(draft.TotalValue)
-                                  }`}
+                                : `${personsUsed} selecionado${personsUsed === 1 ? "" : "s"} · dividindo ${draft.TotalValue === null
+                                    ? "o total"
+                                    : formatMoney(draft.TotalValue)
+                                }`}
                         </span>
                     </div>
                     <SplitEditor
@@ -584,7 +583,7 @@ export function AddExpense() {
                                 }))}
                                 emptyLabel="Nenhuma forma cadastrada"
                             />
-                            {acceptsPaid ? (
+                            {acceptsPaid && (
                                 <div className={styles.paidRow}>
                                     {/* `Paid: true` é o caso do débito e do
                                         pix, que saem pagos no ato. */}
@@ -602,11 +601,6 @@ export function AddExpense() {
                                             })
                                         }
                                     />
-                                </div>
-                            ) : (
-                                <div className={styles.paidNote}>
-                                    Compra no cartão não se marca como paga: quem tira o dinheiro da
-                                    conta é a fatura, quitada em Contas.
                                 </div>
                             )}
                         </Box>
@@ -671,7 +665,6 @@ export function AddExpense() {
                 <div className={styles.extras}>
                     <FormField
                         label="Tags"
-                        help="A tag nasce aqui: digite o nome e ela passa a existir. Não há cadastro separado."
                     >
                         {(field) => (
                             <TagInput
@@ -744,11 +737,6 @@ export function AddExpense() {
             onClose={close}
             wide
             title={isEdit ? "Editar gasto" : "Novo gasto"}
-            subtitle={
-                isEdit
-                    ? "Formato e recorrência não se editam — só o conteúdo do lançamento."
-                    : "Esc para cancelar. Os dois rateios são independentes: com o que foi pago, e de quem é o custo."
-            }
             footer={
                 <>
                     <FooterSpacer />

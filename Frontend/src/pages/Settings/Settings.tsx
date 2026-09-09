@@ -148,11 +148,6 @@ export function Settings() {
                                                     <div className={styles.nameTitle}>
                                                         {category.Description}
                                                     </div>
-                                                    {system && (
-                                                        <div className={styles.nameSub}>
-                                                            Vem pronta com o sistema
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
 
