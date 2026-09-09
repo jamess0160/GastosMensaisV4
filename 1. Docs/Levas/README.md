@@ -3,8 +3,11 @@
 Um arquivo por leva, `<N>. <Nome da leva>.md`. **A próxima é a 6** — o porquê do número está
 em [../RoadMap MVP.md](../RoadMap%20MVP.md#as-levas-daqui-pra-frente).
 
-Ainda não há nenhuma: a leva 6 é a primeira que nasce com os dois repositórios já juntos, e o
-que ela deve conter está na [fila do roadmap](../RoadMap%20MVP.md#a-fila-até-o-mvp).
+A primeira que nasce com os dois repositórios já juntos é a
+[6. O cartão, o uso real e a gestão de membros](6.%20O%20cartão,%20o%20uso%20real%20e%20a%20gestão%20de%20membros.md),
+escrita em 09/09/2026 e ainda sem nenhuma etapa executada. O resto do que falta está na
+[fila do roadmap](../RoadMap%20MVP.md#a-fila-até-o-mvp) — que diz **o que falta**, não o que
+cada leva faz: o recorte é do plano da leva.
 
 As levas anteriores — três do backend e cinco do front, com numeração própria e colidindo entre
 si — estão em [../Old/](../Old/). Elas seguem valendo como referência de **formato** e de

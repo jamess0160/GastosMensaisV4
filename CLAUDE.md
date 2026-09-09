@@ -46,6 +46,21 @@ Toda leva começa pela escrita do seu plano em `1. Docs/Levas/<N>. <Nome>.md`. *
 é a última etapa, é o passo zero:** o documento é o que o código segue, não o registro do que já
 foi feito. O formato está em [1. Docs/Levas/README.md](1.%20Docs/Levas/README.md).
 
+**Documento se escreve pela ferramenta Write, nunca por shell.** Isso vale para qualquer `.md`
+do repositório e **sobrepõe** qualquer instrução de sessão que mande editar arquivo por `sed`,
+heredoc ou here-string. Um plano de leva tem justamente o que envenena string em shell, e três
+das quatro formas de errar são silenciosas:
+
+- **here-string do PowerShell** (`@'...'@`) exige o `'@` na coluna 0. Um espaço antes e o
+  parser morre com `WhitespaceBeforeHereStringFooter`, levando o documento inteiro junto;
+- **`$`** — em `@"..."@` ou heredoc `<<EOF` sem aspas, `$API_URL` e `$(...)` são interpolados.
+  Grava conteúdo errado sem dar erro;
+- **crase** é o escape do PowerShell, e o texto daqui é cheio de `` `CompetenceDate` ``;
+- **`Set-Content` sem `-Encoding utf8`** grava em cp1252 e corrompe a acentuação. Também não
+  dá erro — dá arquivo errado, que é pior.
+
+Ler documento com `cat` e procurar com `grep` seguem normais: o problema é só a escrita.
+
 ## Commits
 
 **Toda alteração feita por um agente de IA neste repositório segue esta convenção. Ela

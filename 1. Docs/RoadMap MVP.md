@@ -72,7 +72,24 @@ navegação de verdade. Nasceram quatro telas: `contas/extrato`, `/esqueci-senha
 sobra na fila não é dívida de um lado contra o outro: é trabalho que nunca entrou em leva
 nenhuma, dos dois.
 
-### 1. Gestão de membros — API e front, na mesma leva
+> **Esta fila diz o que falta, não o que cada leva faz.** Quem decide o recorte de uma leva é o
+> plano dela, em [Levas/](Levas/) — um item daqui pode virar uma etapa, várias, ou atravessar
+> duas levas. Amarrar item e leva neste documento foi o que fez uma leva ser definida por fora
+> antes de existir.
+
+### 1. O cartão de crédito, e a fatura que não fecha
+
+O `CompetenceMode` entrou em setembro e abriu costuras que ninguém releu. A mais cara: **a tela
+de Contas não consegue montar a fatura de um cartão em modo `purchase`** — pede as pernas por
+competência e procura por vencimento, e as duas discordam justamente quando o modo faz o que
+existe para fazer. Como quitar a fatura é a única coisa que grava `Paid` numa perna de cartão,
+o saldo de quem usa `purchase` nunca desce.
+
+Na mesma família: a compra no dia do fechamento caindo na fatura errada, o `Charged` nascendo
+`false` e obrigando a conferir compra a compra, e o extrato do cartão sem dizer que ciclo ele
+cobre.
+
+### 2. Gestão de membros
 
 É o que sobrou do compartilhamento de workspace: **listar membros, trocar papel, remover, sair
 e transferir propriedade**. O convite e o aceite foram feitos na leva 2 do backend e na leva 4
@@ -81,10 +98,15 @@ do front; o resto nunca entrou em leva nenhuma, de nenhum dos dois lados.
 `WorkspaceMembers` já existe com papel, e `assertRole` já é chamado em 7 dos 9 pontos de
 acesso — a tabela e a checagem estão prontas, faltam as rotas e a tela.
 
-**É o primeiro trabalho que nasce unificado**, e por isso é o teste do formato novo de leva: um
-plano só, com as etapas da API e as do front na mesma fila de dependências.
+### 3. O que o uso real mostrou
 
-### 2. Produção
+Levantado usando o app, e nada aqui é feature nova: tabela de gastos no Relatório,
+autocompletar do navegador atrapalhando os campos de valor e descrição, as datas do cliente
+pedindo uma base só, e seis defeitos de mobile — a barra do "Restante" colada no percentual,
+espaço sem criar nem trocar fora do desktop, o selo de dono no bloco errado, Extrato e
+Personalização sem virar card no telefone, e o rodapé dos formulários desalinhado.
+
+### 4. Produção
 
 Nada aqui é código de feature, e cada item já quebrou alguma coisa uma vez:
 
