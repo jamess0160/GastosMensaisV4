@@ -88,7 +88,7 @@ class Controller {
     }
 
     getSelf = async (req: Request, res: Response) => {
-        res.json(await new GetSelf().run(res.locals.IdUser))
+        res.json(await new GetSelf().run(res.locals.IdUser, res))
     }
 
     create = async (req: Request, res: Response) => {
