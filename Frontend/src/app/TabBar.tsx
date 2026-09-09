@@ -115,7 +115,7 @@ export function TabBar() {
             /* O histórico INTEIRO, como na sidebar: sem `From`/`To`.
                Quem quer recortar vai ao Relatório. */
             label: exportSpreadsheet.exporting ? "Exportando…" : "Exportar para Excel",
-            description: "Todo o histórico em .xlsx",
+            description: "Todas as movimentações do mês em .xlsx",
             icon: <IconExport />,
             onSelect: () => exportSpreadsheet.run(),
             disabled: exportSpreadsheet.exporting,
