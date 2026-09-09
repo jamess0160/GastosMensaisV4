@@ -260,6 +260,48 @@
     font-weight: 600;
 }
 
+/* "Esqueci minha senha", ao lado do rótulo do campo de senha. É um
+   <button> e não um <a>: ele navega pelo roteador, e um link de
+   verdade recarregaria o app inteiro. Dentro de um <label>, o clique
+   num elemento interativo não dispara a ativação do rótulo — o campo
+   não rouba o toque. */
+.fieldAction {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--brand);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+
+.fieldAction:hover {
+    text-decoration: underline;
+}
+
+/* O aviso que NÃO é erro — a `msg` do servidor depois de um 200.
+   As telas de recuperação e de confirmação vivem dela: a resposta é a
+   mesma para e-mail com conta e sem conta, e mostrá-la como veio é o
+   que impede a tela de virar um verificador de cadastros. */
+.notice {
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--brand-soft);
+    border: 1px solid var(--brand-tint);
+    color: var(--ink-2);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+/* A letra miúda embaixo do botão: prazo do link, o que acontece
+   depois. É informação que evita um chamado, não decoração. */
+.hint {
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    text-align: center;
+}
+
 .fpBot {
     display: flex;
     align-items: center;

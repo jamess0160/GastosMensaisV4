@@ -14,6 +14,12 @@ import { Login } from "@/pages/Login/Login";
 
 const SignUp = lazy(() => import("@/pages/SignUp/SignUp").then((m) => ({ default: m.SignUp })));
 const Invite = lazy(() => import("@/pages/Invite/Invite").then((m) => ({ default: m.Invite })));
+const ForgotPassword = lazy(() =>
+    import("@/pages/ForgotPassword/ForgotPassword").then((m) => ({ default: m.ForgotPassword })),
+);
+const ResetPassword = lazy(() =>
+    import("@/pages/ResetPassword/ResetPassword").then((m) => ({ default: m.ResetPassword })),
+);
 
 const load = (screen: ReactNode) => (
     <Suspense fallback={<div className={styles.center}>Carregando…</div>}>{screen}</Suspense>
@@ -26,6 +32,16 @@ export const router = createBrowserRouter([
        não ter conta nenhuma. `GET /Workspaces/invite/Hash=` é a única
        rota pública além das de entrar e cadastrar. */
     { path: "/convite/:hash", element: load(<Invite />) },
+    /* As duas da recuperação são públicas por definição: quem esqueceu a
+       senha não tem sessão. A proteção não é o cookie, é o link assinado
+       que chega ao e-mail do dono da conta.
+
+       O link do e-mail aponta para `/recuperar-senha?Token=…` — para a
+       TELA, e não para a API —, e a troca acontece num POST daqui: um
+       GET que muda estado seria gasto pelo pré-carregador de link do
+       cliente de e-mail, sem ninguém ter clicado. */
+    { path: "/esqueci-senha", element: load(<ForgotPassword />) },
+    { path: "/recuperar-senha", element: load(<ResetPassword />) },
     {
         path: "/",
         element: <AppShell />,

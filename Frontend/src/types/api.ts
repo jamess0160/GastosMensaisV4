@@ -79,6 +79,34 @@ export namespace ApiTypes {
         RememberDevice?: boolean;
     }
 
+    /** `POST /Users/forgotPassword` — passo 1 da recuperação.
+     *
+     *  **A resposta é `200` sempre**, inclusive para e-mail que não tem
+     *  conta, e com a mesma `msg`. É de propósito: responder diferente
+     *  transformaria a rota num verificador de quais endereços têm
+     *  conta — a mesma razão da `msg` única do login. A tela mostra a
+     *  `msg` como veio e NUNCA escreve "e-mail não encontrado". */
+    export interface ForgotPasswordBody {
+        Email: string;
+    }
+
+    /** `POST /Users/resetPassword` — passo 2.
+     *
+     *  Token e senha no CORPO, nunca na URL: os dois são credencial, e o
+     *  path cai no log do proxy, no histórico e no `Referer`. É por isso
+     *  também que o link do e-mail aponta para a TELA e a troca acontece
+     *  num `POST` — um `GET` que muda estado seria gasto pelo
+     *  pré-carregador de link do cliente de e-mail.
+     *
+     *  O link vale 30 minutos e serve UMA vez: pedir dois e usar o
+     *  segundo invalida o primeiro. Inválido, expirado e já usado são o
+     *  MESMO `406`, com a mesma `msg` — a ação da tela é a mesma nos
+     *  três: mostrar a mensagem e oferecer pedir outro link. */
+    export interface ResetPasswordBody {
+        Token: string;
+        NewPassword: string;
+    }
+
     /* ── 3. UsersAuth (WebAuthn) ──────────────────────────────── */
 
     /** Tri-estado: true = há passkey aqui; false = usuário recusou;

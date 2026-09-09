@@ -134,12 +134,17 @@ export function Login() {
 
                     <FormField
                         label="Senha"
-                        /* Sem rota de recuperação no contrato: o link some
-                           do produto sem sumir do layout. */
+                        /* O link virou navegação de verdade: as duas
+                           telas da recuperação existem, e a rota da API
+                           também. */
                         hint={
-                            <span title="Ainda sem API" style={{ opacity: 0.5 }}>
+                            <button
+                                type="button"
+                                className={styles.fieldAction}
+                                onClick={() => navigate("/esqueci-senha")}
+                            >
                                 Esqueci minha senha
-                            </span>
+                            </button>
                         }
                     >
                         {(field) => (

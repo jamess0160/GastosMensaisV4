@@ -32,6 +32,26 @@ class Connection {
         return data;
     }
 
+    /** Público. Passo 1 de "esqueci minha senha": manda o link para o
+     *  e-mail, que aponta para `APP_URL/recuperar-senha?Token=…`.
+     *
+     *  **Responde 200 sempre**, inclusive para e-mail sem conta, e com a
+     *  mesma `msg`. Mostre-a como veio: a informação de "existe ou não"
+     *  não está na resposta, e é de propósito que não esteja. */
+    async forgotPassword(body: ApiTypes.ForgotPasswordBody): Promise<{ msg: string }> {
+        const { data } = await http.post<{ msg: string }>(`${this.route}/forgotPassword`, body);
+        return data;
+    }
+
+    /** Público. Passo 2: grava a senha nova.
+     *
+     *  NÃO abre sessão — não vem `Set-Cookie` nenhum. Depois do sucesso
+     *  o caminho é o login, com a senha nova. */
+    async resetPassword(body: ApiTypes.ResetPasswordBody): Promise<{ msg: string }> {
+        const { data } = await http.post<{ msg: string }>(`${this.route}/resetPassword`, body);
+        return data;
+    }
+
     /** `Password` nunca sai na resposta. */
     async getSelf(): Promise<ApiTypes.User> {
         const { data } = await http.get<ApiTypes.User>(`${this.route}/getSelf`);
