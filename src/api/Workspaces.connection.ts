@@ -12,10 +12,13 @@ import type { ApiTypes } from "@/types/api";
 class Connection {
     private readonly route = "/Workspaces";
 
-    /** Os workspaces em que o usuário é membro.
+    /** Os workspaces em que o usuário é membro, com o da SESSÃO marcado
+     *  em `Current` — exatamente um item vem `true`.
      *
-     *  ⚠️ A resposta NÃO marca qual é o da sessão — o `IdWorkspace` vive
-     *  dentro do token, e o cookie é `HttpOnly`. Ver a pendência 19. */
+     *  É daqui que sai a resposta para "em qual espaço eu estou", e não
+     *  de memória do cliente: a seleção vive dentro do token e o cookie é
+     *  `HttpOnly`. O `Current` acompanha o token, então ele muda sozinho
+     *  quando o `switch` reemite o cookie. */
     async getSelf(): Promise<ApiTypes.Workspace[]> {
         const { data } = await http.get<ApiTypes.Workspace[]>(`${this.route}/getSelf`);
         return data;

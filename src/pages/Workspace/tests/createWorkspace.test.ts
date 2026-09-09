@@ -8,6 +8,7 @@ const workspace: ApiTypes.Workspace = {
     IdWorkspace: 2,
     Name: "Empresa",
     IdOwnerUser: 1,
+    Current: true,
     CreatedAt: "2026-09-06T00:00:00.000Z",
     UpdatedAt: "2026-09-06T00:00:00.000Z",
 };

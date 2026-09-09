@@ -1,11 +1,4 @@
-import {
-    createContext,
-    useContext,
-    useEffect,
-    useMemo,
-    useSyncExternalStore,
-    type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ApiUnauthorizedError, UNAUTHORIZED_EVENT } from "@/api/client";
@@ -19,7 +12,8 @@ interface Session {
     user: ApiTypes.User;
     workspaces: ApiTypes.Workspace[];
     /** O espaço em que a sessão está — a raiz de tudo que a tela mostra.
-     *  `null` só no caso impossível de o usuário não ter nenhum. */
+     *  Quem o aponta é o `Current` que a API devolve. `null` enquanto a
+     *  lista não chegou, e no caso impossível de nenhum vir marcado. */
     workspace: ApiTypes.Workspace | null;
     /** Este usuário é `owner` do espaço ATUAL?
      *
@@ -42,60 +36,23 @@ export const sessionKeys = {
     workspaces: ["session", "workspaces"] as const,
 };
 
-/** Em qual espaço a sessão está.
+/** Em qual espaço a sessão está — e quem responde é a API.
  *
- *  ⚠️ O CLIENTE NÃO TEM COMO SABER, e isto é o mais perto que se chega.
- *  `GET /Workspaces/getSelf` devolve a lista sem marcar o atual, o
- *  `IdWorkspace` vive dentro do token e o cookie é `HttpOnly`. É a
- *  pendência 19, e ela importa desde que o chassi passou a AFIRMAR o
- *  espaço em toda tela: um chute errado leva ao pior erro possível, que
- *  é lançar o mês inteiro no lugar errado.
+ *  `GET /Workspaces/getSelf` marca com `Current` o workspace do TOKEN
+ *  que respondeu à requisição. O cliente não tem, e nunca teve, como
+ *  chegar nisso sozinho: a seleção vive dentro do JWT e o cookie é
+ *  `HttpOnly`. Enquanto o campo não existia, o chassi chutava o primeiro
+ *  da lista e a tela AFIRMAVA um espaço enquanto os lançamentos iam para
+ *  outro — era a pendência 19, e ela subiu em 08/09.
  *
- *  O que se sabe com certeza é o que o `switch` respondeu — e é só isso
- *  que `remembered` carrega. Sem troca nenhuma nesta aba, sobra o
- *  primeiro da lista, que é o chute de sempre. Guardar o valor no
- *  navegador seria pior: ele pode discordar do cookie sem que nada
- *  acuse, e é justamente o tipo de leitura defensiva que este projeto
- *  não faz. */
+ *  Sem `Current` em ninguém a resposta é `null`, e não o primeiro da
+ *  lista: um espaço errado na tela é pior do que espaço nenhum. O caso
+ *  não acontece pelo caminho normal — o login já seleciona um. */
 export function currentWorkspace(
     workspaces: readonly ApiTypes.Workspace[],
-    remembered: number | null,
 ): ApiTypes.Workspace | null {
-    return (
-        workspaces.find((workspace) => workspace.IdWorkspace === remembered) ??
-        workspaces[0] ??
-        null
-    );
+    return workspaces.find((workspace) => workspace.Current) ?? null;
 }
-
-/* O que o último `switch` respondeu.
- *
- *  Mora FORA do React, e não no estado do provider, por um motivo
- *  concreto: a tela pública de aceite de convite troca de espaço com o
- *  chassi ainda desmontado — ela chama `join` e depois `switch` antes de
- *  navegar para dentro do app. Um estado do provider nasceria vazio
- *  justamente aí, e o usuário cairia no espaço antigo depois de aceitar,
- *  que é o bug mais provável desta entrega.
- *
- *  Some no reload, junto com a aba: um valor persistido pode discordar
- *  do cookie sem que nada acuse. */
-let remembered: number | null = null;
-const listeners = new Set<() => void>();
-
-/** Só quem acabou de chamar `POST /Workspaces/switch` escreve aqui. */
-export function rememberWorkspace(idWorkspace: number): void {
-    remembered = idWorkspace;
-    for (const listener of listeners) listener();
-}
-
-function subscribeToWorkspace(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => {
-        listeners.delete(listener);
-    };
-}
-
-const readRemembered = () => remembered;
 
 export function useSessionQuery(): UseQueryResult<ApiTypes.User> {
     return useQuery({
@@ -115,13 +72,9 @@ export function SessionProvider({ user, children }: { user: ApiTypes.User; child
         staleTime: 5 * 60 * 1000,
     });
 
-    /* O `switch` limpa TODO o cache de query, então o espaço atual não
-       pode morar lá — ele mora fora do React. Ver `rememberWorkspace`. */
-    const rememberedId = useSyncExternalStore(subscribeToWorkspace, readRemembered, readRemembered);
-
     const value = useMemo<Session>(() => {
         const list = workspaces.data ?? [];
-        const workspace = currentWorkspace(list, rememberedId);
+        const workspace = currentWorkspace(list);
 
         return {
             user,
@@ -129,7 +82,7 @@ export function SessionProvider({ user, children }: { user: ApiTypes.User; child
             workspace,
             isOwner: workspace?.IdOwnerUser === user.IdUser,
         };
-    }, [user, workspaces.data, rememberedId]);
+    }, [user, workspaces.data]);
 
     return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
@@ -207,10 +160,10 @@ export function useSwitchWorkspace() {
 
     return async (idWorkspace: number): Promise<ApiTypes.Workspace> => {
         const workspace = await WorkspacesConnection.switch(idWorkspace);
+        // O cache inteiro descartado inclui a lista de espaços, que volta
+        // do servidor já com o `Current` no lugar novo — não há nada a
+        // lembrar deste lado.
         queryClient.clear();
-        // Depois do `clear`: isto vive fora do cache, e é o que o cliente
-        // sabe de mais confiável sobre onde a sessão está.
-        rememberWorkspace(workspace.IdWorkspace);
         return workspace;
     };
 }

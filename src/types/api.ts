@@ -96,15 +96,20 @@ export namespace ApiTypes {
      *  de isso acontecer: o primeiro nasce no cadastro, um novo se cria
      *  com `POST /Workspaces`, e num que já existe só se entra por
      *  CONVITE. `getSelf` devolve todos, e é o `switch` que escolhe em
-     *  qual a sessão está.
-     *
-     *  ⚠️ A lista NÃO diz qual é o da sessão: o `IdWorkspace` vive dentro
-     *  do token e o cookie é `HttpOnly`. Ver `currentWorkspace` em
-     *  `src/app/session.tsx` e a pendência 19. */
+     *  qual a sessão está. */
     export interface Workspace {
         IdWorkspace: number;
         Name: string;
         IdOwnerUser: number;
+        /** É ESTE o espaço da sessão? Exatamente um item da lista vem
+         *  `true`, e no retorno do `switch` ele é sempre `true`.
+         *
+         *  É o único campo daqui que não descreve o workspace: ele
+         *  descreve o TOKEN que respondeu à requisição — o mesmo espaço
+         *  vem `true` numa aba e `false` na outra. É também a única
+         *  resposta possível para "onde eu estou", porque a seleção vive
+         *  dentro do JWT e o cookie é `HttpOnly`. */
+        Current: boolean;
         CreatedAt: DateTime;
         UpdatedAt: DateTime;
     }

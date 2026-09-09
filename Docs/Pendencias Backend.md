@@ -33,7 +33,7 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 | ~~16~~ | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | ✅ **Entregue** em 04/09 |
 | ~~17~~ | [`Charged` e `CompetenceDate` em `GET /ExpensePayments`](#17-charged-e-competencedate-em-get-expensepayments) | Contrato | ✅ **Confirmado** em 07/09 |
 | ~~18~~ | [Criar um workspace novo](#18-criar-um-workspace-novo) | Produto | ✅ **Entregue** em 06/09 |
-| 19 | [Saber em qual workspace a sessão está](#19-saber-em-qual-workspace-a-sessão-está) | Contrato | O seletor de espaço do chassi |
+| ~~19~~ | [Saber em qual workspace a sessão está](#19-saber-em-qual-workspace-a-sessão-está) | Contrato | ✅ **Entregue** em 08/09 |
 | 20 | [Gestão de membros](#20-gestão-de-membros) | Produto | Tirar alguém de um espaço |
 | 21 | [O `403` não está na tabela de erros](#21-o-403-não-está-na-tabela-de-erros) | Contrato | Mensagem de "não é o dono" |
 
@@ -55,14 +55,15 @@ desenhado para viver sem eles —, e o 11 virou registro histórico quando o
 primeiro como `GET /Reports/Month`, na forma preferida desta seção; o
 segundo com as duas rotinas de orçamento do dia 1º.
 
-**Os itens 17 a 21 nasceram da leva 4**, e dois já saíram: o **18**
-subiu no mesmo dia (`POST /Workspaces`, na forma proposta aqui) e o
+**Os itens 17 a 21 nasceram da leva 4**, e três já saíram: o **18**
+subiu no mesmo dia (`POST /Workspaces`, na forma proposta aqui), o
 **17** foi confirmado em 07/09 — a divergência entre o changelog e o
 exemplo de resposta da seção 12 era do documento, não da rota, e o
-exemplo foi corrigido. O 19, o 20 e o 21 são o que a tela de espaços
-pediu e não encontrou — e o **19 é o mais incômodo**, porque o chassi
-passou a afirmar em toda tela uma coisa que o cliente não tem como
-saber.
+exemplo foi corrigido — e o **19 subiu em 08/09**, na primeira das duas
+formas propostas aqui, depois de o bug aparecer na tela: com dois
+espaços, recarregar a página passava a mostrar o nome do primeiro
+enquanto o cookie continuava no segundo. Sobraram o 20 e o 21, que é o
+que a tela de espaços pediu e ainda não encontrou.
 
 ---
 
@@ -900,7 +901,16 @@ usuário abre o sistema e confia no que está escrito. E não dá para
 persistir: um valor guardado no navegador pode discordar do cookie sem
 que nada acuse.
 
-**Proposta.** Qualquer uma das duas resolve; a primeira é uma linha.
+**✅ Entregue em 08/09, na forma 1.** `GET /Workspaces/getSelf` passou a
+devolver `Current` em cada item, e `POST /Workspaces/switch` devolve o
+mesmo campo (lá sempre `true`, que é o que o workspace acabou de se
+tornar). Exatamente um item da lista vem `true`, e ele acompanha o
+**token**, não a tabela: quem mandar o token antigo continua vendo a
+seleção antiga, que é nela que aquele token opera. O contorno do
+cliente — lembrar o que o último `switch` respondeu, e chutar o
+primeiro da lista sem troca nenhuma — foi apagado junto.
+
+**Proposta (o que foi pedido).** Qualquer uma das duas resolvia; a primeira era uma linha.
 
 1. **Um booleano na lista:**
 
