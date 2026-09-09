@@ -1,5 +1,5 @@
 import { addDaysToDate, dayInMonth, daysApart, parts } from "./date";
-import { sumMoney, type ExpenseLeg } from "./aggregate";
+import { sumMoney } from "./aggregate";
 import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
@@ -73,8 +73,12 @@ export const isCardLeg = (payment: ApiTypes.ExpensePayment): boolean => payment.
 export interface Invoice {
     closing: ApiTypes.CalendarDate;
     due: ApiTypes.CalendarDate;
-    legs: ExpenseLeg[];
-    /** O que a fatura cobra — já com o sinal do estorno, que a reduz. */
+    /** As linhas da fatura, como o extrato as devolveu — a `Date` de
+     *  cada uma é a da COMPRA, não a do vencimento. */
+    entries: readonly ApiTypes.StatementCardEntry[];
+    /** O que a fatura cobra — já com o sinal do estorno, que a reduz.
+     *  Vem somado do servidor: é o mesmo número da linha `Fatura` do
+     *  extrato, e não uma segunda soma que pode divergir dela. */
     total: ApiTypes.Money;
     /** Quanto do total o usuário já conferiu como lançado na fatura. A
      *  diferença para o total é o que ele esperava e o cartão ainda não
@@ -85,31 +89,40 @@ export interface Invoice {
     paid: boolean;
 }
 
-/** As pernas do cartão que caem na fatura que vence naquele mês.
+/** A fatura que vence naquele mês, montada a partir do extrato.
  *
- *  O recorte é pelo `DueDate` exato do ciclo, e não pelo mês: duas
- *  faturas do mesmo cartão nunca vencem no mesmo dia, e é o dia que o
- *  servidor usa para achar as pernas. */
+ *  A entrada NÃO são as pernas do mês, e essa é a correção inteira.
+ *  Elas chegam recortadas por `CompetenceDate`, e num cartão em modo
+ *  `purchase` competência e vencimento divergem de propósito: a compra
+ *  de 20/08 num cartão que vence dia 04 pesa em agosto e é cobrada em
+ *  04/09. Nenhum dos dois meses tinha ao mesmo tempo a perna carregada
+ *  e o `DueDate` procurado — a fatura ficava vazia nos dois, sempre.
+ *
+ *  `GET /Reports/Statement` responde a pergunta certa: `Cards` já é o
+ *  par `(cartão, vencimento)` recortado por `DueDate`, com pago e
+ *  pendente juntos. É o MESMO recorte que o `payInvoice` faz na
+ *  escrita, e é isso que impede o botão de mandar um vencimento cujos
+ *  lançamentos ele nunca viu.
+ *
+ *  `card` é `undefined` quando nenhuma fatura daquele cartão vence
+ *  naquele mês: total zero, nenhuma linha, botão desabilitado — e
+ *  agora isso é verdade. */
 export function invoiceOf(
-    legs: readonly ExpenseLeg[],
+    card: ApiTypes.StatementCard | undefined,
     method: ApiTypes.PaymentMethod,
     month: ApiTypes.ReferenceMonth,
 ): Invoice {
     const { closing, due } = invoiceDates(month, method.DueDay, method.ClosingOffsetDays);
-
-    const mine = legs.filter(
-        (leg) =>
-            leg.payment.IdPaymentMethod === method.IdPaymentMethod && leg.payment.DueDate === due,
-    );
+    const entries = card?.Entries ?? [];
 
     return {
         closing,
-        due,
-        legs: mine,
-        total: sumMoney(mine.map((leg) => leg.value)),
-        charged: sumMoney(
-            mine.filter((leg) => leg.payment.Charged === true).map((leg) => leg.value),
-        ),
-        paid: mine.length > 0 && mine.every((leg) => leg.paid),
+        /* O vencimento do extrato ganha do calculado: é dele que as
+           linhas vieram, e é ele que o `payInvoice` recebe de volta. */
+        due: card?.DueDate ?? due,
+        entries,
+        total: card?.Total ?? 0,
+        charged: sumMoney(entries.filter((entry) => entry.Charged).map((entry) => entry.Value)),
+        paid: entries.length > 0 && entries.every((entry) => entry.Paid),
     };
 }

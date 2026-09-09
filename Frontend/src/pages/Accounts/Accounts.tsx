@@ -10,7 +10,7 @@ import {
 import { useMonthScope } from "@/app/monthScope";
 import { useSession } from "@/app/session";
 import { useAccounts, useInvalidateCatalogs } from "@/data/catalogs";
-import { useInvalidateMovement, useMonthLegs } from "@/data/month";
+import { useInvalidateMovement, useMonthStatement } from "@/data/month";
 import { Badge, Button, Card, Overline, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
 import {
@@ -230,10 +230,20 @@ export function Accounts() {
        total de Contas divergiria do de Início a cada troca de mês. */
     const [month, setMonth] = useMonthScope();
     const accounts = useAccounts();
-    /* As pernas do mês, sob a mesma chave de cache que Início e Gastos
-       já buscaram: é delas que sai a fatura de cada cartão — quanto
-       vence e quanto já foi conferido. */
-    const monthLegs = useMonthLegs(month);
+    /* O extrato do mês, sob a mesma chave de cache que a tela de Extrato
+       já buscou: é dele que sai a fatura de cada cartão — quanto vence e
+       quanto já foi conferido.
+       NÃO são as pernas do mês: elas vêm recortadas por competência, e
+       num cartão em modo `purchase` a compra de agosto vence em
+       setembro. Perguntando por competência e mandando quitar por
+       vencimento, a fatura ficava vazia nos dois meses. `Cards` já é o
+       par (cartão, vencimento) — o mesmo recorte do `payInvoice`. */
+    const statement = useMonthStatement(month);
+    /* Uma fatura por cartão no mês, indexada pelo id do cartão. */
+    const invoiceByCard = useMemo(
+        () => new Map((statement.data?.Cards ?? []).map((card) => [card.IdPaymentMethod, card])),
+        [statement.data],
+    );
     const invalidateCatalogs = useInvalidateCatalogs();
     const invalidateMovement = useInvalidateMovement();
 
@@ -309,8 +319,8 @@ export function Accounts() {
     const askedMethod = Number(urlQuery.get("IdPaymentMethod")) || null;
     const askedAccount = askedMethod
         ? ((accounts.data ?? []).find((account) =>
-            account.PaymentMethods.some((method) => method.IdPaymentMethod === askedMethod),
-        )?.IdAccount ?? null)
+              account.PaymentMethods.some((method) => method.IdPaymentMethod === askedMethod),
+          )?.IdAccount ?? null)
         : null;
 
     const shownAccount = openAccount ?? askedAccount;
@@ -352,9 +362,7 @@ export function Accounts() {
             />
 
             <Page>
-                <PageHead
-                    title="Contas"
-                />
+                <PageHead title="Contas" />
 
                 <div className={styles.summary}>
                     <Card className={styles.total}>
@@ -629,8 +637,8 @@ export function Accounts() {
                                     description={`${TYPE_LABEL[detail.Type]} é conta de saldo fechado: o gasto sai no ato e não há fatura de onde o cartão pudesse ser pago.`}
                                 />
                             ) : detail.PaymentMethods.filter(
-                                (method) => method.Active && method.Kind === "credit_card",
-                            ).length === 0 ? (
+                                  (method) => method.Active && method.Kind === "credit_card",
+                              ).length === 0 ? (
                                 <EmptyState
                                     inline
                                     icon={<IconCard />}
@@ -642,7 +650,11 @@ export function Accounts() {
                                     {detail.PaymentMethods.filter(
                                         (method) => method.Active && method.Kind === "credit_card",
                                     ).map((method) => {
-                                        const invoice = invoiceOf(monthLegs.legs, method, month);
+                                        const invoice = invoiceOf(
+                                            invoiceByCard.get(method.IdPaymentMethod),
+                                            method,
+                                            month,
+                                        );
 
                                         return (
                                             <div
@@ -655,9 +667,9 @@ export function Accounts() {
                                                         style={
                                                             method.Color
                                                                 ? {
-                                                                    background: `${method.Color}1f`,
-                                                                    color: method.Color,
-                                                                }
+                                                                      background: `${method.Color}1f`,
+                                                                      color: method.Color,
+                                                                  }
                                                                 : undefined
                                                         }
                                                     >
@@ -683,7 +695,7 @@ export function Accounts() {
                                                             <div className={styles.cardMode}>
                                                                 {
                                                                     COMPETENCE_LABEL[
-                                                                    method.CompetenceMode
+                                                                        method.CompetenceMode
                                                                     ]
                                                                 }
                                                             </div>
@@ -732,13 +744,13 @@ export function Accounts() {
                                                             {formatMoney(invoice.total)}
                                                         </div>
                                                         <div className={styles.invoiceCaption}>
-                                                            {monthLegs.isPending
+                                                            {statement.isPending
                                                                 ? "Carregando os lançamentos do mês…"
-                                                                : invoice.legs.length === 0
-                                                                    ? "Nenhum lançamento nesta fatura"
-                                                                    : invoice.paid
-                                                                        ? `Quitada · ${invoice.legs.length} lançamento${invoice.legs.length === 1 ? "" : "s"}`
-                                                                        : `${formatMoney(invoice.charged)} já conferidos · ${invoice.legs.length} lançamento${invoice.legs.length === 1 ? "" : "s"}`}
+                                                                : invoice.entries.length === 0
+                                                                  ? "Nenhum lançamento nesta fatura"
+                                                                  : invoice.paid
+                                                                    ? `Quitada · ${invoice.entries.length} lançamento${invoice.entries.length === 1 ? "" : "s"}`
+                                                                    : `${formatMoney(invoice.charged)} já conferidos · ${invoice.entries.length} lançamento${invoice.entries.length === 1 ? "" : "s"}`}
                                                         </div>
                                                     </div>
                                                     <span className={styles.invoiceActions}>
@@ -763,10 +775,10 @@ export function Accounts() {
                                                                 variant="primary"
                                                                 disabled={
                                                                     pending ||
-                                                                    invoice.legs.length === 0
+                                                                    invoice.entries.length === 0
                                                                 }
                                                                 title={
-                                                                    invoice.legs.length === 0
+                                                                    invoice.entries.length === 0
                                                                         ? "Fatura sem lançamento nenhum não é fatura"
                                                                         : undefined
                                                                 }
