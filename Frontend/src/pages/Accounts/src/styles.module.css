@@ -331,3 +331,12 @@
     color: var(--neg);
     border-color: var(--neg);
 }
+
+/* O ciclo digitado vale, mas o fechamento derivado dele anda de mês para
+   mês: é aviso, não recusa. Por isso a cor é a da marca (atenção) e não
+   a do erro, que é a de um envio que não vai passar. */
+.cycleHintWarn {
+    color: var(--ink);
+    background: var(--brand-soft);
+    border-color: var(--brand);
+}

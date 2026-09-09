@@ -23,6 +23,11 @@ export const aCardDraft = (overrides: Partial<CardDraft> = {}): CardDraft => ({
     // que sair igual a um criado sem o campo no corpo.
     CompetenceMode: "purchase",
     Color: null,
+    // Vence dia 5 e fecha 7 dias antes: a subtração atravessa a virada do
+    // mês, então o fechamento derivado NÃO cai sempre no mesmo dia. O
+    // rascunho padrão vem com o aviso do ciclo já lido, para os testes de
+    // envio começarem no envio — quem testa o aviso passa `false`.
+    cycleAcknowledged: true,
     ...overrides,
 });
 
@@ -37,6 +42,7 @@ export function fakeAccountsContext(overrides: Partial<AccountsContext> = {}): A
         finishInvoice: vi.fn(),
         closeAccountForm: vi.fn(),
         closeCardForm: vi.fn(),
+        acknowledgeCycleDrift: vi.fn(),
         ...overrides,
     };
 }

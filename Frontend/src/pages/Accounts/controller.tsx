@@ -36,6 +36,15 @@ export interface CardDraft {
      *  dele. Ver `ApiTypes.CompetenceMode`. */
     CompetenceMode: ApiTypes.CompetenceMode;
     Color: ApiTypes.Color | null;
+    /** A pessoa já foi avisada de que a folga que essas duas datas
+     *  produzem fecha noutro dia em parte do ano, e mesmo assim quis
+     *  salvar. Nasce `false` na criação e `true` na edição — lá as datas
+     *  saíram do próprio cadastro, e mexer numa delas volta a `false`.
+     *
+     *  Ele NÃO vai para a API: o que se guarda é o par vencimento +
+     *  folga, e este campo é a memória de um aviso dentro do formulário
+     *  aberto. */
+    cycleAcknowledged: boolean;
 }
 
 export interface AccountsContext {
@@ -53,6 +62,9 @@ export interface AccountsContext {
     finishInvoice(message: string): void;
     closeAccountForm(): void;
     closeCardForm(): void;
+    /** Marca o aviso do ciclo como lido, para o segundo envio passar. É
+     *  o que separa "aceitou em silêncio" de "leu e decidiu". */
+    acknowledgeCycleDrift(): void;
 }
 
 class Controller {

@@ -335,6 +335,79 @@ describe("Expenses", () => {
             expect((await findPayments(after.IdExpense))[0]).toMatchObject({ ClosingDate: "2026-09-20", DueDate: "2026-09-28" })
         })
 
+        //  **A fronteira do fechamento, no dia exato.** O teste acima olha para o dia anterior e
+        //  o posterior; o que decide a regra é o próprio dia. A comparação é estritamente maior
+        //  (`ExpenseDate > closingOf(...)`), então a compra **no** dia do fechamento ainda entra
+        //  na fatura que fecha naquele dia — e a do dia seguinte já é a próxima. Um dia aqui é um
+        //  mês no caixa, e é a única linha do arquivo que decide isso.
+        it("põe na fatura que fecha no dia a compra feita no próprio dia do fechamento", async () => {
+            let workspace = await buildWorkspace()
+            //  Vence dia 28 e fecha 8 dias antes: o fechamento cai no dia 20 do mesmo mês
+            let card = await createCard(workspace, { DueDay: 28, ClosingOffsetDays: 8 })
+
+            let onClosing = await createExpense(workspace, {
+                ExpenseDate: "2026-08-20",
+                Payments: [{ IdPaymentMethod: card, Value: 100 }],
+            })
+
+            let afterClosing = await createExpense(workspace, {
+                ExpenseDate: "2026-08-21",
+                Payments: [{ IdPaymentMethod: card, Value: 100 }],
+            })
+
+            //  Comprou no dia em que fechou: entra nessa fatura mesmo
+            expect((await findPayments(onClosing.IdExpense))[0]).toMatchObject({ ClosingDate: "2026-08-20", DueDate: "2026-08-28" })
+            //  Um dia depois: a fatura seguinte, um mês inteiro adiante no caixa
+            expect((await findPayments(afterClosing.IdExpense))[0]).toMatchObject({ ClosingDate: "2026-09-20", DueDate: "2026-09-28" })
+        })
+
+        //  A mesma fronteira do outro lado da rolagem: o cartão real que motivou a etapa fecha
+        //  dia 27 e vence dia 04 do mês seguinte, ou seja, 8 dias de folga atravessando a virada
+        //  do mês. É o caso em que o laço do `creditCardInvoice` roda duas vezes, e por isso o
+        //  que vale para o cartão que fecha e vence no mesmo mês tinha que ser verificado aqui
+        //  de novo — a compra do dia 27 não pode cair na fatura de outubro.
+        it("põe na fatura que fecha no dia a compra do dia do fechamento quando o vencimento rola de mês", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { DueDay: 4, ClosingOffsetDays: 8 })
+
+            let onClosing = await createExpense(workspace, {
+                ExpenseDate: "2026-08-27",
+                Payments: [{ IdPaymentMethod: card, Value: 100 }],
+            })
+
+            let afterClosing = await createExpense(workspace, {
+                ExpenseDate: "2026-08-28",
+                Payments: [{ IdPaymentMethod: card, Value: 100 }],
+            })
+
+            expect((await findPayments(onClosing.IdExpense))[0]).toMatchObject({ ClosingDate: "2026-08-27", DueDate: "2026-09-04" })
+            expect((await findPayments(afterClosing.IdExpense))[0]).toMatchObject({ ClosingDate: "2026-09-26", DueDate: "2026-10-04" })
+        })
+
+        //  **O limite conhecido do modelo da folga, escrito como teste.** A folga é uma subtração
+        //  de dias corridos a partir do vencimento, e o emissor brasileiro fecha num dia fixo do
+        //  mês: as duas descrições coincidem no mês em que o cartão foi cadastrado e discordam
+        //  por um dia nos meses em que a distância entre fechamento e vencimento muda. No cartão
+        //  de cima — fecha 27, vence 04 —, agosto tem 8 dias de folga (27/08 a 04/09) e setembro
+        //  tem 7 (27/09 a 04/10), então o fechamento derivado de setembro cai no dia 26 e a
+        //  compra do dia 27 vai para a fatura de novembro, não a de outubro.
+        //
+        //  Isto não é a comparação errada: é o modelo de descrição do cartão, e trocá-lo é
+        //  migration, recálculo de perna já gravada e reescrita desta section — leva própria. O
+        //  teste fica para que a troca, quando vier, apareça aqui em vez de passar despercebida.
+        it("deriva o fechamento pela folga, que anda um dia quando o intervalo do mês muda", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { DueDay: 4, ClosingOffsetDays: 8 })
+
+            let created = await createExpense(workspace, {
+                ExpenseDate: "2026-09-27",
+                Payments: [{ IdPaymentMethod: card, Value: 100 }],
+            })
+
+            //  O emissor fecharia em 27/09 e cobraria em 04/10; a folga fecha em 26/09
+            expect((await findPayments(created.IdExpense))[0]).toMatchObject({ ClosingDate: "2026-10-27", DueDate: "2026-11-04" })
+        })
+
         //  Vence no dia 5 com folga de 8: a fatura fecha no dia 28 do mês anterior ao próprio
         //  vencimento. No modelo antigo essa relação tinha que ser inferida de dois números
         //  soltos (DueDay <= ClosingDay); aqui ela é só a subtração dando um mês para trás.

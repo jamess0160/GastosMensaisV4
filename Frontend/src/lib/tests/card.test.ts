@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     cardCycleFromDates,
+    checkCardCycle,
     DEFAULT_CLOSING_OFFSET_DAYS,
     invoiceDates,
     invoiceOf,
@@ -56,6 +57,43 @@ describe("cardCycleFromDates", () => {
     it("devolve folga não positiva quando as datas estão invertidas", () => {
         // Quem recusa é `saveCard`: aqui a conta é só a subtração.
         expect(cardCycleFromDates("2026-09-10", "2026-09-05").ClosingOffsetDays).toBe(-5);
+    });
+});
+
+describe("checkCardCycle", () => {
+    /*  O caso real que abriu a etapa 2 da leva 6: um cartão que fecha
+        dia 27 e vence dia 04. Lendo a fatura de agosto (27/08 a 04/09) a
+        folga gravada é 8; em setembro (27/09 a 04/10) ela seria 7, e o
+        fechamento derivado de setembro cai no dia 26. Uma compra do dia
+        27/09 vai parar na fatura de 04/11 — um dia de diferença na
+        descrição virando um mês de diferença no caixa. */
+    it("acusa o fechamento que anda de mês para mês", () => {
+        const check = checkCardCycle("2026-08-27", "2026-09-04", "2026-09");
+
+        expect(check.typedClosingDay).toBe(27);
+        expect(check.drifts).toBe(true);
+        // Fevereiro puxa o fechamento para o dia 24; os meses de 31 dias
+        // o devolvem ao 27, que é o único que o emissor usaria.
+        expect(check.closingDays).toContain(26);
+        expect(check.closingDays.length).toBeGreaterThan(1);
+    });
+
+    it("não acusa nada quando a subtração não atravessa a virada do mês", () => {
+        // Vence 28 e fecha 8 dias antes: o dia 20 do mesmo mês, sempre.
+        // Aqui folga e dia fixo do mês descrevem o MESMO cartão.
+        const check = checkCardCycle("2026-08-20", "2026-08-28", "2026-09");
+
+        expect(check.drifts).toBe(false);
+        expect(check.closingDays).toEqual([20]);
+    });
+
+    it("devolve as duas datas do mês pedido, e não as que foram digitadas", () => {
+        // O ciclo digitado é o de uma fatura passada; o que a tela mostra
+        // para conferência é a fatura do mês corrente.
+        const check = checkCardCycle("2026-08-27", "2026-09-04", "2026-10");
+
+        expect(check.due).toBe("2026-10-04");
+        expect(check.closing).toBe("2026-09-26");
     });
 });
 

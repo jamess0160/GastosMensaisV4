@@ -89,6 +89,19 @@ Na mesma família: a compra no dia do fechamento caindo na fatura errada, o `Cha
 `false` e obrigando a conferir compra a compra, e o extrato do cartão sem dizer que ciclo ele
 cobre.
 
+**Guardar o fechamento do cartão como dia do mês — leva própria.** A etapa 2 da leva 6
+reproduziu "a compra no dia do fechamento" e o defeito não é a comparação, que está certa: quem
+erra é o modelo que descreve o cartão. Hoje o fechamento é o vencimento menos uma folga em
+**dias corridos**, e o emissor brasileiro fecha num **dia fixo do mês** — as duas descrições não
+são a mesma coisa. Com o cartão real que motivou a etapa (fecha 27, vence 04), quem cadastra
+lendo a fatura de agosto grava `ClosingOffsetDays = 8`, porque 27/08 a 04/09 são 8 dias; em
+setembro são 7, o fechamento derivado cai no dia **26**, e a compra de **27/09 é cobrada na
+fatura de 04/11** em vez da de 04/10. Um dia de erro na descrição é um mês de erro no caixa, e
+isso vale para todo cartão cuja folga atravessa a virada do mês. Trocar o modelo é migration,
+recálculo de perna já gravada e reescrita do `InvoiceDates` — por isso é leva, não etapa. Até
+lá, a tela do cartão mostra as duas datas do ciclo do mês corrente e avisa quando o fechamento
+derivado anda de mês para mês, em vez de aceitar a folga em silêncio.
+
 ### 2. Gestão de membros
 
 É o que sobrou do compartilhamento de workspace: **listar membros, trocar papel, remover, sair

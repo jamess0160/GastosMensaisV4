@@ -42,6 +42,8 @@ import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import { totalBalance } from "@/lib/aggregate";
 import {
     cardCycleFromDates,
+    checkCardCycle,
+    closingDaysLabel,
     invoiceDates,
     invoiceOf,
     MAX_CLOSING_OFFSET_DAYS,
@@ -104,6 +106,9 @@ const newCardDraft = (idAccount: number): CardDraft => ({
     // criado sem o campo no corpo.
     CompetenceMode: "purchase",
     Color: null,
+    // Cartão novo: as duas datas ainda vão ser digitadas, e o aviso do
+    // ciclo é sobre elas.
+    cycleAcknowledged: false,
 });
 
 /** O modo, em uma palavra que cabe no chip. É a única configuração do
@@ -142,6 +147,10 @@ const editCardDraft = (
         // antes do campo (o servidor aplicou `purchase` neles).
         CompetenceMode: method.CompetenceMode ?? "purchase",
         Color: method.Color,
+        // Na edição as datas saíram do PRÓPRIO cadastro, não da fatura:
+        // avisar sobre elas seria avisar sobre o que já foi decidido. O
+        // aviso volta assim que uma das duas for trocada.
+        cycleAcknowledged: true,
     };
 };
 
@@ -186,8 +195,12 @@ function MethodChip({ method }: { method: ApiTypes.PaymentMethod }) {
  *
  *  O usuário digita datas; a API guarda vencimento + folga. Sem esta
  *  linha, a conversão seria invisível até o cartão já estar salvo — e a
- *  data de fechamento, que muda de mês para mês, pareceria fixa. */
-function CycleHint({ draft, month }: { draft: CardDraft; month: ApiTypes.ReferenceMonth }) {
+ *  data de fechamento, que muda de mês para mês, pareceria fixa.
+ *
+ *  O ciclo é o do MÊS CORRENTE, e não o do mês que a tela está exibindo:
+ *  a fatura que a pessoa tem aberta no app do banco para conferir é a de
+ *  hoje. É por isso que `month` não é parâmetro daqui. */
+function CycleHint({ draft }: { draft: CardDraft }) {
     if (!draft.ClosingDate || !draft.DueDate) {
         return (
             <div className={styles.cycleHint}>
@@ -211,13 +224,30 @@ function CycleHint({ draft, month }: { draft: CardDraft; month: ApiTypes.Referen
         );
     }
 
-    const { closing, due } = invoiceDates(month, DueDay, ClosingOffsetDays);
+    const check = checkCardCycle(draft.ClosingDate, draft.DueDate, currentMonth());
 
     return (
-        <div className={styles.cycleHint}>
+        <div
+            className={
+                check.drifts ? `${styles.cycleHint} ${styles.cycleHintWarn}` : styles.cycleHint
+            }
+        >
             Vence dia <b>{DueDay}</b> e fecha <b>{ClosingOffsetDays} dias antes</b>. A data do
-            fechamento muda de mês para mês: a fatura que vence em {formatDate(due)} fecha em{" "}
-            {formatDate(closing)}.
+            fechamento muda de mês para mês: a fatura que vence em <b>{formatDate(check.due)}</b>{" "}
+            fecha em <b>{formatDate(check.closing)}</b>.
+            {/* A folga é subtração de dias corridos e o emissor fecha em
+                dia fixo do mês: quando a subtração atravessa a virada, as
+                duas descrições discordam por um dia — e um dia aqui vira
+                um mês no caixa. Trocar o modelo é leva própria; o que a
+                tela faz é não deixar isso passar em silêncio. */}
+            {check.drifts && (
+                <>
+                    {" "}
+                    Confira contra a fatura: com essa folga o fechamento cai{" "}
+                    <b>{closingDaysLabel(check.closingDays)}</b> conforme o mês, e você leu o dia{" "}
+                    <b>{check.typedClosingDay}</b>.
+                </>
+            )}
         </div>
     );
 }
@@ -300,6 +330,8 @@ export function Accounts() {
             },
             closeAccountForm: () => setAccountDraft(null),
             closeCardForm: () => setCardDraft(null),
+            acknowledgeCycleDrift: () =>
+                setCardDraft((c) => (c ? { ...c, cycleAcknowledged: true } : c)),
         }),
         [accountDraft, cardDraft, invalidateCatalogs, invalidateMovement],
     );
@@ -1007,7 +1039,15 @@ export function Accounts() {
                                             {...field}
                                             value={cardDraft.ClosingDate}
                                             onValueChange={(ClosingDate) =>
-                                                setCardDraft((c) => (c ? { ...c, ClosingDate } : c))
+                                                setCardDraft((c) =>
+                                                    c
+                                                        ? {
+                                                              ...c,
+                                                              ClosingDate,
+                                                              cycleAcknowledged: false,
+                                                          }
+                                                        : c,
+                                                )
                                             }
                                         />
                                     )}
@@ -1018,7 +1058,15 @@ export function Accounts() {
                                             {...field}
                                             value={cardDraft.DueDate}
                                             onValueChange={(DueDate) =>
-                                                setCardDraft((c) => (c ? { ...c, DueDate } : c))
+                                                setCardDraft((c) =>
+                                                    c
+                                                        ? {
+                                                              ...c,
+                                                              DueDate,
+                                                              cycleAcknowledged: false,
+                                                          }
+                                                        : c,
+                                                )
                                             }
                                         />
                                     )}
@@ -1028,7 +1076,7 @@ export function Accounts() {
                             {/* O que foi derivado das duas datas, à vista: o
                             fechamento não é um dia fixo do calendário, e a
                             conta fica auditável em vez de mágica. */}
-                            <CycleHint draft={cardDraft} month={month} />
+                            <CycleHint draft={cardDraft} />
 
                             {/* A ÚNICA configuração daqui que muda um número já
                             exibido na tela. O `help` mostra a consequência em

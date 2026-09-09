@@ -1,4 +1,4 @@
-import { addDaysToDate, dayInMonth, daysApart, parts } from "./date";
+import { addDaysToDate, addMonths, dayInMonth, daysApart, parts } from "./date";
 import { sumMoney } from "./aggregate";
 import type { ApiTypes } from "@/types/api";
 
@@ -53,6 +53,74 @@ export function cardCycleFromDates(
     due: ApiTypes.CalendarDate,
 ): { DueDay: number; ClosingOffsetDays: number } {
     return { DueDay: parts(due).day, ClosingOffsetDays: daysApart(closing, due) };
+}
+
+/** O ciclo conferido contra a fatura que a pessoa tem na mão.
+ *
+ *  A FOLGA E O EMISSOR NÃO DESCREVEM A MESMA COISA. Aqui o fechamento é
+ *  uma subtração de dias corridos a partir do vencimento; o emissor
+ *  brasileiro fecha num DIA FIXO do mês. As duas descrições coincidem
+ *  enquanto a subtração fica dentro do mês do vencimento, e discordam
+ *  quando ela atravessa a virada — o mês anterior tem 28, 30 ou 31 dias,
+ *  e o fechamento derivado anda junto:
+ *
+ *      fecha 27, vence 04  ->  27/08 a 04/09 = 8 dias
+ *                              27/09 a 04/10 = 7 dias
+ *
+ *  Quem cadastrou lendo as duas datas de UM mês grava a folga daquele
+ *  mês, e ela erra por um dia em metade do ano. Um dia de erro no
+ *  fechamento é um mês de erro no caixa.
+ *
+ *  Trocar o modelo — guardar o fechamento como dia do mês — é migration,
+ *  recálculo de perna já gravada e reescrita do `InvoiceDates` da API.
+ *  O que cabe aqui é NÃO ACEITAR EM SILÊNCIO: a tela mostra o que a
+ *  folga produz e diz quando isso discorda da fatura lida. */
+export interface CycleCheck extends InvoiceDates {
+    /** O dia do mês em que a fatura lida pela pessoa fechou. */
+    typedClosingDay: number;
+    /** Os dias em que o fechamento derivado cai nos doze meses a partir
+     *  de `month`, sem repetição e em ordem. Um valor só = a folga
+     *  descreve este cartão o ano inteiro. */
+    closingDays: number[];
+    /** Algum desses meses fecha num dia diferente do que foi lido. */
+    drifts: boolean;
+}
+
+/** As duas datas do ciclo no mês pedido, mais a conferência acima. */
+export function checkCardCycle(
+    closing: ApiTypes.CalendarDate,
+    due: ApiTypes.CalendarDate,
+    month: ApiTypes.ReferenceMonth,
+): CycleCheck {
+    const { DueDay, ClosingOffsetDays } = cardCycleFromDates(closing, due);
+    const typedClosingDay = parts(closing).day;
+    const days = new Set<number>();
+
+    /*  Doze meses, e não o mês pedido só: quem digitou a fatura DESTE mês
+        acerta nele por construção — a divergência aparece nos vizinhos. */
+    for (let index = 0; index < 12; index++) {
+        const cycle = invoiceDates(addMonths(month, index), DueDay, ClosingOffsetDays);
+        days.add(parts(cycle.closing).day);
+    }
+
+    const closingDays = [...days].sort((first, second) => first - second);
+
+    return {
+        ...invoiceDates(month, DueDay, ClosingOffsetDays),
+        typedClosingDay,
+        closingDays,
+        drifts: closingDays.some((day) => day !== typedClosingDay),
+    };
+}
+
+/** Os dias em que o fechamento cai, na forma mais curta que ainda diz a
+ *  verdade: "no dia 20", "no dia 26 ou 27", "entre os dias 24 e 27". Mora
+ *  aqui, e não na tela, porque a frase do formulário e a do `saveCard`
+ *  têm que dizer o mesmo — são o mesmo aviso, em dois momentos. */
+export function closingDaysLabel(days: readonly number[]): string {
+    return days.length <= 2
+        ? `no dia ${days.join(" ou ")}`
+        : `entre os dias ${days[0]} e ${days[days.length - 1]}`;
 }
 
 /* ── A fatura ─────────────────────────────────────────────── */

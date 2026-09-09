@@ -1,6 +1,13 @@
 import { errorMessage } from "@/api/client";
 import { PaymentMethodsConnection } from "@/api/PaymentMethods.connection";
-import { cardCycleFromDates, MAX_CLOSING_OFFSET_DAYS, MIN_CLOSING_OFFSET_DAYS } from "@/lib/card";
+import {
+    cardCycleFromDates,
+    checkCardCycle,
+    closingDaysLabel,
+    MAX_CLOSING_OFFSET_DAYS,
+    MIN_CLOSING_OFFSET_DAYS,
+} from "@/lib/card";
+import { currentMonth, formatDate } from "@/lib/date";
 import type { AccountsContext } from "../controller";
 
 /** Criar ou editar um cartão de crédito.
@@ -32,6 +39,16 @@ import type { AccountsContext } from "../controller";
  *  opcional e omiti-lo manteria o valor, o que também não serve: o
  *  seletor existe para trocar.
  *
+ *  E A FOLGA NÃO É ACEITA EM SILÊNCIO. Fechamento por dias corridos e
+ *  fechamento em dia fixo do mês são descrições diferentes do mesmo
+ *  cartão, e elas discordam por um dia sempre que a subtração atravessa
+ *  a virada do mês (fecha 27 e vence 04: agosto tem 8 dias de folga,
+ *  setembro tem 7). Quem digita as duas datas de UM mês grava a folga
+ *  daquele mês. Trocar o modelo é migration mais recomputação de perna
+ *  gravada, e não cabe aqui — o que cabe é avisar: o primeiro envio é
+ *  recusado com a divergência escrita, e o segundo salva. A tela já mostra o
+ *  mesmo em `CycleHint`, antes de qualquer clique.
+ *
  *  E TROCAR O MODO VALE PARA O FUTURO. `ClosingDate`, `DueDate`,
  *  `CompetenceDate` e `CashDate` são congeladas na perna no lançamento e
  *  ninguém as revisita: virar a chave em novembro não reescreve agosto —
@@ -62,6 +79,23 @@ export async function saveCard(context: AccountsContext): Promise<void> {
         );
         return;
     }
+
+    /*  O aviso do ciclo: uma vez, com o caso concreto, e só depois o
+        salvamento. `cycleAcknowledged` volta a `false` a cada troca de
+        data no formulário, então o aviso reaparece para um par novo. */
+    const check = checkCardCycle(draft.ClosingDate, draft.DueDate, currentMonth());
+
+    if (check.drifts && !draft.cycleAcknowledged) {
+        context.acknowledgeCycleDrift();
+        context.failSubmit(
+            `Confira: com essas datas, a fatura que vence em ${formatDate(check.due)} fecha em ` +
+                `${formatDate(check.closing)}. A folga conta dias corridos, então o fechamento cai ` +
+                `${closingDaysLabel(check.closingDays)} conforme o mês, e você leu o dia ` +
+                `${check.typedClosingDay}. Se estiver certo, salve de novo.`,
+        );
+        return;
+    }
+
     context.beginSubmit();
 
     const common = {

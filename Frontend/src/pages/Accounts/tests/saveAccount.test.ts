@@ -1,5 +1,5 @@
 import { HttpResponse, http as msw } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { server } from "@/test/server";
 import { saveAccount } from "../sections/saveAccount";
 import { saveCard } from "../sections/saveCard";
@@ -232,6 +232,69 @@ describe("saveCard", () => {
         expect(context.finishSubmit).toHaveBeenCalledWith(
             "Cartão atualizado — vale para o que vier daqui em diante; as compras já lançadas não mudam de mês.",
         );
+    });
+
+    /*  A ETAPA 2 DA LEVA 6. O fechamento aqui é uma subtração de dias
+        corridos a partir do vencimento; o emissor fecha num dia fixo do
+        mês. Quando a subtração atravessa a virada, as duas descrições
+        discordam por um dia em parte do ano — e um dia no fechamento é um
+        mês no caixa. Trocar o modelo é leva própria; o que a tela não pode
+        fazer é aceitar isso em silêncio. */
+    it("avisa uma vez antes de salvar uma folga cujo fechamento anda de mês para mês", async () => {
+        // Fechou 29/08 e venceu 05/09: folga de 7 dias atravessando a
+        // virada, então o fechamento derivado cai no 26, 27, 28 ou 29
+        // conforme o tamanho do mês anterior.
+        const context = fakeAccountsContext({
+            cardDraft: aCardDraft({ cycleAcknowledged: false }),
+        });
+
+        await saveCard(context);
+
+        expect(context.acknowledgeCycleDrift).toHaveBeenCalledOnce();
+        expect(context.beginSubmit).not.toHaveBeenCalled();
+        expect(context.failSubmit).toHaveBeenCalledOnce();
+        expect(vi.mocked(context.failSubmit).mock.calls[0][0]).toContain("você leu o dia 29");
+    });
+
+    it("salva no segundo envio, com o aviso do ciclo lido", async () => {
+        let body: Record<string, unknown> | undefined;
+        server.use(
+            msw.post("*/api/PaymentMethods", async ({ request }) => {
+                body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ IdPaymentMethod: 9 });
+            }),
+        );
+        const context = fakeAccountsContext({
+            cardDraft: aCardDraft({ cycleAcknowledged: true }),
+        });
+
+        await saveCard(context);
+
+        // O aviso informa, não impede: o cartão real existe e precisa ser
+        // cadastrado com a melhor descrição que o modelo permite.
+        expect(body?.DueDay).toBe(5);
+        expect(body?.ClosingOffsetDays).toBe(7);
+        expect(context.finishSubmit).toHaveBeenCalledOnce();
+    });
+
+    it("salva de primeira o cartão cujo fechamento cai sempre no mesmo dia", async () => {
+        server.use(
+            msw.post("*/api/PaymentMethods", () => HttpResponse.json({ IdPaymentMethod: 9 })),
+        );
+        // Vence 28 e fecha 8 dias antes: o dia 20 do MESMO mês, todo mês.
+        // A subtração nunca atravessa a virada, então não há o que avisar.
+        const context = fakeAccountsContext({
+            cardDraft: aCardDraft({
+                ClosingDate: "2026-08-20",
+                DueDate: "2026-08-28",
+                cycleAcknowledged: false,
+            }),
+        });
+
+        await saveCard(context);
+
+        expect(context.acknowledgeCycleDrift).not.toHaveBeenCalled();
+        expect(context.finishSubmit).toHaveBeenCalledOnce();
     });
 
     it("não manda bandeira nem final do cartão — eles saíram do cadastro", async () => {
