@@ -1529,8 +1529,10 @@ Mês, e não `From`/`To` das listagens de movimento: as duas pontas do cálculo 
 {
   "ReferenceMonth": "2026-09-01",
   "OpeningBalance": 1500,
+  "InitialBalances": 0,
   "Inflows": 3000,
   "Expenses": 500,
+  "PastCommitments": 0,
   "OverdueReceivable": 0,
   "OverduePayable": 0,
   "Available": 4000,
@@ -1551,21 +1553,35 @@ Mês, e não `From`/`To` das listagens de movimento: as duas pontas do cálculo 
 
 ```
 Available = OpeningBalance
+          + InitialBalances    (abertura das contas criadas dentro do mês)
+          − PastCommitments    (pesou num mês anterior, o dinheiro ainda está na conta)
           + Inflows            (competência no mês, pendentes + recebidas, sem transferência)
           − Expenses           (pernas com competência no mês, pendentes + pagas)
           + OverdueReceivable
-          − OverduePayable
+          − OverduePayable     (venceu e não foi pago: as duas datas no passado)
 ```
 
 **`OpeningBalance` é o termo que faltava, e a ausência dele era um erro de verdade.** Somar só as entradas do mês para dizer quanto ainda dá para gastar ignora o dinheiro que já estava na conta no dia 1º: quem começa setembro com 1000 e recebe 3000 de salário via **3000**, tendo 4000. Se o seu cliente calculava isso somando `GET /Inflows`, **pare** — este é o número certo.
 
 > Se você já usava o paliativo de somar os `Balance` de `GET /Accounts?ReferenceMonth=<mês anterior>`, ele continua dando o mesmo número. A rota existe para tirar essa regra do cliente, não porque o paliativo estivesse errado.
 
+**`InitialBalances` é o mesmo erro um mês antes: a conta que nasceu dentro do mês pedido.** Se você grava o `InitialBalanceDate` com o dia do cadastro — que é o certo —, a conta aberta em 05/09 **não existia** em 01/09, e o `OpeningBalance` de setembro não pode contê-la. Sem este termo, quem começa a usar o app com 1500 na conta e lança 3000 de salário vê **3000**, tendo 4500: exatamente o buraco que o `OpeningBalance` fecha nos meses seguintes, aberto no mês de estreia.
+
+> Ele é **fluxo, não posição**: a abertura entra no mês em que a data dela cai e nos seguintes já vem dentro do `OpeningBalance`, sem dobrar. É a mesma linha `opening` que `GET /Reports/Statement` mostra no extrato, com o mesmo filtro. Conta sem `InitialBalanceDate` "sempre existiu" e nunca aparece aqui — a abertura dela é posição em todos os meses.
+
+**`PastCommitments` costura a abertura com o fluxo do mês, e sem ele a fórmula não fecha.** O `OpeningBalance` é **caixa** e o resto do `Available` é **competência** (a tabela acima). Enquanto as duas datas coincidiam a soma fechava por acidente — o `CompetenceMode` fez elas divergirem de propósito, e `purchase` é o **default de todo cartão**, então a divergência é a regra.
+
+São as pernas que **já pesaram num mês anterior mas cujo dinheiro ainda está na conta**: a compra de 25/08 no cartão que vence em 28/09. Ela foi descontada do `Available` de agosto (é o que a competência faz) e o saldo de 31/08 ainda a contém (a fatura não venceu). Sem descontá-la, setembro abriria com um dinheiro que já tem dono — e, pior, **quitar a fatura aumentava o `Available`**, porque a perna paga com competência anterior não estava em termo nenhum. Ela **não filtra estado**: paga ou não, o dinheiro está comprometido do mesmo jeito.
+
+> Com isto, cada perna é contada **exatamente uma vez**: competência no mês → `Expenses`; competência anterior com caixa anterior → já está no `OpeningBalance` se paga, no `OverduePayable` se não; competência anterior com caixa daqui para a frente → `PastCommitments`.
+
 **`OverdueReceivable`/`OverduePayable` são o atrasado, e entram no `Available` dos dois lados.** Uma perna com competência em julho e ainda pendente não está no saldo de julho (não foi paga) nem na janela de agosto (a competência é de julho): sem isso ela **some** do indicador — e some justamente o compromisso que ninguém honrou.
+
+> **Vencido é a perna cujas duas datas já passaram** — competência **e** caixa. É o que separa este número do `PastCommitments`: a compra do mês passado no cartão que vence semana que vem não é atraso nenhum, e anunciá-la como "R$ X vencidos" manda o usuário atrás de uma pendência que não existe.
 
 > **O custo está aceito de olhos abertos:** uma entrada prevista que nunca chega infla o `Available` para sempre. É por isso que os dois vão **expostos à parte** — mostre "R$ X vencidos" na tela, com um caminho para receber ou cancelar o que ficou para trás. A alternativa seria o servidor corrigir sozinho, sem contar a ninguém.
 
-**`OpenInvoices` é o que liga os dois números: quanto do saldo já tem dono.** É a soma das pernas de **cartão** que vencem até o fim do mês e ainda não foram pagas — o buraco que o `Available` mostra hoje é o que o `CurrentBalance` vai mostrar quando a fatura for paga.
+**`OpenInvoices` anota o `CurrentBalance`: quanto do saldo já tem dono.** É a soma das pernas de **cartão** que vencem até o fim do mês e ainda não foram pagas — "você tem 1000, mas 500 já estão comprometidos com a fatura". Ele **não entra na fórmula do `Available`**, e não deve ser subtraído dele por sua conta: o `Available` já desconta esse dinheiro, pelo `Expenses` ou pelo `PastCommitments` conforme o mês em que a compra pesou.
 
 **E a dupla contagem que não existe:** `payInvoice` **não cria lançamento**, só vira o `Paid` de pernas que já existem. A compra de agosto contada em agosto não volta a contar em setembro.
 

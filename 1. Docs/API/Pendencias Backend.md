@@ -15,39 +15,75 @@ O que é só decisão de produto (tela X ou Y) não está aqui: está no
 
 | # | Pendência | Tipo | Bloqueia |
 |---|---|---|---|
-| 1 | [Logout](#1-logout) | Segurança | Uso em computador compartilhado |
-| 2 | [`IdWorkspace` no cadastro](#2-idworkspace-no-cadastro-aceito-sem-convite) | Segurança | Convite / workspace compartilhado |
-| 3 | [Agregados do mês](#3-agregados-do-mês-para-o-dashboard) | Performance | Escala do Dashboard |
-| 4 | [Rotina mensal de orçamento](#4-rotina-mensal-de-orçamento) | Produto | Orçamento sem trabalho manual |
+| ~~1~~ | [Logout](#1-logout) | Segurança | ✅ **Entregue** em 04/09 |
+| ~~2~~ | [`IdWorkspace` no cadastro](#2-idworkspace-no-cadastro-aceito-sem-convite) | Segurança | ✅ **Entregue** em 04/09 |
+| ~~3~~ | [Agregados do mês](#3-agregados-do-mês-para-o-dashboard) | Performance | ✅ **Entregue** em 07/09 |
+| ~~4~~ | [Rotina mensal de orçamento](#4-rotina-mensal-de-orçamento) | Produto | ✅ **Entregue** em 07/09 |
 | 5 | [Duração de sessão configurável](#5-duração-de-sessão-configurável) | Produto | "Lembrar deste navegador" |
 | 6 | [Recuperação de senha](#6-recuperação-de-senha) | Produto | Usuário que esqueceu a senha |
 | 7 | [Conciliação de extrato](#7-conciliação-de-extrato) | Produto | Tela 08, frame B |
 | 8 | [Exportar para Excel](#8-exportar-para-excel) | Produto | Item fixo da sidebar |
 | 9 | [Notificações](#9-notificações) | Produto | "Avisos" do Dashboard |
-| 10 | [`Occurrences` fora do `POST /Expenses`](#10-occurrences-fora-do-post-expenses) | Contrato | Gasto fixo — **já aplicado no cliente** |
+| ~~10~~ | [`Occurrences` fora do `POST /Expenses`](#10-occurrences-fora-do-post-expenses) | Contrato | ✅ **Entregue** em 04/09 |
 | 11 | [Clonar o mês anterior de Renda](#11-clonar-o-mês-anterior-de-renda) | Produto | Botão "Clonar mês anterior" |
-| 12 | [Lista de gastos com os filhos](#12-lista-de-gastos-com-os-filhos) | Performance | Colunas de destino e forma de pagamento |
-| 13 | [`IncludeCanceled` em `GET /Expenses`](#13-includecanceled-em-get-expenses) | Contrato | Filtro de status multi-seleção |
-| 14 | [Desfazer recebimento de entrada](#14-desfazer-recebimento-de-entrada) | Produto | Botão de status na linha de Renda |
-| 15 | [Criação de entradas em lote](#15-criação-de-entradas-em-lote) | Produto | Clonagem do mês anterior |
-| 16 | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | — (limpeza) |
+| ~~12~~ | [Lista de gastos com os filhos](#12-lista-de-gastos-com-os-filhos) | Performance | ✅ **Entregue** em 05/09 |
+| ~~13~~ | [`IncludeCanceled` em `GET /Expenses`](#13-includecanceled-em-get-expenses) | Contrato | ✅ **Entregue** em 03/09 |
+| ~~14~~ | [Desfazer recebimento de entrada](#14-desfazer-recebimento-de-entrada) | Produto | ✅ **Entregue** em 04/09 |
+| ~~15~~ | [Criação de entradas em lote](#15-criação-de-entradas-em-lote) | Produto | ✅ **Entregue** em 04/09 |
+| ~~16~~ | [Bandeira e final do cartão saem do cadastro](#16-bandeira-e-final-do-cartão-saem-do-cadastro) | Contrato | ✅ **Entregue** em 04/09 |
+| ~~17~~ | [`Charged` e `CompetenceDate` em `GET /ExpensePayments`](#17-charged-e-competencedate-em-get-expensepayments) | Contrato | ✅ **Confirmado** em 07/09 |
+| ~~18~~ | [Criar um workspace novo](#18-criar-um-workspace-novo) | Produto | ✅ **Entregue** em 06/09 |
+| ~~19~~ | [Saber em qual workspace a sessão está](#19-saber-em-qual-workspace-a-sessão-está) | Contrato | ✅ **Entregue** em 08/09 |
+| 20 | [Gestão de membros](#20-gestão-de-membros) | Produto | Tirar alguém de um espaço |
+| 21 | [O `403` não está na tabela de erros](#21-o-403-não-está-na-tabela-de-erros) | Contrato | Mensagem de "não é o dono" |
 
-Os itens 1 e 2 são de segurança e valem ser tratados antes do MVP ir ao
-ar. O **10 é o mais urgente depois deles**, e por um motivo diferente: o
-cliente já parou de mandar o campo, então contrato e implementação estão
-divergindo agora. Os itens 11 e 12 seguram funcionalidade que já está
-desenhada na tela. Do 3 ao 9 são cortes conscientes do MVP — o frontend
-já está desenhado para viver sem eles.
+**Seis itens saíram da fila.** Os de número **10, 13, 14, 15 e 16**
+subiram na virada de setembro exatamente na forma proposta aqui — e em
+todos eles o cliente já estava escrito assumindo a rota, então não houve
+chamada nova a fazer. O **12** subiu na forma preferida, `GET
+/ExpensePayments`, e esse custou trabalho de verdade no cliente. As
+seções deles ficam abaixo como registro do que foi pedido e do que
+subiu; nada nelas é trabalho pendente.
 
-Os itens **13 a 16 nasceram da leva 3 de ajustes** (ver
-[3. Plano de Ajustes 2](levas/3.%20Plano%20de%20Ajustes%202.md)) e cada um
-tem tela do lado do cliente esperando por ele. O 15 **substitui a forma**
-proposta no 11 — a escolha do que clonar passou a ser do usuário, e o que
-falta no servidor mudou junto.
+O **1** e o **2** também subiram, na forma proposta: o contorno de
+logout que o cliente mantinha no `localStorage` foi apagado junto, e o
+`IdWorkspace` do cadastro virou `InviteHash`.
+
+Do 3 ao 9 eram cortes conscientes do MVP — o frontend já estava
+desenhado para viver sem eles —, e o 11 virou registro histórico quando o
+15 substituiu a forma dele. **O 3 e o 4 saíram da fila em 07/09** — o
+primeiro como `GET /Reports/Month`, na forma preferida desta seção; o
+segundo com as duas rotinas de orçamento do dia 1º.
+
+**Os itens 17 a 21 nasceram da leva 4**, e três já saíram: o **18**
+subiu no mesmo dia (`POST /Workspaces`, na forma proposta aqui), o
+**17** foi confirmado em 07/09 — a divergência entre o changelog e o
+exemplo de resposta da seção 12 era do documento, não da rota, e o
+exemplo foi corrigido — e o **19 subiu em 08/09**, na primeira das duas
+formas propostas aqui, depois de o bug aparecer na tela: com dois
+espaços, recarregar a página passava a mostrar o nome do primeiro
+enquanto o cookie continuava no segundo. Sobraram o 20 e o 21, que é o
+que a tela de espaços pediu e ainda não encontrou.
 
 ---
 
 ## 1. Logout
+
+> ✅ **Entregue em 04/09**, exatamente na forma proposta:
+> `POST /Users/logout`, **público**, sem body, sobrescrevendo o cookie
+> `token` com um `Set-Cookie` expirado. Chamar sem sessão responde `200`
+> do mesmo jeito — é o que impede o botão "Sair" de travar justamente no
+> caso em que o usuário mais quer sair.
+>
+> **O contorno saiu junto.** A trava `gm.session.signedOut` no
+> `localStorage`, o `enabled: !isSignedOut()` da consulta de sessão e a
+> checagem no `AppShell` deixaram de existir; o `Login` parou de marcá-la.
+> Quem diz se há sessão volta a ser só o `getSelf`, e sair agora sai de
+> verdade: apertar "voltar" no navegador ou digitar a URL da home cai no
+> login, porque o `getSelf` responde `401`.
+>
+> Falha de rede não prende ninguém: o cliente limpa o cache e navega
+> para o login de qualquer jeito.
 
 **O problema.** Não existe rota de logout. O cookie `token` é `HttpOnly`,
 então o JavaScript não consegue apagá-lo — é justamente o ponto de ser
@@ -89,6 +125,21 @@ travar a saída do usuário.
 
 ## 2. `IdWorkspace` no cadastro, aceito sem convite
 
+> ✅ **Entregue em 04/09, na opção 2** — a preferida das duas. O campo
+> saiu do `POST /Users` (mandá-lo agora é `406`) e no lugar entrou o
+> **`InviteHash`**. Um convite é linha no banco; o que viaja no link é um
+> hash de 32 bytes em base64url, nunca o `IdWorkspace` sequencial.
+>
+> As três perguntas que faltavam estão respondidas: convida **só o
+> `owner`**; o convite é de **uso único, vale 7 dias** e pode ser
+> revogado; e a matrícula criada é `editor` ou `viewer` — **`owner` não
+> se convida** (`406`). O e-mail do convite tem que bater com o da conta
+> que aceita, o que fecha o buraco de o link ser compartilhável.
+>
+> **Estado no frontend:** o seletor de espaço no chassi, a tela `/espaco`
+> (nome + convites) e a tela pública `/convite/:hash` são a leva 4,
+> etapa 10. O que ficou de fora é a gestão de membros — item **20**.
+
 **O problema.** `POST /Users` aceita um `IdWorkspace` opcional e,
 segundo o próprio contrato, "entra direto como matrícula `owner`, sem
 convite nem conferência".
@@ -117,6 +168,41 @@ Hoje o contrato não descreve papéis.
 ---
 
 ## 3. Agregados do mês para o Dashboard
+
+> ✅ **Entregue em 07/09**, e na forma **preferida** desta seção — a de
+> tirar as regras do cliente, não a de só economizar requisição.
+> `GET /Reports/Month?ReferenceMonth=YYYY-MM`, numa seção própria do
+> contrato (a 15), com **nove** números e não os sete propostos aqui.
+>
+> **Os nomes não são os que estão abaixo, e um número a mais conserta um
+> erro que o cliente tinha.** `Available` abre com o `OpeningBalance` —
+> o saldo realizado no fim do mês anterior —, e era exatamente ele que
+> faltava no "Restante" da tela: somar só as entradas do mês para dizer
+> quanto ainda dá para gastar ignora o dinheiro que já estava na conta no
+> dia 1º. Não era problema de escala; dava errado com dois lançamentos no
+> banco.
+>
+> E vieram dois números que ninguém tinha como somar no cliente:
+> `OverdueReceivable` e `OverduePayable`. Uma perna com competência em
+> julho e ainda pendente não está no saldo de julho (não foi paga) nem na
+> janela de agosto (a competência é de julho) — ela **sumia** do
+> indicador, e sumia justamente o compromisso que ninguém honrou. Eles
+> entram no `Available` de propósito, e por isso vão **expostos** na
+> tela, cada um com o caminho de resolver o que ficou para trás.
+>
+> **`Available` e `CurrentBalance` discordam de propósito**, e a tela diz
+> isso numa linha: um é o mês que a pessoa está vivendo (competência,
+> pendente conta), o outro é o dinheiro que já saiu (caixa, só o
+> realizado). `OpenInvoices` é a ponte — quanto do saldo já tem dono.
+>
+> **O que ficou no cliente**, e não é contradição: as três quebras
+> (categoria, forma de pagamento, destino) e os recortes "Fixos do mês" e
+> "Parcelas do mês". A rota não responde nenhum deles, e todos saem da
+> lista de pernas que a tela já tem em cache — o que mudou é o
+> DENOMINADOR, que passou a ser o `Expenses` da rota. As funções de
+> `aggregate.ts` também ficaram: Renda e Contas somam com elas **a lista
+> que elas próprias mostram**, o que é decomposição de uma tela e não uma
+> segunda implementação de um indicador.
 
 **O problema.** Nenhum número do Dashboard tem endpoint próprio. Saldo
 restante, total recebido, total gasto, fixos do mês e parcelas saem de
@@ -150,14 +236,11 @@ GET /Reports/Month?ReferenceMonth=YYYY-MM        🔒
 ```json
 {
     "ReferenceMonth": "2026-05-01",
-    "OpeningBalance": 1000.00,
     "TotalReceived": 8623.10,
     "TotalSpent": 6592.66,
     "FixedSpent": 2213.42,
     "InstallmentSpent": 1349.88,
     "AvailableBalance": 2030.44,
-    "OverdueReceivable": 0.00,
-    "OverduePayable": 180.00,
     "ReceivedCount": 5,
     "SpentCount": 47
 }
@@ -166,18 +249,31 @@ GET /Reports/Month?ReferenceMonth=YYYY-MM        🔒
 Com esse endpoint, as regras acima passam a existir **num lugar só** — o
 mesmo lugar que já calcula `Balance` e `Spent`.
 
-**Deixou de ser só performance (2026-09-07).** O `AvailableBalance` somado
-no cliente ignora o dinheiro que já estava em conta no dia 1º: quem começa
-setembro com 1000 e recebe 3000 de salário vê 3000, tendo 4000. O termo que
-falta é o `OpeningBalance` — o saldo realizado no fim do mês anterior, que
-o `AccountBalance` já sabe calcular —, e ele **não pode virar um lançamento
-de entrada**, sob pena de dobrar o saldo e de contar como "entrou no mês"
-dinheiro que nunca chegou. O desenho fechado, com o tratamento do vencido,
-está na [leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md).
-
 ---
 
 ## 4. Rotina mensal de orçamento
+
+> ✅ **Entregue em 07/09**, na forma proposta — o job mensal, e não o
+> `GET /Budgets` que materializa na leitura. São **duas** rotinas, todo
+> dia 1º: uma **materializa** o mês novo a partir de cada definição
+> ativa, com o teto que valia naquele dia (e **nunca sobrescreve** um mês
+> que já existe: o teto ajustado na mão fica); a outra **fecha** o mês
+> que acabou, carimbando `Status: "closed"` e `ClosedAt`.
+>
+> Duas coisas do jeito que ela subiu importam para a tela. O **vazio
+> mudou de significado** — ele quer dizer "não há definição nenhuma", e
+> não "o mês ainda não foi cadastrado" —, e o `EmptyState` do painel de
+> orçamento do Início passou a dizer isso. E o **`Status` muda sozinho
+> entre duas leituras**: um período lido como `open` em 31 de agosto
+> volta `closed` em 1º de setembro. A tela não desenha nada a partir
+> dele, e continua não desenhando — **fechado não é travado**: o `PUT`
+> de um mês fechado continua funcionando, que é justamente para o que a
+> tabela do mês congelado existe. O docstring de `BudgetPeriod.Status`
+> registra as duas coisas.
+>
+> **Mês passado que a rotina não pegou continua sem período**, e a tela
+> não inventa um: "esse mês não tem teto" é a resposta certa para "qual
+> era meu limite em março".
 
 **O problema.** O contrato diz explicitamente que a entrega é reduzida de
 propósito: `Budgets` é a definição vigente e `BudgetPeriods` é o mês
@@ -198,12 +294,6 @@ a tela ao mesmo tempo disputariam a criação.
 `BudgetPeriods` do mês novo a partir das definições ativas. Alternativa
 mais barata: `GET /Budgets` materializar o mês pedido caso ele ainda
 não exista, dentro de uma transaction.
-
-> **A alternativa barata foi descartada (2026-09-07).** Ela materializaria
-> qualquer mês pedido, inclusive passado, congelando o teto de hoje num mês
-> em que ele nunca valeu. Vale o job mensal, na
-> [leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md),
-> dentro do motor de rotinas.
 
 ---
 
@@ -245,11 +335,6 @@ e-mail, que hoje o projeto não tem.
 
 ## 7. Conciliação de extrato
 
-> **Fora do MVP (2026-09-07).** No lugar dela entrou o extrato manual — a
-> [leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md),
-> que abre linha a linha o saldo que o sistema já calcula, sem importar arquivo
-> nem casar lançamento. As três perguntas abaixo continuam sem resposta.
-
 **O problema.** A tela `08 - Contas` desenha um frame B inteiro de
 conciliação: faixa de saldo, itens "a resolver", comparação com extrato.
 Não há rota nenhuma para isso.
@@ -284,10 +369,6 @@ rota correspondente.
 
 ## 9. Notificações
 
-> **Fora do MVP (2026-09-07).** Saiu inteira da leva 3; o que
-> havia sido levantado está preservado em *O que não entra nesta leva*, no
-> [documento da leva 3](levas/3.%20Plano%20de%20Desenvolvimento%20-%20Leva%203.md#o-que-não-entra-nesta-leva).
-
 **O problema.** O Dashboard tem "Avisos" na topbar. O contrato registra
 que a tabela `Notifications` existe no banco **sem rota**.
 
@@ -300,6 +381,13 @@ orçamento estourado, entrada prevista não recebida.
 ---
 
 ## 10. `Occurrences` fora do `POST /Expenses`
+
+> ✅ **Entregue em 04/09.** O campo saiu do corpo do `POST /Expenses` e
+> mandá-lo agora responde `406`. A janela da série passou a ser do
+> servidor — **12 ocorrências, contando a raiz** —, limitada pelo
+> `RecurrenceEndDate` quando ele vier antes; a resposta continua trazendo
+> `Occurrences` com quantas nasceram. As três perguntas abaixo estão
+> respondidas, e o cliente não precisou mudar nada.
 
 **O que mudou.** O campo `Occurrences` sai do corpo de criação de gasto.
 O contrato ainda o documenta (`só em fixed, 1-60, default 12`), mas ele
@@ -415,6 +503,29 @@ o que espera rota é só o `POST` final — ver item 15.
 
 ## 12. Lista de gastos com os filhos
 
+> ✅ **Entregue em 05/09, na proposta 2** — `GET /ExpensePayments?From=&To=&IncludeCanceled=`,
+> devolvendo as pernas cuja `coalesce(DueDate, ExpenseDate)` cai no
+> intervalo, cada uma com o gasto de origem e o rateio dele. Ela fechou
+> os DOIS furos de uma vez:
+>
+> - **o N+1 morreu.** `useMonthExpenseDetails` e `useExpenseDetails`
+>   saíram de `src/data/month.ts`; destino e forma de pagamento passaram
+>   a sair da própria perna, no Início, na lista de Gastos e no
+>   Relatório. O `get(id)` por gasto sobrou só para as **tags**, no
+>   slide-over de um gasto — uma consulta, quando o painel abre.
+> - **a janela morreu.** `INSTALLMENT_LOOKBACK_MONTHS` não existe mais, e
+>   com ele o único lugar do MVP em que o número na tela ficava *errado*:
+>   a parcela de uma compra acima de 24 meses atrás agora entra no total.
+>
+> Um mês é **uma** requisição de pernas; o Relatório de doze meses são
+> doze, e não doze listas mais uma varredura mais um `get(id)` por
+> parcelado de cada uma.
+>
+> ⚠️ **O `Persons` da perna é o do GASTO, não o da perna** — as seis
+> pernas de uma compra de 600 em 6× trazem o mesmo rateio de 600. Somar
+> perna a perna dá 3600 e nada estoura. `spentByPerson` rateia
+> (`Persons[i].Value × Payment.Value ÷ Expense.TotalValue`), com teste.
+
 **O problema.** `GET /Expenses` não traz `Payments`, `Persons` nem
 `Tags` — só o `get(id)` traz. Mas a tela de Gastos mostra **destino
 (pessoa)** e **forma de pagamento** em cada linha, e o Início desenha os
@@ -477,6 +588,12 @@ requisição.
 
 ## 13. `IncludeCanceled` em `GET /Expenses`
 
+> ✅ **Entregue em 03/09**, na forma proposta: booleano, com a ausência
+> mantendo exatamente a resposta de antes. O cliente já mandava
+> `IncludeCanceled: true` e separava por `Status` no próprio cliente —
+> marcar "Cancelados" no filtro passou a trazer os dois grupos, e nenhuma
+> linha de código mudou.
+
 **O problema.** Hoje a **ausência** do `Status` carrega significado: sem
 ele a resposta vem sem os cancelados, e `Status=canceled` traz *só* os
 cancelados. Não existe forma de pedir "em aberto **e** cancelados" numa
@@ -522,6 +639,11 @@ traz nada — a lista continua vindo sem eles.
 
 ## 14. Desfazer recebimento de entrada
 
+> ✅ **Entregue em 04/09.** `POST /Inflows/IdInflow=:IdInflow/unreceive`,
+> sem body, o espelho exato do `receive`. O botão da linha de Renda já
+> chamava a rota nos dois sentidos: desfazer deixou de mostrar erro e
+> passou a devolver o dinheiro ao saldo.
+
 **O problema.** Existe `POST /Inflows/IdInflow=:IdInflow/receive`, que é
 o que põe o dinheiro no saldo. **Não existe o inverso.** Um clique errado
 em "Recebido" credita a conta e não há caminho de volta pela tela.
@@ -554,6 +676,12 @@ ensinaria o usuário que ele não existe.
 ---
 
 ## 15. Criação de entradas em lote
+
+> ✅ **Entregue em 04/09.** `POST /Inflows/batch`, com `{ Inflows: [...] }`,
+> teto de 100 itens, cada um validado pelo mesmo schema do `POST` avulso,
+> tudo ou nada numa transaction. A `msg` da recusa aponta o item
+> (`"Item 2: ..."`), contando a partir de 1. `InflowsConnection.createBatch`
+> já existia e a clonagem do mês passou a gravar numa chamada só.
 
 **O problema.** A clonagem do mês (item 11) passou a ser assim: o cliente
 lista o mês anterior, o usuário marca o que quer trazer, o cliente avança
@@ -615,6 +743,11 @@ fluxo de escolha inteiro de pé, esperando a rota.
 
 ## 16. Bandeira e final do cartão saem do cadastro
 
+> ✅ **Entregue em 04/09.** `Brand` e `LastDigits` saíram dos dois corpos
+> e da resposta de `GET /Accounts`; mandá-los agora responde `406`. O
+> cliente já não os declarava em tipo nenhum — a divergência com o
+> contrato fechou sozinha.
+
 **O problema.** `PaymentMethod` tem `Brand` e `LastDigits`, e o
 formulário de cartão os pedia. Nenhum dos dois é usado em regra nenhuma
 do sistema — não entram em saldo, fatura, filtro ou relatório. São
@@ -639,6 +772,228 @@ dos tipos em `src/types/api.ts` — dos dois corpos
 `PaymentMethod`**, o tipo de leitura: enquanto a resposta ainda os
 trouxer, eles são campo extra que o cliente nem declara. Como no item 10, cliente e contrato divergem até o
 documento ser atualizado — a fonte da verdade é este item.
+
+---
+
+## 17. `Charged` e `CompetenceDate` em `GET /ExpensePayments`
+
+> ✅ **Confirmado em 07/09**, e exatamente na forma que esta seção
+> pedia: o exemplo de resposta da seção 12 foi atualizado e agora lista
+> `Charged`, `ChargedAt`, `CompetenceDate` — e `CashDate`, que nasceu
+> junto com o `CompetenceMode` do cartão. O que o frontend assumiu era o
+> que a rota devolvia; nenhuma tela mudou para pior.
+>
+> **E veio uma quarta data.** `CompetenceDate` diz quando a perna
+> **pesa**; `CashDate` diz quando o dinheiro **sai da conta**. Fora de um
+> cartão `purchase` as duas são sempre iguais — é por isso que só agora
+> fez falta separá-las. `CashDate` não vira conta nenhuma no cliente: o
+> que o cliente agrega é competência, e o caixa vem pronto em `Balance` e
+> em `CurrentBalance`. O uso dela é outro — no slide-over do gasto, a
+> perna de um cartão `purchase` tem **duas datas verdadeiras** ("vence 05
+> set" e "pesa em ago/2026"), e a linha passou a mostrar as duas quando
+> elas discordam.
+
+**O problema.** A entrada de 06/09 do changelog diz que a perna ganhou
+**três campos novos** na resposta — `Charged`, `ChargedAt` e
+`CompetenceDate` —, mas o **exemplo de resposta da seção 12**
+(`GET /ExpensePayments`) não lista nenhum dos três. As duas coisas não
+podem estar certas ao mesmo tempo, e a diferença entre elas é grande.
+
+**Por que importa, e não é detalhe de documentação.**
+
+- **`Charged` é o que desenha o botão.** Ele é `null` fora do cartão, e é
+  essa nulidade — não o `Kind` da forma de pagamento, que a perna não
+  carrega — que diz se a linha tem "entrou na fatura" ou "quitar". Sem
+  ele na lista, a tela de Gastos não sabe qual dos dois oferecer sem
+  abrir um `GET /Expenses/IdExpense=:id` por linha, que é exatamente o
+  N+1 que a rota nova acabou de matar.
+- **`CompetenceDate` é o que decide o mês.** É por ela que o cliente
+  sabe em que mês a perna pesa. Sem ela, o cliente volta a calcular
+  `coalesce(DueDate, ExpenseDate)` por conta própria — o mesmo número,
+  mas a regra deixa de ter um dono só.
+
+**O que o frontend assumiu.** Que os três **vêm**, porque é o que a
+entrada do changelog afirma e porque a alternativa seria desfazer a
+entrega da rota. `ApiTypes.ExpensePaymentRow` os declara, `isCardLeg`
+lê o `Charged` e `paymentLegs` recorta o mês pela `CompetenceDate`.
+
+**O que precisamos de vocês:** confirmar que os três saem em
+`GET /ExpensePayments` (e não só no `GET /Expenses/IdExpense=:id`) e
+**atualizar o exemplo da seção 12**. Se algum deles não sair ali, digam
+qual — a tela muda, e muda para pior.
+
+---
+
+## 18. Criar um workspace novo
+
+> ✅ **Entregue em 06/09**, na forma proposta: `POST /Workspaces` com
+> `{ Name }`, respondendo `{ IdWorkspace }`, e o usuário da sessão como
+> `owner` — sem campo por onde apontar a propriedade para outra pessoa.
+>
+> Duas coisas do jeito que a rota subiu importam para a tela: o espaço
+> nasce **vazio**, mas já com a **Person do usuário** criada dentro dele
+> (senão ele não apareceria no próprio rateio); e **criar não troca a
+> sessão**, pela mesma razão do `join` — o cliente chama `switch` logo
+> depois, e é isso que `createWorkspace` faz, com teste.
+>
+> O botão "Novo espaço" do seletor deixou de estar desabilitado.
+
+**O problema.** Não existe `POST /Workspaces`. O contrato é explícito —
+"um workspace nasce no cadastro, e a única forma de entrar num que já
+existe é o convite" — e isso resolve o *entrar*, mas não o *criar*.
+
+**Por que importa.** O caso é banal e aparece cedo: a mesma pessoa quer
+separar "Casa" de "Escritório", ou testar o sistema num espaço de
+brinquedo antes de lançar o mês de verdade. Hoje a única saída é criar
+**outra conta de usuário**, com outro e-mail — e aí os dois espaços nunca
+aparecem na mesma lista, porque a lista é dos espaços de um usuário.
+
+**Por que o frontend não resolve.** Não há rota. Criar workspace é criar
+matrícula, e matrícula é do servidor.
+
+**Proposta:**
+
+```
+POST /Workspaces        🔒
+```
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Name` | string | obrigatório, ≤255 |
+
+Cria o workspace e a matrícula do usuário da sessão como **`owner`**,
+numa transaction. Como no cadastro, faz sentido nascer com as categorias
+pré-definidas — e **não** trocar a sessão: quem quiser operar nele chama
+`POST /Workspaces/switch`, a mesma regra que o `join` já segue.
+
+**Resposta:** `{ "IdWorkspace": 4 }`.
+
+Vale um teto por usuário (sugestão: 10) para a rota não virar vetor de
+carga.
+
+**Estado no frontend.** O botão "Novo espaço" está no seletor da
+sidebar, **desabilitado e rotulado** "Ainda sem API" — como "Conciliar
+extrato" e "Exportar para Excel". No dia em que a rota subir, é uma
+section nova e nada mais muda de lugar.
+
+---
+
+## 19. Saber em qual workspace a sessão está
+
+**O problema.** `GET /Workspaces/getSelf` devolve os workspaces do
+usuário **sem marcar qual é o da sessão**. O `IdWorkspace` vive dentro do
+token, o cookie é `HttpOnly`, e `GET /Users/getSelf` não o devolve. Ou
+seja: **o cliente não tem como saber em qual espaço ele está.**
+
+**Por que virou problema agora.** Até a leva 4 isso passava despercebido,
+porque o único lugar que mostrava a informação era um bloco do Perfil que
+chutava o primeiro da lista. Nesta leva o espaço subiu para o chassi: a
+sidebar **afirma**, em toda tela, "você está em Casa". Um chute errado
+não é mais um detalhe de uma tela — é uma mentira permanente, e ela leva
+ao pior erro possível, que é lançar o mês inteiro no espaço errado.
+
+**O contorno atual, e por que ele não basta.** O cliente guarda o que o
+`POST /Workspaces/switch` respondeu, numa chave de cache em memória
+(`sessionKeys.currentWorkspace`), e só cai no primeiro da lista quando
+nenhuma troca aconteceu naquela aba. Funciona depois de uma troca;
+**não funciona no primeiro carregamento**, que é justamente quando o
+usuário abre o sistema e confia no que está escrito. E não dá para
+persistir: um valor guardado no navegador pode discordar do cookie sem
+que nada acuse.
+
+**✅ Entregue em 08/09, na forma 1.** `GET /Workspaces/getSelf` passou a
+devolver `Current` em cada item, e `POST /Workspaces/switch` devolve o
+mesmo campo (lá sempre `true`, que é o que o workspace acabou de se
+tornar). Exatamente um item da lista vem `true`, e ele acompanha o
+**token**, não a tabela: quem mandar o token antigo continua vendo a
+seleção antiga, que é nela que aquele token opera. O contorno do
+cliente — lembrar o que o último `switch` respondeu, e chutar o
+primeiro da lista sem troca nenhuma — foi apagado junto.
+
+**Proposta (o que foi pedido).** Qualquer uma das duas resolvia; a primeira era uma linha.
+
+1. **Um booleano na lista:**
+
+   ```json
+   [{ "IdWorkspace": 1, "Name": "Casa", "Current": true,  "...": "" },
+    { "IdWorkspace": 4, "Name": "Escritório", "Current": false, "...": "" }]
+   ```
+
+2. **`IdWorkspace` no `GET /Users/getSelf`**, junto com o resto da
+   sessão. Faz sentido porque o workspace É parte da sessão — é o que o
+   token diz.
+
+Não precisa das duas. O que **não** serve é ordenar a lista pelo atual
+sem dizer que é isso que se está fazendo: uma ordem combinada em silêncio
+quebra na primeira vez que alguém mexer no `ORDER BY`.
+
+---
+
+## 20. Gestão de membros
+
+**O problema.** Com o convite, entrar num workspace alheio passou a
+existir. **Sair dele, não** — e nem tirar alguém, trocar o papel de
+alguém ou transferir a propriedade. O contrato registra a ausência, e ela
+tem consequência prática imediata: revogar um convite **não desfaz
+matrícula já criada**, então um convite mandado ao e-mail errado e aceito
+não tem desfazimento nenhum.
+
+**Por que o frontend não resolve.** É matrícula: só o servidor.
+
+**Proposta**, na ordem em que fazem falta:
+
+```
+GET    /Workspaces/members                              🔒
+DELETE /Workspaces/members/IdUser=:IdUser               🔒 (só owner)
+PUT    /Workspaces/members/IdUser=:IdUser               🔒 (só owner)  { Role }
+POST   /Workspaces/leave                                🔒
+```
+
+Regras que o frontend assume (confirmem ou corrijam):
+
+- **O `owner` não sai nem se remove** enquanto for dono: antes é preciso
+  transferir a propriedade. Senão um workspace fica sem dono e ninguém
+  mais consegue convidar.
+- **Remover não apaga lançamento**: o histórico continua apontando para
+  a `Person` e para o `IdUser` que criou a linha. Membro removido perde
+  acesso, não existência.
+- `GET /Workspaces/members` precisa devolver **nome, e-mail e papel** —
+  sem isso a tela não tem o que desenhar numa lista de gente.
+
+**Estado no frontend.** Não implementado, e a tela do espaço não oferece
+o caminho. O que existe é a metade de entrada: convidar, listar
+pendentes e revogar.
+
+---
+
+## 21. O `403` não está na tabela de erros
+
+**O problema.** A seção **1.3** do contrato lista três status — `401`,
+`406` e `500` — e diz o que o front faz com cada um. Mas a seção **4.1**
+introduz um quarto: `POST /Workspaces/invite` e `GET /Workspaces/invites`
+respondem **`403`** para quem não é `owner` do workspace da sessão. A
+tabela não o menciona, e o texto não diz **se o corpo traz `msg`**.
+
+**Por que importa.** O `403` não é nenhum dos outros três disfarçado:
+
+- não é `406`, porque não há dado a corrigir — repetir a chamada com
+  outro corpo nunca vai passar;
+- não é `401`, porque a sessão está válida e mandar o usuário para o
+  login seria mentira;
+- não é `500`, e essa é a pior confusão: a mensagem genérica desse caso é
+  *"Não foi possível concluir. Tente de novo em instantes"*, que convida
+  a um retry que não leva a lugar nenhum.
+
+**O que o frontend fez.** `ApiForbiddenError` em `src/api/client.ts`, que
+**lê a `msg` quando ela vier** e cai numa frase própria ("Esta ação é só
+do dono do espaço") quando não vier. Na prática a tela raramente chega
+lá — o lápis e o formulário de convite só aparecem para o dono —, mas o
+caminho existe: alguém deixa de ser dono enquanto a tela está aberta.
+
+**O que precisamos de vocês:** acrescentar a linha do `403` à tabela da
+seção 1.3 e dizer se ele traz `{ msg }`. Se trouxer, é só documentar. Se
+não trouxer, vale trazer: a frase do servidor é sempre melhor que a
+nossa.
 
 ---
 
