@@ -81,6 +81,32 @@ describe("Users", () => {
             expect(raw).toContain("Max-Age=86400")
         })
 
+        //  **A montagem do Express atrás do nginx, provada numa resposta qualquer.**
+        //
+        //  Os dois lados da etapa, e os dois são invisíveis em localhost:
+        //
+        //  sem Access-Control-Allow-Origin → o `cors()` aberto saiu. Front e API sobem na mesma
+        //  origem, então não há preflight nem resposta cross-origin para liberar; o cabeçalho
+        //  presente seria uma porta que o produto não usa. A saída errada aqui é afrouxar o
+        //  cookie em vez de manter a mesma origem.
+        //  X-Content-Type-Options: nosniff → o helmet está montado. É o cabeçalho que não
+        //  depende de https nem de configuração de proxy, e por isso o que vale como trava do
+        //  helmet inteiro numa suíte rodando em http.
+        it("responde sem cabeçalho de CORS e com os cabeçalhos do helmet", async () => {
+            let response = await client.anonymous().post("/Users/login", { login: root.user.Email, password: root.password })
+
+            expect(response.headers["access-control-allow-origin"]).toBeUndefined()
+            expect(response.headers["x-content-type-options"]).toBe("nosniff")
+        })
+
+        //  O limite de corpo é explícito no express.json, e é a única resposta do app que não
+        //  passa por rota nenhuma: quem devolve é o parser, antes do AsyncHandler existir.
+        it("recusa com 413 um corpo acima de 100kb", async () => {
+            let response = await client.anonymous().post("/Users/login", { login: "a".repeat(200 * 1024), password: root.password })
+
+            expect(response.status).toBe(413)
+        })
+
         //  **O RememberDevice, e as duas armadilhas dele.**
         //
         //  A primeira é esta: o `expiresIn` do token e o `maxAge` do cookie eram dois literais
