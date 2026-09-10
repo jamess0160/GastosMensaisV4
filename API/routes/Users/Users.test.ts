@@ -1020,6 +1020,177 @@ describe("Users", () => {
         })
     })
 
+    describe("DELETE /Users", () => {
+
+        it("recusa sem token", async () => {
+            let owner = await UsersFactory.create()
+
+            let response = await client.anonymous().delete("/Users", { Password: owner.password })
+
+            expect(response.status).toBe(401)
+            expect(await findByEmail(owner.user.Email)).toBeDefined()
+        })
+
+        it("recusa corpo sem a senha", async () => {
+            let owner = await UsersFactory.create()
+
+            let response = await new TestClient(owner.token).delete("/Users", {})
+
+            expect(response.status).toBe(406)
+            expect(await findByEmail(owner.user.Email)).toBeDefined()
+        })
+
+        //  A CONFERÊNCIA DA SENHA É O PONTO DA ROTA, e não formalidade: o cookie de sessão dura
+        //  até 30 dias, então "estar logado" não prova que quem clicou é o dono da conta. 401 e
+        //  não 406, porque o que foi recusado é a credencial — e a conta continua de pé.
+        it("recusa a senha errada e não apaga nada", async () => {
+            let owner = await UsersFactory.create()
+
+            let response = await new TestClient(owner.token).delete("/Users", { Password: "não é essa" })
+
+            expect(response.status).toBe(401)
+            expect(response.body.msg).toBe("Senha incorreta")
+            expect(await findByEmail(owner.user.Email)).toBeDefined()
+
+            //  A sessão sobrevive à recusa: quem só errou a senha não é deslogado junto.
+            expect((await new TestClient(owner.token).get("/Users/getSelf")).status).toBe(200)
+        })
+
+        it("apaga a linha do usuário de verdade, em vez de desativá-la", async () => {
+            let owner = await UsersFactory.create()
+
+            let response = await new TestClient(owner.token).delete("/Users", { Password: owner.password })
+
+            expect(response.status).toBe(200)
+            expect(await findByEmail(owner.user.Email)).toBeUndefined()
+        })
+
+        //  O soft delete manteria o e-mail ocupado: o unique(Email) não conhece o Active, e o
+        //  endereço ficaria travado contra um cadastro futuro do próprio dono.
+        it("libera o e-mail para um cadastro novo", async () => {
+            let owner = await UsersFactory.create()
+            let { Email } = owner.user
+
+            await new TestClient(owner.token).delete("/Users", { Password: owner.password })
+
+            expect((await client.anonymous().post("/Users", buildPayload({ Email }))).status).toBe(200)
+        })
+
+        it("limpa o cookie, e a sessão que apagou a conta não vale mais", async () => {
+            let owner = await UsersFactory.create()
+            let session = new TestClient()
+            await session.login(owner.user.Email, owner.password)
+
+            let response = await session.delete("/Users", { Password: owner.password })
+
+            let cookies: string[] = response.headers["set-cookie"] ?? []
+            let raw = cookies.find((cookie) => cookie.startsWith("token="))
+
+            expect(raw).toBeTruthy()
+            expect(TestClient.extractCookieToken(response)).toBe("")
+            expect(raw).toMatch(/Expires=Thu, 01 Jan 1970|Max-Age=0/)
+
+            //  O token continua assinado e dentro da validade, e mesmo assim não abre nada: o
+            //  usuário que ele nomeia não existe mais. É 406 "Usuário não encontrado!", e não
+            //  401 — o acessMiddleware confere a ASSINATURA, e uma assinatura não deixa de
+            //  valer porque a linha sumiu. Quem responde é o getSelf, que já tratava o usuário
+            //  ausente antes desta rota existir e limpa o cookie de novo ao fazê-lo.
+            let orphan = await session.get("/Users/getSelf")
+
+            expect(orphan.status).toBe(406)
+            expect(orphan.body.msg).toBe("Usuário não encontrado!")
+        })
+
+        //  O espaço de quem era o único integrante some inteiro, em cascata — é isso que o
+        //  direito à eliminação significa, e é o que a política de privacidade afirma.
+        it("leva junto o espaço de que era a única integrante", async () => {
+            let owner = await UsersFactory.create()
+            let { IdWorkspace } = owner.workspace
+
+            await new TestClient(owner.token).delete("/Users", { Password: owner.password })
+
+            expect(await findWorkspace(IdWorkspace)).toBeUndefined()
+            expect(await findPerson(IdWorkspace)).toBeUndefined()
+        })
+
+        //  A GUARDA QUE EXISTE POR CAUSA DA CASCATA. Workspaces.IdOwnerUser é ON DELETE
+        //  CASCADE: sem esta recusa, apagar a conta do dono levaria junto o espaço inteiro —
+        //  contas, gastos e histórico — de todo mundo que foi convidado para ele.
+        it("recusa quem é dono de um espaço com outro membro, mandando transferir", async () => {
+            let owner = await UsersFactory.create({ Name: "Dona do espaço" })
+            let guest = await UsersFactory.create({ Name: "Convidado" })
+            await joinWorkspace(owner.workspace.IdWorkspace, guest.user)
+
+            let response = await new TestClient(owner.token).delete("/Users", { Password: owner.password })
+
+            expect(response.status).toBe(406)
+            expect(response.body.msg).toContain("Transfira a propriedade")
+            expect(await findByEmail(owner.user.Email)).toBeDefined()
+            expect(await findWorkspace(owner.workspace.IdWorkspace)).toBeDefined()
+        })
+
+        //  Depois de transferir, a mesma chamada passa: a recusa é sobre o estado do espaço, e
+        //  não sobre a pessoa. É o próximo passo que a mensagem manda dar, verificado.
+        it("passa a aceitar depois que a propriedade é transferida", async () => {
+            let owner = await UsersFactory.create({ Name: "Dona que transfere" })
+            let guest = await UsersFactory.create({ Name: "Novo dono" })
+            let membership = await joinWorkspace(owner.workspace.IdWorkspace, guest.user)
+
+            let path = "/Workspaces/members/IdWorkspaceMember=" + membership.IdWorkspaceMember + "/transferOwnership"
+            let transfer = await new TestClient(owner.token).post(path)
+
+            expect(transfer.status).toBe(200)
+
+            let response = await new TestClient(owner.token).delete("/Users", { Password: owner.password })
+
+            expect(response.status).toBe(200)
+            expect(await findWorkspace(owner.workspace.IdWorkspace)).toBeDefined()
+        })
+
+        //  O TESTE QUE PROVA QUE O DINHEIRO DE QUEM FICOU NÃO MUDA. O convidado apaga a conta e
+        //  o espaço do dono continua de pé: a matrícula do convidado some, o que ele lançou fica
+        //  sem autor (SET NULL), e a Person dele continua na lista — ela é o eixo analítico do
+        //  rateio, e apagá-la reescreveria o histórico de quem gastou o quê para todo mundo.
+        it("o espaço de outra pessoa continua de pé, com o que o convidado lançou", async () => {
+            let owner = await UsersFactory.create({ Name: "Dona que fica" })
+            let guest = await UsersFactory.create({ Name: "Convidado que sai" })
+            let { IdWorkspace } = owner.workspace
+
+            await joinWorkspace(IdWorkspace, guest.user)
+            let account = await seedAccount(IdWorkspace, guest.user.IdUser)
+            let inflow = await seedInflow(IdWorkspace, guest.user.IdUser, account.IdAccount)
+
+            expect((await new TestClient(guest.token).delete("/Users", { Password: guest.password })).status).toBe(200)
+
+            //  O espaço e o dono continuam lá; quem saiu foi só a matrícula do convidado.
+            expect(await findWorkspace(IdWorkspace)).toBeDefined()
+            expect(await findMembership(IdWorkspace, owner.user.IdUser)).toBeDefined()
+            expect(await findMembership(IdWorkspace, guest.user.IdUser)).toBeUndefined()
+            expect(await countMembers(IdWorkspace)).toBe(1)
+
+            //  Os lançamentos ficam, sem autor: o saldo do mês de quem ficou não pode mudar
+            //  porque outra pessoa encerrou a conta.
+            let storedAccount = await findAccount(account.IdAccount)
+            let storedInflow = await findInflow(inflow.IdInflow)
+
+            expect(storedAccount).toBeDefined()
+            expect(storedAccount.IdUser).toBeNull()
+            expect(storedInflow).toBeDefined()
+            expect(storedInflow.IdUser).toBeNull()
+            expect(Number(storedInflow.TotalValue)).toBe(150)
+
+            //  E a Person do convidado continua na lista do espaço, desligada do usuário.
+            let persons = await findPersons(IdWorkspace)
+
+            expect(persons).toHaveLength(2)
+
+            let guestPerson = persons.find((person: { Name: string }) => person.Name === guest.user.Name)
+
+            expect(guestPerson).toBeDefined()
+            expect(guestPerson.IdUser).toBeNull()
+        })
+    })
+
     //  O caminho completo do usuário, só com HTTP: nenhuma escrita direta no banco, nenhum token
     //  fabricado pela factory. É este describe que continua fazendo sentido quando a suíte roda
     //  com TEST_BASE_URL apontando para um servidor de verdade.
@@ -1173,4 +1344,58 @@ async function countMembers(IdWorkspace: number) {
 
 function findPersons(IdWorkspace: number) {
     return TestDatabase.connection().select("*").from("Persons").where("IdWorkspace", IdWorkspace).orderBy("IdPerson")
+}
+
+//  Põe um segundo usuário dentro de um espaço já existente: a matrícula mais a Person dele, que
+//  é o que o join do convite faz. Aqui isso é arranjo de estado — a rota que o produz é coberta
+//  em Workspaces.test.ts —, e a Person entra junto porque é ela que sobrevive ao encerramento
+//  da conta, desligada do usuário.
+async function joinWorkspace(IdWorkspace: number, user: { IdUser: number, Name: string }, Role: "editor" | "viewer" = "editor") {
+    let [membership] = await TestDatabase.connection()
+        .insert({ IdWorkspace, IdUser: user.IdUser, Role })
+        .into("WorkspaceMembers")
+        .returning("*")
+
+    await TestDatabase.connection()
+        .insert({ IdWorkspace, IdUser: user.IdUser, Name: user.Name })
+        .into("Persons")
+
+    return membership as { IdWorkspaceMember: number }
+}
+
+//  Uma conta e uma entrada lançadas por outra pessoa dentro do espaço, semeadas direto: o que
+//  está sob teste é o que sobra delas depois que o autor encerra a conta, não como nasceram.
+async function seedAccount(IdWorkspace: number, IdUser: number) {
+    let [account] = await TestDatabase.connection()
+        .insert({ IdWorkspace, IdUser, Name: "Conta do convidado", InitialBalance: 0 })
+        .into("Accounts")
+        .returning("*")
+
+    return account as { IdAccount: number }
+}
+
+async function seedInflow(IdWorkspace: number, IdUser: number, IdToAccount: number) {
+    let [inflow] = await TestDatabase.connection()
+        .insert({
+            IdWorkspace,
+            IdUser,
+            IdToAccount,
+            Description: "Entrada do convidado",
+            TotalValue: 150,
+            Status: "received",
+            Kind: "inflow",
+            CompetenceDate: "2026-09-01",
+        })
+        .into("Inflows")
+        .returning("*")
+
+    return inflow as { IdInflow: number }
+}
+
+function findAccount(IdAccount: number) {
+    return TestDatabase.connection().select("*").from("Accounts").where("IdAccount", IdAccount).first()
+}
+
+function findInflow(IdInflow: number) {
+    return TestDatabase.connection().select("*").from("Inflows").where("IdInflow", IdInflow).first()
 }

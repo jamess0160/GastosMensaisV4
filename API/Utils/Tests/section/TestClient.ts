@@ -55,8 +55,10 @@ export class TestClient {
         return this.request("put", url, body)
     }
 
-    public delete(url: string) {
-        return this.request("delete", url)
+    //  O DELETE aceita corpo porque uma rota do app manda um: DELETE /Users leva a senha no
+    //  body, que é onde credencial vai — a URL cai no log do proxy e no Referer.
+    public delete(url: string, body?: unknown) {
+        return this.request("delete", url, body)
     }
 
     //  Um cliente novo sem token, para as asserções de rota protegida

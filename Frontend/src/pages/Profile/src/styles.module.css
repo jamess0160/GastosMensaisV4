@@ -152,6 +152,30 @@
     background: var(--brand-soft);
 }
 
+/* ── Encerrar a conta ─────────────────────────────────────── */
+/* O bloco não é vermelho inteiro: um card gritando ocupa a atenção da
+   tela toda por uma ação que quase ninguém vai usar. O que marca é a
+   BORDA e o botão — o bastante para ninguém clicar por engano, sem
+   transformar o perfil num aviso permanente. */
+.dangerZone {
+    border-top: 1px solid var(--neg-soft);
+    padding-top: 14px;
+}
+
+/* Mesma pintura do botão de confirmação destrutiva do `overlay`: o
+   vermelho de perigo aqui é o mesmo em toda parte, e ele mora nos
+   tokens, não num literal desta tela. */
+.dangerButton {
+    background: var(--neg);
+    border-color: var(--neg);
+    color: #fff;
+}
+
+.dangerButton:hover:not(:disabled) {
+    background: #e00017;
+    border-color: #e00017;
+}
+
 /* ── Sessão ───────────────────────────────────────────────── */
 .meta {
     display: grid;

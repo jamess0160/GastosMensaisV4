@@ -41,8 +41,19 @@ export class class_Users_model extends BaseModel {
         return this.KnexConnection.update({ ...record, UpdatedAt: this.KnexConnection.fn.now() }).from("Users").where("IdUser", IdUser)
     }
 
+    //  A LINHA É APAGADA DE VERDADE, e este é o único delete físico de tabela de cadastro do
+    //  projeto. A coluna Active existe e seria o caminho mais curto, mas soft delete mantém o
+    //  e-mail, o telefone e o hash da senha no banco — o oposto do que a rota existe para
+    //  fazer — e ainda travaria o endereço contra um cadastro futuro, porque o unique(Email)
+    //  não conhece o Active (é por isso que o cadastro tem o getByEmailIncludingInactive).
+    //
+    //  O que vai junto quem decide são as foreign keys, e elas discordam de propósito: os
+    //  workspaces de que o usuário é dono CASCATEIAM inteiros, as matrículas também, e os
+    //  lançamentos em espaço de terceiros ficam com o IdUser em SET NULL. O comentário de
+    //  sections/DELETE/remove.ts tem a lista, e a guarda que impede a cascata de levar o
+    //  espaço de outra pessoa.
     delete(IdUser: number) {
-        return this.KnexConnection.update({ Active: false, UpdatedAt: this.KnexConnection.fn.now() }).from("Users").where("IdUser", IdUser)
+        return this.KnexConnection.delete().from("Users").where("IdUser", IdUser)
     }
 }
 

@@ -35,3 +35,10 @@ Users_route.post("/Users", Users_schema.create, AsyncHandler(Users_controller.cr
 Users_route.put("/Users/IdUser=:IdUser", Users_schema.update, AsyncHandler(Users_controller.update))
 
 Users_route.put("/Users/updatePassword", Users_schema.updatePassword, AsyncHandler(Users_controller.updatePassword))
+
+//  Apagar a conta. Autenticada — é o token que diz de quem é a conta —, com a senha no corpo:
+//  a sessão dura até 30 dias e a ação não se desfaz, então o cookie sozinho não basta.
+//
+//  DELETE com corpo, e não um POST /Users/delete: o verbo descreve o que acontece com o
+//  recurso, e o corpo existe porque a senha não pode ir na URL.
+Users_route.delete("/Users", Users_schema.remove, AsyncHandler(Users_controller.remove))

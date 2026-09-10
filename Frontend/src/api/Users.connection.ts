@@ -94,6 +94,28 @@ class Connection {
     async updatePassword(body: { oldPassword: string; newPassword: string }): Promise<void> {
         await http.put(`${this.route}/updatePassword`, body);
     }
+
+    /** Apaga a conta. **Não se desfaz.**
+     *
+     *  Pede a senha DE NOVO, mesmo com sessão válida: o cookie dura até
+     *  30 dias, e aparelho emprestado ou aba esquecida é o cenário exato
+     *  em que esta chamada é feita por quem não devia. Ela vai no corpo
+     *  (o `data` do axios, que é como um DELETE leva corpo), nunca na
+     *  URL — o path cai no log do proxy, no histórico e no `Referer`.
+     *
+     *  Duas recusas, as duas com `msg` pronta para a tela: **401** para
+     *  senha errada — e é o 401 COM corpo, o que não derruba a sessão de
+     *  quem continua com a conta de pé — e **406** para quem é dono de
+     *  um espaço com outros membros, mandando transferir a propriedade
+     *  ou remover os demais antes. A recusa existe porque a linha do
+     *  dono cascatearia o espaço inteiro, com os dados de quem ficou.
+     *
+     *  No sucesso a resposta já vem com o cookie apagado: o que sobra
+     *  para o cliente é zerar o cache e sair da tela. */
+    async remove(body: { Password: string }): Promise<{ msg: string }> {
+        const { data } = await http.delete<{ msg: string }>(this.route, { data: body });
+        return data;
+    }
 }
 
 export const UsersConnection = new Connection();

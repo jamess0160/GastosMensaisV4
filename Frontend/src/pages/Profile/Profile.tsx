@@ -2,13 +2,13 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import styles from "./src/styles.module.css";
 import { ProfileController, type ProfileContext, type ProfileScope } from "./controller";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useSession, sessionKeys } from "@/app/session";
 import { UsersAuthConnection } from "@/api/UsersAuth.connection";
 import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
-import { FormError, FormField, FormGrid, Input, PasswordInput } from "@/ui/form";
+import { cx, FormError, FormField, FormGrid, Input, PasswordInput } from "@/ui/form";
 import { IconFingerprint } from "@/ui/icons";
-import { ConfirmDialog } from "@/ui/overlay";
+import { ConfirmDialog, FooterSpacer, Modal } from "@/ui/overlay";
 import { EmptyState } from "@/ui/states";
 import { useCooldown } from "@/lib/cooldown";
 import { formatDateTime } from "@/lib/date";
@@ -25,6 +25,7 @@ const maskPhone = (digits: string): string => {
 export function Profile() {
     const { user, workspace, workspaces, isOwner } = useSession();
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
     const deviceKey = readDeviceKey();
 
     const [form, setForm] = useState({
@@ -41,6 +42,11 @@ export function Profile() {
     const [errors, setErrors] = useState<Partial<Record<ProfileScope, string>>>({});
     const [done, setDone] = useState<Partial<Record<ProfileScope, string>>>({});
     const [removing, setRemoving] = useState<number | null>(null);
+    /* O encerramento tem formulário próprio, e ele nasce fechado: o
+       campo de senha só existe dentro do modal, e sair dele apaga o que
+       foi digitado. */
+    const [deleteForm, setDeleteForm] = useState({ password: "" });
+    const [deleting, setDeleting] = useState(false);
     /* O mesmo freio da tela pública de confirmação, e do tamanho da
        janela que a API já usa no reenvio: dois minutos. */
     const confirmationCooldown = useCooldown(120);
@@ -55,6 +61,7 @@ export function Profile() {
             user,
             form,
             passwordForm,
+            deleteForm,
             beginSubmit(scope) {
                 setPending(scope);
                 setErrors((current) => ({ ...current, [scope]: undefined }));
@@ -84,8 +91,16 @@ export function Profile() {
             clearPasswordForm() {
                 setPasswordForm({ oldPassword: "", newPassword: "", confirmation: "" });
             },
+            leaveForGood() {
+                /* Nada do que está em cache pertence mais a alguém: a
+                   conta não existe. O cookie já voltou apagado do
+                   `DELETE`, então não há logout a chamar — o que falta é
+                   sair de uma tela que lê uma sessão morta. */
+                queryClient.clear();
+                navigate("/login", { replace: true });
+            },
         }),
-        [user, form, passwordForm, queryClient, confirmationCooldown],
+        [user, form, passwordForm, deleteForm, queryClient, navigate, confirmationCooldown],
     );
 
     const onSaveProfile = (event: FormEvent) => {
@@ -419,6 +434,40 @@ export function Profile() {
                         </div>
                     </Card>
 
+                    {/* ── Encerrar a conta ──────────────────────── */}
+                    {/* Fica no FIM da tela e visualmente separado do
+                        resto porque é a única ação daqui que não se
+                        desfaz: o vizinho de cima é "trocar a senha", e
+                        um clique errado entre os dois teria consequências
+                        que nenhuma tela consegue devolver. */}
+                    <Card>
+                        <div className={cx(styles.section, styles.dangerZone)}>
+                            <div className={styles.sectionHead}>
+                                <div>
+                                    <div className={styles.sectionTitle}>Encerrar a conta</div>
+                                    <div className={styles.sectionSub}>
+                                        Apaga a sua conta e os espaços em que você é a única pessoa,
+                                        com contas, gastos, entradas e orçamentos.{" "}
+                                        <strong>Não há como desfazer</strong> — exporte a sua
+                                        planilha antes.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className={styles.actions}>
+                                <Button
+                                    className={styles.dangerButton}
+                                    onClick={() => {
+                                        setDeleteForm({ password: "" });
+                                        setDeleting(true);
+                                    }}
+                                >
+                                    Apagar minha conta
+                                </Button>
+                            </div>
+                        </div>
+                    </Card>
+
                     {/* ── Sessão ────────────────────────────────── */}
                     <Card>
                         <div className={styles.section}>
@@ -441,6 +490,60 @@ export function Profile() {
                     </Card>
                 </div>
             </div>
+
+            {/* O modal do encerramento é um `Modal`, e não o
+                `ConfirmDialog`: a confirmação aqui não é um "tem
+                certeza?", é DIGITAR A SENHA. A sessão dura até 30 dias,
+                então estar logado não prova que quem clicou é o dono da
+                conta — e o botão diz o que faz ("Apagar minha conta"),
+                não "Confirmar". */}
+            <Modal
+                open={deleting}
+                onClose={() => setDeleting(false)}
+                title="Apagar minha conta"
+                subtitle="Esta ação não se desfaz."
+                footer={
+                    <>
+                        <FooterSpacer />
+                        <Button onClick={() => setDeleting(false)} disabled={pending === "account"}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="primary"
+                            className={styles.dangerButton}
+                            onClick={() => void ProfileController.deleteAccount(context)}
+                            disabled={pending === "account"}
+                        >
+                            {pending === "account" ? "Apagando…" : "Apagar minha conta"}
+                        </Button>
+                    </>
+                }
+            >
+                <div className={styles.section}>
+                    <div className={styles.sectionSub}>
+                        A sua conta é apagada, não desativada: nome, e-mail, telefone e senha somem
+                        do banco. Os espaços em que você é a única pessoa somem inteiros; nos que
+                        você divide com alguém, o que você lançou fica lá, sem autor, para não mudar
+                        o mês de quem ficou. Se você é dono de um espaço com outras pessoas,
+                        transfira a propriedade em <Link to="/espaco">Espaço</Link> antes.
+                    </div>
+
+                    <FormError>{errors.account}</FormError>
+
+                    <FormField label="Sua senha" required>
+                        {(field) => (
+                            <PasswordInput
+                                {...field}
+                                autoComplete="current-password"
+                                value={deleteForm.password}
+                                onChange={(event) =>
+                                    setDeleteForm({ password: event.target.value })
+                                }
+                            />
+                        )}
+                    </FormField>
+                </div>
+            </Modal>
 
             <ConfirmDialog
                 open={removing !== null}

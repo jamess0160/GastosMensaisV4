@@ -147,6 +147,23 @@ class Schema {
         })),
     ]
 
+    //  A senha no CORPO de um DELETE, e não na URL — o mesmo motivo do login e do
+    //  updatePassword: o path cai no log de acesso do proxy, no histórico do navegador, no
+    //  header Referer e no Logs.handleError via req.originalUrl.
+    //
+    //  Nenhum id no caminho: a conta que esta rota apaga é a do token que a chamou, e não há
+    //  o que conferir contra nada. Um IdUser no path viria do cliente, seria sequencial, e a
+    //  rota passaria a existir para recusá-lo — a mesma razão pela qual o leave do workspace
+    //  também não tem id.
+    public readonly remove = [
+        joiController.validateBody(Joi.object({
+            Password: Joi.string().trim().required(),
+        })),
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+        })),
+    ]
+
     public readonly updatePassword = [
         joiController.validateBody(Joi.object({
             oldPassword: Joi.string().trim().required(),

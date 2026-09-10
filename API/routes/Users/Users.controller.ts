@@ -10,6 +10,7 @@ import { ForgotPassword } from './sections/POST/forgotPassword'
 import { ResetPassword } from './sections/POST/resetPassword'
 import { ConfirmEmail } from './sections/POST/confirmEmail'
 import { ResendConfirmation } from './sections/POST/resendConfirmation'
+import { Remove } from './sections/DELETE/remove'
 
 class Controller {
 
@@ -101,6 +102,21 @@ class Controller {
 
     updatePassword = async (req: Request, res: Response) => {
         res.json(await new UpdatePassword().run(res.locals.IdUser, req.body.oldPassword, req.body.newPassword))
+    }
+
+    //  A conta que se apaga é a do token, e o cookie sai junto — pelo mesmo AcessControl do
+    //  logout, que é a regra do projeto: nada além dele emite ou apaga sessão.
+    //
+    //  A ORDEM IMPORTA, e é o inverso da do logout. Ali o cookie some sempre; aqui ele só some
+    //  DEPOIS de a section ter voltado sem erro. Senha errada (401) e dono de espaço
+    //  compartilhado (406) sobem pelo AsyncHandler e nunca chegam nesta linha: quem continua
+    //  com a conta de pé não pode perder a sessão no mesmo clique.
+    remove = async (req: Request, res: Response) => {
+        let result = await new Remove().run(res.locals.IdUser, req.body.Password)
+
+        AcessControl.clearTokenCookie(res)
+
+        res.json(result)
     }
 }
 

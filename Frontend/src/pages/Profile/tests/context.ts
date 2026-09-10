@@ -28,11 +28,13 @@ export function fakeProfileContext(overrides: Partial<ProfileContext> = {}): Pro
             newPassword: "senha-nova-1",
             confirmation: "senha-nova-1",
         },
+        deleteForm: { password: "senha-atual" },
         beginSubmit: vi.fn(),
         failSubmit: vi.fn(),
         finishSubmit: vi.fn(),
         refresh: vi.fn(),
         clearPasswordForm: vi.fn(),
+        leaveForGood: vi.fn(),
         ...overrides,
     };
 }

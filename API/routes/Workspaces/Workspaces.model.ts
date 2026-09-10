@@ -26,6 +26,27 @@ export class class_Workspaces_model extends BaseModel {
         return this.baseQuery.clone()
     }
 
+    //  Os espaços de que este usuário é o dono E que têm outro membro além dele.
+    //
+    //  É a leitura que autoriza o DELETE /Users, e por isso ela filtra por IdOwnerUser e não
+    //  pelo papel da matrícula: quem cascateia o workspace inteiro quando a linha de Users
+    //  some é a FK Workspaces.IdOwnerUser, então a guarda tem que perguntar exatamente pela
+    //  coluna que dispara a cascata. As duas respondem igual — transferOwnership move as duas
+    //  na mesma transaction —, mas só uma delas é a que o banco vai obedecer.
+    //
+    //  Vazio significa "pode apagar": ou a pessoa não é dona de nada, ou os espaços que ela
+    //  tem são só dela, e aí a cascata leva embora apenas o que era dela mesma.
+    getOwnedWithOtherMembers(IdUser: number) {
+        return this.baseQuery.clone()
+            .where("IdOwnerUser", IdUser)
+            .whereExists((query) => {
+                query.select("*")
+                    .from("WorkspaceMembers")
+                    .whereRaw('"WorkspaceMembers"."IdWorkspace" = "Workspaces"."IdWorkspace"')
+                    .whereNot("WorkspaceMembers.IdUser", IdUser)
+            })
+    }
+
     create(records: MaybeArray<Partial<Database.Workspaces>>) {
         return this.KnexConnection.insert(records).into("Workspaces")
     }
