@@ -71,6 +71,7 @@
 }
 
 .heroMeterCaption {
+    margin-bottom: 10px;
     font-size: 11.5px;
     /* Altura de linha própria. Com a `normal` herdada a caixa da linha é
        justa demais e a primeira linha encosta na régua. */
