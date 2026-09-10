@@ -1,5 +1,6 @@
 import winston from "winston";
 import 'winston-daily-rotate-file'
+import { isProduction } from "./environment"
 
 const caminhoLogs = `${process.cwd()}/Logs/`
 
@@ -7,7 +8,33 @@ const RotineLoggers: Record<string, winston.Logger> = {}
 
 const Loggers: Partial<Record<KeyLogs, winston.Logger>> = {}
 
+//  **O ambiente decide para onde o log vai; o que vai dentro dele não muda.**
+//
+//  Em produção isto roda dentro de um container, e arquivo em disco ali é a camada de escrita
+//  da imagem: o log some no próximo `docker compose up` — justamente o momento em que alguém
+//  vai querer ler o que aconteceu antes. Some junto o `maxFiles: 7`, que não tem quem o cumpra
+//  se ninguém nunca lê o volume, e o caminho, que depende de `process.cwd()` e muda com o
+//  `WORKDIR`. Então em produção o transporte é o `Console`: o stdout é o que o driver de log do
+//  Docker captura, e rotação e teto de tamanho viram configuração do orquestrador — fora da
+//  aplicação, que é onde essa decisão pertence.
+//
+//  Fora de produção nada muda: o `DailyRotateFile` de sempre, porque `Logs/` na máquina de
+//  desenvolvimento é útil e não custa nada.
+//
+//  O ambiente é perguntado pelo `isProduction()` e por mais nada — o mesmo ponto único que
+//  decide o `secure` do cookie e o stack de erro do `AsyncHandler`; um segundo jeito de
+//  perguntar é um jeito de os dois discordarem. E é perguntado **aqui dentro**, na criação de
+//  cada logger (preguiçosa, no primeiro log de cada tipo), não no import: em produção o
+//  `DailyRotateFile` nunca chega a ser construído, e é a construção dele que criaria a pasta
+//  `Logs/` que ninguém vai ler.
+//
+//  As chaves do JSON são as mesmas nos dois (`level`, `timestamp`, `message`). A única
+//  diferença é a indentação, e ela não é cosmética: um driver de log lê **uma linha por
+//  evento**, então o JSON indentado que é confortável de ler no arquivo viraria, no stdout,
+//  uma dúzia de registros soltos sem nível e sem timestamp.
 function createLogger(path: string, level: string = path) {
+    const producao = isProduction()
+
     return winston.createLogger({
         level: level,
         levels: { [level]: 0 },
@@ -19,10 +46,12 @@ function createLogger(path: string, level: string = path) {
                     level: info.level,
                     timestamp: new Date(info.timestamp).toLocaleString("pt-br"),
                     message: JSON.parse(info.message),
-                }, null, 2)
+                }, null, producao ? 0 : 2)
             })
         ),
-        transports: new winston.transports.DailyRotateFile({ filename: `${caminhoLogs}/${path}/%DATE%.${level}.log`, level: level, datePattern: "YYYY-MM-DD", maxFiles: 7 })
+        transports: producao
+            ? new winston.transports.Console({ level: level })
+            : new winston.transports.DailyRotateFile({ filename: `${caminhoLogs}/${path}/%DATE%.${level}.log`, level: level, datePattern: "YYYY-MM-DD", maxFiles: 7 })
     })
 }
 

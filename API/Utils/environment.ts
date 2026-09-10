@@ -20,7 +20,8 @@
 //  congelado no import faria esse teste passar mentindo.
 
 /**
- * Ambiente de produção — hoje: `secure` no cookie de sessão e o stack de erro fora do stdout.
+ * Ambiente de produção — hoje: `secure` no cookie de sessão, o stack de erro fora do stdout e o
+ * log do Winston pelo `Console` em vez de arquivo em disco.
  *
  * A ausência da variável é a resposta "não é produção", não um erro de boot: em
  * desenvolvimento ela simplesmente não existe. **Setar `NODE_ENV=production` no ambiente do
