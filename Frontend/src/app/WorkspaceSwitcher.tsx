@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./WorkspaceSwitcher.module.css";
 import { useSession, useSwitchWorkspace } from "./session";
@@ -32,6 +32,19 @@ import type { ApiTypes } from "@/types/api";
    - **Criar** chama `POST /Workspaces` e, logo depois, o `switch` — a
      rota não troca a sessão sozinha, pela mesma razão do `join`. O
      espaço nasce vazio e com você como dono.
+
+   ELE TEM DOIS PONTOS DE MONTAGEM, e é o MESMO componente nos dois: a
+   `Sidebar` no desktop e a `TabBar` no mobile. Abaixo de 900px a sidebar
+   sai inteira, e até a leva 6 o seletor saía junto — no telefone não
+   havia como trocar nem criar espaço, e a página `/espaco` (que edita o
+   nome e convida) nunca fez nenhuma das duas coisas.
+
+   O que muda entre os dois é só a CAIXA: no desktop um popover ancorado
+   acima do gatilho; no mobile um painel que sobe da base da tela, sem
+   gatilho próprio — quem o abre é uma linha do menu da barra inferior, e
+   por isso ali o `open` vem de fora. As três ações, a section
+   `createWorkspace` e o `switchWorkspace` da sessão são os mesmos, que é
+   o que impede os dois lugares de divergirem.
    ════════════════════════════════════════════════════════════ */
 
 const initials = (name: string) =>
@@ -42,15 +55,42 @@ const initials = (name: string) =>
         .join("")
         .toUpperCase();
 
-export function WorkspaceSwitcher() {
+export function WorkspaceSwitcher({
+    variant = "sidebar",
+    open: openFromParent = false,
+    onClose,
+}: {
+    /** A caixa em que ele é desenhado. `sidebar` é o popover ancorado do
+     *  desktop; `sheet` é o painel que sobe da base, no mobile. */
+    variant?: "sidebar" | "sheet";
+    /** Só no `sheet`: lá ele não tem gatilho próprio — a barra inferior
+     *  não tem fatia sobrando para um sexto ícone —, então quem o abre e
+     *  fecha é quem o monta. No `sidebar` os dois são ignorados. */
+    open?: boolean;
+    onClose?: () => void;
+}) {
     const navigate = useNavigate();
     const { workspaces, workspace, user } = useSession();
     const switchWorkspace = useSwitchWorkspace();
 
-    const [open, setOpen] = useState(false);
+    const sheet = variant === "sheet";
+
+    /* O estado do popover do desktop. No `sheet` ele não é usado: mandar
+       as duas fontes de verdade conviverem é como o painel fica aberto
+       para um lado e fechado para o outro. */
+    const [ownOpen, setOwnOpen] = useState(false);
+    const open = sheet ? openFromParent : ownOpen;
+
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const wrapRef = useRef<HTMLDivElement>(null);
+
+    /* Fechar é o único verbo que os dois lados compartilham — abrir, no
+       `sheet`, é de quem monta. */
+    const close = useCallback(() => {
+        if (sheet) onClose?.();
+        else setOwnOpen(false);
+    }, [sheet, onClose]);
 
     /* O nome do espaço novo. `null` é "o formulário não está aberto" —
        um campo de texto não cabe na largura da sidebar, então ele vira
@@ -60,15 +100,20 @@ export function WorkspaceSwitcher() {
     const [createError, setCreateError] = useState<string | null>(null);
 
     /* Clique fora e Esc fecham. O painel cobre a navegação e o bloco do
-       usuário: deixá-lo aberto por engano esconde meia sidebar. */
+       usuário: deixá-lo aberto por engano esconde meia sidebar.
+
+       Vale para os dois pontos de montagem: o wrapper existe no DOM
+       também no `sheet` (é o que o `.wrapSheet` faz, sem ocupar espaço),
+       e o véu está DENTRO dele — quem fecha no véu é o `onClick` dele,
+       não este ouvinte. */
     useEffect(() => {
         if (!open) return;
 
         const onPointerDown = (event: MouseEvent) => {
-            if (!wrapRef.current?.contains(event.target as Node)) setOpen(false);
+            if (!wrapRef.current?.contains(event.target as Node)) close();
         };
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") setOpen(false);
+            if (event.key === "Escape") close();
         };
 
         document.addEventListener("mousedown", onPointerDown);
@@ -77,7 +122,7 @@ export function WorkspaceSwitcher() {
             document.removeEventListener("mousedown", onPointerDown);
             document.removeEventListener("keydown", onKeyDown);
         };
-    }, [open]);
+    }, [open, close]);
 
     const createContext = useMemo<CreateWorkspaceContext>(
         () => ({
@@ -114,7 +159,7 @@ export function WorkspaceSwitcher() {
         setError(null);
         try {
             await switchWorkspace(idWorkspace);
-            setOpen(false);
+            close();
             then?.();
         } catch (cause) {
             setError(errorMessage(cause));
@@ -129,7 +174,7 @@ export function WorkspaceSwitcher() {
      *  seria um formulário que grava no espaço errado. */
     const manage = (candidate: ApiTypes.Workspace) => {
         if (isCurrent(candidate)) {
-            setOpen(false);
+            close();
             navigate("/espaco");
             return;
         }
@@ -137,26 +182,48 @@ export function WorkspaceSwitcher() {
     };
 
     return (
-        <div className={styles.wrap} ref={wrapRef}>
-            <button
-                type="button"
-                className={styles.trigger}
-                onClick={() => setOpen((current) => !current)}
-                aria-expanded={open}
-                aria-haspopup="menu"
-            >
-                <span className={styles.mark}>{initials(workspace.Name)}</span>
-                <span className={styles.body}>
-                    <span className={styles.label}>Espaço</span>
-                    <span className={styles.name}>{workspace.Name}</span>
-                </span>
-                <span className={styles.chevron}>
-                    <IconChevronDown />
-                </span>
-            </button>
+        <div className={sheet ? styles.wrapSheet : styles.wrap} ref={wrapRef}>
+            {/* O gatilho é do desktop. No mobile ele seria um sexto ícone
+                numa barra que já está em cinco fatias — lá quem abre é a
+                linha "Trocar de espaço" do menu. */}
+            {!sheet && (
+                <button
+                    type="button"
+                    className={styles.trigger}
+                    onClick={() => setOwnOpen((current) => !current)}
+                    aria-expanded={open}
+                    aria-haspopup="menu"
+                >
+                    <span className={styles.mark}>{initials(workspace.Name)}</span>
+                    <span className={styles.body}>
+                        <span className={styles.label}>Espaço</span>
+                        <span className={styles.name}>{workspace.Name}</span>
+                    </span>
+                    <span className={styles.chevron}>
+                        <IconChevronDown />
+                    </span>
+                </button>
+            )}
+
+            {/* O véu é do painel de baixo: sem gatilho na tela, é ele que
+                dá o "toque fora" e mostra que a tela está esperando uma
+                escolha. No desktop o popover fica ancorado e não escurece
+                nada. */}
+            {open && sheet && <div className={styles.scrim} onClick={close} />}
 
             {open && (
-                <div className={styles.panel} role="menu">
+                <div
+                    className={sheet ? styles.sheetPanel : styles.panel}
+                    role="menu"
+                    aria-label="Espaços"
+                >
+                    {sheet && (
+                        <div className={styles.sheetHead}>
+                            <span className={styles.sheetTitle}>Espaço</span>
+                            <span className={styles.sheetNow}>{workspace.Name}</span>
+                        </div>
+                    )}
+
                     {workspaces.map((candidate) => (
                         <div
                             className={`${styles.row} ${isCurrent(candidate) ? styles.on : ""}`}
@@ -212,7 +279,7 @@ export function WorkspaceSwitcher() {
                         className={styles.new}
                         disabled={pending}
                         onClick={() => {
-                            setOpen(false);
+                            close();
                             setCreateError(null);
                             setNewName("");
                         }}
@@ -220,6 +287,16 @@ export function WorkspaceSwitcher() {
                         <IconPlus />
                         Novo espaço
                     </button>
+
+                    {/* Só no painel de baixo: o popover do desktop fecha
+                        no clique fora, que ali é a tela inteira. Com o
+                        véu cobrindo tudo, um botão explícito é o gesto
+                        que o resto do mobile já usa. */}
+                    {sheet && (
+                        <button type="button" className={styles.sheetCancel} onClick={close}>
+                            Cancelar
+                        </button>
+                    )}
                 </div>
             )}
 

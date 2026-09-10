@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import styles from "./TabBar.module.css";
 import {
@@ -17,8 +17,9 @@ import {
 import { useExportSpreadsheet } from "./exportSpreadsheet";
 import { useSession, useSignOut } from "./session";
 import { useOpenModal } from "./modalRoute";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { SheetMenu, type SheetMenuItem } from "@/ui/overlay";
-import { IconPlus } from "@/ui/icons";
+import { IconLayers, IconPlus } from "@/ui/icons";
 
 /** A barra inferior do mobile.
  *
@@ -52,6 +53,13 @@ export function TabBar() {
     const openModal = useOpenModal();
     const exportSpreadsheet = useExportSpreadsheet();
     const [menuOpen, setMenuOpen] = useState(false);
+
+    /* O seletor de espaço não cabe como sexta fatia da barra, então ele
+       é aberto por uma linha do menu — e por isso o estado dele mora
+       aqui, e não dentro do componente. `useCallback` porque ele é
+       dependência do efeito de Escape lá dentro. */
+    const [switcherOpen, setSwitcherOpen] = useState(false);
+    const closeSwitcher = useCallback(() => setSwitcherOpen(false), []);
 
     const item = ({
         to,
@@ -97,11 +105,21 @@ export function TabBar() {
             onSelect: () => navigate("/personalizacao"),
         },
         {
-            /* No desktop o espaço tem seletor próprio na sidebar; aqui
-               ele entra pelo menu, com o nome do atual na descrição —
-               saber onde se está é a metade da informação. */
+            /* TROCAR e CRIAR são do seletor, não da página: são as duas
+               coisas que sumiam no telefone junto com a sidebar. O nome
+               do atual vai aqui porque saber onde se está é a metade da
+               informação. */
+            label: "Trocar de espaço",
+            description: workspace
+                ? `Você está em ${workspace.Name}`
+                : "Escolher ou criar um espaço",
+            icon: <IconLayers />,
+            onSelect: () => setSwitcherOpen(true),
+        },
+        {
+            /* E a página é o que a página faz — nem trocar, nem criar. */
             label: "Espaço",
-            description: workspace ? `${workspace.Name} · trocar e convidar` : "Trocar e convidar",
+            description: "Nome do espaço e convites",
             icon: <IconUsers />,
             onSelect: () => navigate("/espaco"),
         },
@@ -181,6 +199,12 @@ export function TabBar() {
                 title="Mais opções"
                 items={menu}
             />
+
+            {/* O MESMO seletor da sidebar, num segundo ponto de montagem
+                — não uma versão de mobile dele. Escolher no menu FECHA o
+                menu antes de agir, então os dois painéis nunca ficam um
+                por cima do outro. */}
+            <WorkspaceSwitcher variant="sheet" open={switcherOpen} onClose={closeSwitcher} />
         </>
     );
 }
