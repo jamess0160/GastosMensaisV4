@@ -20,12 +20,22 @@ export class ApiBusinessError extends Error {
     }
 }
 
-/** 401 — sem cookie, inválido ou expirado. Corpo vazio. */
+/** 401 — e ele vem em dois sabores que o corpo separa.
+ *
+ *  **Sem corpo** é o middleware de sessão da API (`res.status(401).send()`):
+ *  não veio cookie, ou o token não vale mais. É o 401 que derruba a
+ *  sessão, e a frase é a padrão.
+ *
+ *  **Com `msg`** são as rotas públicas de entrar — `POST /Users/login` e
+ *  `POST /UsersAuth/authenticate` —, que respondem 401 para credencial
+ *  recusada. Aí não há sessão a expirar: quem errou a senha nunca teve
+ *  uma. A frase é a que a API escreveu ("Login inválido"), a mesma para
+ *  e-mail inexistente e senha errada de propósito. */
 export class ApiUnauthorizedError extends Error {
     readonly status = 401;
 
-    constructor() {
-        super("Sessão expirada.");
+    constructor(message = "Sessão expirada.") {
+        super(message);
         this.name = "ApiUnauthorizedError";
     }
 }
@@ -112,6 +122,21 @@ http.interceptors.response.use(
         const { status, data } = error.response;
 
         if (status === 401) {
+            /* O corpo decide, e a diferença aparece inteira na tela de
+               login: dizer "Sessão expirada." a quem acabou de errar a
+               senha manda a pessoa procurar uma sessão que ela nunca
+               teve, escondendo o que estava errado de verdade.
+
+               E só o 401 de sessão dispara o evento. O de credencial não
+               tem sessão a derrubar — o `queryClient.clear()` e o
+               `navigate("/login")` que o evento provoca não teriam o que
+               fazer partindo da própria tela de login. */
+            const body = await readErrorBody(data);
+
+            if (body?.msg) {
+                return Promise.reject(new ApiUnauthorizedError(body.msg));
+            }
+
             window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
             return Promise.reject(new ApiUnauthorizedError());
         }

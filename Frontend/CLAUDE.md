@@ -179,9 +179,16 @@ Três decisões de teste que valem saber:
 ## O erro da API vira tipo antes de virar tela
 
 [src/api/client.ts](src/api/client.ts) tem a instância axios e o interceptor que traduz status
-em erro tipado — `401` vira `ApiUnauthorizedError` e dispara o evento que derruba a sessão,
-`406` vira `ApiBusinessError` com a `msg` pronta para a tela, o resto vira `ApiServerError`. As
-connections só falam de rotas e corpos.
+em erro tipado — `401` vira `ApiUnauthorizedError`, `406` vira `ApiBusinessError` com a `msg`
+pronta para a tela, o resto vira `ApiServerError`. As connections só falam de rotas e corpos.
+
+**São dois `401`, e o corpo é o que os separa.** O middleware de sessão da API responde
+`res.status(401).send()`, de corpo VAZIO: não veio cookie, ou o token não vale mais — esse é o
+que dispara o `UNAUTHORIZED_EVENT` e derruba a sessão, com a frase "Sessão expirada.". As rotas
+públicas de entrar (`POST /Users/login`, `POST /UsersAuth/authenticate`) respondem `401` **com
+`msg`** para credencial recusada, e aí não há sessão a derrubar: o erro carrega a frase da API
+("Login inválido") e nenhum evento é disparado. Tratar os dois igual é dizer "Sessão expirada."
+a quem só errou a senha, e mandar a tela de login limpar o cache para navegar até ela mesma.
 
 **O corpo do erro pode não ser JSON.** `GET /Reports/Export` é a única rota que responde um
 arquivo, e o `responseType: "blob"` da connection vale também para a resposta de erro: um `406`

@@ -63,6 +63,43 @@ describe("interceptor de resposta", () => {
         window.removeEventListener(UNAUTHORIZED_EVENT, listener);
     });
 
+    // O 401 das rotas de entrar. `POST /Users/login` e `POST
+    // /UsersAuth/authenticate` recusam credencial com 401 + `msg`, e a
+    // frase pronta da API é a única que descreve o que aconteceu:
+    // "Sessão expirada." mandaria quem errou a senha procurar uma sessão
+    // que nunca existiu.
+    it("mostra a msg do 401 quando ela vem — credencial recusada não é sessão expirada", async () => {
+        server.use(
+            msw.post("*/api/Users/login", () =>
+                HttpResponse.json({ msg: "Login inválido" }, { status: 401 }),
+            ),
+        );
+
+        await expect(http.post("/Users/login", {})).rejects.toMatchObject({
+            name: "ApiUnauthorizedError",
+            status: 401,
+            message: "Login inválido",
+        });
+    });
+
+    // E ele NÃO derruba a sessão: não há sessão nenhuma a derrubar, e o
+    // evento levaria a tela de login a limpar o cache e navegar para ela
+    // mesma.
+    it("não avisa o app quando o 401 é de credencial", async () => {
+        server.use(
+            msw.post("*/api/Users/login", () =>
+                HttpResponse.json({ msg: "Login inválido" }, { status: 401 }),
+            ),
+        );
+        const listener = vi.fn();
+        window.addEventListener(UNAUTHORIZED_EVENT, listener);
+
+        await expect(http.post("/Users/login", {})).rejects.toThrow("Login inválido");
+
+        expect(listener).not.toHaveBeenCalled();
+        window.removeEventListener(UNAUTHORIZED_EVENT, listener);
+    });
+
     it("não avisa o app quando o erro é de negócio", async () => {
         server.use(msw.get(route, () => HttpResponse.json({ msg: "Erro" }, { status: 406 })));
         const listener = vi.fn();

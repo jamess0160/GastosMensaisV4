@@ -66,9 +66,12 @@ describe("submitLogin", () => {
         expect((body as { RememberDevice: boolean }).RememberDevice).toBe(true);
     });
 
+    //  401, e NÃO 406: a API responde "Login inválido" com o status de
+    //  credencial recusada. O mock errado aqui era o que escondia o bug —
+    //  a tela mostrava "Sessão expirada." para quem só tinha errado a senha.
     it("mostra a mensagem da API quando a credencial está errada", async () => {
         server.use(
-            msw.post(route, () => HttpResponse.json({ msg: "Login inválido" }, { status: 406 })),
+            msw.post(route, () => HttpResponse.json({ msg: "Login inválido" }, { status: 401 })),
         );
         const context = fakeLoginContext();
 

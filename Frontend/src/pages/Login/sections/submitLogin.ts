@@ -27,9 +27,13 @@ async function shouldInviteBiometrics(deviceKey: string | null): Promise<boolean
 /** Login por e-mail e senha.
  *
  *  O 200 vale pelo `Set-Cookie`, não pelo corpo — quem confirma a sessão
- *  depois é o `getSelf` do guard. Credencial errada volta 406 com a mesma
+ *  depois é o `getSelf` do guard. Credencial errada volta 401 com a mesma
  *  `msg` para e-mail inexistente e senha errada, de propósito: mostre-a
  *  como veio, sem tentar distinguir os dois casos.
+ *
+ *  É um 401 QUE NÃO É SESSÃO EXPIRADA, e quem faz essa distinção é o
+ *  interceptor do client, pelo corpo da resposta — aqui só se pede a
+ *  frase ao `errorMessage`, como em qualquer outro erro.
  *
  *  Com a sessão de pé, o convite de biometria vem ANTES de sair da tela:
  *  as rotas de registro de passkey são autenticadas, e é aqui que o
