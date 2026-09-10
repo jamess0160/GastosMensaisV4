@@ -102,6 +102,32 @@ class Connection {
         return data;
     }
 
+    /** Tira alguém do espaço. **Só `owner`** — quem não é leva 403.
+     *
+     *  Endereça a MATRÍCULA, como o `updateMember`, e não recebe corpo:
+     *  remover não tem opção.
+     *
+     *  ⚠️ **A matrícula é apagada de verdade** — não é arquivamento. Não
+     *  há como desfazer: readmitir a pessoa é convidá-la de novo, e a
+     *  data de entrada dela recomeça. Confirme antes de chamar.
+     *
+     *  **Nada do que a pessoa lançou é tocado.** Gasto, entrada e conta
+     *  são do ESPAÇO, não da matrícula; e quem responde "quem gastou" é
+     *  `ExpensePersons`, que aponta para `Persons` — outra tabela, sem
+     *  relação com quem tem login. Nenhum saldo muda, nenhum rateio
+     *  muda, e o mês continua fechando igual. A tela não pode sugerir o
+     *  contrário.
+     *
+     *  **Ninguém se remove por aqui**: a própria matrícula responde 406,
+     *  mandando transferir a propriedade. 406 também numa matrícula que
+     *  não é deste espaço, com "Membro não encontrado". */
+    async removeMember(idWorkspaceMember: number): Promise<{ msg: string }> {
+        const { data } = await http.delete<{ msg: string }>(
+            `${this.route}/members/IdWorkspaceMember=${idWorkspaceMember}`,
+        );
+        return data;
+    }
+
     /* ── Convites ─────────────────────────────────────────── */
 
     /** Cria o convite do workspace da sessão. **Só `owner`** — quem não
@@ -162,8 +188,8 @@ class Connection {
 
     /** Revoga: o link para de funcionar NA HORA. Só `owner`.
      *
-     *  Revogar NÃO desfaz matrícula já criada — remover membro é outra
-     *  coisa, e ainda não existe (pendência 20). */
+     *  Revogar NÃO desfaz matrícula já criada: quem já aceitou nem
+     *  aparece nesta lista, e tirá-lo do espaço é o `removeMember`. */
     async revokeInvite(idWorkspaceInvite: number): Promise<{ msg: string }> {
         const { data } = await http.delete<{ msg: string }>(
             `${this.route}/invite/IdWorkspaceInvite=${idWorkspaceInvite}`,

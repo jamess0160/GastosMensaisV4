@@ -137,6 +137,15 @@ class Schema {
         })),
     ]
 
+    //  Tira alguém do espaço. Só a matrícula, no caminho: o workspace vem do token e não há
+    //  corpo nenhum a receber — remover não tem opção, e um corpo aqui só daria ao cliente
+    //  onde escrever o que a rota ignoraria.
+    public readonly removeMember = [
+        joiController.validateParams(Joi.object({
+            IdWorkspaceMember: Joi.number().required(),
+        })),
+    ]
+
     //  Rota pública: quem recebeu o link ainda pode não ter conta.
     public readonly getInviteByHash = [
         joiController.validateParams(Joi.object({

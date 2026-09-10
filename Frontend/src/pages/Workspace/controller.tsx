@@ -1,4 +1,5 @@
 import { createInvite } from "./sections/createInvite";
+import { removeMember } from "./sections/removeMember";
 import { revokeInvite } from "./sections/revokeInvite";
 import { saveWorkspace } from "./sections/saveWorkspace";
 import { updateMemberRole } from "./sections/updateMemberRole";
@@ -44,6 +45,7 @@ class Controller {
     readonly createInvite = createInvite;
     readonly revokeInvite = revokeInvite;
     readonly updateMemberRole = updateMemberRole;
+    readonly removeMember = removeMember;
 }
 
 export const WorkspaceController = new Controller();

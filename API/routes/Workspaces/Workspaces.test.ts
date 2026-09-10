@@ -475,6 +475,160 @@ describe("Workspaces", () => {
         })
     })
 
+    describe("DELETE /Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().delete("/Workspaces/members/IdWorkspaceMember=1")
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).delete("/Workspaces/members/IdWorkspaceMember=1")
+
+            expect(response.status).toBe(406)
+        })
+
+        //  A matrícula é apagada DE VERDADE, e não desativada: não há Active em
+        //  WorkspaceMembers de propósito, porque matrícula inativa é acesso revogado que
+        //  continua ocupando a chave única e voltaria sozinha num convite futuro.
+        it("o dono remove um membro, e a matrícula deixa de existir", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let membership = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            let response = await owner.client.delete(`/Workspaces/members/IdWorkspaceMember=${membership!.IdWorkspaceMember}`)
+
+            expect(response.status).toBe(200)
+            expect(await countMemberships(owner.workspace.IdWorkspace, member.user.IdUser)).toBe(0)
+            expect((await owner.client.get("/Workspaces/members")).body.map((item: { Email: string }) => item.Email)).toEqual([owner.user.Email])
+        })
+
+        //  O token é uma fotografia da autorização e vale 24h: quem responde pela remoção na
+        //  chamada seguinte é o assertMember, com o MESMO token que funcionava antes dela.
+        it("o removido perde o acesso na chamada seguinte, com o mesmo token", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let memberClient = new TestClient(UsersFactory.buildToken(member.user.IdUser, owner.workspace.IdWorkspace))
+
+            expect((await memberClient.get("/Workspaces/members")).status).toBe(200)
+
+            let membership = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            await owner.client.delete(`/Workspaces/members/IdWorkspaceMember=${membership!.IdWorkspaceMember}`)
+
+            let after = await memberClient.get("/Workspaces/members")
+
+            expect(after.status).toBe(406)
+            expect(after.body.msg).toBe("Workspace não encontrado!")
+
+            //  E o espaço sai da lista dele: é a matrícula que o getSelf lê.
+            let visible = await new TestClient(member.token).get("/Workspaces/getSelf")
+
+            expect(visible.body.map((item: { IdWorkspace: number }) => item.IdWorkspace)).toEqual([member.workspace.IdWorkspace])
+        })
+
+        //  Um editor que pudesse remover terceiros tiraria o dono da decisão de quem fica.
+        //  403, e não 406: a matrícula existe, o papel é que não basta.
+        it("recusa um editor removendo outro membro", async () => {
+            let owner = await UsersFactory.create()
+            let editor = await UsersFactory.create()
+            let viewer = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, editor.user.IdUser, "editor")
+            await seedMembership(owner.workspace.IdWorkspace, viewer.user.IdUser, "viewer")
+
+            let target = await findMembership(owner.workspace.IdWorkspace, viewer.user.IdUser)
+
+            let response = await new TestClient(UsersFactory.buildToken(editor.user.IdUser, owner.workspace.IdWorkspace))
+                .delete(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}`)
+
+            expect(response.status).toBe(403)
+            expect(await countMemberships(owner.workspace.IdWorkspace, viewer.user.IdUser)).toBe(1)
+        })
+
+        //  Quem chega à guarda é sempre o dono, porque é o assertRole que deixou passar: sair
+        //  é operação do próprio usuário, e o dono só sai depois de transferir a propriedade.
+        it("recusa o dono removendo a si mesmo, e a msg diz o conserto", async () => {
+            let owner = await UsersFactory.createClient()
+
+            let membership = await findMembership(owner.workspace.IdWorkspace, owner.user.IdUser)
+
+            let response = await owner.client.delete(`/Workspaces/members/IdWorkspaceMember=${membership!.IdWorkspaceMember}`)
+
+            expect(response.status).toBe(406)
+            expect(response.body.msg).toContain("transfira a propriedade")
+            expect(await countMemberships(owner.workspace.IdWorkspace, owner.user.IdUser)).toBe(1)
+        })
+
+        //  O id da matrícula chega do cliente e é sequencial: sem o IdWorkspace na busca, um
+        //  dono removeria o membro do vizinho.
+        it("não remove uma matrícula de outro workspace", async () => {
+            let owner = await UsersFactory.createClient()
+            let other = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(other.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let target = await findMembership(other.workspace.IdWorkspace, member.user.IdUser)
+
+            let response = await owner.client.delete(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}`)
+
+            expect(response.status).toBe(406)
+            expect(response.body.msg).toBe("Membro não encontrado!")
+            expect(await countMemberships(other.workspace.IdWorkspace, member.user.IdUser)).toBe(1)
+        })
+
+        //  O que a etapa NÃO faz, e é o que ela mais precisa provar: gasto, entrada e conta são
+        //  do WORKSPACE, não da matrícula — nenhuma dessas tabelas aponta para
+        //  WorkspaceMembers. E quem responde "quem gastou" é ExpensePersons, que aponta para
+        //  Persons, outra tabela, sem relação com quem tem login. Então remover um membro não
+        //  pode mexer em um centavo de saldo nem em uma linha de rateio.
+        it("não toca no que o removido lançou, e o saldo não muda um centavo", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let memberClient = new TestClient(UsersFactory.buildToken(member.user.IdUser, owner.workspace.IdWorkspace))
+
+            let account = await owner.client.post("/Accounts", { Name: "Conta da casa", InitialBalance: 1000 })
+            let accounts = await owner.client.get("/Accounts")
+            let methods = accounts.body.find((item: { IdAccount: number }) => item.IdAccount === account.body.IdAccount).PaymentMethods
+            let debit = methods.find((item: { Kind: string }) => item.Kind === "debit").IdPaymentMethod
+            let category = await owner.client.post("/Categories", { Description: "Mercado" })
+            let person = await owner.client.post("/Persons", { Name: "Quem gastou" })
+
+            //  Lançado pelo MEMBRO, e rateado numa Person: a Person é do espaço e sobrevive à
+            //  remoção porque ela nunca teve nada a ver com a matrícula.
+            let expense = await memberClient.post("/Expenses", {
+                Description: "Gasto do convidado",
+                TotalValue: 250,
+                IdCategory: category.body.IdCategory,
+                ExpenseDate: "2026-08-10",
+                Payments: [{ IdPaymentMethod: debit, Value: 250, Paid: true }],
+                Persons: [{ IdPerson: person.body.IdPerson, Value: 250 }],
+            })
+
+            expect(expense.status).toBe(200)
+
+            let before = await balanceOf(owner.client, account.body.IdAccount)
+
+            let membership = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            expect((await owner.client.delete(`/Workspaces/members/IdWorkspaceMember=${membership!.IdWorkspaceMember}`)).status).toBe(200)
+
+            expect(await balanceOf(owner.client, account.body.IdAccount)).toBe(before)
+
+            let survivor = await owner.client.get(`/Expenses/IdExpense=${expense.body.IdExpense}`)
+
+            expect(survivor.status).toBe(200)
+            expect(survivor.body.Description).toBe("Gasto do convidado")
+            expect(survivor.body.Persons.map((item: { IdPerson: number, Value: number }) => [item.IdPerson, item.Value])).toEqual([[person.body.IdPerson, 250]])
+        })
+    })
+
     describe("POST /Workspaces/invite", () => {
 
         it("recusa sem token", async () => {
@@ -1032,6 +1186,15 @@ async function countMemberships(IdWorkspace: number, IdUser: number) {
 
 function findPersonsByUser(IdUser: number): Promise<{ IdWorkspace: number }[]> {
     return TestDatabase.connection().select("*").from("Persons").where("IdUser", IdUser)
+}
+
+//  O saldo sai pela rota de contas, como em toda outra suíte: ele não é coluna, é calculado a
+//  cada leitura. É o que deixa "remover um membro não mexe em um centavo" ser uma comparação de
+//  dois números, e não uma inspeção de tabela.
+async function balanceOf(client: TestClient, IdAccount: number) {
+    let response = await client.get("/Accounts")
+
+    return response.body.find((item: { IdAccount: number }) => item.IdAccount === IdAccount).Balance as number
 }
 
 //  Matrícula semeada direto: arranjar um editor/viewer é estado, e o app só o produz pelo

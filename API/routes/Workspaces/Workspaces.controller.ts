@@ -7,6 +7,7 @@ import { GetMembers } from "./sections/GET/getMembers"
 import { CreateInvite } from "./sections/POST/createInvite"
 import { Join } from "./sections/POST/join"
 import { Switch } from "./sections/POST/switch"
+import { RemoveMember } from "./sections/DELETE/removeMember"
 import { RevokeInvite } from "./sections/DELETE/revokeInvite"
 import { Update } from "./sections/PUT/update"
 import { UpdateMember } from "./sections/PUT/updateMember"
@@ -47,6 +48,13 @@ class Controller {
     //  confere e é contra a matrícula DELE que a guarda do "próprio papel" compara.
     updateMember = async (req: Request, res: Response) => {
         res.json(await new UpdateMember().run(res.locals.IdWorkspace, Number(req.params.IdWorkspaceMember), res.locals.IdUser, req.body))
+    }
+
+    //  Mesma forma do updateMember: a matrícula alvo vem do caminho, e o IdUser vai junto
+    //  porque é ele que o assertRole confere e é contra a matrícula DELE que a guarda do
+    //  "não se remove a si mesmo" compara. Sem corpo — não há nada a receber.
+    removeMember = async (req: Request, res: Response) => {
+        res.json(await new RemoveMember().run(res.locals.IdWorkspace, Number(req.params.IdWorkspaceMember), res.locals.IdUser))
     }
 
     //  Sem res.locals: é rota pública, o que identifica o convite é o hash.

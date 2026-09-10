@@ -33,6 +33,17 @@ Workspaces_route.get("/Workspaces/members", Workspaces_schema.getMembers, AsyncH
 //  porque promover a dono é transferir a propriedade, que tem regra própria.
 Workspaces_route.put("/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember", Workspaces_schema.updateMember, AsyncHandler(Workspaces_controller.updateMember))
 
+//  Tira alguém do espaço. Só o dono (assertRole owner), como o convite e a troca de papel.
+//
+//  Apaga a matrícula DE VERDADE: não há Active em WorkspaceMembers, porque matrícula inativa é
+//  acesso revogado que continua ocupando a chave única e voltaria sozinha num convite futuro.
+//  Nada do que a pessoa lançou é tocado — gasto, entrada e conta são do workspace, e o rateio
+//  de quem gastou aponta para Persons, que é outra tabela.
+//
+//  O dono não se remove por aqui: sair é operação do próprio usuário, e ele só sai depois de
+//  transferir a propriedade.
+Workspaces_route.delete("/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember", Workspaces_schema.removeMember, AsyncHandler(Workspaces_controller.removeMember))
+
 //  O convite — a porta pela qual se entra num workspace alheio, agora que o cadastro não aceita
 //  mais um IdWorkspace do corpo. Só o dono convida, lista e revoga (assertRole owner): um
 //  editor que pudesse convidar promoveria terceiros ao próprio nível sem o dono saber.

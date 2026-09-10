@@ -29,7 +29,7 @@ import type { ApiTypes } from "@/types/api";
    sidebar.
 
    E ela é quase toda a tela do DONO: renomear, convidar, listar convites
-   e trocar o papel de um membro respondem 403 para quem não é. Para os
+   e trocar o papel ou remover um membro respondem 403 para quem não é. Para os
    outros a tela mostra o espaço, diz de quem ele é e lista quem tem
    acesso — que é a única leitura de `assertMember` daqui —, sem oferecer
    um controle que sempre falharia.
@@ -77,6 +77,10 @@ export function Workspace() {
     const [done, setDone] = useState<Partial<Record<WorkspaceScope, string | null>>>({});
     const [copied, setCopied] = useState<number | null>(null);
     const [revoking, setRevoking] = useState<ApiTypes.WorkspaceInvite | null>(null);
+    /* A matrícula é apagada de verdade, e não arquivada: a confirmação
+       existe porque não há desfazer. Guarda o membro inteiro, e não o
+       id, porque a pergunta do diálogo é pelo NOME de quem sai. */
+    const [removing, setRemoving] = useState<ApiTypes.WorkspaceMember | null>(null);
 
     /* O nome vem da sessão, e a sessão é relida depois de gravar. Sem
        isto, trocar de espaço com a tela aberta deixaria o campo com o
@@ -273,33 +277,52 @@ export function Workspace() {
                                             </div>
                                         </div>
 
-                                        {/* O seletor só para o dono, e nunca na
-                                            própria linha: a rota responde 403 para
-                                            quem não é dono e 406 na própria
-                                            matrícula — um controle que sempre
-                                            falharia não é um controle.
+                                        {/* As ações só para o dono, e nunca na
+                                            própria linha: as duas rotas respondem
+                                            403 para quem não é dono e 406 na
+                                            própria matrícula — um controle que
+                                            sempre falharia não é um controle.
 
-                                            O terceiro teste é o que diz ao
-                                            compilador que sobraram dois papéis, e
-                                            ele é verdadeiro por construção: há um
-                                            dono só, e ele é quem está olhando. */}
-                                        {isOwner && !member.IsSelf && member.Role !== "owner" && (
+                                            Não há terceiro caso a filtrar: o dono
+                                            é um só, e é ele quem está olhando —
+                                            então `IsSelf` já exclui a linha de
+                                            papel `owner`. */}
+                                        {isOwner && !member.IsSelf && (
                                             <span className={styles.memberActions}>
-                                                <SegmentedControl
-                                                    value={member.Role}
-                                                    ariaLabel={`O que ${member.Name} pode fazer`}
-                                                    onChange={(Role) =>
-                                                        void WorkspaceController.updateMemberRole(
-                                                            context,
-                                                            member,
-                                                            Role,
-                                                        )
-                                                    }
-                                                    options={ROLE_OPTIONS.map((option) => ({
-                                                        ...option,
-                                                        disabled: pending === "members",
-                                                    }))}
-                                                />
+                                                {/* O teste do papel é o que diz ao
+                                                    compilador que sobraram os dois
+                                                    do seletor. Remover, ao
+                                                    contrário, não depende do papel:
+                                                    tira-se editor e viewer do mesmo
+                                                    jeito. */}
+                                                {member.Role !== "owner" && (
+                                                    <SegmentedControl
+                                                        value={member.Role}
+                                                        ariaLabel={`O que ${member.Name} pode fazer`}
+                                                        onChange={(Role) =>
+                                                            void WorkspaceController.updateMemberRole(
+                                                                context,
+                                                                member,
+                                                                Role,
+                                                            )
+                                                        }
+                                                        options={ROLE_OPTIONS.map((option) => ({
+                                                            ...option,
+                                                            disabled: pending === "members",
+                                                        }))}
+                                                    />
+                                                )}
+                                                {/* Atrás de confirmação, no padrão
+                                                    do arquivamento de Contas: a
+                                                    matrícula é apagada de verdade e
+                                                    não há desfazer. */}
+                                                <Button
+                                                    size="sm"
+                                                    disabled={pending === "members"}
+                                                    onClick={() => setRemoving(member)}
+                                                >
+                                                    Remover
+                                                </Button>
                                             </span>
                                         )}
                                     </div>
@@ -475,7 +498,8 @@ export function Workspace() {
 
                             <div className={styles.note}>
                                 Revogar um convite só impede quem <b>ainda não usou</b> o link. Quem
-                                já entrou aparece em <b>Quem tem acesso</b>, acima.
+                                já entrou aparece em <b>Quem tem acesso</b>, acima, e é lá que se
+                                remove.
                             </div>
                         </div>
                     </Card>
@@ -493,10 +517,33 @@ export function Workspace() {
                     }
                 }}
                 title={`Revogar o convite de ${revoking?.Email ?? ""}?`}
-                description="O link para de funcionar na hora. Se essa pessoa já tiver entrado, revogar não a tira do espaço — ela não apareceria nesta lista."
+                description="O link para de funcionar na hora. Se essa pessoa já tiver entrado, revogar não a tira do espaço — ela não apareceria nesta lista, e quem tira é o botão de remover em Quem tem acesso."
                 confirmLabel="Revogar"
                 danger
                 pending={pending === "invite"}
+            />
+
+            {/* A confirmação de remover, no mesmo padrão do arquivamento
+                de Contas — mas o texto diz o oposto: aqui a linha é
+                apagada de verdade, e o que NÃO acontece é o que precisa
+                estar escrito. Gasto, entrada e conta são do espaço, e
+                quem gastou é a lista de pessoas, que não tem relação com
+                quem tem login: nenhum saldo muda. */}
+            <ConfirmDialog
+                open={removing !== null}
+                onClose={() => setRemoving(null)}
+                onConfirm={() => {
+                    const target = removing;
+                    setRemoving(null);
+                    if (target) {
+                        void WorkspaceController.removeMember(context, target);
+                    }
+                }}
+                title={`Remover ${removing?.Name ?? ""} do espaço?`}
+                description="A pessoa perde o acesso na hora e não há como desfazer — readmitir é convidar de novo, e a data de entrada recomeça. Nada do que ela lançou é apagado: os gastos, as entradas e as contas são do espaço, o rateio das pessoas fica igual e nenhum saldo muda."
+                confirmLabel="Remover"
+                danger
+                pending={pending === "members"}
             />
         </Page>
     );
