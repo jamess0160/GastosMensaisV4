@@ -40,11 +40,12 @@ Etapa por etapa, com commit e data: [Old/API/Levas executadas.md](Old/API/Levas%
 que fecha a última pendência que o front tinha contra a API.
 
 **16 suítes de integração**, sem um único teste unitário e sem nada mockado. A última contagem
-registrada é **654 testes**, no fim da leva 3.
+registrada é **725 testes**, no fim da leva 7.
 
 ### Front — cinco levas, todas fechadas
 
-**16 telas**, todas respondendo em 390px, todas ligadas na API de verdade.
+**16 telas**, todas respondendo em 390px, todas ligadas na API de verdade — mais as três que a
+leva 7 acrescentou, que não consomem rota nenhuma: `/termos`, `/privacidade` e a de 404.
 
 | Leva | O que entregou | Estado |
 | --- | --- | --- |
@@ -71,6 +72,29 @@ conciliar extrato virou **"Extrato"** (a rota não concilia nada, e o nome tinha
 isso), o de exportar passou a baixar o `.xlsx` do servidor, e "Esqueci minha senha" virou
 navegação de verdade. Nasceram quatro telas: `contas/extrato`, `/esqueci-senha`,
 `/recuperar-senha` e `/confirmar-email`.
+
+### Leva 7 — a primeira de produção, fechada em 10/09
+
+**12 de 12 etapas**, num commit por etapa:
+[Levas/7. O que a lei cobra e o que só quebra em produção](Levas/7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md).
+Ela fechou os dois blocos que abriam a fila abaixo — **compliance** e **o código de produção** —
+e nada nela é feature.
+
+Do lado da lei: `/termos` e `/privacidade` existem, com a data de versão no topo e o rodapé das
+telas públicas linkando para as duas; o aceite deixou de morrer no navegador (`AcceptedTerms`
+obrigatório em `POST /Users`, com `TermsAcceptedAt`/`TermsVersion` carimbados **pelo servidor**,
+sem *backfill* de quem já existia); e `DELETE /Users` passou a existir, pedindo a senha, com a
+guarda que recusa quem é dono de espaço compartilhado até transferir a propriedade.
+
+Do lado do deploy saiu código, e é o mais importante: o **socket.io e o `/Cache` inteiro**
+foram apagados (−838 linhas, duas dependências e uma porta a menos escutando), junto com o
+`Utils/constants.json` herdado do outro projeto. Entraram `trust proxy`, `helmet`, corpo
+limitado a 100kb e a saída do `cors()`; rate limiting por IP nas quatro rotas públicas de
+`Users`; `NODE_ENV` como a **única** variável de ambiente, lida num lugar só
+(`Utils/environment.ts`), com o log de produção indo para o stdout em vez do disco; o
+desligamento limpo em `SIGTERM`/`SIGINT`, que espera a requisição em voo e o tick de rotina
+antes de fechar; o `knexfile` com a chave `production` e o `build/knexfile.js` saindo do
+`build`; e a tela de 404 dentro do chassi.
 
 ---
 
@@ -101,59 +125,7 @@ recálculo de perna já gravada e reescrita do `InvoiceDates` — por isso é le
 lá, a tela do cartão mostra as duas datas do ciclo do mês corrente e avisa quando o fechamento
 derivado anda de mês para mês, em vez de aceitar a folga em silêncio — o que a leva 6 entregou.
 
-### 2. Compliance: o cadastro promete o que não entrega
-
-A tela de criar conta exige o aceite de **dois documentos que não existem**, e o rodapé das
-telas públicas tem "Termos" e "Privacidade" como texto solto, sem link. O aceite morre no
-navegador: `POST /Users` não recebe campo nenhum sobre isso e não há coluna onde gravar, então
-**não existe registro de que alguém aceitou alguma coisa** — e um `curl` cria conta sem aceitar
-nada, porque o Joi não exige o que não existe.
-
-Falta a outra metade também: **não há como apagar a conta**. `DELETE /Users` não existe, e a
-foreign key `Workspaces.IdOwnerUser` é `CASCADE` — um delete sem guarda levaria junto o espaço
-compartilhado de outra pessoa.
-
-**Os dois documentos nascem de MVP, e é uma decisão, não um atalho.** Este lançamento é para
-conhecidos testarem, de graça: o controlador é pessoa física, não há cobrança, não há
-processador de pagamento e não há assinatura para cancelar. **Quando entrar a cobrança, os dois
-textos são revisados** — ver a linha de `Plans`/`Subscriptions` abaixo.
-
-### 3. Produção: o código
-
-Nada aqui é código de feature. É o que hoje funciona na máquina de desenvolvimento e muda de
-comportamento — ou de superfície de ataque — no momento em que a mesma linha roda atrás de um
-proxy, num container, com gente de fora batendo na porta:
-
-- **Rate limiting, que não existe em lugar nenhum do projeto.** A primeira rota que dói é a
-  pública que manda e-mail (`forgotPassword`). Hoje há **dois freios parciais e nenhum deles é
-  rate limiting**: o `MailCooldown` da API, que é um `Map` em memória e só protege o
-  `resendConfirmation`, e o `useCooldown` do cliente, que mora no navegador e qualquer um
-  contorna com `curl`. O `forgotPassword` continua sem freio nenhum do lado do servidor;
-- **o socket.io e o `/Cache`, herdados de outro projeto e nunca usados pelo cliente.** A API
-  sobe uma segunda porta com `origin: "*"`, e as três rotas de `/Cache` deixam qualquer conta
-  logada escrever sem limite na memória do processo e ler o que os outros escreveram — não são
-  escopadas por workspace. Não há `socket.io-client` no front, nem um import de socket em
-  `Frontend/src/`;
-- **`trust proxy` não setado** — atrás do nginx, `req.ip` é o nginx para o mundo inteiro, que é
-  a definição de um rate limiting que conta todo mundo como uma pessoa só;
-- **`cors()` montado e aberto**, `express.json()` sem `limit`, e nenhum cabeçalho de segurança;
-- **uma segunda variável de ambiente, não documentada, decidindo o ambiente.** O `AsyncHandler`
-  lê `process.env.PROD`, que não está em `exemple.env` nem no `CLAUDE.md`: sem alguém adivinhar
-  que ela existe, todo stack de erro vai para o stdout do container;
-- **`Utils/constants.json` lido do disco a cada requisição** pelo `AsyncHandler`, para decidir
-  dois booleanos de log. O arquivo é de outro projeto: fala de OEE, ordens de produção e MSSQL;
-- **log só em arquivo**, em `process.cwd()/Logs` — dentro de um container isso some no próximo
-  `up`, que é justamente quando alguém vai querer ler;
-- **nenhum tratamento de `SIGTERM`.** O `docker stop` corta requisição em voo e pode interromper
-  um tick de rotina depois de ele ter reivindicado o `RotineRuns` e antes de carimbar o
-  `FinishedAt` — o mês fica sem fechar, e o catch-up não cobre esta;
-- **o `knexfile` só declara a chave `development` e não há script de migration.** Com
-  `NODE_ENV=production` o CLI do Knex procura `production`, não acha, e o primeiro deploy morre
-  antes da primeira requisição;
-- **`path: "*"` do chassi desenha `element: null`** — qualquer URL errada mostra a tela em
-  branco, com a sidebar em volta.
-
-### 4. Produção: o ambiente
+### 2. Produção: o ambiente
 
 O que não está versionado em `API/` nem em `Frontend/`, e que só se prova subindo:
 
@@ -197,6 +169,8 @@ cliente enquanto não voltar como etapa de leva.**
 | **`Plans` / `Subscriptions`** | Cobrança não faz parte do fluxo de um mês | Tabelas existem, rotas não. **Quando isto voltar, os termos de uso e a política de privacidade têm que ser revisados antes**: muda o controlador (o CNPJ assina no lugar da pessoa física), entram pagamento, reembolso e cancelamento, e o processador de pagamento vira mais um operador na política |
 | **Fatura de cartão como entidade** | As datas da fatura já vivem na perna (`ClosingDate`/`DueDate`), e o extrato mostra a fatura sem precisar de tabela. Só se pagaria com conciliação, que também saiu | — |
 | **"Continuar com Google"** | Não há OAuth na API | Desenhado no layout; o botão fica desabilitado |
+| **Re-aceite dos termos quando o documento mudar** | O que fazer com quem está numa versão antiga — avisar, pedir de novo, bloquear — é decisão de produto e precisa de tela | A leva 7 gravou `TermsVersion` no cadastro, que é o que torna a pergunta respondível depois **sem migration** |
+| **Exportação de dados para portabilidade** | A exportação `.xlsx` da leva 3 já entrega o conteúdo financeiro, e é o que a política de privacidade cita | Um formato formal, com os dados cadastrais junto, só se paga quando alguém pedir |
 
 Onde um botão faz parte da composição visual, ele fica **desabilitado e rotulado**, nunca
 escondido: some do produto sem sumir do layout. Depois da leva 5 sobrou **um só**: o "Continuar
@@ -234,12 +208,12 @@ fila — e fechou em 09/09 com 18 de 18 etapas.
 até a Fase #5, e os dois históricos agora são um: recomeçar em 1 faria
 `Fase #1 | Etapa 2` existir duas vezes no mesmo `git log` querendo dizer coisas diferentes.
 
-**A próxima é a 7, e ela é a primeira de duas de preparação para produção.** O corte entre elas
-é o que se prova de que jeito: a **7** — compliance e o código que muda de comportamento em
-produção — se verifica com `npm test` e `npm run typecheck`, e é o que está versionado em `API/`
-e `Frontend/`; a **8** — ambiente, e-mail do domínio, arquivos externos, infra e backup — é o
-que está em volta dos dois, e só subindo se sabe. Juntá-las faria uma leva em que metade das
-etapas não tem critério de aceite até o dia do deploy.
+**A 7 fechou em 10/09, com 12 de 12 etapas, e a próxima é a 8.** As duas são a preparação para
+produção, e o corte entre elas é o que se prova de que jeito: a **7** — compliance e o código
+que muda de comportamento em produção — se verificou com `npm test` e `npm run typecheck`, e é
+o que está versionado em `API/` e `Frontend/`; a **8** — ambiente, e-mail do domínio, arquivos
+externos, infra e backup — é o que está em volta dos dois, e só subindo se sabe. Juntá-las faria
+uma leva em que metade das etapas não tem critério de aceite até o dia do deploy.
 
 Cada leva ganha um arquivo em [Levas/](Levas/), no formato descrito lá. O que muda em relação
 ao que existia antes:

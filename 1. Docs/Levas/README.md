@@ -1,12 +1,12 @@
 # Levas
 
-Um arquivo por leva, `<N>. <Nome da leva>.md`. **A próxima é a 7** — o porquê da numeração
+Um arquivo por leva, `<N>. <Nome da leva>.md`. **A próxima é a 8** — o porquê da numeração
 começar em 6 está em [../RoadMap MVP.md](../RoadMap%20MVP.md#as-levas-daqui-pra-frente).
 
 | Leva | Estado |
 | --- | --- |
 | [6. O cartão, o uso real e a gestão de membros](6.%20O%20cartão,%20o%20uso%20real%20e%20a%20gestão%20de%20membros.md) | escrita em 09/09/2026, **fechada** em 09/09/2026 — 18 de 18 etapas |
-| [7. O que a lei cobra e o que só quebra em produção](7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md) | escrita em 10/09/2026, **nenhuma etapa executada** |
+| [7. O que a lei cobra e o que só quebra em produção](7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md) | escrita em 10/09/2026, **fechada** em 10/09/2026 — 12 de 12 etapas |
 
 A 6 foi a primeira que nasceu com os dois repositórios já juntos. A **7 é a primeira das duas de
 preparação para produção**, e o corte entre elas é o que se prova de que jeito: na 7 muda o que
