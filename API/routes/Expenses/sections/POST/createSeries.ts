@@ -19,9 +19,9 @@ export class CreateSeries {
     //  Quantas ocorrências nascem de uma vez, contando a raiz.
     //
     //  Constante do servidor, e não campo do corpo: é regra de domínio, não escolha de quem
-    //  lança — quem cria um gasto fixo quer "todo mês", não "doze". E não vai para o
-    //  constants.json pelo mesmo motivo: não é flag de runtime, é regra, e regra mora ao lado
-    //  do código que a aplica.
+    //  lança — quem cria um gasto fixo quer "todo mês", não "doze". E não vai para o `.env`
+    //  pelo mesmo motivo: não é configuração de servidor, é regra, e regra mora ao lado do
+    //  código que a aplica.
     //
     //  O que limita a série é ESTA janela **ou** o RecurrenceEndDate, o que vier primeiro.
     private static readonly OCCURRENCE_WINDOW = 12

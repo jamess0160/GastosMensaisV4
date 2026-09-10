@@ -24,8 +24,8 @@ import type { Knex } from "knex";
 //
 // Nao existe tabela "Rotines". O catalogo das rotinas e codigo: um catalogo
 // em banco permitiria desligar no banco uma rotina que o codigo ainda acha
-// que existe, e e assim que os dois divergem. Ligar e desligar sai do
-// constants.json, que ja e o mecanismo do projeto para flag de runtime.
+// que existe, e e assim que os dois divergem. Ligar e desligar e editar a
+// lista em rotines/index.ts, que o compilador confere e o deploy carrega.
 //
 // Sem Active: o ciclo de vida vem do Status, como manda a convencao.
 export async function up(knex: Knex): Promise<void> {

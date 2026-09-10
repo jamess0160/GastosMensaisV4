@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express"
 import { Utils } from "./Utils"
 import { APIError, Logs } from "./Logs"
+import { logFlags } from "./logFlags"
 import { Users_controller } from "root/routes/Users/Users.controller"
 
 type ExpressPromise = (req: Request, res: Response, next: NextFunction) => unknown
@@ -9,7 +10,6 @@ type ExpressPromise = (req: Request, res: Response, next: NextFunction) => unkno
 export function AsyncHandler(routeFunction: ExpressPromise, requireToken = true) {
 
     return async function (req: Request, res: Response, next: NextFunction) {
-        let constants = await Utils.getConstants()
 
         try {
 
@@ -29,7 +29,7 @@ export function AsyncHandler(routeFunction: ExpressPromise, requireToken = true)
                 console.log(error)
             }
 
-            if (constants.logs.routeErros && (error instanceof APIError && error.status !== 401)) {
+            if (logFlags.routeErrors && (error instanceof APIError && error.status !== 401)) {
                 Logs.handleError(`Ocorreu um erro na rota ${req.originalUrl}`, error, {
                     rota: req.originalUrl,
                     methodo: req.method,

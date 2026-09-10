@@ -1,6 +1,6 @@
 import { Database } from "root/Utils/database"
 import { Logs } from "root/Utils/Logs"
-import { Utils } from "root/Utils/Utils"
+import { logFlags } from "root/Utils/logFlags"
 import { RotineRuns_model } from "../RotineRuns.model"
 import { currentOccurrenceClock, lastDueOccurrence } from "./lastDueOccurrence"
 import { RotinesNamespace } from "./types"
@@ -169,11 +169,9 @@ export class RotineEngine {
     }
 
     //  O log por rotina já existia antes do motor (Logs/rotines/<nome>/, herdado da V3) e a
-    //  flag que o liga também: constants.logs.rotine.
+    //  flag que o liga também: logFlags.rotine.
     private async log(name: string, log: Parameters<typeof Logs.insertRotineLog>[0]) {
-        let constants = await Utils.getConstants()
-
-        if (!constants.logs.rotine) {
+        if (!logFlags.rotine) {
             return
         }
 

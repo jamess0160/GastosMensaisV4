@@ -1,6 +1,4 @@
 import { config } from 'dotenv'
-import path from "path";
-import fs from 'fs/promises'
 import moment from "moment";
 
 //  Funções de utilidades do projeto
@@ -140,21 +138,6 @@ export namespace Utils {
         }
     }
 
-    export async function getConstants(): Promise<Constants> {
-
-        let envPath = process.env.CONSTANTS_PATH
-
-        let constantsPath = envPath ? path.resolve(process.cwd(), ...envPath.split("\\")) : path.resolve(process.cwd(), "Utils", "constants.json")
-
-        //  Lendo com encoding o retorno já é string: sem ele o readFile devolve Buffer e o
-        //  ramo que tentava dar JSON.parse direto no valor era código morto.
-        let jsonConstants = await fs.readFile(constantsPath, "utf8")
-
-        if (!jsonConstants) throw new Error(`JSON de constantes não foi encontrado no diretório ${constantsPath}`)
-
-        return JSON.parse(jsonConstants)
-    }
-
     /**
      * Dinheiro em centavos, para comparar sem o erro do ponto flutuante.
      *
@@ -273,20 +256,6 @@ export namespace Utils {
 
 
     //#endregion
-}
-
-export interface Constants {
-    MssqlMaxParameters: number
-    GroupTypes: {
-        "Root": number
-        "White Collar": number
-        "Manager": number
-        "Blue Collar": number
-    }
-    logs: {
-        routeErros: boolean
-        rotine: boolean
-    }
 }
 
 type TreeNode<T> = T & { TreeItems?: TreeNode<T>[] }
