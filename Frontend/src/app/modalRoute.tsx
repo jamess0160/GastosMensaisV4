@@ -1,6 +1,12 @@
 import { Route, Routes, matchPath, useLocation, useNavigate } from "react-router-dom";
-import styles from "./AppShell.module.css";
 import { MODAL_SCREENS, SHELL_SCREENS } from "./screens";
+/* A única tela do chassi que NÃO é `lazy`. As outras são pesadas e
+   chegam sob demanda; esta é um card e um botão, e o momento em que ela
+   é necessária é justamente o pior para depender de um chunk novo — uma
+   URL desconhecida logo depois de um deploy é onde o pedido do chunk
+   antigo também responderia 404, trocando a tela de "não existe" por um
+   erro de carregamento. */
+import { NotFound } from "@/pages/NotFound/NotFound";
 
 /* ════════════════════════════════════════════════════════════
    Rotas modais — o padrão de "abrir por cima da tela atual".
@@ -71,9 +77,13 @@ export function ScreenRoutes({ at }: { at: Background }) {
                     <Route key={screen.path} path={screen.path} element={screen.element} />
                 ),
             )}
-            {/* Sem isto, uma URL inventada dentro do chassi ficaria com a
-                área de trabalho em branco e sem dizer por quê. */}
-            <Route path="*" element={<div className={styles.center}>Tela não encontrada.</div>} />
+            {/* O 404, e é AQUI que ele mora — não no `path: "*"` de
+                `routes.tsx`, que casa com toda tela do chassi (só as
+                modais são rotas de verdade lá) e portanto desenharia o
+                404 por cima de Gastos, do Relatório e de todas as
+                outras. Este `*` é o único que só sobra quando nenhuma
+                tela casou. */}
+            <Route path="*" element={<NotFound />} />
         </Routes>
     );
 }

@@ -66,7 +66,19 @@ export const router = createBrowserRouter([
            modal precisa mostrar a tela de onde foi aberta e não a que a
            URL diz — ver `modalRoute.tsx`. O `*` é o que faz qualquer
            URL de tela casar com o chassi; o que ela desenha é decidido
-           lá dentro. */
+           lá dentro.
+
+           `element: null` é o certo, e não um esquecimento: este `*`
+           casa com `/gastos` e com toda outra tela do chassi, então o
+           que for posto aqui aparece SEMPRE, por cima da tela. O
+           `<Outlet />` do chassi desenha painel modal e mais nada — e o
+           404 de URL desconhecida mora no `*` de `ScreenRoutes`, o
+           único que só sobra quando nenhuma tela casou.
+
+           Fora do chassi não há 404 a escrever: `/termos` digitado
+           errado não casa com nenhuma rota pública, cai neste `path: "/"`
+           e vira o chassi — com sessão, o 404 de dentro; sem sessão, o
+           guard manda para o login. */
         children: [...MODAL_SCREENS, { path: "*", element: null }],
     },
 ]);

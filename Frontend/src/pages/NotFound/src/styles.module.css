@@ -1,0 +1,25 @@
+/* O 404 do chassi. Quase nada de folha própria: o corpo é o
+   `EmptyState` de `src/ui/states.tsx`, que já é a gramática de "não há
+   nada para mostrar aqui" no resto do app. */
+
+/* Centraliza no que sobra da área de conteúdo. A medida é `vh` e não
+   `100%` de propósito: a faixa de "confirme seu e-mail" também mora no
+   `.main`, e uma altura cheia somaria à dela e criaria barra de
+   rolagem numa tela sem conteúdo para rolar. */
+.page {
+    justify-content: center;
+    min-height: 70vh;
+}
+
+/* O endereço que falhou, em monoespaçada — é um nome exato, não texto
+   corrido. `anywhere` porque uma URL longa não tem espaço onde quebrar
+   e estouraria a largura do card. */
+.path {
+    font-family: var(--mono);
+    font-size: 0.95em;
+    padding: 1px 5px;
+    border-radius: var(--r-xs);
+    background: var(--fill-soft);
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
