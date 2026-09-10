@@ -1,4 +1,5 @@
 import { createInvite } from "./sections/createInvite";
+import { leaveWorkspace } from "./sections/leaveWorkspace";
 import { removeMember } from "./sections/removeMember";
 import { revokeInvite } from "./sections/revokeInvite";
 import { saveWorkspace } from "./sections/saveWorkspace";
@@ -35,7 +36,12 @@ export interface WorkspaceContext {
      *  membro só mexe nesta. */
     refreshMembers(): void;
     /** O nome do espaço aparece na sidebar, em toda tela: depois de
-     *  renomear, a lista de workspaces da sessão está velha. */
+     *  renomear, a lista de workspaces da sessão está velha.
+     *
+     *  E depois de SAIR ela está velha de outra forma: o espaço de onde
+     *  se saiu continuaria na lista, e é dela que o chassi tira o espaço
+     *  atual. Quando não sobra nenhum, é esta releitura que faz a tela
+     *  chegar na criação de espaço. */
     refreshWorkspaces(): void;
     clearInviteDraft(): void;
 }
@@ -46,6 +52,7 @@ class Controller {
     readonly revokeInvite = revokeInvite;
     readonly updateMemberRole = updateMemberRole;
     readonly removeMember = removeMember;
+    readonly leaveWorkspace = leaveWorkspace;
 }
 
 export const WorkspaceController = new Controller();

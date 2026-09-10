@@ -21,6 +21,16 @@ interface Session {
      *  Quem o aponta é o `Current` que a API devolve. `null` enquanto a
      *  lista não chegou, e no caso impossível de nenhum vir marcado. */
     workspace: ApiTypes.Workspace | null;
+    /** A lista de espaços ainda não chegou.
+     *
+     *  Existe porque `workspace` é `null` em DOIS casos que pedem telas
+     *  opostas: enquanto a lista carrega, e quando não há espaço nenhum.
+     *  O segundo deixou de ser impossível quando sair do espaço passou a
+     *  existir — quem sai do último fica exatamente assim, com a sessão
+     *  válida e sem espaço a que voltar. Sem este campo, a tela do
+     *  espaço teria que escolher entre piscar o formulário de criação em
+     *  todo carregamento ou deixar quem saiu num "Carregando…" eterno. */
+    workspacesPending: boolean;
     /** Este usuário é `owner` do espaço ATUAL?
      *
      *  As três rotas de gestão (`PUT /Workspaces`, `POST
@@ -86,9 +96,10 @@ export function SessionProvider({ user, children }: { user: ApiTypes.User; child
             user,
             workspaces: list,
             workspace,
+            workspacesPending: workspaces.isPending,
             isOwner: workspace?.IdOwnerUser === user.IdUser,
         };
-    }, [user, workspaces.data]);
+    }, [user, workspaces.data, workspaces.isPending]);
 
     return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

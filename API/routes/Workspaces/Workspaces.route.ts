@@ -44,6 +44,23 @@ Workspaces_route.put("/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember",
 //  transferir a propriedade.
 Workspaces_route.delete("/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember", Workspaces_schema.removeMember, AsyncHandler(Workspaces_controller.removeMember))
 
+//  Sair do espaço da sessão — a própria matrícula, sem id no caminho: o id viria do cliente e a
+//  rota teria que conferir que é o do próprio usuário, quando a sessão já sabe disso.
+//
+//  A guarda é a OPOSTA da de cima: assertMember, e depois exige NÃO ser dono. Enquanto ele for
+//  dono, sair deixaria o espaço sem quem convida e sem quem remove — e o 406 diz o conserto,
+//  transferir a propriedade, em vez do 403 genérico do assertRole.
+//
+//  NÃO reemite o token, como o join e o create: switch é a única rota que aceita um IdWorkspace
+//  escrito pelo cliente, e uma saída não abre exceção nisso. Depois de sair, o cliente chama
+//  getSelf e dá switch no primeiro espaço que sobrou; se não sobrar nenhum, o getSelf volta
+//  vazio e o caminho é criar um espaço — POST /Workspaces é a única rota da feature que não
+//  confere matrícula, porque o workspace nasce nela.
+//
+//  'self' é segmento literal e o padrão de cima exige o prefixo literal 'IdWorkspaceMember=':
+//  as duas rotas não se cruzam, em qualquer ordem de registro.
+Workspaces_route.delete("/Workspaces/members/self", Workspaces_schema.leave, AsyncHandler(Workspaces_controller.leave))
+
 //  O convite — a porta pela qual se entra num workspace alheio, agora que o cadastro não aceita
 //  mais um IdWorkspace do corpo. Só o dono convida, lista e revoga (assertRole owner): um
 //  editor que pudesse convidar promoveria terceiros ao próprio nível sem o dono saber.

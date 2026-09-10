@@ -7,6 +7,7 @@ import { GetMembers } from "./sections/GET/getMembers"
 import { CreateInvite } from "./sections/POST/createInvite"
 import { Join } from "./sections/POST/join"
 import { Switch } from "./sections/POST/switch"
+import { Leave } from "./sections/DELETE/leave"
 import { RemoveMember } from "./sections/DELETE/removeMember"
 import { RevokeInvite } from "./sections/DELETE/revokeInvite"
 import { Update } from "./sections/PUT/update"
@@ -55,6 +56,13 @@ class Controller {
     //  "não se remove a si mesmo" compara. Sem corpo — não há nada a receber.
     removeMember = async (req: Request, res: Response) => {
         res.json(await new RemoveMember().run(res.locals.IdWorkspace, Number(req.params.IdWorkspaceMember), res.locals.IdUser))
+    }
+
+    //  Sem id nenhum do cliente: a matrícula apagada é a da própria sessão, e o par
+    //  (workspace do token, usuário do token) é o que a identifica. Sem corpo, como o
+    //  removeMember — sair não tem opção.
+    leave = async (req: Request, res: Response) => {
+        res.json(await new Leave().run(res.locals.IdWorkspace, res.locals.IdUser))
     }
 
     //  Sem res.locals: é rota pública, o que identifica o convite é o hash.

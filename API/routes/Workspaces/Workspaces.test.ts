@@ -629,6 +629,168 @@ describe("Workspaces", () => {
         })
     })
 
+    describe("DELETE /Workspaces/members/self", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().delete("/Workspaces/members/self")
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).delete("/Workspaces/members/self")
+
+            expect(response.status).toBe(406)
+            expect(response.body.msg).toBe("Nenhum workspace selecionado.")
+        })
+
+        //  Sem id no caminho: a matrícula apagada é a que o assertMember devolveu, e é por isso
+        //  que a rota não tem nada a conferir contra nada.
+        it("um editor sai, e a matrícula deixa de existir", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let response = await new TestClient(UsersFactory.buildToken(member.user.IdUser, owner.workspace.IdWorkspace))
+                .delete("/Workspaces/members/self")
+
+            expect(response.status).toBe(200)
+            expect(await countMemberships(owner.workspace.IdWorkspace, member.user.IdUser)).toBe(0)
+
+            //  E o espaço sai da lista dele: é a matrícula que o getSelf lê.
+            let visible = await new TestClient(member.token).get("/Workspaces/getSelf")
+
+            expect(visible.body.map((item: { IdWorkspace: number }) => item.IdWorkspace)).toEqual([member.workspace.IdWorkspace])
+
+            //  Quem ficou continua lá: sair é a própria matrícula, e só ela.
+            expect((await owner.client.get("/Workspaces/members")).body.map((item: { Email: string }) => item.Email)).toEqual([owner.user.Email])
+        })
+
+        //  A rota NÃO reemite o token, de propósito: switch é a única que aceita um IdWorkspace
+        //  escrito pelo cliente. Então o token continua apontando para o espaço de onde a
+        //  pessoa saiu — e a partir da chamada seguinte ele não vale mais nada ali, porque quem
+        //  responde é o assertMember e a matrícula não existe mais.
+        it("não reemite o token, e o mesmo token perde o acesso na chamada seguinte", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let memberClient = new TestClient(UsersFactory.buildToken(member.user.IdUser, owner.workspace.IdWorkspace))
+
+            expect((await memberClient.get("/Workspaces/members")).status).toBe(200)
+
+            let response = await memberClient.delete("/Workspaces/members/self")
+
+            expect(response.status).toBe(200)
+            expect(response.headers["set-cookie"]).toBeUndefined()
+
+            let after = await memberClient.get("/Workspaces/members")
+
+            expect(after.status).toBe(406)
+            expect(after.body.msg).toBe("Workspace não encontrado!")
+        })
+
+        //  A guarda é a OPOSTA da do removeMember: lá o assertRole exige ser dono, aqui exige
+        //  NÃO ser. E é 406 com mensagem própria em vez do 403 genérico justamente porque o
+        //  erro tem de dizer o próximo passo.
+        it("recusa o dono, e a msg manda transferir a propriedade", async () => {
+            let owner = await UsersFactory.createClient()
+
+            let response = await owner.client.delete("/Workspaces/members/self")
+
+            expect(response.status).toBe(406)
+            expect(response.body.msg).toContain("Transfira a propriedade")
+            expect(await countMemberships(owner.workspace.IdWorkspace, owner.user.IdUser)).toBe(1)
+        })
+
+        //  Quem se cadastrou por convite não tem workspace próprio: o único dele é o
+        //  compartilhado. Sair dele deixa a sessão sem espaço nenhum a que voltar — a sessão
+        //  continua válida (ninguém foi deslogado), o getSelf volta vazio, e toda rota escopada
+        //  responde 406 porque o token continua apontando para o espaço de onde ele saiu.
+        //
+        //  O conserto é criar um espaço: POST /Workspaces é a única rota da feature que não
+        //  confere matrícula nenhuma, justamente porque o workspace nasce nela.
+        it("sair do último espaço deixa a sessão sem espaço a que voltar", async () => {
+            let owner = await UsersFactory.createClient()
+
+            let guest = {
+                Name: "Convidado que sai",
+                Email: UsersFactory.buildEmail(),
+                Password: "Senha@123",
+                Phone: 549987654321,
+            }
+
+            let invite = await owner.client.post("/Workspaces/invite", { Email: guest.Email, Role: "editor" })
+
+            expect((await new TestClient().post("/Users", { ...guest, InviteHash: invite.body.Hash })).status).toBe(200)
+
+            let guestClient = new TestClient()
+
+            expect((await guestClient.login(guest.Email, guest.Password)).status).toBe(200)
+            expect((await guestClient.get("/Workspaces/getSelf")).body).toHaveLength(1)
+
+            expect((await guestClient.delete("/Workspaces/members/self")).status).toBe(200)
+
+            //  A sessão continua válida — quem saiu não foi deslogado. O 401 seria outra
+            //  história, e não é esta.
+            let orphan = await guestClient.get("/Accounts")
+
+            expect(orphan.status).toBe(406)
+            expect(orphan.body.msg).toBe("Workspace não encontrado!")
+
+            //  E não há mais espaço nenhum para o switch escolher: é este vazio que o cliente
+            //  lê para saber que o caminho agora é criar um espaço.
+            expect((await guestClient.get("/Workspaces/getSelf")).body).toEqual([])
+
+            //  E criar continua possível com o token apontando para o espaço morto: POST
+            //  /Workspaces não confere matrícula, porque o workspace nasce nele.
+            let created = await guestClient.post("/Workspaces", { Name: "Meu próprio espaço" })
+
+            expect(created.status).toBe(200)
+            expect((await guestClient.post("/Workspaces/switch", { IdWorkspace: created.body.IdWorkspace })).status).toBe(200)
+        })
+
+        //  O que a etapa NÃO faz: gasto, entrada e conta são do WORKSPACE, não da matrícula, e
+        //  quem responde "quem gastou" é ExpensePersons, que aponta para Persons. Sair não pode
+        //  mexer em um centavo de saldo — o mesmo invariante do removeMember, pela porta oposta.
+        it("não toca no que quem saiu lançou, e o saldo não muda um centavo", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let memberClient = new TestClient(UsersFactory.buildToken(member.user.IdUser, owner.workspace.IdWorkspace))
+
+            let account = await owner.client.post("/Accounts", { Name: "Conta da casa", InitialBalance: 1000 })
+            let accounts = await owner.client.get("/Accounts")
+            let methods = accounts.body.find((item: { IdAccount: number }) => item.IdAccount === account.body.IdAccount).PaymentMethods
+            let debit = methods.find((item: { Kind: string }) => item.Kind === "debit").IdPaymentMethod
+            let category = await owner.client.post("/Categories", { Description: "Mercado" })
+            let person = await owner.client.post("/Persons", { Name: "Quem gastou aqui" })
+
+            let expense = await memberClient.post("/Expenses", {
+                Description: "Gasto de quem saiu",
+                TotalValue: 250,
+                IdCategory: category.body.IdCategory,
+                ExpenseDate: "2026-08-10",
+                Payments: [{ IdPaymentMethod: debit, Value: 250, Paid: true }],
+                Persons: [{ IdPerson: person.body.IdPerson, Value: 250 }],
+            })
+
+            expect(expense.status).toBe(200)
+
+            let before = await balanceOf(owner.client, account.body.IdAccount)
+
+            expect((await memberClient.delete("/Workspaces/members/self")).status).toBe(200)
+
+            expect(await balanceOf(owner.client, account.body.IdAccount)).toBe(before)
+
+            let survivor = await owner.client.get(`/Expenses/IdExpense=${expense.body.IdExpense}`)
+
+            expect(survivor.status).toBe(200)
+            expect(survivor.body.Persons.map((item: { IdPerson: number, Value: number }) => [item.IdPerson, item.Value])).toEqual([[person.body.IdPerson, 250]])
+        })
+    })
+
     describe("POST /Workspaces/invite", () => {
 
         it("recusa sem token", async () => {

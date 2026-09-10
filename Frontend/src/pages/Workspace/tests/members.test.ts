@@ -1,9 +1,11 @@
 import { HttpResponse, http as msw } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { server } from "@/test/server";
+import { leaveWorkspace } from "../sections/leaveWorkspace";
 import { removeMember } from "../sections/removeMember";
 import { updateMemberRole } from "../sections/updateMemberRole";
 import { aMember, fakeWorkspaceContext } from "./context";
+import type { ApiTypes } from "@/types/api";
 
 describe("updateMemberRole", () => {
     it("endereça a MATRÍCULA e manda só o papel novo", async () => {
@@ -190,6 +192,142 @@ describe("removeMember", () => {
         expect(context.failSubmit).toHaveBeenCalledWith(
             "members",
             expect.stringContaining("transfira a propriedade"),
+        );
+    });
+});
+
+/* Sair é a guarda OPOSTA de remover: aquela rota é só do dono, esta é de
+   todo mundo MENOS ele. E, ao contrário dela, são DUAS chamadas — o
+   `DELETE` não reemite o cookie, então sem o `getSelf` + `switch` em
+   seguida o token continuaria apontando para o espaço de onde a pessoa
+   acabou de sair. */
+describe("leaveWorkspace", () => {
+    const otherWorkspace: ApiTypes.Workspace = {
+        IdWorkspace: 9,
+        Name: "Meu espaço",
+        IdOwnerUser: 1,
+        Current: true,
+        CreatedAt: "2026-09-06T00:00:00.000Z",
+        UpdatedAt: "2026-09-06T00:00:00.000Z",
+    };
+
+    it("endereça a PRÓPRIA matrícula, sem id no caminho e sem corpo", async () => {
+        let method = "";
+        let path = "";
+        let body: unknown = "não lido";
+        server.use(
+            msw.delete("*/api/Workspaces/members/self", async ({ request }) => {
+                method = request.method;
+                path = new URL(request.url).pathname;
+                body = await request.text();
+                return HttpResponse.json({ msg: "Você saiu do espaço" });
+            }),
+            msw.get("*/api/Workspaces/getSelf", () => HttpResponse.json([])),
+        );
+        const context = fakeWorkspaceContext();
+
+        await leaveWorkspace(context, vi.fn());
+
+        expect(method).toBe("DELETE");
+        // Um id aqui viria do cliente e a rota teria que conferir que é o
+        // do próprio usuário, quando a sessão já sabe disso.
+        expect(path).toMatch(/\/Workspaces\/members\/self$/);
+        expect(body).toBe("");
+        expect(context.beginSubmit).toHaveBeenCalledWith("members");
+    });
+
+    // A armadilha da entrega: o `DELETE` não reemite o cookie, porque o
+    // `switch` é a única rota que recebe um `IdWorkspace`.
+    it("entra no espaço que sobrou — o DELETE não troca a sessão sozinho", async () => {
+        server.use(
+            msw.delete("*/api/Workspaces/members/self", () =>
+                HttpResponse.json({ msg: "Você saiu do espaço" }),
+            ),
+            msw.get("*/api/Workspaces/getSelf", () =>
+                HttpResponse.json([{ ...otherWorkspace, Current: false }]),
+            ),
+        );
+        const switchWorkspace = vi.fn().mockResolvedValue(otherWorkspace);
+        const context = fakeWorkspaceContext();
+
+        await leaveWorkspace(context, switchWorkspace);
+
+        expect(switchWorkspace).toHaveBeenCalledWith(9);
+        expect(context.finishSubmit).toHaveBeenCalledWith(
+            "members",
+            "Você saiu do espaço. Agora você está em Meu espaço.",
+        );
+    });
+
+    // Sem espaço nenhum não há para onde trocar: a releitura da lista é o
+    // que faz a tela chegar na criação de espaço.
+    it("relê a lista de espaços quando não sobra nenhum, sem tentar trocar", async () => {
+        server.use(
+            msw.delete("*/api/Workspaces/members/self", () =>
+                HttpResponse.json({ msg: "Você saiu do espaço" }),
+            ),
+            msw.get("*/api/Workspaces/getSelf", () => HttpResponse.json([])),
+        );
+        const switchWorkspace = vi.fn();
+        const context = fakeWorkspaceContext();
+
+        await leaveWorkspace(context, switchWorkspace);
+
+        expect(switchWorkspace).not.toHaveBeenCalled();
+        expect(context.refreshWorkspaces).toHaveBeenCalledOnce();
+        expect(context.finishSubmit).toHaveBeenCalledWith("members", "Você saiu do espaço.");
+    });
+
+    // A tela não mostra o botão para o dono, mas a rota recusa de
+    // qualquer jeito — e a msg diz o próximo passo, que é a razão de ela
+    // ser 406 com texto próprio e não o 403 genérico.
+    it("mostra a msg do servidor quando quem chamou é o dono, e não sai", async () => {
+        const switchWorkspace = vi.fn();
+        server.use(
+            msw.delete("*/api/Workspaces/members/self", () =>
+                HttpResponse.json(
+                    {
+                        msg: "O dono não pode sair do próprio espaço. Transfira a propriedade a outro membro e saia depois.",
+                    },
+                    { status: 406 },
+                ),
+            ),
+        );
+        const context = fakeWorkspaceContext();
+
+        await leaveWorkspace(context, switchWorkspace);
+
+        expect(switchWorkspace).not.toHaveBeenCalled();
+        expect(context.refreshWorkspaces).not.toHaveBeenCalled();
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "members",
+            expect.stringContaining("Transfira a propriedade"),
+        );
+    });
+
+    // Depois do DELETE bem-sucedido a saída JÁ aconteceu: um erro daí
+    // para frente não pode ser lido como "não saiu", e o conserto é o
+    // cache velho sair da frente.
+    it("não diz que a saída falhou quando o que falhou foi entrar em outro", async () => {
+        server.use(
+            msw.delete("*/api/Workspaces/members/self", () =>
+                HttpResponse.json({ msg: "Você saiu do espaço" }),
+            ),
+            msw.get("*/api/Workspaces/getSelf", () =>
+                HttpResponse.json([{ ...otherWorkspace, Current: false }]),
+            ),
+        );
+        const context = fakeWorkspaceContext();
+
+        await leaveWorkspace(
+            context,
+            vi.fn().mockRejectedValue(new Error("Workspace não encontrado!")),
+        );
+
+        expect(context.refreshWorkspaces).toHaveBeenCalledOnce();
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "members",
+            expect.stringContaining("Você saiu do espaço, mas não consegui entrar em outro"),
         );
     });
 });

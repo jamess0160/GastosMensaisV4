@@ -246,3 +246,28 @@
     border-radius: 10px;
     padding: 10px 12px;
 }
+
+/* ── Sair do espaço ───────────────────────────────────────── */
+
+/* No pé do card de quem tem acesso, e não num card próprio: sair é uma
+   ação sobre a PRÓPRIA matrícula, e a matrícula é o que aquele card
+   lista. Um card separado a leria como uma configuração do espaço, que
+   é justamente o que ela não é — quem não é dono não configura nada
+   aqui.
+
+   O texto ao lado do botão, e não dentro do diálogo só: o botão sozinho
+   não diz que o histórico fica, e é a dúvida que faz alguém não clicar.
+   A 390px o `wrap` desce o botão para baixo do texto. */
+.leave {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.leaveText {
+    flex: 1;
+    min-width: 180px;
+}

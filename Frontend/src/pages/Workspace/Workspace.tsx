@@ -7,7 +7,8 @@ import {
     type WorkspaceContext,
     type WorkspaceScope,
 } from "./controller";
-import { sessionKeys, useSession } from "@/app/session";
+import { createWorkspace, type CreateWorkspaceContext } from "./sections/createWorkspace";
+import { sessionKeys, useSession, useSwitchWorkspace } from "@/app/session";
 import { queryKeys } from "@/data/keys";
 import { useWorkspaceMembers } from "@/data/members";
 import { WorkspacesConnection } from "@/api/Workspaces.connection";
@@ -33,6 +34,14 @@ import type { ApiTypes } from "@/types/api";
    outros a tela mostra o espaço, diz de quem ele é e lista quem tem
    acesso — que é a única leitura de `assertMember` daqui —, sem oferecer
    um controle que sempre falharia.
+
+   COM UMA EXCEÇÃO, e ela é o inverso de todas as outras: **sair do
+   espaço** é a única ação daqui que o dono NÃO pode fazer. A rota exige
+   não ser dono, então é o botão que aparece só para quem não é.
+
+   E a tela tem um terceiro estado, além do dono e do membro: **espaço
+   nenhum**. Quem sai do último cai nele — sessão válida, sem espaço a
+   que voltar —, e aí a tela é só a criação de um.
    ════════════════════════════════════════════════════════════ */
 
 const ROLE_LABEL: Record<ApiTypes.WorkspaceRole, string> = {
@@ -67,8 +76,9 @@ const inviteLink = (hash: string): string =>
     `${window.location.origin}/convite/${encodeURIComponent(hash)}`;
 
 export function Workspace() {
-    const { workspace, isOwner, workspaces } = useSession();
+    const { workspace, workspacesPending, isOwner, workspaces } = useSession();
     const queryClient = useQueryClient();
+    const switchWorkspace = useSwitchWorkspace();
 
     const [name, setName] = useState(workspace?.Name ?? "");
     const [inviteDraft, setInviteDraft] = useState<InviteDraft>(emptyInviteDraft);
@@ -81,6 +91,16 @@ export function Workspace() {
        existe porque não há desfazer. Guarda o membro inteiro, e não o
        id, porque a pergunta do diálogo é pelo NOME de quem sai. */
     const [removing, setRemoving] = useState<ApiTypes.WorkspaceMember | null>(null);
+    /* Sair também é irreversível, e pelo mesmo motivo: a matrícula é
+       apagada de verdade, e voltar é ser convidado de novo. Booleano e
+       não um membro, porque quem sai é sempre você. */
+    const [leaving, setLeaving] = useState(false);
+    /* O nome do espaço a criar, para quando não houver espaço NENHUM —
+       o estado em que sair do último deixa a sessão. `null` é "o
+       formulário não está na tela", como no seletor do chassi. */
+    const [newName, setNewName] = useState<string | null>(null);
+    const [creating, setCreating] = useState(false);
+    const [createError, setCreateError] = useState<string | null>(null);
 
     /* O nome vem da sessão, e a sessão é relida depois de gravar. Sem
        isto, trocar de espaço com a tela aberta deixaria o campo com o
@@ -133,6 +153,34 @@ export function Workspace() {
         [name, inviteDraft, queryClient],
     );
 
+    /* A MESMA section do seletor do chassi, e é o ponto: criar espaço é
+       um POST seguido de um `switch`, e duas implementações disso
+       divergiriam na primeira vez que uma delas esquecesse a segunda
+       chamada. O que muda aqui é só a caixa — um card no lugar de um
+       modal, porque quem chega neste estado não tem tela por baixo. */
+    const createContext = useMemo<CreateWorkspaceContext>(
+        () => ({
+            name: newName ?? "",
+            beginSubmit() {
+                setCreating(true);
+                setCreateError(null);
+            },
+            failSubmit(message) {
+                setCreating(false);
+                setCreateError(message);
+            },
+            finishCreate() {
+                setCreating(false);
+                setNewName(null);
+                /* Sem `navigate`: o `switch` já aconteceu dentro da
+                   section, e o `reset` do cache traz a lista de espaços
+                   com o novo marcado como atual. Esta mesma tela volta a
+                   desenhar o espaço inteiro. */
+            },
+        }),
+        [newName],
+    );
+
     const copy = async (invite: ApiTypes.WorkspaceInvite) => {
         try {
             await navigator.clipboard.writeText(inviteLink(invite.Hash));
@@ -149,11 +197,78 @@ export function Workspace() {
         }
     };
 
-    if (!workspace) {
+    /* Sem espaço nenhum, e a lista ainda vindo: é só o carregamento. */
+    if (!workspace && workspacesPending) {
         return (
             <Page>
                 <PageHead title="Espaço" />
                 <LoadingRows rows={3} />
+            </Page>
+        );
+    }
+
+    /* Sem espaço nenhum, e a lista JÁ chegou vazia. Deixou de ser
+       impossível quando sair do espaço passou a existir: quem sai do
+       último cai exatamente aqui, com a sessão válida e sem espaço a que
+       voltar. A API responde 406 em toda rota escopada, e o conserto que
+       ela não pode fazer sozinha é este — criar um espaço, a única rota
+       da feature que não confere matrícula, porque o workspace nasce
+       nela.
+
+       O seletor do chassi não serve aqui: ele desenha o espaço atual, e
+       não há um. */
+    if (!workspace) {
+        return (
+            <Page>
+                <PageHead
+                    title="Você não está em nenhum espaço"
+                    subtitle="Um espaço é onde vivem suas contas, categorias e lançamentos — sem um, não há onde lançar nada."
+                />
+                <Card>
+                    <div className={styles.section}>
+                        <div className={styles.sectionHead}>
+                            <div>
+                                <div className={styles.sectionTitle}>Criar um espaço</div>
+                                <div className={styles.sectionSub}>
+                                    Ele nasce vazio e com você como dono. Você entra nele assim que
+                                    for criado.
+                                </div>
+                            </div>
+                        </div>
+
+                        <FormError>{createError}</FormError>
+
+                        <form
+                            className={styles.row}
+                            onSubmit={(event: FormEvent) => {
+                                event.preventDefault();
+                                void createWorkspace(createContext, switchWorkspace);
+                            }}
+                        >
+                            <FormField label="Nome" required className={styles.rowGrow}>
+                                {(field) => (
+                                    <Input
+                                        {...field}
+                                        maxLength={255}
+                                        placeholder="Casa, Escritório…"
+                                        value={newName ?? ""}
+                                        onChange={(event) => setNewName(event.target.value)}
+                                    />
+                                )}
+                            </FormField>
+                            <Button variant="primary" type="submit" disabled={creating}>
+                                {creating ? "Criando…" : "Criar e entrar"}
+                            </Button>
+                        </form>
+
+                        <div className={styles.note}>
+                            Se você saiu de um espaço compartilhado,{" "}
+                            <b>nada do que você lançou lá foi apagado</b> — gastos, entradas e
+                            contas são do espaço, e continuam com quem ficou. Para voltar, peça um
+                            convite novo ao dono.
+                        </div>
+                    </div>
+                </Card>
             </Page>
         );
     }
@@ -327,6 +442,33 @@ export function Workspace() {
                                         )}
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {/* Sair é a guarda OPOSTA de remover: aquela rota
+                            é só do dono, esta é de todo mundo MENOS ele.
+                            Enquanto ele for dono, sair deixaria o espaço
+                            sem quem convida e sem quem remove — a chamada
+                            direta responde 406 mandando transferir a
+                            propriedade, e é por isso que o botão não
+                            aparece aqui. Não é a mesma condição do bloco
+                            de ações da linha: lá é `isOwner && !IsSelf`,
+                            aqui é só `!isOwner`. */}
+                        {!isOwner && (
+                            <div className={styles.leave}>
+                                <div className={styles.leaveText}>
+                                    <div className={styles.sectionTitle}>Sair deste espaço</div>
+                                    <div className={styles.sectionSub}>
+                                        Você perde o acesso na hora. O que você lançou fica com quem
+                                        ficou, e voltar exige um convite novo.
+                                    </div>
+                                </div>
+                                <Button
+                                    disabled={pending === "members"}
+                                    onClick={() => setLeaving(true)}
+                                >
+                                    {pending === "members" ? "Saindo…" : "Sair do espaço"}
+                                </Button>
                             </div>
                         )}
                     </div>
@@ -542,6 +684,24 @@ export function Workspace() {
                 title={`Remover ${removing?.Name ?? ""} do espaço?`}
                 description="A pessoa perde o acesso na hora e não há como desfazer — readmitir é convidar de novo, e a data de entrada recomeça. Nada do que ela lançou é apagado: os gastos, as entradas e as contas são do espaço, o rateio das pessoas fica igual e nenhum saldo muda."
                 confirmLabel="Remover"
+                danger
+                pending={pending === "members"}
+            />
+
+            {/* Sair é irreversível pelo mesmo motivo de remover — a
+                matrícula é apagada de verdade —, mas o que o texto tem de
+                dizer é outro: o que se perde é o ACESSO, e nada do que a
+                pessoa lançou vai com ela. */}
+            <ConfirmDialog
+                open={leaving}
+                onClose={() => setLeaving(false)}
+                onConfirm={() => {
+                    setLeaving(false);
+                    void WorkspaceController.leaveWorkspace(context, switchWorkspace);
+                }}
+                title={`Sair de ${workspace.Name}?`}
+                description="Você perde o acesso na hora, e voltar exige um convite novo do dono — a data de entrada recomeça. Nada do que você lançou é apagado: os gastos, as entradas e as contas são do espaço e continuam com quem ficou. Se você tiver outro espaço, entramos nele em seguida; se não, você poderá criar um."
+                confirmLabel="Sair do espaço"
                 danger
                 pending={pending === "members"}
             />

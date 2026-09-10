@@ -128,6 +128,39 @@ class Connection {
         return data;
     }
 
+    /** Sair do espaço da sessão — a SUA matrícula.
+     *
+     *  Sem id no caminho, ao contrário do `removeMember`: um
+     *  `IdWorkspaceMember` aqui viria do cliente e a rota teria que
+     *  conferir que é o do próprio usuário, quando a sessão já sabe
+     *  disso.
+     *
+     *  **O dono não sai**: 406, com a `msg` mandando transferir a
+     *  propriedade. É a guarda OPOSTA do `removeMember`, que só o dono
+     *  pode chamar — e por isso o botão da tela é o inverso do de
+     *  remover.
+     *
+     *  ⚠️ **NÃO reemite o cookie**, como o `join` e o `create`: o
+     *  `switch` continua sendo a única rota que recebe um
+     *  `IdWorkspace`. Depois desta chamada o token ainda aponta para o
+     *  espaço de onde você saiu, e toda rota escopada responde 406 de
+     *  lá. Quem escolhe onde continuar é o cliente: chame `getSelf` e
+     *  dê `switch` no primeiro espaço que sobrou.
+     *
+     *  Se não sobrar nenhum — `getSelf` vazio —, a sessão continua
+     *  válida e sem espaço a que voltar. Ninguém é deslogado; o caminho
+     *  é criar um espaço, que é a rota que não confere matrícula
+     *  nenhuma.
+     *
+     *  **Nada do que você lançou vai com você.** Gasto, entrada e conta
+     *  são do ESPAÇO, e o rateio aponta para `Persons` — nenhum saldo
+     *  muda para quem fica. Voltar é ser convidado de novo, e a data de
+     *  entrada recomeça. */
+    async leave(): Promise<{ msg: string }> {
+        const { data } = await http.delete<{ msg: string }>(`${this.route}/members/self`);
+        return data;
+    }
+
     /* ── Convites ─────────────────────────────────────────── */
 
     /** Cria o convite do workspace da sessão. **Só `owner`** — quem não

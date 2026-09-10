@@ -146,6 +146,17 @@ class Schema {
         })),
     ]
 
+    //  Sair do espaço. Sem params e sem body, ao contrário do removeMember: a matrícula que
+    //  esta rota apaga é a de quem chamou, e a sessão já sabe qual é — um id no caminho seria
+    //  um dado do cliente que a rota teria que conferir contra o token.
+    //
+    //  Só a resposta é descrita, como no logout de Users: o msg fica preso ao contrato.
+    public readonly leave = [
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+        })),
+    ]
+
     //  Rota pública: quem recebeu o link ainda pode não ter conta.
     public readonly getInviteByHash = [
         joiController.validateParams(Joi.object({
