@@ -58,12 +58,23 @@
 /* A régua do cartão principal — o "76% do orçamento usado" do layout.
    Sem a contagem de dias: ela repetia o subtítulo da página. */
 .heroMeter {
+    /* O respiro entre a régua e a legenda é um token do bloco, e não um
+       número solto na margem da legenda: a 390px a legenda quebra em duas
+       linhas ("88% do orçamento usado") e aí o mesmo valor tem de valer
+       para a régua e para a quebra. */
+    --meter-gap: 10px;
+
     margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--meter-gap);
 }
 
 .heroMeterCaption {
-    margin-top: 6px;
     font-size: 11.5px;
+    /* Altura de linha própria. Com a `normal` herdada a caixa da linha é
+       justa demais e a primeira linha encosta na régua. */
+    line-height: 1.45;
     color: var(--ink-2);
     font-variant-numeric: tabular-nums;
 }
