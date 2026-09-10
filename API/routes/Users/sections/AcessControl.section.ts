@@ -1,6 +1,7 @@
 import { Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { enviromentManager } from 'root/Utils/enviromentManager'
+import { isProduction } from 'root/Utils/environment'
 import { Logs } from 'root/Utils/Logs'
 import { Utils } from 'root/Utils/Utils'
 import { SelectDefault } from 'root/routes/Workspaces/sections/POST/selectDefault'
@@ -101,7 +102,7 @@ class Controller {
         const token = this.generateToken(IdUser, IdWorkspace, RememberDevice)
         res.cookie('token', token, {
             httpOnly: true,
-            secure: this.isProduction(),
+            secure: isProduction(),
             sameSite: 'strict',
             //  Mesmo número do expiresIn do token, convertido: os dois saem de `durations`, e
             //  é isso que os impede de divergir.
@@ -116,16 +117,9 @@ class Controller {
     clearTokenCookie(res: Response): void {
         res.clearCookie('token', {
             httpOnly: true,
-            secure: this.isProduction(),
+            secure: isProduction(),
             sameSite: 'strict'
         })
-    }
-
-    //  Todo acesso a env passa pelo enviromentManager, e este é opcional: em desenvolvimento e
-    //  em teste a variável simplesmente não existe, e a ausência dela é a resposta 'não é
-    //  produção' — não um erro de boot como seria numa variável obrigatória.
-    private isProduction(): boolean {
-        return enviromentManager.getEnv("NODE_ENV", true) === "production"
     }
 
 }

@@ -1,6 +1,7 @@
 import nodemailer, { Transporter } from "nodemailer"
 import { enviromentManager } from "root/Utils/enviromentManager"
 import { Logs } from "root/Utils/Logs"
+import { isTest } from "root/Utils/environment"
 
 //  **O transporte, e só o transporte.** Ele sabe de SMTP, pool, timeout e remetente; não sabe
 //  o que está mandando. Quem sabe *o que* é o template (`Utils/Mail/templates/`), e quem sabe
@@ -54,14 +55,14 @@ class Controller {
 
         try {
             let info = await this.transport().sendMail({
-                from: this.isTest() ? "Gastos Mensais <teste@gastos.local>" : enviromentManager.getEnv("MAIL_FROM"),
+                from: isTest() ? "Gastos Mensais <teste@gastos.local>" : enviromentManager.getEnv("MAIL_FROM"),
                 to: message.to,
                 subject: message.subject,
                 text: message.text,
                 html: message.html,
             })
 
-            if (this.isTest()) {
+            if (isTest()) {
                 //  O jsonTransport devolve a mensagem serializada em vez de mandá-la pela
                 //  rede. É o que permite a suíte afirmar "saiu um e-mail para este endereço,
                 //  com este link" **sem mock nenhum** — e é onde os bugs de e-mail moram: um
@@ -118,7 +119,7 @@ class Controller {
             return this.transporter
         }
 
-        this.transporter = this.isTest() ? this.buildTestTransport() : this.buildSmtpTransport()
+        this.transporter = isTest() ? this.buildTestTransport() : this.buildSmtpTransport()
 
         return this.transporter
     }
@@ -153,10 +154,6 @@ class Controller {
             greetingTimeout: 10000,
             socketTimeout: 20000,
         })
-    }
-
-    private isTest() {
-        return enviromentManager.getEnv("NODE_ENV", true) === "test"
     }
 }
 

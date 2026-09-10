@@ -2,6 +2,7 @@ import { server } from "./Utils/server"
 import { Logs } from "./Utils/Logs"
 import { Utils } from "./Utils/Utils"
 import { enviromentManager } from "./Utils/enviromentManager"
+import { isTest } from "./Utils/environment"
 import { Rotines } from "./rotines"
 import { rotineEngine } from "./rotines/section/RotineEngine"
 
@@ -26,7 +27,7 @@ server.app.listen(port, () => {
 //  Ligar aqui, e não no import do motor, é o que mantém o app em memória do supertest livre de
 //  rotina: ele importa `Utils/server`, nunca este arquivo.
 function startRotines() {
-    if (enviromentManager.getEnv("NODE_ENV", true) === "test") {
+    if (isTest()) {
         console.log("Rotinas desligadas: NODE_ENV=test")
         return
     }

@@ -1,5 +1,6 @@
 import { config } from 'dotenv'
 import moment from "moment";
+import { isTest } from "./environment"
 
 //  Funções de utilidades do projeto
 export namespace Utils {
@@ -133,7 +134,7 @@ export namespace Utils {
 
         //  Em teste o .env.test entra por cima, declarando só o que muda (banco, portas).
         //  O override é obrigatório: variável já exportada no terminal vence o dotenv.
-        if (process.env.NODE_ENV === "test") {
+        if (isTest()) {
             config({ path: "./.env.test", override: true })
         }
     }
