@@ -87,6 +87,12 @@ class Schema {
             Phone: Joi.number().required(),
             //  E o que a faixa da tela le para saber se aparece: nulo = ainda nao confirmado.
             EmailConfirmedAt: Joi.date().allow(null).required(),
+            //  O aceite dos termos: quando, e com qual versão do documento. Nulos nos dois
+            //  para quem se cadastrou antes de eles existirem — não houve backfill. Estão
+            //  aqui porque o getSelf devolve a LINHA (menos o Password), e uma coluna que
+            //  o schema não descreve derruba a rota com 406 pelo unknown.
+            TermsAcceptedAt: Joi.date().allow(null).required(),
+            TermsVersion: Joi.string().allow(null).required(),
             LastLogin: Joi.date().required(),
             TrialStartAt: Joi.date().required(),
             TrialEndAt: Joi.date().allow(null).required(),
@@ -111,6 +117,16 @@ class Schema {
             Email: Joi.string().trim().lowercase().email(emailOptions).required(),
             Password: Joi.string().trim().required(),
             Phone: Joi.number().required(),
+            //  O aceite dos termos, obrigatório e obrigatoriamente `true`: `valid(true)` é o
+            //  que faz `false` responder 406 em vez de criar a conta com o campo desmarcado.
+            //  Antes desta linha a validação era do cliente e só dele — um POST por curl
+            //  criava a conta sem aceitar nada, porque o campo não existia para ser exigido.
+            //
+            //  **A versão NÃO vem aqui.** O que o cliente afirma é que aceitou; COM O QUE ele
+            //  concordou quem diz é a API, com o `TERMS_VERSION` dela. Aceitar a versão do
+            //  corpo seria aceitar que o cliente dissesse ter concordado com um documento
+            //  antigo, que é o oposto do que a coluna serve para provar.
+            AcceptedTerms: Joi.boolean().valid(true).required(),
         })),
         //  O cadastro devolve o workspace criado junto: é por ele que o cliente escopa
         //  todo o resto, e sem isso precisaria de um GET extra logo depois do login.

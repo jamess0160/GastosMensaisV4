@@ -30,6 +30,12 @@ export function validateSignUp(context: SignUpContext): string | null {
  *  - a senha vai em TEXTO PURO. Pré-hashear no cliente não protege nada:
  *    o que a API recebe vira a credencial efetiva, e um hash vazado
  *    seria reproduzido como está. O bcrypt (custo 12) roda no servidor.
+ *  - `AcceptedTerms` é OBRIGATÓRIO e obrigatoriamente `true`. A
+ *    conferência do checkbox aqui em cima não substitui nada: ela
+ *    poupa a viagem, e quem recusa de verdade é o Joi, com 406. O
+ *    campo diz QUE a pessoa aceitou; a versão do documento quem
+ *    grava é a API, com a constante dela — o cliente não a manda,
+ *    ou poderia afirmar ter concordado com um texto antigo.
  *  - `IdWorkspace` NÃO EXISTE MAIS: mandá-lo é 406. Ele entrava direto
  *    como matrícula `owner`, sem convite nem conferência, com um id
  *    sequencial que se adivinhava contando. No lugar dele vai o
@@ -55,6 +61,9 @@ export async function submitSignUp(context: SignUpContext): Promise<void> {
             Email: context.email.trim(),
             Password: context.password,
             Phone: Number(context.phone),
+            // Sempre `true`: o `validateSignUp` acima já devolveu quando
+            // a caixa estava desmarcada, então daqui não sai `false`.
+            AcceptedTerms: true,
             // Espalhado, e não `InviteHash: null`: quem não veio de um
             // convite não manda a chave.
             ...(context.inviteHash ? { InviteHash: context.inviteHash } : {}),

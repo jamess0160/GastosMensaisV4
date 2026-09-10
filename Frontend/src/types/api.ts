@@ -43,6 +43,18 @@ export namespace ApiTypes {
          *  `null`: quem não confirmou continua entrando e usando o app —
          *  é decisão do produto, não etapa pela metade. */
         EmailConfirmedAt: DateTime | null;
+        /** Quando a pessoa aceitou os termos, e com qual versão do
+         *  documento (a data em `"YYYY-MM-DD"`, a mesma impressa em
+         *  `/termos` e `/privacidade`).
+         *
+         *  `null` nos dois para quem se cadastrou antes de os documentos
+         *  existirem: não houve backfill, porque carimbar um aceite que
+         *  não aconteceu é justamente o que faria o registro não valer
+         *  nada. Nada é bloqueado por eles estarem `null` — o re-aceite
+         *  é decisão de produto, e estas colunas são o que a torna
+         *  possível depois sem migration. */
+        TermsAcceptedAt: DateTime | null;
+        TermsVersion: string | null;
         LastLogin: DateTime | null;
         TrialStartAt: DateTime | null;
         TrialEndAt: DateTime | null;
@@ -57,6 +69,17 @@ export namespace ApiTypes {
         /** Texto puro. NÃO pré-hasheie no cliente — o bcrypt roda no servidor. */
         Password: string;
         Phone: number;
+        /** O aceite dos termos e da política de privacidade, e ele é
+         *  OBRIGATORIAMENTE `true`: a API recusa com 406 tanto a ausência
+         *  quanto o `false`. Não é um campo opcional que a tela preenche
+         *  quando dá — é a prova de consentimento que a conta carrega.
+         *
+         *  A VERSÃO NÃO VEM DAQUI. O cliente afirma QUE aceitou; com o quê
+         *  ele concordou quem carimba é a API, com a constante dela. Deixar
+         *  o cliente mandar a versão seria deixá-lo dizer ter concordado
+         *  com um documento antigo. A data impressa em `/termos` e
+         *  `/privacidade` (`LEGAL_VERSION`) é a mesma que a API grava. */
+        AcceptedTerms: boolean;
         /** O hash do convite, para quem chegou por um link e ainda não
          *  tem conta. Sem ele, o cadastro cria um workspace novo.
          *

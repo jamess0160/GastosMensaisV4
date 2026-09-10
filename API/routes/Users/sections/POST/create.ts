@@ -1,4 +1,4 @@
-import { KnexTransaction } from "root/Utils/Connections/Knex/KnexConnection"
+import { KnexConnection, KnexTransaction } from "root/Utils/Connections/Knex/KnexConnection"
 import { APIError } from "root/Utils/Logs"
 import { Database } from "root/Utils/database"
 import { Create as CreateWorkspace } from "root/routes/Workspaces/sections/POST/create"
@@ -7,6 +7,7 @@ import { CreateSelf as CreateSelfPerson } from "root/routes/Persons/sections/POS
 import { Users_model } from "../../Users.model"
 import { PasswordHasher } from "../PasswordHasher.section"
 import { SendEmailConfirmation } from "../SendEmailConfirmation.section"
+import { TERMS_VERSION } from "../TermsVersion"
 import { UsersNamespace } from "../types"
 
 //  Cadastro. Usuário, workspace e a Person do próprio dono nascem juntos: todo dado de domínio
@@ -33,6 +34,16 @@ export class Create {
                 Email: body.Email,
                 Phone: body.Phone,
                 Password: await PasswordHasher.hash(body.Password),
+                //  O aceite vira registro na MESMA escrita que cria a conta: uma conta viva
+                //  sem a prova de consentimento é justamente o estado que a coluna existe
+                //  para impedir, e um UPDATE separado depois do commit falha sozinho.
+                //
+                //  A data é a do BANCO, como no carimbo do `confirmEmail`: quem aceita não
+                //  escolhe quando aceitou. E a versão é a da API, nunca a do corpo — o
+                //  cliente diz QUE aceitou (o `AcceptedTerms`, que o Joi só deixa passar
+                //  como `true`), e COM O QUE ele concordou quem responde é o servidor.
+                TermsAcceptedAt: KnexConnection.fn.now() as unknown as Database.Users["TermsAcceptedAt"],
+                TermsVersion: TERMS_VERSION,
             }).transacting(tx).returnId("IdUser")
 
             //  O e-mail de confirmação pendura no `attachOnEnd`, nunca dentro da transaction:

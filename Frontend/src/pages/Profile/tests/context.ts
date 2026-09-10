@@ -8,6 +8,8 @@ const user: ApiTypes.User = {
     Email: "tiago@exemplo.com",
     Phone: 11999998888,
     EmailConfirmedAt: "2026-08-01T12:00:00.000Z",
+    TermsAcceptedAt: "2026-08-01T00:00:00.000Z",
+    TermsVersion: "2026-09-10",
     LastLogin: "2026-08-30T12:00:00.000Z",
     TrialStartAt: null,
     TrialEndAt: null,

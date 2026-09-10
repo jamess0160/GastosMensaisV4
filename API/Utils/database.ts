@@ -16,6 +16,23 @@ export namespace Database {
          * senao "confirmado" passaria a valer para um endereco que ninguem provou.
          */
         EmailConfirmedAt: Datetime | null
+        /**
+         * Quando a pessoa aceitou os termos e a politica - nulo para quem se
+         * cadastrou antes de eles existirem.
+         *
+         * Nao ha backfill: quem ja existia nao aceitou documento nenhum, porque
+         * nao havia documento, e carimbar seria escrever aqui uma coisa que nao
+         * aconteceu - o registro perderia justamente o valor que tem.
+         */
+        TermsAcceptedAt: Datetime | null
+        /**
+         * COM O QUE ela concordou: a data de versao dos dois documentos, em
+         * "YYYY-MM-DD". Quem escreve e sempre a API, com o `TERMS_VERSION` de
+         * `routes/Users/sections/TermsVersion.ts` - nunca o corpo do cadastro.
+         *
+         * Nulo junto com o `TermsAcceptedAt`, e pelo mesmo motivo.
+         */
+        TermsVersion: string | null
         LastLogin: Datetime
         TrialStartAt: Datetime
         TrialEndAt: Datetime | null

@@ -1498,6 +1498,7 @@ describe("Expenses", () => {
                 Email: UsersFactory.buildEmail(),
                 Password: "Senha@123",
                 Phone: 549987654321,
+                AcceptedTerms: true,
             }
 
             expect((await new TestClient().post("/Users", payload)).status).toBe(200)

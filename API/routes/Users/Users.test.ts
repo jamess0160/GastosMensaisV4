@@ -3,6 +3,7 @@ import { TestClient, TestDatabase, TestEnv, TestUser, UsersFactory } from "root/
 import { mailer } from "root/Utils/Connections/Mailer"
 import { enviromentManager } from "root/Utils/enviromentManager"
 import { MailCooldown } from "./sections/MailCooldown.section"
+import { TERMS_VERSION } from "./sections/TermsVersion"
 import { UsersNamespace } from "./sections/types"
 
 //  Testes integrados da feature Users. Um describe por rota de Users.route.ts, na mesma ordem.
@@ -619,6 +620,55 @@ describe("Users", () => {
             expect((await findByEmail(payload.Email))?.EmailConfirmedAt).toBeNull()
         })
 
+        //  A VALIDAÇÃO DO ACEITE É DO SERVIDOR, e é isso que estes dois testes travam: antes
+        //  dela o checkbox era conferido só na tela, e um POST por curl criava a conta sem
+        //  aceitar nada — o Joi deixava passar porque o campo não existia para ser exigido.
+        it("recusa o cadastro sem o AcceptedTerms", async () => {
+            let { AcceptedTerms, ...payload } = buildPayload()
+
+            let response = await client.anonymous().post("/Users", payload)
+
+            expect(response.status).toBe(406)
+            expect(await findByEmail(payload.Email)).toBeUndefined()
+        })
+
+        //  Recusar o `false` é outra coisa que recusar a ausência: um cliente que manda o
+        //  estado do checkbox como veio precisa falhar alto, não criar a conta desmarcada.
+        it("recusa o cadastro com o AcceptedTerms false", async () => {
+            let payload = buildPayload({ AcceptedTerms: false })
+
+            let response = await client.anonymous().post("/Users", payload)
+
+            expect(response.status).toBe(406)
+            expect(await findByEmail(payload.Email)).toBeUndefined()
+        })
+
+        //  O QUE ficou gravado é a versão da API, não uma que o cliente pudesse escolher: o
+        //  corpo não tem onde escrevê-la, e é o que impede alguém de afirmar ter concordado
+        //  com um documento antigo. A data é a mesma impressa no topo de /termos.
+        it("carimba o aceite com a versão do servidor", async () => {
+            let payload = buildPayload()
+
+            await client.anonymous().post("/Users", payload)
+
+            let created = await findByEmail(payload.Email)
+
+            expect(created?.TermsAcceptedAt).toBeInstanceOf(Date)
+            expect(created?.TermsVersion).toBe(TERMS_VERSION)
+        })
+
+        //  Quem se cadastrou antes da leva fica com as duas colunas nulas, e é a verdade:
+        //  não havia documento para aceitar. Sem backfill, e nada é bloqueado pelo nulo.
+        it("o usuário semeado direto no banco continua sem aceite nenhum", async () => {
+            let seeded = await UsersFactory.create()
+
+            let stored = await findByEmail(seeded.user.Email)
+
+            expect(stored?.TermsAcceptedAt).toBeNull()
+            expect(stored?.TermsVersion).toBeNull()
+            expect((await new TestClient().login(seeded.user.Email, seeded.password)).status).toBe(200)
+        })
+
         describeMailbox("o e-mail de confirmação do cadastro", () => {
 
             beforeEach(() => {
@@ -1065,13 +1115,14 @@ function buildPayload(overrides: Partial<UsersNamespace.CreateUserPayload> = {})
         Email: UsersFactory.buildEmail(),
         Password: "Senha@123",
         Phone: 549987654321,
+        AcceptedTerms: true,
         ...overrides,
     }
 }
 
 //  Corpo do update: sem senha, que só se troca pela rota dedicada
 function buildUpdatePayload(overrides: Partial<UsersNamespace.UpdateUserPayload> = {}): UsersNamespace.UpdateUserPayload {
-    let { Password, ...payload } = buildPayload()
+    let { Password, AcceptedTerms, ...payload } = buildPayload()
 
     return { ...payload, ...overrides }
 }

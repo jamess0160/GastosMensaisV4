@@ -7,6 +7,10 @@ export namespace UsersNamespace {
         Email: string
         Password: string
         Phone: number
+        //  O aceite dos termos. Obrigatório e obrigatoriamente `true` — o Joi recusa tanto a
+        //  ausência quanto o `false` com 406. O cliente afirma QUE aceitou; COM O QUE ele
+        //  concordou é a API que carimba, com o `TERMS_VERSION` dela.
+        AcceptedTerms: boolean
     }
 
     export interface UpdateUserPayload {

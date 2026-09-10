@@ -6,7 +6,11 @@ class Connection {
     private readonly route = "/Users";
 
     /** Público. Cria usuário, workspace, matrícula e Person numa única
-     *  transaction. NÃO loga: chame `login` em seguida. */
+     *  transaction. NÃO loga: chame `login` em seguida.
+     *
+     *  O corpo exige `AcceptedTerms: true` — sem ele, ou com `false`, a
+     *  resposta é 406. O aceite é gravado em `Users` junto da versão do
+     *  documento, que é a da API e nunca uma que o cliente mande. */
     async signUp(body: ApiTypes.SignUpBody): Promise<{ IdUser: number; IdWorkspace: number }> {
         const { data } = await http.post<{ IdUser: number; IdWorkspace: number }>(this.route, body);
         return data;

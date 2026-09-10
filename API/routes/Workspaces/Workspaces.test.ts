@@ -718,6 +718,7 @@ describe("Workspaces", () => {
                 Email: UsersFactory.buildEmail(),
                 Password: "Senha@123",
                 Phone: 549987654321,
+                AcceptedTerms: true,
             }
 
             let invite = await owner.client.post("/Workspaces/invite", { Email: guest.Email, Role: "editor" })
@@ -1415,6 +1416,7 @@ describe("Workspaces", () => {
                 Email: UsersFactory.buildEmail(),
                 Password: "Senha@123",
                 Phone: 549987654321,
+                AcceptedTerms: true,
             }
 
             let created = await new TestClient().post("/Users", payload)
@@ -1469,6 +1471,7 @@ describe("Workspaces", () => {
                 Email: UsersFactory.buildEmail(),
                 Password: "Senha@123",
                 Phone: 549987654321,
+                AcceptedTerms: true,
             }
 
             let invite = await owner.client.post("/Workspaces/invite", { Email: guest.Email, Role: "editor" })

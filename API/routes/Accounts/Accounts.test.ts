@@ -643,6 +643,7 @@ describe("Accounts", () => {
                 Email: UsersFactory.buildEmail(),
                 Password: "Senha@123",
                 Phone: 549987654321,
+                AcceptedTerms: true,
             }
 
             let created = await new TestClient().post("/Users", payload)

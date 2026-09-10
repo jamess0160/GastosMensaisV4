@@ -56,6 +56,27 @@ describe("submitSignUp", () => {
         expect(body?.Phone).toBe(11999998888);
     });
 
+    it("manda o AcceptedTerms, e a versão do documento NÃO", async () => {
+        /* O aceite deixou de existir só na memória do navegador: ele vira
+           linha em `Users`. A API recusa com 406 a ausência e o `false`, e
+           é ela — não o cliente — que carimba com o que a pessoa
+           concordou. Mandar a versão daqui seria poder afirmar ter aceitado
+           um documento antigo. */
+        let body: Record<string, unknown> | undefined;
+        server.use(
+            msw.post(signUp, async ({ request }) => {
+                body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ IdUser: 1, IdWorkspace: 1 });
+            }),
+        );
+        server.use(msw.post(login, () => HttpResponse.json({ msg: "ok" })));
+
+        await submitSignUp(fakeSignUpContext());
+
+        expect(body?.AcceptedTerms).toBe(true);
+        expect(body).not.toHaveProperty("TermsVersion");
+    });
+
     it("NÃO manda IdWorkspace — ele saiu do contrato e agora é 406", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
