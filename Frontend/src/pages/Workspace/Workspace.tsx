@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import styles from "./src/styles.module.css";
-import { WorkspaceController, type InviteDraft, type WorkspaceContext } from "./controller";
+import {
+    WorkspaceController,
+    type InviteDraft,
+    type WorkspaceContext,
+    type WorkspaceScope,
+} from "./controller";
 import { sessionKeys, useSession } from "@/app/session";
 import { queryKeys } from "@/data/keys";
 import { useWorkspaceMembers } from "@/data/members";
@@ -17,14 +22,17 @@ import type { ApiTypes } from "@/types/api";
 /* ════════════════════════════════════════════════════════════
    A tela do espaço.
 
-   Ela é sempre a do espaço DA SESSÃO: `PUT /Workspaces`,
-   `GET /Workspaces/invites` e `POST /Workspaces/invite` não recebem id —
-   agem no workspace do cookie. Quem chega aqui pelo lápis de outro
-   espaço já foi trocado antes, no seletor da sidebar.
+   Ela é sempre a do espaço DA SESSÃO: nenhuma rota daqui recebe um
+   `IdWorkspace` — todas agem no workspace do cookie, e o único id que
+   viaja é o da linha em que se age (o convite, a matrícula). Quem chega
+   aqui pelo lápis de outro espaço já foi trocado antes, no seletor da
+   sidebar.
 
-   E ela é a tela do DONO: as três rotas respondem 403 para quem não é.
-   Para os outros a tela mostra o espaço e diz de quem ele é, sem
-   oferecer um formulário que sempre falharia.
+   E ela é quase toda a tela do DONO: renomear, convidar, listar convites
+   e trocar o papel de um membro respondem 403 para quem não é. Para os
+   outros a tela mostra o espaço, diz de quem ele é e lista quem tem
+   acesso — que é a única leitura de `assertMember` daqui —, sem oferecer
+   um controle que sempre falharia.
    ════════════════════════════════════════════════════════════ */
 
 const ROLE_LABEL: Record<ApiTypes.WorkspaceRole, string> = {
@@ -38,6 +46,15 @@ const MEMBER_ROLE_LABEL: Record<ApiTypes.WorkspaceMemberRole, string> = {
     owner: "Dono do espaço",
     ...ROLE_LABEL,
 };
+
+/* Os rótulos curtos do seletor de papel, num lugar só: é a MESMA
+   escolha em dois momentos — no convite, antes de a pessoa entrar; na
+   linha do membro, depois. Duas listas divergiriam na primeira vez que
+   uma delas fosse reescrita. */
+const ROLE_OPTIONS: readonly { value: ApiTypes.WorkspaceRole; label: string }[] = [
+    { value: "editor", label: "Lançar" },
+    { value: "viewer", label: "Só ver" },
+];
 
 const emptyInviteDraft = (): InviteDraft => ({ Email: "", Role: "editor" });
 
@@ -55,9 +72,9 @@ export function Workspace() {
 
     const [name, setName] = useState(workspace?.Name ?? "");
     const [inviteDraft, setInviteDraft] = useState<InviteDraft>(emptyInviteDraft);
-    const [pending, setPending] = useState<"name" | "invite" | null>(null);
-    const [errors, setErrors] = useState<{ name?: string | null; invite?: string | null }>({});
-    const [done, setDone] = useState<{ name?: string | null; invite?: string | null }>({});
+    const [pending, setPending] = useState<WorkspaceScope | null>(null);
+    const [errors, setErrors] = useState<Partial<Record<WorkspaceScope, string | null>>>({});
+    const [done, setDone] = useState<Partial<Record<WorkspaceScope, string | null>>>({});
     const [copied, setCopied] = useState<number | null>(null);
     const [revoking, setRevoking] = useState<ApiTypes.WorkspaceInvite | null>(null);
 
@@ -100,6 +117,9 @@ export function Workspace() {
             },
             refreshInvites() {
                 void queryClient.invalidateQueries({ queryKey: queryKeys.invites });
+            },
+            refreshMembers() {
+                void queryClient.invalidateQueries({ queryKey: queryKeys.members });
             },
             refreshWorkspaces() {
                 void queryClient.invalidateQueries({ queryKey: sessionKeys.workspaces });
@@ -218,6 +238,12 @@ export function Workspace() {
                             </div>
                         </div>
 
+                        {/* Escopo próprio: o aviso de que o papel mudou não
+                            pode ser apagado por um convite criado depois,
+                            nem apagar o dele. */}
+                        <FormError>{errors.members}</FormError>
+                        <FormNotice>{done.members}</FormNotice>
+
                         {members.isPending ? (
                             <LoadingRows rows={2} />
                         ) : members.isError ? (
@@ -246,6 +272,36 @@ export function Workspace() {
                                                 {formatDateTime(member.JoinedAt)}
                                             </div>
                                         </div>
+
+                                        {/* O seletor só para o dono, e nunca na
+                                            própria linha: a rota responde 403 para
+                                            quem não é dono e 406 na própria
+                                            matrícula — um controle que sempre
+                                            falharia não é um controle.
+
+                                            O terceiro teste é o que diz ao
+                                            compilador que sobraram dois papéis, e
+                                            ele é verdadeiro por construção: há um
+                                            dono só, e ele é quem está olhando. */}
+                                        {isOwner && !member.IsSelf && member.Role !== "owner" && (
+                                            <span className={styles.memberActions}>
+                                                <SegmentedControl
+                                                    value={member.Role}
+                                                    ariaLabel={`O que ${member.Name} pode fazer`}
+                                                    onChange={(Role) =>
+                                                        void WorkspaceController.updateMemberRole(
+                                                            context,
+                                                            member,
+                                                            Role,
+                                                        )
+                                                    }
+                                                    options={ROLE_OPTIONS.map((option) => ({
+                                                        ...option,
+                                                        disabled: pending === "members",
+                                                    }))}
+                                                />
+                                            </span>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -307,10 +363,7 @@ export function Workspace() {
                                             onChange={(Role) =>
                                                 setInviteDraft((current) => ({ ...current, Role }))
                                             }
-                                            options={[
-                                                { value: "editor", label: "Lançar" },
-                                                { value: "viewer", label: "Só ver" },
-                                            ]}
+                                            options={ROLE_OPTIONS}
                                         />
                                     )}
                                 </FormField>

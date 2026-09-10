@@ -9,6 +9,7 @@ import { Join } from "./sections/POST/join"
 import { Switch } from "./sections/POST/switch"
 import { RevokeInvite } from "./sections/DELETE/revokeInvite"
 import { Update } from "./sections/PUT/update"
+import { UpdateMember } from "./sections/PUT/updateMember"
 
 class Controller {
 
@@ -40,6 +41,12 @@ class Controller {
     //  ele que marca o IsSelf de uma das linhas.
     getMembers = async (req: Request, res: Response) => {
         res.json(await new GetMembers().run(res.locals.IdWorkspace, res.locals.IdUser))
+    }
+
+    //  A matrícula alvo vem do caminho; o IdUser vai junto porque é ele que o assertRole
+    //  confere e é contra a matrícula DELE que a guarda do "próprio papel" compara.
+    updateMember = async (req: Request, res: Response) => {
+        res.json(await new UpdateMember().run(res.locals.IdWorkspace, Number(req.params.IdWorkspaceMember), res.locals.IdUser, req.body))
     }
 
     //  Sem res.locals: é rota pública, o que identifica o convite é o hash.

@@ -25,6 +25,14 @@ Workspaces_route.post("/Workspaces/switch", Workspaces_schema.switch, AsyncHandl
 //  o editor sem saber a quem pedir uma permissão.
 Workspaces_route.get("/Workspaces/members", Workspaces_schema.getMembers, AsyncHandler(Workspaces_controller.getMembers))
 
+//  Troca o papel de quem JÁ é membro — antes disto o papel só se decidia no convite e era
+//  imutável depois do aceite. Só o dono (assertRole owner), como as rotas de convite.
+//
+//  Endereça a MATRÍCULA e não o usuário: ela é do espaço e já nasce escopada, enquanto o IdUser
+//  é global e atravessa tenants. Só se anda entre editor e viewer — 'owner' é recusado pelo Joi,
+//  porque promover a dono é transferir a propriedade, que tem regra própria.
+Workspaces_route.put("/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember", Workspaces_schema.updateMember, AsyncHandler(Workspaces_controller.updateMember))
+
 //  O convite — a porta pela qual se entra num workspace alheio, agora que o cadastro não aceita
 //  mais um IdWorkspace do corpo. Só o dono convida, lista e revoga (assertRole owner): um
 //  editor que pudesse convidar promoveria terceiros ao próprio nível sem o dono saber.

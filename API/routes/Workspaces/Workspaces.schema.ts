@@ -5,8 +5,9 @@ import { joiController } from "root/Utils/joiController"
 //  recusa domínio interno e o .local dos testes. Aqui interessa a forma do e-mail.
 const emailOptions = { tlds: { allow: false } }
 
-//  'owner' fica de fora de propósito: propriedade não se convida, se transfere — e transferir é
-//  operação própria, que continua na etapa 9 do ROADMAP.
+//  Os papéis que se ATRIBUEM: no convite e na troca de papel de quem já é membro. 'owner' fica
+//  de fora dos dois pelo mesmo motivo — propriedade não se atribui, se transfere, e transferir
+//  é operação própria. É por isso que o mesmo par serve às duas rotas.
 const inviteRole = Joi.string().valid("editor", "viewer")
 
 //  A listagem de membros tem os TRÊS papéis. 'owner' não se convida, mas é justamente ele
@@ -118,6 +119,22 @@ class Schema {
             //  comparar e-mail no cliente seria comparar a coisa errada.
             IsSelf: Joi.boolean().required(),
         }))),
+    ]
+
+    //  Troca o papel de quem já é membro. A matrícula vem do caminho e o workspace do token:
+    //  não há IdWorkspace a receber aqui, e o par (workspace da sessão, matrícula) é conferido
+    //  no banco pela section.
+    //
+    //  O Role é o inviteRole — o mesmo par editor/viewer, pelo mesmo motivo: 'owner' no corpo é
+    //  recusado AQUI, pelo Joi, antes de chegar à section. Promover a dono é transferir a
+    //  propriedade, que é operação própria.
+    public readonly updateMember = [
+        joiController.validateParams(Joi.object({
+            IdWorkspaceMember: Joi.number().required(),
+        })),
+        joiController.validateBody(Joi.object({
+            Role: inviteRole.required(),
+        })),
     ]
 
     //  Rota pública: quem recebeu o link ainda pode não ter conta.

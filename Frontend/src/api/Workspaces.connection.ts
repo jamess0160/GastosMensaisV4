@@ -5,10 +5,11 @@ import type { ApiTypes } from "@/types/api";
  *  primeiro nasce no cadastro, um novo se cria aqui, e num que já existe
  *  só se entra por CONVITE.
  *
- *  As três rotas de gestão — `update`, `invites` e `invite` — agem no
- *  workspace DA SESSÃO e não recebem id: quem escolhe em qual espaço se
- *  está é o `switch`, que reemite o cookie. Gerenciar um espaço que não
- *  é o atual exige trocar antes. */
+ *  **Nenhuma rota de gestão recebe `IdWorkspace`**: todas agem no
+ *  workspace DA SESSÃO, e quem escolhe em qual espaço se está é o
+ *  `switch`, que reemite o cookie. Gerenciar um espaço que não é o atual
+ *  exige trocar antes. O único id que algumas delas recebem é o da linha
+ *  em que agem — o convite, ou a matrícula do membro. */
 class Connection {
     private readonly route = "/Workspaces";
 
@@ -72,6 +73,32 @@ class Connection {
      *  Uma das linhas vem com `IsSelf: true` — é a sua. */
     async members(): Promise<ApiTypes.WorkspaceMember[]> {
         const { data } = await http.get<ApiTypes.WorkspaceMember[]>(`${this.route}/members`);
+        return data;
+    }
+
+    /** Troca o papel de quem JÁ é membro. **Só `owner`** — quem não é
+     *  leva 403.
+     *
+     *  Endereça a MATRÍCULA, não o usuário: `IdWorkspaceMember` é do
+     *  espaço e já nasce escopado, enquanto o `IdUser` é global — e é por
+     *  isso que a lista de membros não traz um.
+     *
+     *  Só se anda entre `editor` e `viewer`: `Role: "owner"` é 406, como
+     *  no convite, porque promover a dono é transferir a propriedade. E
+     *  **ninguém troca o próprio papel** — a própria matrícula responde
+     *  406: um espaço sem dono não é estado do qual se volta.
+     *
+     *  A data de entrada sobrevive à troca, e é o que esta rota existe
+     *  para não perder: rebaixar e repromover por remover-e-reconvidar
+     *  apagava a matrícula, e com ela o `JoinedAt`. */
+    async updateMember(
+        idWorkspaceMember: number,
+        body: ApiTypes.WorkspaceMemberUpdateBody,
+    ): Promise<{ msg: string }> {
+        const { data } = await http.put<{ msg: string }>(
+            `${this.route}/members/IdWorkspaceMember=${idWorkspaceMember}`,
+            body,
+        );
         return data;
     }
 

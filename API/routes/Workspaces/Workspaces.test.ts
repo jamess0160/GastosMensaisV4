@@ -355,6 +355,126 @@ describe("Workspaces", () => {
         })
     })
 
+    describe("PUT /Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().put("/Workspaces/members/IdWorkspaceMember=1", { Role: "editor" })
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).put("/Workspaces/members/IdWorkspaceMember=1", { Role: "editor" })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  'owner' é recusado pelo Joi, antes de chegar à section: promover alguém a dono é
+        //  TRANSFERIR a propriedade, que tem regra própria.
+        it("recusa 'owner' no corpo", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "viewer")
+
+            let membership = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            let response = await owner.client.put(`/Workspaces/members/IdWorkspaceMember=${membership!.IdWorkspaceMember}`, { Role: "owner" })
+
+            expect(response.status).toBe(406)
+            expect((await findMembership(owner.workspace.IdWorkspace, member.user.IdUser))?.Role).toBe("viewer")
+        })
+
+        it("recusa corpo sem o Role", async () => {
+            let owner = await UsersFactory.createClient()
+
+            let response = await owner.client.put("/Workspaces/members/IdWorkspaceMember=1", {})
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Promover é o caso de uso da etapa: antes disto, tirar alguém de 'viewer' exigia
+        //  remover e convidar de novo — e a matrícula é apagada de verdade, então isso perdia
+        //  a data de entrada. Ela tem de sobreviver à troca.
+        it("o dono promove um viewer a editor, e a data de entrada não muda", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "viewer")
+
+            let before = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            let response = await owner.client.put(`/Workspaces/members/IdWorkspaceMember=${before!.IdWorkspaceMember}`, { Role: "editor" })
+
+            expect(response.status).toBe(200)
+
+            let after = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            expect(after?.Role).toBe("editor")
+            expect(new Date(after!.CreatedAt).getTime()).toBe(new Date(before!.CreatedAt).getTime())
+            expect(new Date(after!.UpdatedAt).getTime()).toBeGreaterThanOrEqual(new Date(before!.UpdatedAt).getTime())
+        })
+
+        it("o dono rebaixa um editor a viewer", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let membership = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            let response = await owner.client.put(`/Workspaces/members/IdWorkspaceMember=${membership!.IdWorkspaceMember}`, { Role: "viewer" })
+
+            expect(response.status).toBe(200)
+            expect((await findMembership(owner.workspace.IdWorkspace, member.user.IdUser))?.Role).toBe("viewer")
+        })
+
+        //  Um editor que pudesse promover terceiros ao próprio nível dispensaria o dono da
+        //  decisão. 403, e não 406: a matrícula existe, o papel é que não basta.
+        it("recusa um editor trocando o papel de outro membro", async () => {
+            let owner = await UsersFactory.create()
+            let editor = await UsersFactory.create()
+            let viewer = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, editor.user.IdUser, "editor")
+            await seedMembership(owner.workspace.IdWorkspace, viewer.user.IdUser, "viewer")
+
+            let target = await findMembership(owner.workspace.IdWorkspace, viewer.user.IdUser)
+
+            let response = await new TestClient(UsersFactory.buildToken(editor.user.IdUser, owner.workspace.IdWorkspace))
+                .put(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}`, { Role: "editor" })
+
+            expect(response.status).toBe(403)
+            expect((await findMembership(owner.workspace.IdWorkspace, viewer.user.IdUser))?.Role).toBe("viewer")
+        })
+
+        //  Um espaço sem dono não é estado do qual se volta: ninguém poderia mais convidar,
+        //  remover ou transferir.
+        it("recusa o dono mudando o próprio papel", async () => {
+            let owner = await UsersFactory.createClient()
+
+            let membership = await findMembership(owner.workspace.IdWorkspace, owner.user.IdUser)
+
+            let response = await owner.client.put(`/Workspaces/members/IdWorkspaceMember=${membership!.IdWorkspaceMember}`, { Role: "editor" })
+
+            expect(response.status).toBe(406)
+            expect((await findMembership(owner.workspace.IdWorkspace, owner.user.IdUser))?.Role).toBe("owner")
+        })
+
+        //  O id da matrícula chega do cliente e é sequencial: sem o IdWorkspace na busca, um
+        //  dono rebaixaria o membro do vizinho.
+        it("não troca o papel de uma matrícula de outro workspace", async () => {
+            let owner = await UsersFactory.createClient()
+            let other = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(other.workspace.IdWorkspace, member.user.IdUser, "viewer")
+
+            let target = await findMembership(other.workspace.IdWorkspace, member.user.IdUser)
+
+            let response = await owner.client.put(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}`, { Role: "editor" })
+
+            expect(response.status).toBe(406)
+            expect(response.body.msg).toBe("Membro não encontrado!")
+            expect((await findMembership(other.workspace.IdWorkspace, member.user.IdUser))?.Role).toBe("viewer")
+        })
+    })
+
     describe("POST /Workspaces/invite", () => {
 
         it("recusa sem token", async () => {

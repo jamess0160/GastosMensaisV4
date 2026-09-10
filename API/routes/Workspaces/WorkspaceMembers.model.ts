@@ -12,6 +12,13 @@ export class class_WorkspaceMembers_model extends BaseModel {
         return this.baseQuery.clone().where("IdWorkspace", IdWorkspace)
     }
 
+    //  Uma matrícula pelo id, SEMPRE com o IdWorkspace ao lado — a mesma forma do getUnique de
+    //  toda outra feature: o id chega do cliente e é sequencial, então filtrar só por ele
+    //  deixaria uma sessão mexer na matrícula do vizinho.
+    getUnique(IdWorkspace: number, IdWorkspaceMember: number) {
+        return this.baseQuery.clone().where("IdWorkspace", IdWorkspace).where("IdWorkspaceMember", IdWorkspaceMember).first()
+    }
+
     //  "Quem tem acesso a este espaço", com o nome e o e-mail de cada um — a única leitura
     //  desta tabela que sai para a tela, e por isso a única que precisa do join.
     //

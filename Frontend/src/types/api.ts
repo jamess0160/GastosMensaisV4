@@ -242,10 +242,22 @@ export namespace ApiTypes {
         IsSelf: boolean;
     }
 
+    /** O corpo de `PUT /Workspaces/members/IdWorkspaceMember=:Id`.
+     *
+     *  `Role` é o `WorkspaceRole` — o par do convite, sem `owner`: aqui
+     *  só se anda entre `editor` e `viewer`, porque promover alguém a
+     *  dono é TRANSFERIR a propriedade, que é outra rota. Mandar `owner`
+     *  é 406 do Joi, e o tipo já não deixa escrevê-lo. */
+    export interface WorkspaceMemberUpdateBody {
+        Role: WorkspaceRole;
+    }
+
     /* ── 4.1 Convites ─────────────────────────────────────────── */
 
-    /** `owner` NÃO se convida: propriedade não se transfere por convite,
-     *  e mandá-lo em `Role` responde 406. */
+    /** Os papéis que se ATRIBUEM — no convite e na troca de papel de
+     *  quem já é membro. `owner` fica fora dos dois pelo mesmo motivo:
+     *  propriedade não se atribui, se transfere, e mandá-lo em `Role`
+     *  responde 406. */
     export type WorkspaceRole = "editor" | "viewer";
 
     export type WorkspaceInviteStatus = "pending" | "accepted" | "revoked";

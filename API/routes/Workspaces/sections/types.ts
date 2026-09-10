@@ -26,6 +26,14 @@ export namespace WorkspacesNamespace {
         Hash: string
     }
 
+    //  Só o papel: a matrícula alvo vem do caminho, e o workspace vem do token.
+    //
+    //  Sem 'owner', pelo mesmo motivo do convite: promover alguém a dono é TRANSFERIR a
+    //  propriedade, que tem regra própria. Aqui só se anda entre editor e viewer.
+    export interface UpdateMemberPayload {
+        Role: "editor" | "viewer"
+    }
+
     //  A linha crua do join de WorkspaceMembers com Users. Fica separada da linha que sai na
     //  resposta porque ela ainda carrega o IdUser: a section precisa dele para marcar qual
     //  linha é a do usuário da requisição, e é ela que o descarta em seguida.
