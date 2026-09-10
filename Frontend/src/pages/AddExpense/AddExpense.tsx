@@ -262,9 +262,9 @@ export function AddExpense() {
             TotalValue,
             payments: splitPayments
                 ? draft.payments.map((line) => ({
-                    ...line,
-                    value: withSignOf(line.value, TotalValue),
-                }))
+                      ...line,
+                      value: withSignOf(line.value, TotalValue),
+                  }))
                 : [{ ...singlePayment, value: TotalValue }],
             persons: draft.persons.map((line) => ({
                 ...line,
@@ -335,6 +335,11 @@ export function AddExpense() {
                 <FormNotice>{notice}</FormNotice>
 
                 {/* ── Valor e descrição ──────────────────────── */}
+                {/* `autoComplete="off"` nos dois: o valor é um campo
+                    mascarado, e o histórico do navegador devolve texto que a
+                    máscara rejeita; na descrição a lista cobre o formulário no
+                    telefone. E-mail, nome, telefone e senha continuam
+                    autocompletando — desligar por atacado seria pior. */}
                 <div className={styles.rowValue}>
                     <Box
                         label="Valor"
@@ -346,6 +351,7 @@ export function AddExpense() {
                             <input
                                 id="expense-total"
                                 className={styles.amountInput}
+                                autoComplete="off"
                                 {...amountField}
                             />
                         </div>
@@ -365,6 +371,7 @@ export function AddExpense() {
                         <input
                             id="expense-description"
                             className={styles.plainInput}
+                            autoComplete="off"
                             maxLength={255}
                             placeholder="Mercado · compras do mês"
                             value={draft.Description}
@@ -511,10 +518,11 @@ export function AddExpense() {
                         <span className={styles.groupLabelHint}>
                             {personsUsed === 0
                                 ? "opcional"
-                                : `${personsUsed} selecionado${personsUsed === 1 ? "" : "s"} · dividindo ${draft.TotalValue === null
-                                    ? "o total"
-                                    : formatMoney(draft.TotalValue)
-                                }`}
+                                : `${personsUsed} selecionado${personsUsed === 1 ? "" : "s"} · dividindo ${
+                                      draft.TotalValue === null
+                                          ? "o total"
+                                          : formatMoney(draft.TotalValue)
+                                  }`}
                         </span>
                     </div>
                     <SplitEditor
@@ -663,9 +671,7 @@ export function AddExpense() {
 
                 {/* ── Etiquetas e observações ────────────────── */}
                 <div className={styles.extras}>
-                    <FormField
-                        label="Tags"
-                    >
+                    <FormField label="Tags">
                         {(field) => (
                             <TagInput
                                 id={field.id}
