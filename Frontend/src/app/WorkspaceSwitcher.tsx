@@ -70,7 +70,7 @@ export function WorkspaceSwitcher({
     onClose?: () => void;
 }) {
     const navigate = useNavigate();
-    const { workspaces, workspace, user } = useSession();
+    const { workspaces, workspace } = useSession();
     const switchWorkspace = useSwitchWorkspace();
 
     const sheet = variant === "sheet";
@@ -150,7 +150,6 @@ export function WorkspaceSwitcher({
 
     if (!workspace) return null;
 
-    const isOwnerOf = (candidate: ApiTypes.Workspace) => candidate.IdOwnerUser === user.IdUser;
     const isCurrent = (candidate: ApiTypes.Workspace) =>
         candidate.IdWorkspace === workspace.IdWorkspace;
 
@@ -242,31 +241,26 @@ export function WorkspaceSwitcher({
                                         {isCurrent(candidate)
                                             ? "Espaço atual"
                                             : pending
-                                              ? "Trocando…"
-                                              : "Entrar neste espaço"}
+                                                ? "Trocando…"
+                                                : "Entrar neste espaço"}
                                     </span>
                                 </span>
                             </button>
 
-                            {/* Só o dono: as rotas de gestão respondem 403
-                                para quem não é, e oferecer o caminho seria
-                                oferecer uma tela que sempre falha. */}
-                            {isOwnerOf(candidate) && (
-                                <button
-                                    type="button"
-                                    className={styles.edit}
-                                    disabled={pending}
-                                    title={
-                                        isCurrent(candidate)
-                                            ? "Gerenciar este espaço"
-                                            : "Entrar neste espaço e gerenciá-lo"
-                                    }
-                                    aria-label={`Gerenciar ${candidate.Name}`}
-                                    onClick={() => manage(candidate)}
-                                >
-                                    <IconEdit />
-                                </button>
-                            )}
+                            <button
+                                type="button"
+                                className={styles.edit}
+                                disabled={pending}
+                                title={
+                                    isCurrent(candidate)
+                                        ? "Gerenciar este espaço"
+                                        : "Entrar neste espaço e gerenciá-lo"
+                                }
+                                aria-label={`Gerenciar ${candidate.Name}`}
+                                onClick={() => manage(candidate)}
+                            >
+                                <IconEdit />
+                            </button>
                         </div>
                     ))}
 

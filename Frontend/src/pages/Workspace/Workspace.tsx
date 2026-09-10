@@ -353,7 +353,7 @@ export function Workspace() {
                             </form>
                         ) : (
                             <div className={styles.note}>
-                                Só o dono do espaço muda o nome e convida gente. Você lança e
+                                Só o dono do espaço muda o nome e convida novas pessoas. Você pode lançar e
                                 consulta normalmente.
                             </div>
                         )}
@@ -721,7 +721,7 @@ export function Workspace() {
                     }
                 }}
                 title={`Remover ${removing?.Name ?? ""} do espaço?`}
-                description="A pessoa perde o acesso na hora e não há como desfazer — readmitir é convidar de novo, e a data de entrada recomeça. Nada do que ela lançou é apagado: os gastos, as entradas e as contas são do espaço, o rateio das pessoas fica igual e nenhum saldo muda."
+                description="A pessoa perde o acesso na hora e não há como desfazer, precisa convidar novamente. Nada do que ela lançou é apagado: os gastos, as entradas e as contas são do espaço, o rateio das pessoas fica igual e nenhum saldo muda."
                 confirmLabel="Remover"
                 danger
                 pending={pending === "members"}
@@ -751,11 +751,11 @@ export function Workspace() {
                         <b>
                             {transferring?.Name ?? ""} passa a ser o dono e você passa a ser editor
                         </b>{" "}
-                        — você continua lançando e editando, mas deixa de renomear o espaço, de
-                        convidar, de remover gente e de mudar papéis. Nada do que existe no espaço
+                        - você continua lançando e editando, mas deixa de renomear o espaço, de
+                        convidar, de remover pessoas e de mudar papéis. Nada do que existe no espaço
                         muda: contas, lançamentos e saldos ficam exatamente como estão.{" "}
                         <b>Só {transferring?.Name ?? "o novo dono"} pode devolver a propriedade</b>{" "}
-                        — você não tem como desfazer isso sozinho.
+                        - você não tem como desfazer isso sozinho.
                     </>
                 }
                 confirmLabel="Passar a propriedade"
