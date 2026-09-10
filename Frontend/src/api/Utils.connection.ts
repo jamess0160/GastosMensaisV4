@@ -1,11 +1,7 @@
 import { http } from "./client";
 import type { ApiTypes } from "@/types/api";
 
-/** `/Utils`
- *
- *  `/Cache` fica fora daqui de propósito: é o subsistema interno de
- *  cache em memória, não é escopado por workspace e não faz parte do
- *  domínio do app — não consuma a partir das telas. */
+/** `/Utils` */
 class Connection {
     private readonly route = "/Utils";
 

@@ -7,8 +7,6 @@ class Schema {
 
     public readonly health = []
 
-    public readonly reload = []
-
     public readonly logs = [
         joiController.validateBody(Joi.object({
             Type: Joi.string().valid("info", "error", "userError", "untracked", "telemetry"),

@@ -7,7 +7,7 @@ import { Logs } from "root/Utils/Logs"
 //  *por que* é a section que tem a razão de mandar — três camadas, e nenhuma delas conhece as
 //  outras duas.
 //
-//  Mora em `Utils/Connections/` junto com Knex e Socket porque é isso que ele é: uma conexão
+//  Mora em `Utils/Connections/` junto com o Knex porque é isso que ele é: uma conexão
 //  externa. Veio pronto de outro projeto como `Utils/nodeMailer.ts`, com a forma certa e sete
 //  ajustes por fazer — os três primeiros de segurança:
 //
@@ -24,7 +24,7 @@ import { Logs } from "root/Utils/Logs"
 //     hoje é sempre um só, então não doeria agora — mas o primeiro envio em lote que aparecer
 //     vai chamar este método, e aí é vazamento de endereço entre usuários.
 //  4. Ganhou `html` além do `text`: todo e-mail destas etapas carrega link.
-//  5. Instância única com `pool: true`, como o Knex e o `cacheEngine`. Sem pool, cada envio
+//  5. Instância única com `pool: true`, como o Knex. Sem pool, cada envio
 //     abre TCP + TLS + auth do zero, e esse custo entra direto na latência da requisição.
 //  6. **A escolha do transporte vem antes da leitura das envs** — ver `transport()`.
 //  7. `sendMail` já devolve promise no nodemailer 10, então o `new Promise` em volta sumiu; e

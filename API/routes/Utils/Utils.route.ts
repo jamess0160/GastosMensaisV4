@@ -9,6 +9,4 @@ Base_Utils_route.get("/Utils/ServerTime", Base_Utils_schema.getServerTime, Async
 
 Base_Utils_route.get("/Utils/Health", Base_Utils_schema.health, AsyncHandler(Base_Utils_controller.health, false))
 
-Base_Utils_route.get("/Utils/Reload", Base_Utils_schema.reload, AsyncHandler(Base_Utils_controller.reload))
-
 Base_Utils_route.post("/Utils/Logs", Base_Utils_schema.logs, AsyncHandler(Base_Utils_controller.logs))

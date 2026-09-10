@@ -5,8 +5,6 @@ const caminhoLogs = `${process.cwd()}/Logs/`
 
 const RotineLoggers: Record<string, winston.Logger> = {}
 
-const CacheLoggers: Record<string, winston.Logger> = {}
-
 const Loggers: Partial<Record<KeyLogs, winston.Logger>> = {}
 
 function createLogger(path: string, level: string = path) {
@@ -54,20 +52,6 @@ export namespace Logs {
         }
 
         RotineLoggers[key].log({
-            level: name,
-            message: JSON.stringify(newLog)
-        })
-    }
-
-    export function insertCacheLog(newLog: Log, name: string) {
-
-        let key = `cache/${name}`
-
-        if (!CacheLoggers[key]) {
-            CacheLoggers[key] = createLogger(key, name)
-        }
-
-        CacheLoggers[key].log({
             level: name,
             message: JSON.stringify(newLog)
         })

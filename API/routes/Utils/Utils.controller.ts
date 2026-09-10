@@ -1,7 +1,6 @@
 import { Request, Response } from "express"
 import { Logs } from "root/Utils/Logs"
 import { BaseUtilsNamespace } from "./sections/types"
-import { socket } from "root/Utils/socket"
 
 class Controller {
 
@@ -15,12 +14,6 @@ class Controller {
             timeStamp: Date.now(),
             serverTime: new Date().toLocaleString("pt-br"),
         })
-    }
-
-    reload = async (req: Request, res: Response) => {
-        socket.emmitReload()
-
-        res.send("Mensagem socket enviada com sucesso!")
     }
 
     logs = async (req: Request, res: Response) => {

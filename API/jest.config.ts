@@ -24,9 +24,9 @@ const config: Config = {
     maxWorkers: 1,
     testTimeout: 30000,
 
-    //  Importar o app em memória deixa handles vivos que nunca fecham sozinhos (o socket.io do
-    //  Utils/socket.ts e o setInterval do memoryLog do cache). Sem isso o jest termina os testes
-    //  e fica pendurado esperando o event loop esvaziar.
+    //  Importar o app em memória pode deixar handles vivos que não fecham sozinhos (o pool do
+    //  nodemailer é o que sobrou). Sem isso o jest termina os testes e fica pendurado esperando
+    //  o event loop esvaziar.
     forceExit: true,
 
     clearMocks: true,

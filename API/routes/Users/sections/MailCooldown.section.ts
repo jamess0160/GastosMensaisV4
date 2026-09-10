@@ -7,13 +7,13 @@ import crypto from "crypto"
 //  sem freio nenhum, um laço sobre o `resendConfirmation` enche a caixa de entrada de outra
 //  pessoa usando o meu servidor, e queima a reputação do domínio no provedor junto.
 //
-//  **NÃO passa pelo `cacheEngine`**, e essa é a única decisão desta section. O plano da etapa
-//  previa isso — o `cacheEngine` já é um cache em memória por chave, e seria a peça óbvia —,
-//  mas ele é exposto por HTTP: `GET /Cache/CacheName=:CacheName` devolve o balde inteiro para
-//  qualquer sessão autenticada, e `POST /Cache` escreve nele. Guardar aqui a lista de quem
-//  pediu reenvio publicaria **exatamente** o que a resposta 200-sempre existe para esconder —
-//  quais e-mails têm conta —, e um `POST /Cache` limparia o freio. Um `Map` privado dentro
-//  desta section não tem nenhuma das duas portas.
+//  **A janela é um `Map` privado desta section, e não um balde de cache genérico** — essa é a
+//  única decisão daqui. O projeto teve um `cacheEngine` exposto por HTTP, e ele era a peça
+//  óbvia para guardar isto; era também o motivo para não guardar: qualquer sessão autenticada
+//  lia o balde inteiro e escrevia nele, o que publicaria **exatamente** o que a resposta
+//  200-sempre existe para esconder — quais e-mails têm conta — e daria a quem quisesse um jeito
+//  de limpar o freio. O cache saiu do projeto; a regra fica: o que mora aqui não ganha porta
+//  HTTP, nem a de leitura nem a de escrita.
 //
 //  Duas consequências aceitas, e as duas são o preço de não ter tabela nem Redis:
 //
