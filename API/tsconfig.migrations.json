@@ -3,13 +3,16 @@
     //  knex, que carrega os .js de build/migrations um a um. Herdar do tsconfig principal
     //  evita as duas configurações divergirem (era o caso: target es2020 contra ESNext).
     "extends": "./tsconfig.json",
-    "compilerOptions": {
-        //  rootDir na própria pasta para a saída ser build/migrations/<arquivo>.js, e não
-        //  build/migrations/migrations/<arquivo>.js
-        "rootDir": "./migrations",
-        "outDir": "build/migrations"
-    },
+    //  O knexfile entra junto porque o CLI precisa dele para saber contra qual banco rodar, e
+    //  dentro da imagem não há ts-node para ler o .ts. Sem ele, `build/` tinha as migrations e
+    //  nada que soubesse executá-las.
+    //
+    //  O rootDir "." e o outDir "build" vêm do tsconfig principal e não são sobrescritos aqui
+    //  de propósito: é o que faz a saída ser build/knexfile.js ao lado de build/migrations/*.js,
+    //  espelhando a árvore do projeto. O que o knexfile importa (Utils/) é compilado junto pelo
+    //  mesmo motivo — o require dele tem que achar alguém do outro lado.
     "include": [
-        "./migrations/*.ts"
+        "./migrations/*.ts",
+        "./knexfile.ts"
     ]
 }
