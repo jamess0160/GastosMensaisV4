@@ -9,6 +9,10 @@ const emailOptions = { tlds: { allow: false } }
 //  operação própria, que continua na etapa 9 do ROADMAP.
 const inviteRole = Joi.string().valid("editor", "viewer")
 
+//  A listagem de membros tem os TRÊS papéis. 'owner' não se convida, mas é justamente ele
+//  quem mais aparece aqui — reusar o inviteRole faria a resposta do dono não validar.
+const memberRole = Joi.string().valid("owner", "editor", "viewer")
+
 class Schema {
 
     //  Só o nome. IdOwnerUser vem do token, e não há IdWorkspace a receber: ele nasce nesta
@@ -88,6 +92,31 @@ class Schema {
             IdAcceptedUser: Joi.number().allow(null).required(),
             CreatedAt: Joi.date().required(),
             UpdatedAt: Joi.date().required(),
+        }))),
+    ]
+
+    //  Quem tem acesso ao espaço da sessão. Sem validateParams e sem validateQuery: o
+    //  workspace é o do token, e não há filtro nenhum a receber.
+    //
+    //  A resposta NÃO tem IdUser. O que identifica um membro daqui para frente é o
+    //  IdWorkspaceMember: a matrícula é do espaço e já nasce escopada, enquanto o IdUser é
+    //  global e atravessa tenants. É o mesmo motivo por que nenhuma rota do projeto aceita
+    //  IdUser do cliente.
+    public readonly getMembers = [
+        joiController.validateResponse(Joi.array().items(Joi.object({
+            IdWorkspaceMember: Joi.number().required(),
+            //  Nome e e-mail vêm de Users pelo join: sem eles a lista seria uma lista de ids.
+            Name: Joi.string().required(),
+            Email: Joi.string().required(),
+            Role: memberRole.required(),
+            //  O CreatedAt da matrícula, renomeado: "quando entrou no espaço" é o que a
+            //  coluna significa aqui, e CreatedAt ao lado de um nome de pessoa se leria como
+            //  a data do cadastro dela.
+            JoinedAt: Joi.date().required(),
+            //  Igual ao Current do getSelf: não descreve a linha, descreve o token que
+            //  respondeu. É o que deixa a tela não oferecer "remover" no próprio nome — e
+            //  comparar e-mail no cliente seria comparar a coisa errada.
+            IsSelf: Joi.boolean().required(),
         }))),
     ]
 

@@ -87,6 +87,72 @@
     color: var(--pos-ink, var(--ink-2));
 }
 
+/* ── Quem tem acesso ─────────────────────────────────────── */
+
+/* Mesma forma da lista de convites, de propósito: são duas listas de
+   gente no mesmo cartão de cima, e formas diferentes fariam parecer que
+   uma é mais importante que a outra.
+
+   A linha é `flex` com o corpo em `flex: 1` porque as etapas seguintes
+   penduram AÇÃO nela — trocar papel, remover, sair. Assim o botão entra
+   à direita sem que a linha precise ser remontada, e a 390px ele desce
+   para a linha de baixo pelo `wrap` em vez de espremer o nome. */
+.members {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.member {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.memberBody {
+    flex: 1;
+    min-width: 180px;
+}
+
+.memberName {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.memberSub {
+    font-size: 11.5px;
+    color: var(--ink-2);
+    margin-top: 2px;
+    /* O e-mail é a única coisa aqui que não tem tamanho previsível: sem
+       isto ele empurra a largura da linha inteira no telefone. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* "você" em vez de um selo cheio: ele repete em uma linha só de todas, e
+   um Badge do tamanho dos outros roubaria a atenção do nome. */
+.selfTag {
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-2);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 7px;
+}
+
 /* ── A lista de convites ──────────────────────────────────── */
 
 .invites {

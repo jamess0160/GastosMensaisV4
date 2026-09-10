@@ -3,6 +3,7 @@ import { CreateOwn } from "./sections/POST/createOwn"
 import { GetSelf } from "./sections/GET/getSelf"
 import { GetInviteByHash } from "./sections/GET/getInviteByHash"
 import { GetInvites } from "./sections/GET/getInvites"
+import { GetMembers } from "./sections/GET/getMembers"
 import { CreateInvite } from "./sections/POST/createInvite"
 import { Join } from "./sections/POST/join"
 import { Switch } from "./sections/POST/switch"
@@ -33,6 +34,12 @@ class Controller {
 
     getInvites = async (req: Request, res: Response) => {
         res.json(await new GetInvites().run(res.locals.IdWorkspace, res.locals.IdUser))
+    }
+
+    //  O IdUser vai junto por dois motivos: ele é quem a matrícula é conferida contra, e é
+    //  ele que marca o IsSelf de uma das linhas.
+    getMembers = async (req: Request, res: Response) => {
+        res.json(await new GetMembers().run(res.locals.IdWorkspace, res.locals.IdUser))
     }
 
     //  Sem res.locals: é rota pública, o que identifica o convite é o hash.

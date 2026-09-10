@@ -16,6 +16,13 @@ export const queryKeys = {
      *  rota não recebe nenhum dos dois — ela olha o workspace do cookie,
      *  e trocar de espaço limpa o cache inteiro de qualquer jeito. */
     invites: ["invites"] as const,
+    /** Quem tem acesso ao espaço da sessão. Sem mês e sem id, pelo
+     *  mesmo motivo de `invites`: a rota olha o workspace do cookie.
+     *
+     *  Chave própria, e não junto de `invites`: as duas listas mudam por
+     *  motivos diferentes — aceitar um convite tira uma linha de uma e
+     *  põe na outra, mas trocar o papel de um membro só mexe nesta. */
+    members: ["members"] as const,
     persons: ["persons"] as const,
     /** As contas NÃO são o mesmo em todo mês: a lista é, o `Balance`
      *  não. Ele é recortado pelo `ReferenceMonth` a cada leitura, então

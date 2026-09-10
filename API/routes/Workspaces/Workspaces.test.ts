@@ -271,6 +271,90 @@ describe("Workspaces", () => {
     //  corpo e entrava direto como matrícula 'owner' do tenant alheio. O que entra no lugar é o
     //  hash desta linha, e é por isso que a suíte cobre com tanto detalhe quem pode criar,
     //  quem pode aceitar e o que acontece com um link repassado.
+    describe("GET /Workspaces/members", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().get("/Workspaces/members")
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get("/Workspaces/members")
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Token assinado pela própria API, apontando para um workspace de que o usuário não é
+        //  membro. É o assertMember que pega — e 406 "não encontrado", não 404: um 404
+        //  confirmaria que o workspace existe.
+        it("recusa quem não é membro, sem confirmar que o workspace existe", async () => {
+            let outsider = await UsersFactory.create()
+
+            let response = await new TestClient(UsersFactory.buildToken(outsider.user.IdUser, root.workspace.IdWorkspace)).get("/Workspaces/members")
+
+            expect(response.status).toBe(406)
+            expect(response.body.msg).toBe("Workspace não encontrado!")
+        })
+
+        //  Ao contrário das rotas de convite, esta abre com assertMember: quem divide o espaço
+        //  tem direito de saber com quem divide.
+        it("permite a leitura por editor, e marca a linha dele com IsSelf", async () => {
+            let owner = await UsersFactory.create({ Name: "Dona do espaço" })
+            let member = await UsersFactory.create({ Name: "Editor convidado" })
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let response = await new TestClient(UsersFactory.buildToken(member.user.IdUser, owner.workspace.IdWorkspace)).get("/Workspaces/members")
+
+            expect(response.status).toBe(200)
+            expect(response.body).toHaveLength(2)
+
+            //  A ordem é a da matrícula, que é a de entrada: o dono primeiro
+            expect(response.body[0]).toMatchObject({
+                Name: "Dona do espaço",
+                Email: owner.user.Email,
+                Role: "owner",
+                IsSelf: false,
+            })
+            expect(response.body[1]).toMatchObject({
+                Name: "Editor convidado",
+                Email: member.user.Email,
+                Role: "editor",
+                IsSelf: true,
+            })
+
+            //  A data de entrada é o CreatedAt da MATRÍCULA, não o do usuário
+            let membership = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            expect(new Date(response.body[1].JoinedAt).getTime()).toBe(new Date(membership!.CreatedAt).getTime())
+        })
+
+        //  O que identifica um membro daqui para frente é a matrícula: ela é do espaço e já
+        //  nasce escopada, enquanto o IdUser é global e atravessa tenants.
+        it("devolve o IdWorkspaceMember e nenhum IdUser", async () => {
+            let owner = await UsersFactory.createClient()
+
+            let response = await owner.client.get("/Workspaces/members")
+
+            let membership = await findMembership(owner.workspace.IdWorkspace, owner.user.IdUser)
+
+            expect(response.body[0].IdWorkspaceMember).toBe(membership!.IdWorkspaceMember)
+            expect(response.body[0]).not.toHaveProperty("IdUser")
+        })
+
+        //  Cada linha é de uma matrícula, e a matrícula é do workspace: o membro do vizinho
+        //  não aparece aqui nem quando os dois espaços são do mesmo dono.
+        it("lista só os membros do workspace da sessão", async () => {
+            let owner = await UsersFactory.createClient({ Name: "Dono de dois espaços" })
+            let other = await UsersFactory.create({ Name: "Membro do outro espaço" })
+            await seedMembership(other.workspace.IdWorkspace, owner.user.IdUser, "editor")
+
+            let response = await owner.client.get("/Workspaces/members")
+
+            expect(response.body.map((item: { Email: string }) => item.Email)).toEqual([owner.user.Email])
+        })
+    })
+
     describe("POST /Workspaces/invite", () => {
 
         it("recusa sem token", async () => {

@@ -208,6 +208,40 @@ export namespace ApiTypes {
         Name: string;
     }
 
+    /* ── 4.1 Membros ──────────────────────────────────────────── */
+
+    /** Os TRÊS papéis de uma matrícula. Diferente de `WorkspaceRole`, que
+     *  é o do CONVITE e não tem `owner`: propriedade não se convida, mas
+     *  é o papel que mais aparece na lista de membros. */
+    export type WorkspaceMemberRole = "owner" | "editor" | "viewer";
+
+    /** Uma linha de "quem tem acesso" — `GET /Workspaces/members`.
+     *
+     *  Abre com `assertMember`, e não com `assertRole`: qualquer membro
+     *  lê a lista, porque quem divide o espaço tem direito de saber com
+     *  quem divide.
+     *
+     *  **Não existe `IdUser` aqui, de propósito.** O que endereça um
+     *  membro é o `IdWorkspaceMember`: a matrícula é do espaço e já nasce
+     *  escopada, enquanto o `IdUser` é global e atravessa tenants. As
+     *  ações de membro recebem a matrícula. */
+    export interface WorkspaceMember {
+        IdWorkspaceMember: number;
+        Name: string;
+        Email: string;
+        Role: WorkspaceMemberRole;
+        /** Quando a pessoa entrou NO ESPAÇO — o `CreatedAt` da
+         *  matrícula, não o do cadastro dela. */
+        JoinedAt: DateTime;
+        /** É esta a linha do usuário da SESSÃO?
+         *
+         *  Como o `Current` do workspace, ele não descreve a linha e sim
+         *  o token que respondeu. É o que deixa a tela não oferecer
+         *  "remover" no próprio nome — comparar e-mail no cliente seria
+         *  comparar a coisa errada. */
+        IsSelf: boolean;
+    }
+
     /* ── 4.1 Convites ─────────────────────────────────────────── */
 
     /** `owner` NÃO se convida: propriedade não se transfere por convite,

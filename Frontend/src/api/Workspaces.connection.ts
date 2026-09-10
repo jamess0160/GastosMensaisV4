@@ -56,6 +56,25 @@ class Connection {
         return data;
     }
 
+    /* ── Membros ──────────────────────────────────────────── */
+
+    /** Quem tem acesso ao espaço da SESSÃO — nome, e-mail, papel e
+     *  quando entrou.
+     *
+     *  **Não é rota de dono.** Ao contrário de `invites`, ela abre com
+     *  `assertMember`: qualquer membro lê, porque quem divide o espaço
+     *  tem direito de saber com quem divide. Quem não é membro leva 406
+     *  "Workspace não encontrado" — a rota não confirma que o espaço
+     *  existe.
+     *
+     *  A lista NÃO traz `IdUser`, e as ações de membro endereçam o
+     *  `IdWorkspaceMember`: a matrícula é do espaço, o usuário é global.
+     *  Uma das linhas vem com `IsSelf: true` — é a sua. */
+    async members(): Promise<ApiTypes.WorkspaceMember[]> {
+        const { data } = await http.get<ApiTypes.WorkspaceMember[]>(`${this.route}/members`);
+        return data;
+    }
+
     /* ── Convites ─────────────────────────────────────────── */
 
     /** Cria o convite do workspace da sessão. **Só `owner`** — quem não

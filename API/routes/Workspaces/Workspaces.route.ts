@@ -19,6 +19,12 @@ Workspaces_route.get("/Workspaces/getSelf", Workspaces_schema.getSelf, AsyncHand
 //  pelo cliente, e a única que precisa: nas demais ele vem de dentro do token da sessão.
 Workspaces_route.post("/Workspaces/switch", Workspaces_schema.switch, AsyncHandler(Workspaces_controller.switch))
 
+//  Quem tem acesso ao espaço da sessão. Ao contrário das rotas de convite, esta abre com
+//  assertMember e não com assertRole: quem divide o espaço tem direito de saber com quem
+//  divide — os lançamentos de todos já estão à vista de todos, e esconder a lista só deixaria
+//  o editor sem saber a quem pedir uma permissão.
+Workspaces_route.get("/Workspaces/members", Workspaces_schema.getMembers, AsyncHandler(Workspaces_controller.getMembers))
+
 //  O convite — a porta pela qual se entra num workspace alheio, agora que o cadastro não aceita
 //  mais um IdWorkspace do corpo. Só o dono convida, lista e revoga (assertRole owner): um
 //  editor que pudesse convidar promoveria terceiros ao próprio nível sem o dono saber.

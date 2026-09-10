@@ -1,5 +1,6 @@
 import { BaseModel, MaybeArray } from "root/Utils/Base"
 import { Database } from "root/Utils/database"
+import { WorkspacesNamespace } from "./sections/types"
 
 //  Tabela irmã de Workspaces: é a matrícula do usuário no tenant e o que toda leitura de
 //  domínio vai consultar para decidir se o IdWorkspace pedido é mesmo do usuário do token.
@@ -9,6 +10,31 @@ export class class_WorkspaceMembers_model extends BaseModel {
 
     getByWorkspace(IdWorkspace: number) {
         return this.baseQuery.clone().where("IdWorkspace", IdWorkspace)
+    }
+
+    //  "Quem tem acesso a este espaço", com o nome e o e-mail de cada um — a única leitura
+    //  desta tabela que sai para a tela, e por isso a única que precisa do join.
+    //
+    //  Os dados da pessoa moram em Users, e Users não tem IdWorkspace: é o join que os traz
+    //  sem que a section precise de uma segunda consulta por linha.
+    //
+    //  A ordem é a da matrícula, que é a ordem de entrada: o dono original é o primeiro, e
+    //  quem entrou depois vem na sequência em que entrou. Ordenar por papel deixaria a lista
+    //  pulando de lugar quando a propriedade é transferida.
+    getByWorkspaceWithUser(IdWorkspace: number) {
+        return this.KnexConnection
+            .select(
+                "WorkspaceMembers.IdWorkspaceMember",
+                "WorkspaceMembers.IdUser",
+                "WorkspaceMembers.Role",
+                "WorkspaceMembers.CreatedAt",
+                "Users.Name",
+                "Users.Email",
+            )
+            .from<Database.WorkspaceMembers>("WorkspaceMembers")
+            .innerJoin("Users", "Users.IdUser", "WorkspaceMembers.IdUser")
+            .where("WorkspaceMembers.IdWorkspace", IdWorkspace)
+            .orderBy("WorkspaceMembers.IdWorkspaceMember") as unknown as Promise<WorkspacesNamespace.WorkspaceMemberWithUser[]>
     }
 
     getByUser(IdUser: number) {

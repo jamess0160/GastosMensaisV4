@@ -4,6 +4,7 @@ import styles from "./src/styles.module.css";
 import { WorkspaceController, type InviteDraft, type WorkspaceContext } from "./controller";
 import { sessionKeys, useSession } from "@/app/session";
 import { queryKeys } from "@/data/keys";
+import { useWorkspaceMembers } from "@/data/members";
 import { WorkspacesConnection } from "@/api/Workspaces.connection";
 import { Badge, Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { FormError, FormField, FormNotice, Input, SegmentedControl } from "@/ui/form";
@@ -29,6 +30,13 @@ import type { ApiTypes } from "@/types/api";
 const ROLE_LABEL: Record<ApiTypes.WorkspaceRole, string> = {
     editor: "Pode lançar e editar",
     viewer: "Só consulta",
+};
+
+/* Três papéis, e não os dois do convite: `owner` não se convida, mas é
+   quem mais aparece na lista de membros. */
+const MEMBER_ROLE_LABEL: Record<ApiTypes.WorkspaceMemberRole, string> = {
+    owner: "Dono do espaço",
+    ...ROLE_LABEL,
 };
 
 const emptyInviteDraft = (): InviteDraft => ({ Email: "", Role: "editor" });
@@ -66,6 +74,12 @@ export function Workspace() {
         queryFn: () => WorkspacesConnection.invites(),
         enabled: isOwner,
     });
+
+    /* Sem `enabled`, ao contrário dos convites: a rota abre com
+       `assertMember`, então quem só lança também lê a lista. Esconder
+       dele com quem divide o espaço deixaria o editor sem saber a quem
+       pedir uma permissão. */
+    const members = useWorkspaceMembers();
 
     const context = useMemo<WorkspaceContext>(
         () => ({
@@ -191,7 +205,57 @@ export function Workspace() {
                     </div>
                 </Card>
 
+                {/* ── Quem tem acesso ───────────────────────── */}
+                <Card>
+                    <div className={styles.section}>
+                        <div className={styles.sectionHead}>
+                            <div>
+                                <div className={styles.sectionTitle}>Quem tem acesso</div>
+                                <div className={styles.sectionSub}>
+                                    Todos aqui veem as mesmas contas, os mesmos lançamentos e os
+                                    mesmos saldos. O que muda entre os papéis é quem pode escrever.
+                                </div>
+                            </div>
+                        </div>
+
+                        {members.isPending ? (
+                            <LoadingRows rows={2} />
+                        ) : members.isError ? (
+                            <ErrorState
+                                inline
+                                error={members.error}
+                                onRetry={() => void members.refetch()}
+                            />
+                        ) : (
+                            <div className={styles.members}>
+                                {(members.data ?? []).map((member) => (
+                                    <div className={styles.member} key={member.IdWorkspaceMember}>
+                                        <div className={styles.memberBody}>
+                                            <div className={styles.memberName}>
+                                                {member.Name}
+                                                {/* Quem é "você" vem da API, em
+                                                    `IsSelf`: comparar e-mail aqui
+                                                    seria comparar a coisa errada. */}
+                                                {member.IsSelf && (
+                                                    <span className={styles.selfTag}>você</span>
+                                                )}
+                                            </div>
+                                            <div className={styles.memberSub}>{member.Email}</div>
+                                            <div className={styles.memberSub}>
+                                                {MEMBER_ROLE_LABEL[member.Role]} · entrou em{" "}
+                                                {formatDateTime(member.JoinedAt)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </Card>
+
                 {/* ── Convites ──────────────────────────────── */}
+                {/* Depois dos membros, e não antes: o convite é o que
+                    ainda NÃO virou acesso. */}
                 {isOwner && (
                     <Card>
                         <div className={styles.section}>
@@ -357,8 +421,8 @@ export function Workspace() {
                             )}
 
                             <div className={styles.note}>
-                                Tirar alguém que <b>já entrou</b> ainda não existe na API — revogar
-                                um convite só impede quem ainda não usou o link.
+                                Revogar um convite só impede quem <b>ainda não usou</b> o link. Quem
+                                já entrou aparece em <b>Quem tem acesso</b>, acima.
                             </div>
                         </div>
                     </Card>
