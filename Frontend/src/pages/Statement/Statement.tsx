@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { useMonthScope } from "@/app/monthScope";
 import { useSession } from "@/app/session";
+import { useAccounts } from "@/data/catalogs";
 import { useMonthStatement } from "@/data/month";
 import { Badge, Button, Card, Overline, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
@@ -79,6 +81,27 @@ export function Statement() {
     const [month, setMonth] = useMonthScope();
 
     const statement = useMonthStatement(month);
+
+    /* De que CONTA é cada cartão.
+
+       A fatura vem do extrato sabendo só o `IdPaymentMethod`, e o nome do
+       cartão sozinho não distingue dois "Cartão" de bancos diferentes. A
+       ligação já está no cadastro que a tela de Contas leu no mesmo mês
+       — `GET /Accounts` traz as formas de pagamento dentro da conta —,
+       então isto é a mesma entrada de cache, sem requisição a mais.
+
+       SEM filtrar `Active`, dos dois lados: o extrato lista a fatura do
+       cartão arquivado, e a conta arquivada com movimento no mês também
+       aparece. Filtrar aqui deixaria justamente essas faturas sem nome
+       de banco. */
+    const accounts = useAccounts();
+    const accountOfCard = useMemo(() => {
+        const index = new Map<number, string>();
+        for (const account of accounts.data ?? [])
+            for (const method of account.PaymentMethods)
+                index.set(method.IdPaymentMethod, account.Name);
+        return index;
+    }, [accounts.data]);
 
     /* O caminho de volta ao lançamento. QUAIS ids vêm depende do `Kind`,
        e a linha `opening` não tem nenhum — ela não é lançamento, é a
@@ -262,70 +285,85 @@ export function Statement() {
        não some: `payInvoice` quita o CICLO INTEIRO, então essa perna
        sai da conta junto. Uma linha invisível que mesmo assim tira
        dinheiro da conta é exatamente o que um extrato não pode ter. */
-    const cardSection = (card: ApiTypes.StatementCard) => (
-        <Card
-            key={`${card.IdPaymentMethod}-${card.DueDate}`}
-            padded={false}
-            className={styles.section}
-        >
-            <div className={styles.sectionHead}>
-                <div>
-                    <div className={styles.sectionTitle}>
-                        <IconCard />
-                        {card.Name}
-                    </div>
-                    <div className={styles.sectionSub}>
-                        Fatura com vencimento em {formatDate(card.DueDate)}
-                    </div>
-                    {/* O QUE ESTA FATURA COBRE, dito na tela.
+    const cardSection = (card: ApiTypes.StatementCard) => {
+        const accountName = accountOfCard.get(card.IdPaymentMethod);
 
-                        O recorte é o vencimento — é o que uma fatura é —,
-                        então a de setembro é feita de compras de agosto.
-                        Sem esta linha não há como saber, olhando, se
-                        aquelas compras pesam no mês selecionado ou no
-                        anterior; e num cartão em `purchase` a resposta é
-                        o anterior, que é a diferença que o modo produz e
-                        a razão de o "Restante" do Início e o "Saldo nas
-                        contas" discordarem. */}
-                    <div className={styles.cycle}>
-                        <span>{cycleLabel({ start: card.CycleStart, end: card.CycleEnd })}</span>
-                        <Badge tone="neutral">{COMPETENCE_LABEL[card.CompetenceMode]}</Badge>
-                    </div>
-                </div>
+        return (
+            <Card
+                key={`${card.IdPaymentMethod}-${card.DueDate}`}
+                padded={false}
+                className={styles.section}
+            >
+                <div className={styles.sectionHead}>
+                    <div>
+                        {/* O BANCO ANTES DO CARTÃO, como qualquer extrato
+                            identifica uma fatura. Dois cartões de nome
+                            parecido em bancos diferentes só se distinguem
+                            por aqui — e o ícone grande que estava neste
+                            lugar ocupava o espaço sem dizer nada: TODA
+                            seção desta metade da tela é de um cartão. */}
+                        <div className={styles.sectionTitle}>
+                            {accountName !== undefined && (
+                                <span className={styles.titleAccount}>{accountName}</span>
+                            )}
+                            {card.Name}
+                        </div>
+                        <div className={styles.sectionSub}>
+                            Fatura com vencimento em {formatDate(card.DueDate)}
+                        </div>
+                        {/* O QUE ESTA FATURA COBRE, dito na tela.
 
-                <div className={styles.ends}>
-                    <div className={styles.end}>
-                        <Overline>Total da fatura</Overline>
-                        <div className={`${styles.endValue} ${styles.endStrong}`}>
-                            {formatMoney(card.Total)}
+                            O recorte é o vencimento — é o que uma fatura
+                            é —, então a de setembro é feita de compras de
+                            agosto. Sem esta linha não há como saber,
+                            olhando, se aquelas compras pesam no mês
+                            selecionado ou no anterior; e num cartão em
+                            `purchase` a resposta é o anterior, que é a
+                            diferença que o modo produz e a razão de o
+                            "Restante" do Início e o "Saldo nas contas"
+                            discordarem. */}
+                        <div className={styles.cycle}>
+                            <span>
+                                {cycleLabel({ start: card.CycleStart, end: card.CycleEnd })}
+                            </span>
+                            <Badge tone="neutral">{COMPETENCE_LABEL[card.CompetenceMode]}</Badge>
+                        </div>
+                    </div>
+
+                    <div className={styles.ends}>
+                        <div className={styles.end}>
+                            <Overline>Total da fatura</Overline>
+                            <div className={`${styles.endValue} ${styles.endStrong}`}>
+                                {formatMoney(card.Total)}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {card.Entries.length === 0 ? (
-                <EmptyState
-                    inline
-                    title="Nada nesta fatura ainda"
-                    description="Todo o ciclo está marcado como previsto — nenhuma compra foi dada como lançada na fatura."
-                />
-            ) : (
-                cardTable(card.Entries)
-            )}
+                {card.Entries.length === 0 ? (
+                    <EmptyState
+                        inline
+                        title="Nada nesta fatura ainda"
+                        description="Todo o ciclo está marcado como previsto — nenhuma compra foi dada como lançada na fatura."
+                    />
+                ) : (
+                    cardTable(card.Entries)
+                )}
 
-            {card.Expected.length > 0 && (
-                <>
-                    <div className={styles.group}>
-                        <span>Previsto · ainda não apareceu na fatura</span>
-                        <span className={styles.groupValue}>
-                            {formatMoney(sumMoney(card.Expected.map((entry) => entry.Value)))}
-                        </span>
-                    </div>
-                    {cardTable(card.Expected)}
-                </>
-            )}
-        </Card>
-    );
+                {card.Expected.length > 0 && (
+                    <>
+                        <div className={styles.group}>
+                            <span>Previsto · ainda não apareceu na fatura</span>
+                            <span className={styles.groupValue}>
+                                {formatMoney(sumMoney(card.Expected.map((entry) => entry.Value)))}
+                            </span>
+                        </div>
+                        {cardTable(card.Expected)}
+                    </>
+                )}
+            </Card>
+        );
+    };
 
     const body = () => {
         if (statement.isError) return <ErrorState error={statement.error} />;

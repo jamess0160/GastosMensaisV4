@@ -47,6 +47,22 @@
     font-weight: 600;
 }
 
+/* O nome da CONTA, na frente do nome do cartão — é assim que um extrato
+   identifica de quem é a fatura. Ele vem mais fraco de propósito: quem
+   procura a fatura procura pelo cartão, e o banco é o desempate entre
+   dois cartões de nome parecido. O separador é do CSS porque é
+   decoração: lido em voz alta, "Nubank Cartão Roxo" já basta. */
+.titleAccount {
+    font-weight: 500;
+    color: var(--ink-2);
+}
+
+.titleAccount::after {
+    content: "·";
+    margin-left: 8px;
+    color: var(--ink-3);
+}
+
 .sectionSub {
     font-size: 12px;
     color: var(--ink-2);
