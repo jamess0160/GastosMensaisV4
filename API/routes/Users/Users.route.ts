@@ -2,12 +2,21 @@ import express from "express"
 import { Users_controller } from "./Users.controller"
 import { AsyncHandler } from "root/Utils/AsyncHandler"
 import { Users_schema } from "./Users.schema"
+import { RateLimits } from "./sections/RateLimits.section"
 
 export const Users_route = express()
 
+//  **O freio vem antes do schema em quatro rotas**, e a ordem é o ponto: o limitador é o
+//  primeiro middleware da rota, então a requisição que estourou o teto é recusada com 429 sem
+//  passar pelo Joi, pelo banco ou pelo bcrypt. Um freio depois da validação ainda deixaria o
+//  atacante pagar o custo do servidor a cada tentativa.
+//
+//  Só as públicas: as autenticadas já têm o token como porta, e um teto por IP nelas contaria
+//  o uso normal de quem está trabalhando. O porquê de cada janela está em `RateLimits.section`.
+
 //  Senha nunca vai na URL: o path inteiro cai no log de acesso do proxy, no histórico do
 //  browser, no header Referer e no próprio Logs.handleError. Login e troca de senha vão no body.
-Users_route.post("/Users/login", Users_schema.validateLogin, AsyncHandler(Users_controller.validateLogin, false))
+Users_route.post("/Users/login", RateLimits.login, Users_schema.validateLogin, AsyncHandler(Users_controller.validateLogin, false))
 
 //  Sem token de propósito (AsyncHandler(..., false)), como o login e o cadastro. Exigir sessão
 //  aqui responderia 401 justo no caso em que o usuário mais quer sair — token expirado, cookie
@@ -17,7 +26,7 @@ Users_route.post("/Users/logout", Users_schema.logout, AsyncHandler(Users_contro
 
 //  As duas da recuperacao sao publicas por definicao: quem esqueceu a senha nao tem sessao.
 //  A protecao nao e o token, e o link assinado que chega ao e-mail do dono da conta.
-Users_route.post("/Users/forgotPassword", Users_schema.forgotPassword, AsyncHandler(Users_controller.forgotPassword, false))
+Users_route.post("/Users/forgotPassword", RateLimits.forgotPassword, Users_schema.forgotPassword, AsyncHandler(Users_controller.forgotPassword, false))
 
 Users_route.post("/Users/resetPassword", Users_schema.resetPassword, AsyncHandler(Users_controller.resetPassword, false))
 
@@ -26,11 +35,11 @@ Users_route.post("/Users/resetPassword", Users_schema.resetPassword, AsyncHandle
 //  aparelho, e o reenvio e pedido justamente por quem nao conseguiu entrar.
 Users_route.post("/Users/confirmEmail", Users_schema.confirmEmail, AsyncHandler(Users_controller.confirmEmail, false))
 
-Users_route.post("/Users/resendConfirmation", Users_schema.resendConfirmation, AsyncHandler(Users_controller.resendConfirmation, false))
+Users_route.post("/Users/resendConfirmation", RateLimits.resendConfirmation, Users_schema.resendConfirmation, AsyncHandler(Users_controller.resendConfirmation, false))
 
 Users_route.get("/Users/getSelf", Users_schema.getSelf, AsyncHandler(Users_controller.getSelf))
 
-Users_route.post("/Users", Users_schema.create, AsyncHandler(Users_controller.create, false))
+Users_route.post("/Users", RateLimits.create, Users_schema.create, AsyncHandler(Users_controller.create, false))
 
 Users_route.put("/Users/IdUser=:IdUser", Users_schema.update, AsyncHandler(Users_controller.update))
 

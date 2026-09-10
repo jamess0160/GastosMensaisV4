@@ -3,6 +3,7 @@ import { TestClient, TestDatabase, TestEnv, TestUser, UsersFactory } from "root/
 import { mailer } from "root/Utils/Connections/Mailer"
 import { enviromentManager } from "root/Utils/enviromentManager"
 import { MailCooldown } from "./sections/MailCooldown.section"
+import { RateLimits } from "./sections/RateLimits.section"
 import { TERMS_VERSION } from "./sections/TermsVersion"
 import { UsersNamespace } from "./sections/types"
 
@@ -31,6 +32,20 @@ describe("Users", () => {
 
         root = await UsersFactory.create({ Name: "Usuário raiz" })
         client = new TestClient(root.token)
+    })
+
+    //  **O freio das rotas públicas fica ligado na suíte, e é zerado entre um teste e o outro.**
+    //
+    //  Desligá-lo em NODE_ENV=test seria não testar nada: é rodando ligado que o 429 abaixo
+    //  prova que ele existe. Mas a contagem é por IP e por processo, e esta suíte chama as
+    //  quatro rotas limitadas muito mais vezes do que um humano chamaria numa hora — 28
+    //  cadastros, 14 logins — todas do mesmo 127.0.0.1. Sem o reset, o teto pararia a suíte no
+    //  meio, e o que quebraria seria o teste seguinte, não o que estourou.
+    //
+    //  Mesmo motivo do MailCooldown.clear(), e mesma limitação: em modo end to end a contagem
+    //  vive no processo do servidor, e este reset não a alcança.
+    beforeEach(() => {
+        RateLimits.reset()
     })
 
     describe("POST /Users/login", () => {
@@ -229,6 +244,29 @@ describe("Users", () => {
             expect(found.status).toBe(200)
             expect(missing.status).toBe(200)
             expect(found.body).toEqual(missing.body)
+        })
+
+        //  **O teto: 5 por hora, por IP.** Os cinco primeiros respondem o que a rota sempre
+        //  respondeu; o sexto é recusado antes do schema, do banco e do envio.
+        //
+        //  O e-mail é o de uma conta que existe **e** o corpo do 429 não diz nada sobre ela: a
+        //  rota responde igual para endereço com e sem conta, e o freio não pode ser o que passa
+        //  a diferenciar os dois. Por isso o teto é contado por IP — contado por e-mail, este
+        //  mesmo laço trancaria a recuperação de senha da vítima.
+        it("recusa a sexta tentativa da mesma hora com 429", async () => {
+            let owner = await UsersFactory.create()
+
+            let anonymous = client.anonymous()
+
+            for (let attempt = 1; attempt <= 5; attempt++) {
+                expect((await anonymous.post("/Users/forgotPassword", { Email: owner.user.Email })).status).toBe(200)
+            }
+
+            let blocked = await anonymous.post("/Users/forgotPassword", { Email: owner.user.Email })
+
+            expect(blocked.status).toBe(429)
+            expect(blocked.body.msg).toBeTruthy()
+            expect(JSON.stringify(blocked.body)).not.toContain(owner.user.Email)
         })
 
         describeMailbox("o e-mail que sai", () => {
