@@ -172,7 +172,7 @@ describe("removeBudgetPeriod", () => {
         // É o único delete físico do projeto — mas só do período: um
         // período é plano, não lançamento.
         expect(context.finishSubmit).toHaveBeenCalledWith(
-            "Teto removido deste mês — a definição continua valendo.",
+            "Orçamento removido deste mês.",
         );
         expect(context.closeBudgetForm).toHaveBeenCalledOnce();
     });

@@ -20,7 +20,7 @@ export async function removeBudgetPeriod(
     try {
         await BudgetPeriodsConnection.remove(idBudgetPeriod);
         context.closeBudgetForm();
-        context.finishSubmit("Teto removido deste mês — a definição continua valendo.");
+        context.finishSubmit("Orçamento removido deste mês.");
     } catch (cause) {
         context.failSubmit(errorMessage(cause));
     }
