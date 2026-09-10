@@ -124,11 +124,19 @@ export function Workspace() {
 
     return (
         <Page>
+            {/* O selo do papel fica aqui, e não no card do nome: ele
+                qualifica o ESPAÇO — "você é o dono deste espaço" —, e
+                dentro daquele cabeçalho ele parecia qualificar o campo.
+                Ao lado do título ele também cabe numa linha só a 390px,
+                onde antes quebrava contra o subtítulo do bloco. */}
             <div className={styles.head}>
                 <PageHead
                     title={workspace.Name}
                     subtitle={`Onde vivem suas contas, categorias e lançamentos · ${workspaces.length} espaço${workspaces.length === 1 ? "" : "s"} nesta conta`}
                 />
+                <Badge className={styles.headBadge}>
+                    {isOwner ? "Você é o dono" : "Você é membro"}
+                </Badge>
             </div>
 
             <div className={styles.grid}>
@@ -142,7 +150,6 @@ export function Workspace() {
                                     É o que aparece no seletor da barra lateral, em toda tela.
                                 </div>
                             </div>
-                            <Badge>{isOwner ? "Você é o dono" : "Você é membro"}</Badge>
                         </div>
 
                         <FormError>{errors.name}</FormError>
