@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { server } from "@/test/server";
 import { leaveWorkspace } from "../sections/leaveWorkspace";
 import { removeMember } from "../sections/removeMember";
+import { transferOwnership } from "../sections/transferOwnership";
 import { updateMemberRole } from "../sections/updateMemberRole";
 import { aMember, fakeWorkspaceContext } from "./context";
 import type { ApiTypes } from "@/types/api";
@@ -192,6 +193,121 @@ describe("removeMember", () => {
         expect(context.failSubmit).toHaveBeenCalledWith(
             "members",
             expect.stringContaining("transfira a propriedade"),
+        );
+    });
+});
+
+/* A única ação do app que muda o que o PRÓPRIO usuário pode fazer: quem
+   chama sai dela como editor. Por isso ela relê DUAS listas — os membros,
+   porque os dois papéis trocaram, e os espaços, porque é do
+   `IdOwnerUser` de lá que a tela tira o `isOwner`. */
+describe("transferOwnership", () => {
+    it("endereça a matrícula de quem RECEBE, sem corpo", async () => {
+        let method = "";
+        let path = "";
+        let body: unknown = "não lido";
+        server.use(
+            msw.post(
+                "*/api/Workspaces/members/IdWorkspaceMember=7/transferOwnership",
+                async ({ request }) => {
+                    method = request.method;
+                    path = new URL(request.url).pathname;
+                    body = await request.text();
+                    return HttpResponse.json({ msg: "Propriedade transferida com sucesso" });
+                },
+            ),
+        );
+        const context = fakeWorkspaceContext();
+
+        await transferOwnership(context, aMember({ Role: "editor" }));
+
+        expect(method).toBe("POST");
+        expect(path).toMatch(/IdWorkspaceMember=7\/transferOwnership$/);
+        // Transferir não tem opção: o alvo vira dono e quem chamou vira
+        // editor, e as duas coisas são a operação, não parâmetros dela.
+        expect(body).toBe("");
+        expect(context.beginSubmit).toHaveBeenCalledWith("members");
+    });
+
+    // A releitura que se esquece. Sem a lista de ESPAÇOS, a tela seguiria
+    // oferecendo o bloco de convites a quem agora leva 403 e escondendo o
+    // botão de sair de quem agora pode usá-lo — as duas guardas leem o
+    // `isOwner`, que sai do `IdOwnerUser` daquela lista.
+    it("relê os membros E os espaços — é o IdOwnerUser que virou o lado", async () => {
+        server.use(
+            msw.post("*/api/Workspaces/members/IdWorkspaceMember=7/transferOwnership", () =>
+                HttpResponse.json({ msg: "Propriedade transferida com sucesso" }),
+            ),
+        );
+        const context = fakeWorkspaceContext();
+
+        await transferOwnership(context, aMember({ Role: "editor" }));
+
+        expect(context.refreshMembers).toHaveBeenCalledOnce();
+        expect(context.refreshWorkspaces).toHaveBeenCalledOnce();
+    });
+
+    // O aviso tem de dizer as duas metades: o que quem clicou continua
+    // podendo, e que o desfazer não está mais com ele.
+    it("diz que quem clicou continua editando e que só o novo dono devolve", async () => {
+        server.use(
+            msw.post("*/api/Workspaces/members/IdWorkspaceMember=7/transferOwnership", () =>
+                HttpResponse.json({ msg: "Propriedade transferida com sucesso" }),
+            ),
+        );
+        const context = fakeWorkspaceContext();
+
+        await transferOwnership(context, aMember({ Role: "editor" }));
+
+        expect(context.finishSubmit).toHaveBeenCalledWith(
+            "members",
+            "Ana agora é o dono do espaço. Você continua podendo lançar e editar, e só Ana pode devolver a propriedade.",
+        );
+    });
+
+    it("mostra a msg do servidor quando quem chamou não é o dono", async () => {
+        server.use(
+            msw.post("*/api/Workspaces/members/IdWorkspaceMember=7/transferOwnership", () =>
+                HttpResponse.json(
+                    { msg: "Você não tem permissão para essa ação neste workspace." },
+                    { status: 403 },
+                ),
+            ),
+        );
+        const context = fakeWorkspaceContext();
+
+        await transferOwnership(context, aMember({ Role: "editor" }));
+
+        expect(context.refreshMembers).not.toHaveBeenCalled();
+        expect(context.refreshWorkspaces).not.toHaveBeenCalled();
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "members",
+            "Você não tem permissão para essa ação neste workspace.",
+        );
+    });
+
+    // A tela não oferece o botão na própria linha, mas a rota recusa de
+    // qualquer jeito: transferir para si mesmo gravaria o mesmo estado com
+    // outro nome.
+    it("mostra a msg quando o alvo é a própria matrícula", async () => {
+        server.use(
+            msw.post("*/api/Workspaces/members/IdWorkspaceMember=7/transferOwnership", () =>
+                HttpResponse.json(
+                    {
+                        msg: "Você já é o dono deste espaço. Escolha outro membro para receber a propriedade.",
+                    },
+                    { status: 406 },
+                ),
+            ),
+        );
+        const context = fakeWorkspaceContext();
+
+        await transferOwnership(context, aMember({ IsSelf: true, Role: "owner" }));
+
+        expect(context.refreshWorkspaces).not.toHaveBeenCalled();
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "members",
+            expect.stringContaining("Você já é o dono deste espaço"),
         );
     });
 });

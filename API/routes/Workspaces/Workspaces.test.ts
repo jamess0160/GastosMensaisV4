@@ -791,6 +791,187 @@ describe("Workspaces", () => {
         })
     })
 
+    describe("POST /Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember/transferOwnership", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().post("/Workspaces/members/IdWorkspaceMember=1/transferOwnership", {})
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).post("/Workspaces/members/IdWorkspaceMember=1/transferOwnership", {})
+
+            expect(response.status).toBe(406)
+            expect(response.body.msg).toBe("Nenhum workspace selecionado.")
+        })
+
+        //  O caso de uso da etapa: os DOIS papéis trocam, e o IdOwnerUser vai com eles. A
+        //  propriedade está gravada em dois lugares que não derivam um do outro — o papel da
+        //  matrícula, que é o que o assertRole lê, e o Workspaces.IdOwnerUser, que é o que sai
+        //  no getSelf e de que o cliente tira "sou o dono". Mover um sem o outro deixaria a
+        //  tela e a API discordando sobre quem manda.
+        it("o dono transfere: os dois papéis trocam e o IdOwnerUser vai com eles", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let target = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            let response = await owner.client.post(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}/transferOwnership`, {})
+
+            expect(response.status).toBe(200)
+
+            expect((await findMembership(owner.workspace.IdWorkspace, member.user.IdUser))?.Role).toBe("owner")
+            //  Quem entregou vira EDITOR, não viewer: quem passa a chave não perde a escrita no
+            //  mesmo clique. Rebaixar mais é decisão do novo dono.
+            expect((await findMembership(owner.workspace.IdWorkspace, owner.user.IdUser))?.Role).toBe("editor")
+            expect((await findWorkspace(owner.workspace.IdWorkspace))?.IdOwnerUser).toBe(member.user.IdUser)
+        })
+
+        //  Um viewer também recebe: não existe dono que só consulta, então o papel vem junto
+        //  com o espaço.
+        it("transfere para um viewer, que passa a ser dono", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "viewer")
+
+            let target = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            expect((await owner.client.post(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}/transferOwnership`, {})).status).toBe(200)
+
+            expect((await findMembership(owner.workspace.IdWorkspace, member.user.IdUser))?.Role).toBe("owner")
+        })
+
+        //  O que a transferência TROCA de lugar, do ponto de vista de quem chama: as rotas de
+        //  dono passam a responder 403 para quem entregou, e o leave — que respondia 406
+        //  mandando transferir — passa a funcionar. É a razão de a etapa existir: era o dono o
+        //  único membro sem saída do próprio espaço.
+        it("quem transferiu perde a rota de convite e ganha a de sair", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            //  Antes: convida e não sai
+            expect((await owner.client.post("/Workspaces/invite", { Email: UsersFactory.buildEmail(), Role: "editor" })).status).toBe(200)
+
+            let blocked = await owner.client.delete("/Workspaces/members/self")
+
+            expect(blocked.status).toBe(406)
+            expect(blocked.body.msg).toContain("Transfira a propriedade")
+
+            let target = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            expect((await owner.client.post(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}/transferOwnership`, {})).status).toBe(200)
+
+            //  Depois, com o MESMO token: o papel nunca esteve dentro dele, quem responde por
+            //  ele é o assertRole a cada requisição.
+            let invite = await owner.client.post("/Workspaces/invite", { Email: UsersFactory.buildEmail(), Role: "editor" })
+
+            expect(invite.status).toBe(403)
+
+            //  E a lista de membros continua aberta a ele: ela abre com assertMember.
+            expect((await owner.client.get("/Workspaces/members")).status).toBe(200)
+
+            let left = await owner.client.delete("/Workspaces/members/self")
+
+            expect(left.status).toBe(200)
+            expect(await countMemberships(owner.workspace.IdWorkspace, owner.user.IdUser)).toBe(0)
+        })
+
+        //  E o outro lado: quem recebeu passa a convidar, com o token que já tinha.
+        it("quem recebeu passa a convidar e a trocar papéis", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let memberClient = new TestClient(UsersFactory.buildToken(member.user.IdUser, owner.workspace.IdWorkspace))
+
+            expect((await memberClient.post("/Workspaces/invite", { Email: UsersFactory.buildEmail(), Role: "editor" })).status).toBe(403)
+
+            let target = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            expect((await owner.client.post(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}/transferOwnership`, {})).status).toBe(200)
+
+            expect((await memberClient.post("/Workspaces/invite", { Email: UsersFactory.buildEmail(), Role: "editor" })).status).toBe(200)
+
+            //  Inclusive rebaixar quem lhe entregou o espaço, que é o que o "vira editor, não
+            //  viewer" deixa para o novo dono decidir.
+            let former = await findMembership(owner.workspace.IdWorkspace, owner.user.IdUser)
+
+            expect((await memberClient.put(`/Workspaces/members/IdWorkspaceMember=${former!.IdWorkspaceMember}`, { Role: "viewer" })).status).toBe(200)
+            expect((await findMembership(owner.workspace.IdWorkspace, owner.user.IdUser))?.Role).toBe("viewer")
+        })
+
+        //  Um editor que pudesse transferir entregaria o espaço a quem quisesse sem o dono
+        //  saber. 403, e não 406: a matrícula existe, o papel é que não basta.
+        it("recusa um editor transferindo a propriedade", async () => {
+            let owner = await UsersFactory.create()
+            let editor = await UsersFactory.create()
+            let viewer = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, editor.user.IdUser, "editor")
+            await seedMembership(owner.workspace.IdWorkspace, viewer.user.IdUser, "viewer")
+
+            let target = await findMembership(owner.workspace.IdWorkspace, viewer.user.IdUser)
+
+            let response = await new TestClient(UsersFactory.buildToken(editor.user.IdUser, owner.workspace.IdWorkspace))
+                .post(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}/transferOwnership`, {})
+
+            expect(response.status).toBe(403)
+            expect((await findMembership(owner.workspace.IdWorkspace, viewer.user.IdUser))?.Role).toBe("viewer")
+            expect((await findWorkspace(owner.workspace.IdWorkspace))?.IdOwnerUser).toBe(owner.user.IdUser)
+        })
+
+        //  Transferir para si mesmo passaria pelas três escritas e gravaria o MESMO estado com
+        //  outro nome — 'editor' e 'owner' na mesma matrícula, na ordem em que as queries
+        //  caíssem.
+        it("recusa o dono transferindo para a própria matrícula", async () => {
+            let owner = await UsersFactory.createClient()
+
+            let membership = await findMembership(owner.workspace.IdWorkspace, owner.user.IdUser)
+
+            let response = await owner.client.post(`/Workspaces/members/IdWorkspaceMember=${membership!.IdWorkspaceMember}/transferOwnership`, {})
+
+            expect(response.status).toBe(406)
+            expect((await findMembership(owner.workspace.IdWorkspace, owner.user.IdUser))?.Role).toBe("owner")
+            expect((await findWorkspace(owner.workspace.IdWorkspace))?.IdOwnerUser).toBe(owner.user.IdUser)
+        })
+
+        //  O id da matrícula chega do cliente e é sequencial: sem o IdWorkspace na busca, um
+        //  dono entregaria o espaço do vizinho a alguém.
+        it("não transfere para uma matrícula de outro workspace", async () => {
+            let owner = await UsersFactory.createClient()
+            let other = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(other.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let target = await findMembership(other.workspace.IdWorkspace, member.user.IdUser)
+
+            let response = await owner.client.post(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}/transferOwnership`, {})
+
+            expect(response.status).toBe(406)
+            expect(response.body.msg).toBe("Membro não encontrado!")
+            expect((await findMembership(other.workspace.IdWorkspace, member.user.IdUser))?.Role).toBe("editor")
+            expect((await findWorkspace(other.workspace.IdWorkspace))?.IdOwnerUser).toBe(other.user.IdUser)
+            expect((await findWorkspace(owner.workspace.IdWorkspace))?.IdOwnerUser).toBe(owner.user.IdUser)
+        })
+
+        //  A rota não reemite o token: o espaço da sessão é o MESMO antes e depois, e o que
+        //  mudou — o papel — nunca esteve dentro dele.
+        it("não reemite o token", async () => {
+            let owner = await UsersFactory.createClient()
+            let member = await UsersFactory.create()
+            await seedMembership(owner.workspace.IdWorkspace, member.user.IdUser, "editor")
+
+            let target = await findMembership(owner.workspace.IdWorkspace, member.user.IdUser)
+
+            let response = await owner.client.post(`/Workspaces/members/IdWorkspaceMember=${target!.IdWorkspaceMember}/transferOwnership`, {})
+
+            expect(response.status).toBe(200)
+            expect(response.headers["set-cookie"]).toBeUndefined()
+        })
+    })
+
     describe("POST /Workspaces/invite", () => {
 
         it("recusa sem token", async () => {

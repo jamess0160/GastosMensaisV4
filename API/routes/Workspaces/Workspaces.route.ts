@@ -61,6 +61,22 @@ Workspaces_route.delete("/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMembe
 //  as duas rotas não se cruzam, em qualquer ordem de registro.
 Workspaces_route.delete("/Workspaces/members/self", Workspaces_schema.leave, AsyncHandler(Workspaces_controller.leave))
 
+//  Passa a propriedade do espaço a outro membro. Só o dono (assertRole owner) — transferir é a
+//  decisão mais forte da feature, e quem a toma é quem a perde.
+//
+//  É a rota que as três recusas anteriores apontam: o updateMember não aceita 'owner' no corpo
+//  nem a própria matrícula, o removeMember não deixa o dono se remover, e o leave não deixa o
+//  dono sair. Sem ela, o dono era o único membro sem saída do próprio espaço.
+//
+//  POST, e não PUT em .../members/:Id: o que muda não é UMA matrícula, são três linhas em duas
+//  tabelas — o papel do alvo, o de quem chamou e o Workspaces.IdOwnerUser —, todas na mesma
+//  transaction, porque um espaço com dois donos ou com nenhum não tem rota que conserte.
+//
+//  Não reemite o token, como o join, o create e o leave: o espaço da sessão é o MESMO antes e
+//  depois. O que muda é o papel dentro dele, e papel nunca esteve no token — quem responde por
+//  ele é o assertRole, a cada requisição, direto do banco.
+Workspaces_route.post("/Workspaces/members/IdWorkspaceMember=:IdWorkspaceMember/transferOwnership", Workspaces_schema.transferOwnership, AsyncHandler(Workspaces_controller.transferOwnership))
+
 //  O convite — a porta pela qual se entra num workspace alheio, agora que o cadastro não aceita
 //  mais um IdWorkspace do corpo. Só o dono convida, lista e revoga (assertRole owner): um
 //  editor que pudesse convidar promoveria terceiros ao próprio nível sem o dono saber.

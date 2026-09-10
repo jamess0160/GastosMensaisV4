@@ -146,6 +146,23 @@ class Schema {
         })),
     ]
 
+    //  Transfere a propriedade. Só a matrícula de QUEM RECEBE, no caminho: o workspace vem do
+    //  token e quem entrega é o usuário da sessão — não há um segundo id a receber.
+    //
+    //  Sem body de propósito, como o removeMember: não há o que escolher. O papel do alvo passa
+    //  a ser 'owner' e o de quem entrega passa a ser 'editor', e as duas coisas são a operação,
+    //  não parâmetros dela.
+    //
+    //  Só a resposta é descrita, como no leave: o msg fica preso ao contrato.
+    public readonly transferOwnership = [
+        joiController.validateParams(Joi.object({
+            IdWorkspaceMember: Joi.number().required(),
+        })),
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+        })),
+    ]
+
     //  Sair do espaço. Sem params e sem body, ao contrário do removeMember: a matrícula que
     //  esta rota apaga é a de quem chamou, e a sessão já sabe qual é — um id no caminho seria
     //  um dado do cliente que a rota teria que conferir contra o token.

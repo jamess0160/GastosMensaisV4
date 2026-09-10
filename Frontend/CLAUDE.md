@@ -208,7 +208,7 @@ o usuário veria o texto genérico no lugar da frase do servidor. Quem desempaco
 | Relatório | `/relatorio` | linha, barras e donut em ECharts, com filtros próprios de período |
 | Personalização | `/personalizacao` | categorias e pessoas |
 | Perfil | `/perfil` | dados, senha, passkeys |
-| Espaço | `/espaco` | criar e editar o espaço, convidar e revogar convite |
+| Espaço | `/espaco` | criar e editar o espaço, convidar e revogar convite, quem tem acesso — trocar papel, remover, sair e transferir a propriedade |
 
 Todas respondem em 390px. Abaixo de 900px a sidebar sai e entra a barra inferior
 ([src/app/TabBar.tsx](src/app/TabBar.tsx)), com o botão central de lançar gasto — a navegação do
@@ -220,6 +220,31 @@ extrato" virou **"Extrato"** — a rota não importa arquivo do banco, não casa
 lançamento e não tem estado "conciliado", e chamá-la de conciliação prometeria o que a tela não
 faz. Sobrou **um** desabilitado no produto: o "Continuar com Google" do login, que não tem
 OAuth na API.
+
+**A tela do Espaço é a única que muda de forma com o PAPEL de quem olha**, e a chave é uma só:
+o `isOwner` da sessão ([src/app/session.tsx](src/app/session.tsx)), que sai do `IdOwnerUser` do
+espaço atual. Renomear, convidar, listar convites e as ações de membro respondem 403 para quem
+não é dono, e a tela não oferece um controle que sempre falharia. **Quem tem acesso** é a
+exceção: a rota abre com `assertMember`, então todo mundo lê a lista — esconder de um editor
+com quem ele divide o espaço só o deixaria sem saber a quem pedir uma permissão.
+
+Duas guardas da tela são o inverso uma da outra, e vale saber por quê: as ações da linha do
+membro são `isOwner && !IsSelf` (trocar papel, remover e transferir são só do dono, e nunca na
+própria matrícula, que responde 406), enquanto **sair do espaço** é `!isOwner` — a rota exige
+NÃO ser dono, porque um espaço sem dono não tem mais quem convide nem quem remova. É `IsSelf`
+que diz qual linha é a sua, e ele vem da API: comparar e-mail no cliente seria comparar a coisa
+errada.
+
+**Transferir a propriedade é a única ação do app que muda o que o próprio usuário pode fazer**,
+e é por isso que a section dela relê DUAS listas — a de membros e a de espaços. É o
+`IdOwnerUser` da segunda que o `isOwner` lê: sem essa releitura a tela seguiria oferecendo o
+bloco de convites a quem passou a levar 403 e escondendo o botão de sair de quem passou a poder
+usá-lo. Fora isso não há cache a zerar, ao contrário de sair: o espaço é o mesmo, e contas,
+lançamentos e saldos não mudaram.
+
+E a tela tem um **terceiro estado**, além do dono e do membro: espaço nenhum. Quem sai do último
+cai nele — sessão válida, sem espaço a que voltar —, e aí ela é só a criação de um, com a mesma
+section que o seletor da sidebar usa.
 
 **A faixa de "confirme seu e-mail" mora no chassi**, e não numa tela: o estado do e-mail é
 informação da conta e vale em qualquer lugar do app. Ela não trava nada — quem não confirmou

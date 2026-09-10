@@ -3,6 +3,7 @@ import { leaveWorkspace } from "./sections/leaveWorkspace";
 import { removeMember } from "./sections/removeMember";
 import { revokeInvite } from "./sections/revokeInvite";
 import { saveWorkspace } from "./sections/saveWorkspace";
+import { transferOwnership } from "./sections/transferOwnership";
 import { updateMemberRole } from "./sections/updateMemberRole";
 import type { ApiTypes } from "@/types/api";
 
@@ -41,7 +42,14 @@ export interface WorkspaceContext {
      *  E depois de SAIR ela está velha de outra forma: o espaço de onde
      *  se saiu continuaria na lista, e é dela que o chassi tira o espaço
      *  atual. Quando não sobra nenhum, é esta releitura que faz a tela
-     *  chegar na criação de espaço. */
+     *  chegar na criação de espaço.
+     *
+     *  Depois de TRANSFERIR A PROPRIEDADE ela está velha de uma terceira:
+     *  quem diz à tela que você é o dono é o `IdOwnerUser` do espaço, que
+     *  vem nesta lista — e ele acabou de apontar para outra pessoa. Sem
+     *  esta releitura a tela seguiria oferecendo o bloco de convites a
+     *  quem agora leva 403, e escondendo o botão de sair de quem agora
+     *  pode usá-lo. */
     refreshWorkspaces(): void;
     clearInviteDraft(): void;
 }
@@ -52,6 +60,7 @@ class Controller {
     readonly revokeInvite = revokeInvite;
     readonly updateMemberRole = updateMemberRole;
     readonly removeMember = removeMember;
+    readonly transferOwnership = transferOwnership;
     readonly leaveWorkspace = leaveWorkspace;
 }
 

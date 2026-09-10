@@ -128,6 +128,41 @@ class Connection {
         return data;
     }
 
+    /** Passa a propriedade do espaço a outro membro. **Só `owner`** —
+     *  quem não é leva 403.
+     *
+     *  É a rota que as recusas dos outros três apontam: `updateMember`
+     *  não aceita `Role: "owner"` nem a própria matrícula,
+     *  `removeMember` não deixa o dono se remover e `leave` não deixa o
+     *  dono sair. Sem esta chamada o dono é o único membro sem saída do
+     *  próprio espaço.
+     *
+     *  Recebe a matrícula de QUEM RECEBE, e não recebe corpo: o papel do
+     *  alvo passa a `owner` e o de quem chamou passa a `editor` — as
+     *  duas coisas são a operação, não parâmetros dela.
+     *
+     *  ⚠️ **Ela muda o que o PRÓPRIO usuário pode fazer**, e é a única
+     *  rota do app que faz isso. Depois dela, com o mesmo cookie: as
+     *  rotas de dono respondem 403 para quem chamou (`invites`,
+     *  `invite`, `update`, as ações de membro) e o `leave`, que
+     *  respondia 406, passa a funcionar. Releia a lista de espaços
+     *  (`getSelf`) além da de membros — é o `IdOwnerUser` de lá que diz
+     *  à tela quem é o dono, e ele mudou.
+     *
+     *  Não reemite o cookie: o espaço da sessão é o MESMO antes e
+     *  depois, e o papel nunca esteve dentro do token — quem responde
+     *  por ele é o servidor, a cada requisição.
+     *
+     *  **Desfazer depende do novo dono**: só ele pode devolver. 406 na
+     *  própria matrícula ("você já é o dono") e numa que não é deste
+     *  espaço ("Membro não encontrado"). */
+    async transferOwnership(idWorkspaceMember: number): Promise<{ msg: string }> {
+        const { data } = await http.post<{ msg: string }>(
+            `${this.route}/members/IdWorkspaceMember=${idWorkspaceMember}/transferOwnership`,
+        );
+        return data;
+    }
+
     /** Sair do espaço da sessão — a SUA matrícula.
      *
      *  Sem id no caminho, ao contrário do `removeMember`: um

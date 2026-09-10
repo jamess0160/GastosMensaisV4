@@ -42,6 +42,16 @@ import type { ApiTypes } from "@/types/api";
    E a tela tem um terceiro estado, além do dono e do membro: **espaço
    nenhum**. Quem sai do último cai nele — sessão válida, sem espaço a
    que voltar —, e aí a tela é só a criação de um.
+
+   Uma ação daqui **muda o lado em que o próprio usuário está**, e é a
+   única do app que faz isso: transferir a propriedade. Ela não tem
+   guarda própria nem estado próprio — o dono a chama como chama remover
+   —, e o que ela faz é virar o `isOwner` da sessão. Todas as guardas
+   desta tela caem do outro lado sozinhas depois dela: quem transferiu
+   perde o bloco de convites e ganha o botão de sair, e quem recebeu
+   passa a ver os dois. O que a section tem de garantir é só que a lista
+   de ESPAÇOS seja relida junto com a de membros — é o `IdOwnerUser` de
+   lá que o `isOwner` lê.
    ════════════════════════════════════════════════════════════ */
 
 const ROLE_LABEL: Record<ApiTypes.WorkspaceRole, string> = {
@@ -91,6 +101,12 @@ export function Workspace() {
        existe porque não há desfazer. Guarda o membro inteiro, e não o
        id, porque a pergunta do diálogo é pelo NOME de quem sai. */
     const [removing, setRemoving] = useState<ApiTypes.WorkspaceMember | null>(null);
+    /* A ação mais destrutiva da tela, e a única que muda o que o PRÓPRIO
+       usuário pode fazer: quem confirma sai do clique sem o bloco de
+       convites e sem as ações de membro. Guarda o membro inteiro porque a
+       pergunta do diálogo é pelo NOME de quem recebe — o aviso não pode
+       ser genérico numa ação que só o outro lado pode desfazer. */
+    const [transferring, setTransferring] = useState<ApiTypes.WorkspaceMember | null>(null);
     /* Sair também é irreversível, e pelo mesmo motivo: a matrícula é
        apagada de verdade, e voltar é ser convidado de novo. Booleano e
        não um membro, porque quem sai é sempre você. */
@@ -438,6 +454,29 @@ export function Workspace() {
                                                 >
                                                     Remover
                                                 </Button>
+                                                {/* Por último, e é de propósito: é a
+                                                    ação mais forte da tela — a única
+                                                    que muda o que o próprio usuário
+                                                    pode fazer, e a única cujo desfazer
+                                                    não está com ele. Fica onde o dedo
+                                                    não passa antes de "Remover".
+
+                                                    A condição é a mesma das outras
+                                                    duas, sem nada a mais: `isOwner`
+                                                    porque a rota é 403 para quem não
+                                                    é, e `!IsSelf` porque a própria
+                                                    matrícula é 406 — "você já é o
+                                                    dono". Um viewer também pode
+                                                    receber: não existe dono que só
+                                                    consulta, e o papel vem junto com
+                                                    o espaço. */}
+                                                <Button
+                                                    size="sm"
+                                                    disabled={pending === "members"}
+                                                    onClick={() => setTransferring(member)}
+                                                >
+                                                    Tornar dono
+                                                </Button>
                                             </span>
                                         )}
                                     </div>
@@ -684,6 +723,42 @@ export function Workspace() {
                 title={`Remover ${removing?.Name ?? ""} do espaço?`}
                 description="A pessoa perde o acesso na hora e não há como desfazer — readmitir é convidar de novo, e a data de entrada recomeça. Nada do que ela lançou é apagado: os gastos, as entradas e as contas são do espaço, o rateio das pessoas fica igual e nenhum saldo muda."
                 confirmLabel="Remover"
+                danger
+                pending={pending === "members"}
+            />
+
+            {/* A confirmação mais forte da tela. O que ela tem de dizer é
+                diferente das outras duas: aqui não se perde acesso a
+                nada de imediato — quem transfere continua lançando e
+                editando —, o que se perde é o comando do espaço, e o
+                desfazer não está mais com quem clicou. Por isso o nome de
+                quem recebe vem POR EXTENSO no título e no texto: numa
+                ação que só o outro lado pode reverter, "esta pessoa" não
+                é confirmação suficiente. */}
+            <ConfirmDialog
+                open={transferring !== null}
+                onClose={() => setTransferring(null)}
+                onConfirm={() => {
+                    const target = transferring;
+                    setTransferring(null);
+                    if (target) {
+                        void WorkspaceController.transferOwnership(context, target);
+                    }
+                }}
+                title={`Passar a propriedade de ${workspace.Name} para ${transferring?.Name ?? ""}?`}
+                description={
+                    <>
+                        <b>
+                            {transferring?.Name ?? ""} passa a ser o dono e você passa a ser editor
+                        </b>{" "}
+                        — você continua lançando e editando, mas deixa de renomear o espaço, de
+                        convidar, de remover gente e de mudar papéis. Nada do que existe no espaço
+                        muda: contas, lançamentos e saldos ficam exatamente como estão.{" "}
+                        <b>Só {transferring?.Name ?? "o novo dono"} pode devolver a propriedade</b>{" "}
+                        — você não tem como desfazer isso sozinho.
+                    </>
+                }
+                confirmLabel="Passar a propriedade"
                 danger
                 pending={pending === "members"}
             />
