@@ -1,5 +1,15 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import styles from "./authLayout.module.css";
+
+/** O suporte do rodapé é o MESMO endereço do canal do titular escrito
+ *  nos dois documentos legais (`src/pages/Legal/LegalLayout.tsx`).
+ *
+ *  A string está repetida aqui, e não importada de lá, para não puxar o
+ *  pedaço `lazy` das telas legais para dentro do bundle que carrega o
+ *  login. Trocar o endereço é mudar o documento — logo é versão nova —,
+ *  e os dois lugares mudam juntos. */
+const SUPPORT_EMAIL = "tiagoribeiro12@hotmail.com.br";
 
 /** O chassi das duas telas públicas — entrar e criar conta.
  *
@@ -53,9 +63,9 @@ export function AuthLayout({
                 <div className={styles.fpBot}>
                     <span>© {new Date().getFullYear()} Gastos mensais</span>
                     <div className={styles.links}>
-                        <span>Termos</span>
-                        <span>Privacidade</span>
-                        <span>Suporte</span>
+                        <Link to="/termos">Termos</Link>
+                        <Link to="/privacidade">Privacidade</Link>
+                        <a href={`mailto:${SUPPORT_EMAIL}`}>Suporte</a>
                     </div>
                 </div>
             </main>

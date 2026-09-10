@@ -23,6 +23,8 @@ const ResetPassword = lazy(() =>
 const ConfirmEmail = lazy(() =>
     import("@/pages/ConfirmEmail/ConfirmEmail").then((m) => ({ default: m.ConfirmEmail })),
 );
+const Terms = lazy(() => import("@/pages/Legal/Terms").then((m) => ({ default: m.Terms })));
+const Privacy = lazy(() => import("@/pages/Legal/Privacy").then((m) => ({ default: m.Privacy })));
 
 const load = (screen: ReactNode) => (
     <Suspense fallback={<div className={styles.center}>Carregando…</div>}>{screen}</Suspense>
@@ -49,6 +51,13 @@ export const router = createBrowserRouter([
        ter sessão nenhuma — o link chega no cadastro e é aberto em outro
        aparelho. */
     { path: "/confirmar-email", element: load(<ConfirmEmail />) },
+    /* Os dois documentos legais, públicos pelo mesmo motivo das de
+       cima: quem lê os termos ANTES de criar a conta não tem sessão, e
+       dentro do chassi o guard mandaria para o login. Eles também são
+       abertos em aba nova pelo rótulo do checkbox do cadastro, com o
+       formulário meio preenchido esperando na aba de trás. */
+    { path: "/termos", element: load(<Terms />) },
+    { path: "/privacidade", element: load(<Privacy />) },
     {
         path: "/",
         element: <AppShell />,

@@ -216,6 +216,16 @@
     padding-top: 1px;
 }
 
+/* Link dentro do rótulo — hoje, os dois documentos legais do cadastro.
+   Sem isto ele herda o `color: inherit` da folha global e fica
+   indistinguível do texto, que é o mesmo que não ter link. */
+.checkboxText a {
+    color: var(--brand-press);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 /* ── Toggle ───────────────────────────────────────────────── */
 .toggle {
     width: 44px;

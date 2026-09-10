@@ -167,10 +167,26 @@ export function SignUp() {
                     )}
                 </FormField>
 
+                {/* Os dois links abrem em ABA NOVA: na mesma aba, ler
+                    os termos jogaria fora o formulário meio preenchido.
+                    O `rel` acompanha o `target` por higiene — a aba
+                    aberta não precisa de `window.opener`. */}
                 <Checkbox
                     checked={acceptedTerms}
                     onChange={(event) => setAcceptedTerms(event.target.checked)}
-                    label="Li e aceito os termos de uso e a política de privacidade."
+                    label={
+                        <>
+                            Li e aceito os{" "}
+                            <a href="/termos" target="_blank" rel="noopener noreferrer">
+                                termos de uso
+                            </a>{" "}
+                            e a{" "}
+                            <a href="/privacidade" target="_blank" rel="noopener noreferrer">
+                                política de privacidade
+                            </a>
+                            .
+                        </>
+                    }
                 />
 
                 {error && (

@@ -317,6 +317,15 @@
     gap: 16px;
 }
 
+/* Os três eram `<span>` sem destino nenhum. Agora levam aos documentos
+   legais e ao suporte, e o hover é o que diz isso — no repouso eles
+   continuam discretos, que é o papel de um rodapé de login. */
+.links a:hover {
+    color: var(--brand-press);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 @media (max-width: 980px) {
     .brandpane {
         display: none;
