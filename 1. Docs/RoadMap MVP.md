@@ -113,6 +113,11 @@ Falta a outra metade também: **não há como apagar a conta**. `DELETE /Users` 
 foreign key `Workspaces.IdOwnerUser` é `CASCADE` — um delete sem guarda levaria junto o espaço
 compartilhado de outra pessoa.
 
+**Os dois documentos nascem de MVP, e é uma decisão, não um atalho.** Este lançamento é para
+conhecidos testarem, de graça: o controlador é pessoa física, não há cobrança, não há
+processador de pagamento e não há assinatura para cancelar. **Quando entrar a cobrança, os dois
+textos são revisados** — ver a linha de `Plans`/`Subscriptions` abaixo.
+
 ### 3. Produção: o código
 
 Nada aqui é código de feature. É o que hoje funciona na máquina de desenvolvimento e muda de
@@ -164,7 +169,11 @@ O que não está versionado em `API/` nem em `Frontend/`, e que só se prova sub
   `GET /Utils/Health` que já existe, e as migrations rodando no deploy;
 - **certificado TLS.** Sem `https` o cookie `secure` não volta, e a sessão inteira morre;
 - **SPF/DKIM/DMARC no domínio** — enviar como `@gastosmensais.com.br` por um SMTP não autorizado
-  cai em spam, e nenhuma arquitetura conserta isso;
+  cai em spam, e nenhuma arquitetura conserta isso. **O provedor escolhido em 10/09 é o Resend,
+  por SMTP** (`smtp.resend.com:465`, usuário literal `resend`, a API key como senha): o
+  `Mailer` é nodemailer sobre SMTP genérico e não muda uma linha, então isto é troca de `.env`.
+  A verificação do domínio no Resend é o que entrega os registros de SPF e DKIM prontos; o
+  DMARC continua sendo escrito à mão;
 - **as variáveis que se esquecem**: `APP_URL` (sem ela o link de recuperação de senha é montado
   com o `Host` da requisição), e `WEBAUTHN_RP_ID`/`WEBAUTHN_ORIGIN`, que estão em `localhost` no
   exemplo — valor errado não dá erro, a biometria só não funciona;
@@ -185,7 +194,7 @@ cliente enquanto não voltar como etapa de leva.**
 | **Notificações** | Fora do MVP em 07/09. Falta **definir o que gera aviso** — parcela vencendo, orçamento estourado, entrada não recebida | A tabela existe com `ReadAt`, `ScheduledFor`/`SentAt` e os índices. O `CHECK` do `Type` só tem `system` e `security`: todo aviso de domínio precisa de valor novo |
 | **Conciliação de extrato** | Fora do MVP em 07/09 — virou o extrato manual, entregue na leva 5 (`contas/extrato`), que é o que a tela precisa | Três perguntas sem resposta: **de onde vem o extrato** (OFX/CSV ou Open Finance — um parser contra uma integração com credencial e homologação), **o que é um item "a resolver"**, e **se conciliar cria lançamento ou só marca os existentes** — se cria, é migration em `Inflows` e `Expenses` |
 | **`UserDevices`** | Só faz sentido junto com notificações | Tabela existe, rota não |
-| **`Plans` / `Subscriptions`** | Cobrança não faz parte do fluxo de um mês | Tabelas existem, rotas não |
+| **`Plans` / `Subscriptions`** | Cobrança não faz parte do fluxo de um mês | Tabelas existem, rotas não. **Quando isto voltar, os termos de uso e a política de privacidade têm que ser revisados antes**: muda o controlador (o CNPJ assina no lugar da pessoa física), entram pagamento, reembolso e cancelamento, e o processador de pagamento vira mais um operador na política |
 | **Fatura de cartão como entidade** | As datas da fatura já vivem na perna (`ClosingDate`/`DueDate`), e o extrato mostra a fatura sem precisar de tabela. Só se pagaria com conciliação, que também saiu | — |
 | **"Continuar com Google"** | Não há OAuth na API | Desenhado no layout; o botão fica desabilitado |
 
