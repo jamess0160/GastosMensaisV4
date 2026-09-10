@@ -1,15 +1,23 @@
 import { useMemo, useState } from "react";
 import styles from "./src/styles.module.css";
 import { ReportController, type ReportContext } from "./controller";
-import { useCategories, useCategoryIndex, usePaymentMethods, usePersons } from "@/data/catalogs";
+import {
+    useCategories,
+    useCategoryIndex,
+    usePaymentMethodIndex,
+    usePaymentMethods,
+    usePersons,
+} from "@/data/catalogs";
 import { useRangeLegs } from "@/data/month";
-import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
+import { Button, Card, Chip, PageHead, Workspace as Page } from "@/ui/primitives";
 import { ClearFilters, FilterBar, FilterMultiSelect, SearchInput } from "@/ui/controls";
 import { DateInput } from "@/ui/form";
 import { EChart, token } from "@/ui/echart";
 import { KpiCard } from "@/ui/budget";
 import { CategoryIcon } from "@/ui/iconCatalog";
 import { IconCard, IconRepeat, IconTag, METHOD_ICON } from "@/ui/icons";
+import { Cell, CellAmount, Table, TableFoot, TableHead, TableRow, TypeTile } from "@/ui/table";
+import { CardList, ItemCard } from "@/ui/cardList";
 import { IconExport } from "@/app/icons";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import {
@@ -128,6 +136,7 @@ export function Report() {
     const categoryIndex = useCategoryIndex();
     const persons = usePersons();
     const methods = usePaymentMethods();
+    const methodIndex = usePaymentMethodIndex();
 
     /* ── O recorte ─────────────────────────────────────────────
        Um predicado só, sobre PERNAS — e todos os cinco filtros são
@@ -201,6 +210,27 @@ export function Report() {
     );
 
     const grouped = useMemo(() => spentByMonthCategory(shown, months), [shown, months]);
+
+    /* ── As linhas da tabela ───────────────────────────────────
+       É `shown` — o MESMO recorte que os três gráficos desenham, sem
+       consulta nova e sem filtro próprio. Se a tabela pudesse listar
+       outra coisa, a tela responderia duas coisas para a mesma
+       pergunta, e a soma do rodapé deixaria de bater com o indicador
+       de gasto do período, que é o que o usuário confere.
+
+       Ordenada da perna mais recente para a mais antiga, pela data de
+       COMPETÊNCIA — a mesma que recorta o período e que o gráfico de
+       linha usa no eixo. */
+    const rows = useMemo(
+        () =>
+            [...shown].sort((a, b) => {
+                const dayA = legCompetence(a).slice(0, 10);
+                const dayB = legCompetence(b).slice(0, 10);
+                if (dayA !== dayB) return dayA < dayB ? 1 : -1;
+                return a.expense.Description.localeCompare(b.expense.Description, "pt-BR");
+            }),
+        [shown],
+    );
 
     /* ── Números do topo ─────────────────────────────────────── */
     const total = totalSpent(shown);
@@ -612,6 +642,185 @@ export function Report() {
                                 }
                             />
                         </Card>
+                    </div>
+
+                    {/* ── Quais gastos são esses? ───────────────
+                        A pergunta que todo gráfico gera, e que até
+                        aqui só se respondia saindo da tela e refazendo
+                        o filtro em Gastos — que recorta MÊS, não
+                        período, e por isso devolvia outra lista.
+
+                        A tabela lê `rows`, que é `shown`: exatamente o
+                        que os desenhos acima consomem. Nenhuma consulta
+                        nova, nenhum filtro próprio — o rodapé fecha com
+                        o "Gasto no período" do topo porque os dois
+                        somam as MESMAS pernas. */}
+                    <div className={styles.section}>
+                        <div className={styles.sectionHead}>
+                            <div>
+                                <div className={styles.sectionTitle}>Gastos do período</div>
+                                <div className={styles.sectionSub}>
+                                    Uma linha por parcela, na data em que ela pesa — o mesmo recorte
+                                    que os gráficos desenham.
+                                </div>
+                            </div>
+                        </div>
+
+                        {isMobile ? (
+                            /* No telefone a tabela vira lista de cards,
+                               no formato que Gastos e Renda já usam. */
+                            <div>
+                                <CardList>
+                                    {rows.map((leg) => {
+                                        const category = categoryIndex.get(leg.expense.IdCategory);
+                                        const method = methodIndex.get(leg.payment.IdPaymentMethod);
+
+                                        return (
+                                            <ItemCard
+                                                key={leg.payment.IdExpensePayment}
+                                                title={leg.expense.Description}
+                                                meta={
+                                                    <>
+                                                        {category && (
+                                                            <Chip>
+                                                                <span
+                                                                    className={styles.chipIcon}
+                                                                    style={{
+                                                                        color: categoryColor(
+                                                                            category,
+                                                                        ),
+                                                                    }}
+                                                                >
+                                                                    <CategoryIcon
+                                                                        iconKey={category.IconKey}
+                                                                    />
+                                                                </span>
+                                                                {category.Description}
+                                                            </Chip>
+                                                        )}
+                                                        <Chip>
+                                                            {method
+                                                                ? `${method.account.Name} · ${method.method.Name}`
+                                                                : "Forma arquivada"}
+                                                        </Chip>
+                                                        <span className={styles.meta}>
+                                                            {formatDate(
+                                                                legCompetence(leg).slice(0, 10),
+                                                            )}
+                                                            {leg.payment.InstallmentNumber !==
+                                                                null &&
+                                                                ` · parcela ${leg.payment.InstallmentNumber}/${leg.payment.InstallmentTotal}`}
+                                                        </span>
+                                                    </>
+                                                }
+                                                amount={formatMoney(leg.value)}
+                                            />
+                                        );
+                                    })}
+                                </CardList>
+
+                                <div className={styles.cardFoot}>
+                                    <span>
+                                        {rows.length} parcela{rows.length === 1 ? "" : "s"} no
+                                        período
+                                    </span>
+                                    <span>
+                                        Total <b>{formatMoney(total)}</b>
+                                    </span>
+                                </div>
+                            </div>
+                        ) : (
+                            <Table columns="120px minmax(0,1.6fr) minmax(0,1fr) minmax(0,1.2fr) 130px">
+                                <TableHead>
+                                    <span>Competência</span>
+                                    <span>Descrição</span>
+                                    <span>Categoria</span>
+                                    <span>Forma de pagamento</span>
+                                    <span style={{ textAlign: "right" }}>Valor</span>
+                                </TableHead>
+
+                                {rows.map((leg) => {
+                                    const category = categoryIndex.get(leg.expense.IdCategory);
+                                    const method = methodIndex.get(leg.payment.IdPaymentMethod);
+
+                                    return (
+                                        <TableRow key={leg.payment.IdExpensePayment}>
+                                            <Cell>
+                                                {formatDate(legCompetence(leg).slice(0, 10))}
+                                            </Cell>
+
+                                            <Cell>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div className={styles.description}>
+                                                        {leg.expense.Description}
+                                                    </div>
+                                                    <div className={styles.meta}>
+                                                        {leg.payment.InstallmentNumber !== null
+                                                            ? `Parcela ${leg.payment.InstallmentNumber}/${leg.payment.InstallmentTotal}`
+                                                            : KIND_LABEL[leg.expense.Kind]}
+                                                    </div>
+                                                </div>
+                                            </Cell>
+
+                                            <Cell>
+                                                {category ? (
+                                                    <Chip>
+                                                        <span
+                                                            className={styles.chipIcon}
+                                                            style={{
+                                                                color: categoryColor(category),
+                                                            }}
+                                                        >
+                                                            <CategoryIcon
+                                                                iconKey={category.IconKey}
+                                                            />
+                                                        </span>
+                                                        {category.Description}
+                                                    </Chip>
+                                                ) : (
+                                                    <span className={styles.meta}>—</span>
+                                                )}
+                                            </Cell>
+
+                                            <Cell>
+                                                <span className={styles.who}>
+                                                    <TypeTile
+                                                        color={accentColor(
+                                                            method?.method.Color ??
+                                                                method?.account.Color ??
+                                                                null,
+                                                        )}
+                                                    >
+                                                        {
+                                                            METHOD_ICON[
+                                                                method?.method.Kind ?? "debit"
+                                                            ]
+                                                        }
+                                                    </TypeTile>
+                                                    <span className={styles.whoName}>
+                                                        {method
+                                                            ? `${method.account.Name} · ${method.method.Name}`
+                                                            : "Forma arquivada"}
+                                                    </span>
+                                                </span>
+                                            </Cell>
+
+                                            <CellAmount>{formatMoney(leg.value)}</CellAmount>
+                                        </TableRow>
+                                    );
+                                })}
+
+                                <TableFoot>
+                                    <span>
+                                        {rows.length} parcela{rows.length === 1 ? "" : "s"} no
+                                        período
+                                    </span>
+                                    <span>
+                                        Total <b>{formatMoney(total)}</b>
+                                    </span>
+                                </TableFoot>
+                            </Table>
+                        )}
                     </div>
                 </>
             )}
