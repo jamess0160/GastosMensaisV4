@@ -173,6 +173,51 @@ describe("Rotines", () => {
             expect((await getRun("segunda-sadia")).Status).toBe("done")
         })
 
+        //  O `stop()` é a primeira coisa que o encerramento do `index.ts` faz. Parar o
+        //  `setInterval` sem esperar quem já estava rodando é a mesma interrupção que o
+        //  SIGTERM causava antes, só que com outro nome: a ocorrência fica reivindicada e sem
+        //  `FinishedAt`, e o `unique(Name, ScheduledFor)` impede que alguém a reivindique de
+        //  novo — o mês não fecha e o catch-up não cobre.
+        it("o stop espera o tick em andamento terminar", async () => {
+            let liberar!: () => void
+            let bloqueio = new Promise<void>((resolve) => { liberar = resolve })
+            let terminou = false
+
+            let rotine: RotinesNamespace.Rotine = {
+                name: "stop-espera-o-tick",
+                schedule: { kind: "monthly", day: 1, hour: 3 },
+                run: async () => {
+                    await bloqueio
+                    terminou = true
+                },
+            }
+
+            let engine = new RotineEngine().register(rotine)
+
+            let tick = engine.tick("2026-09-01 03:30")
+
+            let parou = false
+            let stopping = engine.stop().then(() => { parou = true })
+
+            //  Com a rotina presa no bloqueio, nenhuma quantidade de voltas do event loop pode
+            //  fazer o stop resolver — é isso que separa "esperou" de "deu sorte na ordem".
+            await flushEventLoop()
+
+            expect(terminou).toBe(false)
+            expect(parou).toBe(false)
+
+            liberar()
+
+            await stopping
+            await tick
+
+            expect(terminou).toBe(true)
+
+            let run = await getRun("stop-espera-o-tick")
+            expect(run.Status).toBe("done")
+            expect(run.FinishedAt).not.toBeNull()
+        })
+
         //  O nome é a chave em RotineRuns: dois registros com o mesmo nome disputariam a mesma
         //  linha e um deles nunca rodaria, em silêncio.
         it("recusa duas rotinas com o mesmo nome no registro", () => {
@@ -394,6 +439,15 @@ function buildRotine(name: string, schedule: RotinesNamespace.Schedule = { kind:
         schedule,
         calls,
         run: async (ScheduledFor: string) => { calls.push(ScheduledFor) },
+    }
+}
+
+//  Deixa o event loop dar algumas voltas completas (macrotask, não microtask): é o que faz a
+//  espera do stop ser afirmada de verdade, em vez de observada antes de qualquer coisa poder
+//  ter acontecido.
+async function flushEventLoop() {
+    for (let i = 0; i < 3; i++) {
+        await new Promise((resolve) => setImmediate(resolve))
     }
 }
 

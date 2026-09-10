@@ -50,6 +50,16 @@ export class RotineEngine {
 
     private timer: NodeJS.Timeout | null = null
 
+    //  O tick em andamento, ou null quando nenhum está rodando. É o que o `stop()` espera: um
+    //  tick já reivindicou a linha em `RotineRuns` e ainda não carimbou o `FinishedAt`, e o
+    //  `unique(Name, ScheduledFor)` faz dessa linha uma ocorrência que **ninguém mais
+    //  reivindica** — o catch-up, que existe para cobrir uma queda, não cobre esta.
+    //
+    //  Guarda a versão já resolvida do tick (nunca a que rejeita), porque quem espera aqui só
+    //  quer saber que terminou: o erro do tick tem dono no `safeTick`, e uma segunda espera
+    //  sobre a mesma promise rejeitada seria um unhandled rejection.
+    private running: Promise<void> | null = null
+
     //  Um minuto. Não é a frequência de nenhuma rotina — é só de quanto em quanto tempo a
     //  pergunta "o que venceu?" é feita, e o pior atraso que uma rotina pode sofrer.
     private readonly tickInterval = 60 * 1000
@@ -95,20 +105,47 @@ export class RotineEngine {
         this.safeTick()
     }
 
-    public stop() {
-        if (!this.timer) {
-            return
+    /**
+     * Desliga o tick e **espera o que já estava rodando**. É a primeira coisa que o
+     * encerramento do `index.ts` faz, antes de fechar o servidor HTTP.
+     *
+     * Parar o `setInterval` sem esperar seria a mesma interrupção com outro nome: o tick que
+     * está no ar já reivindicou a ocorrência em `RotineRuns`, e morrer antes do `FinishedAt`
+     * deixa uma linha órfã que o `unique(Name, ScheduledFor)` impede de ser reivindicada de
+     * novo — o mês fica sem fechar e nem o catch-up conserta.
+     */
+    public async stop() {
+        if (this.timer) {
+            clearInterval(this.timer)
+            this.timer = null
         }
 
-        clearInterval(this.timer)
-        this.timer = null
+        //  Depois do clearInterval, para que nenhum tick novo comece enquanto se espera este.
+        await this.running
     }
 
     /**
      * Um tick. **Público de propósito**, para a suíte exercer o motor com o relógio que ela
      * escolher, sem esperar um minuto nem esperar o dia 1º.
      */
-    public async tick(now: string = currentOccurrenceClock()) {
+    public tick(now: string = currentOccurrenceClock()) {
+        let execution = this.runTick(now)
+
+        let tracked = execution.then(() => undefined, () => undefined)
+
+        this.running = tracked
+
+        tracked.then(() => {
+            //  Só limpa se ainda for este tick: um tick posterior já teria assumido o lugar.
+            if (this.running === tracked) {
+                this.running = null
+            }
+        })
+
+        return execution
+    }
+
+    private async runTick(now: string) {
         let executed: string[] = []
 
         for (let rotine of this.rotines) {

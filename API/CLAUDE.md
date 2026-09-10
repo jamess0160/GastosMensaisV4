@@ -232,6 +232,8 @@ Four rules hold for every routine here:
 
 `RotineRuns` is the **first table with no `IdWorkspace`** — deliberate: it is a system table, and one execution crosses every workspace. There is no `Rotines` table either; the catalogue is code, since a catalogue in the database could disable a routine the code still believes exists. Turning one on or off is editing that list, and the log switch comes from `Utils/logFlags.ts`, as everywhere else.
 
+**`stop()` waits for the tick in flight**, it doesn't just clear the `setInterval` — a tick that has already claimed its `RotineRuns` row and hasn't stamped the `FinishedAt` yet is exactly the orphan the unique index makes unrecoverable. It is the first step of the shutdown below, and `Rotines.test.ts` holds a routine open on a promise to prove the wait is real.
+
 Two operational notes: the engine is started **only from `index.ts`, and only outside `NODE_ENV=test`** — a routine firing mid-suite would change the database under a running test — the same failure mode the cache's telemetry timer used to cause before the whole subsystem was deleted. And `moment` with no timezone uses the server clock, so the process needs `TZ=America/Sao_Paulo`: in UTC a "1st at 00:30" routine fires at 21:30 on the 31st in Brazil and materializes the wrong month. There is deliberately **no manual trigger** (no route, no CLI entry point): routines are convergent and catch-up already covers an outage, so the answer in production is to wait for the next tick.
 
 ### There is no socket and no in-memory cache
@@ -241,6 +243,21 @@ Both existed, both came from another project, and both were deleted whole — th
 The socket.io server ran on a `SOCKETPORT` of its own with `cors: { origin: "*" }`, and it booted **on import**, which is why the test env had to hand it an ephemeral port. On top of it sat `routes/Cache/` — an in-memory bucket store exposed as `GET /Cache/CacheName=:CacheName`, `POST /Cache` and `POST /Cache/Reset/...`, **not scoped by workspace**: any logged-in account wrote unbounded data into the server's memory and read back what other tenants had put there. `GET /Utils/Reload` went with them; it broadcast a `reload` to every connected client and any authenticated user could press it. No screen ever consumed any of the three.
 
 Two consequences worth keeping in mind: a bucket store reachable over HTTP is not where a server-side guard belongs (see `MailCooldown.section.ts`, whose window is a private `Map` for exactly that reason), and anything that wants to push to the browser now starts from nothing — which is the right place to start it, next to the HTTP server rather than on a second port.
+
+### Shutdown
+
+`SIGTERM` — what `docker stop` sends, ten seconds before the `SIGKILL` — and `SIGINT` (Ctrl+C) are handled in `index.ts`, and until batch 7 neither was: the process died where it stood. Three things were cut in the middle of those ten seconds — a request in flight, including one inside a transaction; the Knex pool, which without `destroy()` leaves connections hanging on the Postgres side until *its* timeout; and the routine tick, which is the expensive one. An occurrence claimed in `RotineRuns` and interrupted before its `FinishedAt` is **never claimed again** — that is what `unique(Name, ScheduledFor)` guarantees — so the month never closes, and catch-up, which exists precisely to cover an outage, does not cover this one.
+
+The order is the whole design: each step exists so the next one has nothing new to wait for.
+
+1. **`rotineEngine.stop()`** — no new tick starts, and the one already running is *awaited*. Stopping the `setInterval` without waiting is the same interruption under another name.
+2. **`httpServer.close()`** — stops accepting connections and waits for the requests in flight. **One** server, since the socket was deleted (see above); with it there would be a second port to close, and a `close()` that forgets the other is a process that never dies.
+3. **`KnexConnection.destroy()`** — after the server, never before: closing the pool first leaves the in-flight request with no connection, which is the same cut inside a transaction with another name.
+4. **A ten-second ceiling**, then `process.exit(1)`. A shutdown that hangs is worse than an abrupt one — the `SIGKILL` lands in the same place ten seconds later, with no log and nobody knowing what held it. The timer is deliberately not `unref`ed: it is what keeps the process alive until one of the two exits happens, and it's cleared on the happy path.
+
+**`closeIdleConnections()` is what makes step 2 actually end**, and it runs on a 200ms sweep rather than once. nginx holds idle keep-alive connections to the upstream, and an idle connection is not a request in flight — but the connection that *carried* the in-flight request isn't idle at the instant of `close()`: it goes idle when the response leaves, by which time a single call has already happened. Measured, that left the shutdown hanging on that socket for three seconds, until the client gave up by itself.
+
+The second signal is ignored while the first is being served — a second `destroy()` on the pool while the first is still waiting for the server. And **the orphan occurrence from before this existed stays orphaned**: routines are convergent and the next month reprocesses. What the handler prevents is new ones.
 
 ### Logging
 
