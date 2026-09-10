@@ -127,6 +127,14 @@
     flex-shrink: 0;
 }
 
+/* As ações no rodapé do card, no telefone — os mesmos dois botões da
+   coluna "Ações" da tabela, em linha. */
+.cardActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
 @media (max-width: 1100px) {
     .twocol {
         grid-template-columns: minmax(0, 1fr);

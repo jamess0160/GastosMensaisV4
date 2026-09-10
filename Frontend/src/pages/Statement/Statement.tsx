@@ -19,7 +19,9 @@ import {
     TableHead,
     TableRow,
 } from "@/ui/table";
+import { CardGroup, CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
+import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatDate, formatMonthLabel } from "@/lib/date";
 import { COMPETENCE_LABEL, cycleLabel } from "@/lib/card";
 import { formatMoney } from "@/lib/money";
@@ -79,6 +81,7 @@ export function Statement() {
     const navigate = useNavigate();
     const { user } = useSession();
     const [month, setMonth] = useMonthScope();
+    const isMobile = useIsMobile();
 
     const statement = useMonthStatement(month);
 
@@ -230,6 +233,88 @@ export function Statement() {
         </Card>
     );
 
+    /* ── A mesma conta, no telefone ──────────────────────────
+       A tabela rolava de lado (o `min-width: 640px` de
+       `table.module.css`), que é justamente o que Gastos, Renda e
+       Contas deixaram de fazer. Aqui ela vira a MESMA lista de cards
+       daquelas três — nenhum desenho novo.
+
+       A moldura do card da seção sai junto: os cards das linhas já são
+       as caixas, e uma borda em volta delas seria borda dentro de
+       borda.
+
+       O que NÃO muda é a ordem, porque é ela que o extrato promete:
+       abertura em cima, as linhas no meio e o FECHAMENTO como último
+       elemento da conta. Um extrato se confere de cima para baixo, e o
+       fechamento no cabeçalho — como no desktop, onde ele cabe ao lado
+       da abertura — tiraria o número de onde a soma termina. */
+    const accountCards = (account: ApiTypes.StatementAccount) => (
+        <div key={account.IdAccount} className={styles.mobileSection}>
+            <div className={styles.mobileHead}>
+                <div className={styles.sectionTitle}>
+                    {account.Name}
+                    {!account.Active && <Badge tone="neutral">Arquivada</Badge>}
+                </div>
+                <div className={styles.sectionSub}>
+                    {account.Entries.length === 1
+                        ? "1 lançamento liquidado"
+                        : `${account.Entries.length} lançamentos liquidados`}
+                </div>
+                <div className={styles.mobileEnd}>
+                    <Overline>Abertura</Overline>
+                    <span className={styles.mobileEndValue}>
+                        {formatMoney(account.OpeningBalance)}
+                    </span>
+                </div>
+            </div>
+
+            {account.Entries.length === 0 ? (
+                <EmptyState
+                    title="Nenhum movimento neste mês"
+                    description={`Nada entrou nem saiu desta conta em ${formatMonthLabel(month)}.`}
+                />
+            ) : (
+                <CardList>
+                    {account.Entries.map((entry, index) => {
+                        const label = entryLabel(entry);
+
+                        return (
+                            <ItemCard
+                                key={`${account.IdAccount}-${index}`}
+                                onClick={label ? () => openEntry(entry) : undefined}
+                                label={label ?? undefined}
+                                title={entry.Description}
+                                meta={
+                                    <>
+                                        <span className={styles.kind}>
+                                            {kindIcon(entry)}
+                                            {KIND_LABEL[entry.Kind]}
+                                        </span>
+                                        <span className={styles.meta}>
+                                            {formatDate(entry.Date)}
+                                        </span>
+                                    </>
+                                }
+                                amount={
+                                    <span className={toneOf(entry.Value)}>
+                                        {signed(entry.Value)}
+                                    </span>
+                                }
+                            />
+                        );
+                    })}
+                </CardList>
+            )}
+
+            {/* O `ClosingBalance` que a API AFIRMOU, e não a soma dos
+                cards feita aqui — a mesma regra da tabela. */}
+            <div className={styles.mobileFoot}>
+                <Overline>Fechamento</Overline>
+                <b>{formatMoney(account.ClosingBalance)}</b>
+            </div>
+        </div>
+    );
+
     /* A tabela de um dos dois grupos da fatura. As colunas são as mesmas
        nos dois: o que muda entre eles é se a linha entra no total. */
     const cardTable = (entries: ApiTypes.StatementCardEntry[]) => (
@@ -273,6 +358,36 @@ export function Statement() {
                 </TableRow>
             ))}
         </Table>
+    );
+
+    /* Um dos dois grupos da fatura no telefone. O par de `cardTable`:
+       mesmo conteúdo, mesma ordem, sem rolagem de lado. */
+    const cardCards = (entries: ApiTypes.StatementCardEntry[]) => (
+        <CardList>
+            {entries.map((entry) => (
+                <ItemCard
+                    key={entry.IdExpensePayment}
+                    onClick={() => navigate(`/gastos?IdExpense=${entry.IdExpense}`)}
+                    label={`Ver o gasto ${entry.Description}`}
+                    title={entry.Description}
+                    badges={
+                        <Badge tone={entry.Paid ? "pos" : "neutral"}>
+                            {entry.Paid ? "Paga" : "Em aberto"}
+                        </Badge>
+                    }
+                    meta={
+                        <span className={styles.meta}>
+                            {/* A data da COMPRA, não a do vencimento. */}
+                            {formatDate(entry.Date)}
+                            {entry.InstallmentNumber !== null &&
+                                entry.InstallmentTotal !== null &&
+                                ` · parcela ${entry.InstallmentNumber} de ${entry.InstallmentTotal}`}
+                        </span>
+                    }
+                    amount={formatMoney(entry.Value)}
+                />
+            ))}
+        </CardList>
     );
 
     /* ── A fatura, em DOIS blocos ────────────────────────────
@@ -365,6 +480,57 @@ export function Statement() {
         );
     };
 
+    /* A mesma fatura, no telefone.
+       O total continua NO CABEÇALHO, e não no rodapé como o fechamento
+       da conta: ele é o total do PRIMEIRO bloco, e um número depois do
+       "Previsto" seria lido como a soma dos dois. */
+    const cardMobileSection = (card: ApiTypes.StatementCard) => {
+        const accountName = accountOfCard.get(card.IdPaymentMethod);
+
+        return (
+            <div key={`${card.IdPaymentMethod}-${card.DueDate}`} className={styles.mobileSection}>
+                <div className={styles.mobileHead}>
+                    <div className={styles.sectionTitle}>
+                        {accountName !== undefined && (
+                            <span className={styles.titleAccount}>{accountName}</span>
+                        )}
+                        {card.Name}
+                    </div>
+                    <div className={styles.sectionSub}>
+                        Fatura com vencimento em {formatDate(card.DueDate)}
+                    </div>
+                    <div className={styles.cycle}>
+                        <span>{cycleLabel({ start: card.CycleStart, end: card.CycleEnd })}</span>
+                        <Badge tone="neutral">{COMPETENCE_LABEL[card.CompetenceMode]}</Badge>
+                    </div>
+                    <div className={styles.mobileEnd}>
+                        <Overline>Total da fatura</Overline>
+                        <span className={styles.mobileEndValue}>{formatMoney(card.Total)}</span>
+                    </div>
+                </div>
+
+                {card.Entries.length === 0 ? (
+                    <EmptyState
+                        title="Nada nesta fatura ainda"
+                        description="Todo o ciclo está marcado como previsto — nenhuma compra foi dada como lançada na fatura."
+                    />
+                ) : (
+                    cardCards(card.Entries)
+                )}
+
+                {card.Expected.length > 0 && (
+                    <>
+                        <CardGroup
+                            title="Previsto · ainda não apareceu na fatura"
+                            meta={formatMoney(sumMoney(card.Expected.map((entry) => entry.Value)))}
+                        />
+                        {cardCards(card.Expected)}
+                    </>
+                )}
+            </div>
+        );
+    };
+
     const body = () => {
         if (statement.isError) return <ErrorState error={statement.error} />;
 
@@ -390,7 +556,12 @@ export function Statement() {
 
         return (
             <>
-                {Accounts.map(accountSection)}
+                {/* Quem escolhe entre a tabela e os cards é
+                    `useIsMobile()`, não o CSS — o mesmo critério das
+                    outras telas de lista. */}
+                {Accounts.map((account) =>
+                    isMobile ? accountCards(account) : accountSection(account),
+                )}
 
                 {/* A fatura já entrou na conta como UMA linha, acima.
                     Aqui ela é aberta — e não é dupla contagem: é a mesma
@@ -400,7 +571,9 @@ export function Statement() {
                         <div className={styles.divider}>
                             <span>Faturas do mês</span>
                         </div>
-                        {Cards.map(cardSection)}
+                        {Cards.map((card) =>
+                            isMobile ? cardMobileSection(card) : cardSection(card),
+                        )}
                     </>
                 )}
             </>

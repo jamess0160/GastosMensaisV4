@@ -21,7 +21,9 @@ import { ConfirmDialog } from "@/ui/overlay";
 import { CategoryIcon } from "@/ui/iconCatalog";
 import { IconArchive, IconEdit, IconUser } from "@/ui/icons";
 import { Cell, CellActions, IconButton, Table, TableHead, TableRow } from "@/ui/table";
+import { CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
+import { useIsMobile } from "@/lib/useMediaQuery";
 import { categoryColor } from "@/lib/categoryColor";
 
 type Tab = "categories" | "persons";
@@ -36,6 +38,12 @@ const emptyCategory = (): CategoryDraft => ({
 const emptyPerson = (): PersonDraft => ({ IdPerson: null, Name: "" });
 
 export function Settings() {
+    /* Quem escolhe entre a tabela e os cards é `useIsMobile()`, não o
+       CSS — o mesmo critério de Gastos, Renda e Contas. A tabela sem
+       essa bifurcação rolava de lado no telefone (o `min-width: 640px`
+       de `table.module.css`), que é o que as outras deixaram de
+       fazer. */
+    const isMobile = useIsMobile();
     const [tab, setTab] = useState<Tab>("categories");
     const [categoryDraft, setCategoryDraft] = useState<CategoryDraft>(emptyCategory);
     const [personDraft, setPersonDraft] = useState<PersonDraft>(emptyPerson);
@@ -120,6 +128,80 @@ export function Settings() {
                                 title="Nenhuma categoria ainda"
                                 description="Crie a primeira ao lado — categoria é obrigatória em todo gasto."
                             />
+                        ) : isMobile ? (
+                            <CardList>
+                                {activeCategories.map((category) => {
+                                    const system = isSystemCategory(category);
+                                    const color = categoryColor(category);
+
+                                    return (
+                                        <ItemCard
+                                            key={category.IdCategory}
+                                            title={
+                                                <>
+                                                    <span
+                                                        className={styles.tile}
+                                                        style={{
+                                                            background: `${color}1f`,
+                                                            color,
+                                                            borderColor: `${color}33`,
+                                                        }}
+                                                    >
+                                                        <CategoryIcon iconKey={category.IconKey} />
+                                                    </span>
+                                                    {category.Description}
+                                                </>
+                                            }
+                                            badges={
+                                                system ? (
+                                                    <Badge>Do sistema</Badge>
+                                                ) : (
+                                                    <Badge tone="brand">Sua</Badge>
+                                                )
+                                            }
+                                            trailing={
+                                                <span className={styles.cardActions}>
+                                                    <IconButton
+                                                        label={
+                                                            system
+                                                                ? "Categoria do sistema não pode ser editada"
+                                                                : "Editar"
+                                                        }
+                                                        disabled={system}
+                                                        onClick={() =>
+                                                            setCategoryDraft({
+                                                                IdCategory: category.IdCategory,
+                                                                Description: category.Description,
+                                                                IconKey: category.IconKey,
+                                                                Color: category.Color,
+                                                            })
+                                                        }
+                                                    >
+                                                        <IconEdit />
+                                                    </IconButton>
+                                                    <IconButton
+                                                        label={
+                                                            system
+                                                                ? "Categoria do sistema não pode ser arquivada"
+                                                                : "Arquivar"
+                                                        }
+                                                        disabled={system}
+                                                        onClick={() =>
+                                                            setArchiving({
+                                                                kind: "categories",
+                                                                id: category.IdCategory,
+                                                                name: category.Description,
+                                                            })
+                                                        }
+                                                    >
+                                                        <IconArchive />
+                                                    </IconButton>
+                                                </span>
+                                            }
+                                        />
+                                    );
+                                })}
+                            </CardList>
                         ) : (
                             <Table columns="minmax(0,1fr) 120px 110px">
                                 <TableHead>
@@ -325,6 +407,65 @@ export function Settings() {
                                 title="Nenhuma pessoa ainda"
                                 description="Pessoas são quem recebe e de quem é o custo — elas não precisam ter login."
                             />
+                        ) : isMobile ? (
+                            <CardList>
+                                {activePersons.map((person) => {
+                                    const linked = isLinkedPerson(person);
+
+                                    return (
+                                        <ItemCard
+                                            key={person.IdPerson}
+                                            title={
+                                                <>
+                                                    <span className={styles.avatar}>
+                                                        {person.Name.charAt(0).toUpperCase()}
+                                                    </span>
+                                                    {person.Name}
+                                                </>
+                                            }
+                                            badges={
+                                                linked ? (
+                                                    <Badge tone="pos">Usuário</Badge>
+                                                ) : (
+                                                    <Badge>Só rateio</Badge>
+                                                )
+                                            }
+                                            trailing={
+                                                <span className={styles.cardActions}>
+                                                    <IconButton
+                                                        label="Renomear"
+                                                        onClick={() =>
+                                                            setPersonDraft({
+                                                                IdPerson: person.IdPerson,
+                                                                Name: person.Name,
+                                                            })
+                                                        }
+                                                    >
+                                                        <IconEdit />
+                                                    </IconButton>
+                                                    <IconButton
+                                                        label={
+                                                            linked
+                                                                ? "Pessoa com login não pode ser arquivada"
+                                                                : "Arquivar"
+                                                        }
+                                                        disabled={linked}
+                                                        onClick={() =>
+                                                            setArchiving({
+                                                                kind: "persons",
+                                                                id: person.IdPerson,
+                                                                name: person.Name,
+                                                            })
+                                                        }
+                                                    >
+                                                        <IconArchive />
+                                                    </IconButton>
+                                                </span>
+                                            }
+                                        />
+                                    );
+                                })}
+                            </CardList>
                         ) : (
                             <Table columns="minmax(0,1fr) 150px 110px">
                                 <TableHead>

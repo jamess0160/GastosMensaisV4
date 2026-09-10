@@ -181,6 +181,60 @@
     background: var(--border);
 }
 
+/* ── A seção no telefone ──────────────────────────────────────
+   Abaixo de 900px a tabela vira a lista de cards de Gastos e Renda, e
+   a seção perde a moldura do card: os cards das linhas já são as
+   caixas, e uma borda em volta delas seria borda dentro de borda. */
+.mobileSection {
+    display: flex;
+    flex-direction: column;
+}
+
+.mobileHead {
+    padding: 0 2px 4px;
+}
+
+/* A ponta que ABRE a leitura: a abertura da conta e o total da fatura.
+   O fechamento não vem aqui — ele é o último elemento da conta. */
+.mobileEnd {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.mobileEndValue {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* O fechamento, no rodapé — o par do `.cardFoot` das outras telas de
+   lista. Último elemento da conta, onde a soma termina. */
+.mobileFoot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 2px 0;
+}
+
+.mobileFoot b {
+    font-size: 17px;
+    letter-spacing: -0.3px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+/* A data da linha, dentro do card. */
+.meta {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    white-space: nowrap;
+}
+
 @media (max-width: 900px) {
     .sectionHead {
         padding: 16px;
