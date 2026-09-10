@@ -1,43 +1,50 @@
+import moment from "moment";
+import "moment/locale/pt-br";
 import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
    CalendarDate ("YYYY-MM-DD") é string, e fica string.
-   `new Date("2026-05-05")` é interpretado como UTC: em UTC-3 volta
-   como 04/05. Todas as operações aqui são sobre a string ou sobre um
-   Date construído em horário LOCAL, nunca sobre o parser ISO.
+
+   A aritmética é do `moment`, a mesma biblioteca que a API usa em
+   `Utils.ts` — duas implementações da mesma regra de calendário é como
+   os dois lados passam a discordar sobre onde 31/01 mais um mês cai. O
+   que NÃO muda por causa da biblioteca é a superfície: toda função
+   daqui recebe e devolve `CalendarDate`/`ReferenceMonth`, e nenhuma
+   devolve `Moment`. Um `Moment` que escapa deste arquivo é um instante
+   solto, e instante solto é o que o fuso estraga.
+
+   Três cuidados que o moment não toma sozinho:
+
+   - **modo estrito, com o formato explícito.** `moment(x)` adivinha o
+     formato e aceita quase tudo; aqui uma string fora do padrão vira
+     "Invalid date" na saída, e o erro aparece onde nasceu;
+   - **nunca o parser ISO em UTC.** `new Date("2026-05-05")` é
+     meia-noite UTC e volta como 04/05 em UTC-3. `moment(texto, formato)`
+     constrói em horário LOCAL, que é o que a data de calendário quer;
+   - **locale `pt-br` importado e ligado explicitamente**, porque os
+     nomes de mês e de dia saem dele. Sem o import, `MMMM` sai em inglês
+     no bundle de produção.
    ════════════════════════════════════════════════════════════ */
 
-const MESES = [
-    "janeiro",
-    "fevereiro",
-    "março",
-    "abril",
-    "maio",
-    "junho",
-    "julho",
-    "agosto",
-    "setembro",
-    "outubro",
-    "novembro",
-    "dezembro",
-] as const;
+moment.locale("pt-br");
 
-const MESES_CURTOS = [
-    "jan",
-    "fev",
-    "mar",
-    "abr",
-    "mai",
-    "jun",
-    "jul",
-    "ago",
-    "set",
-    "out",
-    "nov",
-    "dez",
-] as const;
+/** O formato do `CalendarDate`, e o único que o parser estrito aceita. */
+const CALENDAR = "YYYY-MM-DD";
 
-const DIAS_CURTOS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"] as const;
+/** O formato do `ReferenceMonth`. */
+const MONTH = "YYYY-MM";
+
+/** O moment de uma data de calendário, em horário local.
+ *
+ *  O `slice` é pelo `ReferenceMonth` que volta do servidor como
+ *  "2026-05-01T00:00:00.000Z": o dia dele é o que interessa, e o
+ *  instante depois do "T" é ruído de serialização. */
+const calendar = (date: ApiTypes.CalendarDate) => moment(date.slice(0, 10), CALENDAR, true);
+
+/** O moment do primeiro dia de um mês de referência. Aceita a
+ *  `CalendarDate` inteira pelo mesmo motivo do `calendar`. */
+const month = (value: ApiTypes.ReferenceMonth | ApiTypes.CalendarDate) =>
+    moment(value.slice(0, 7), MONTH, true);
 
 interface Parts {
     year: number;
@@ -46,56 +53,51 @@ interface Parts {
 }
 
 /** Quebra "YYYY-MM-DD" (ou "YYYY-MM-DDTxx", como o ReferenceMonth que
- *  volta do servidor) sem passar pelo parser de Date. */
+ *  volta do servidor) sem passar pelo parser ISO. */
 export function parts(date: ApiTypes.CalendarDate): Parts {
-    const [year, month, day] = date.slice(0, 10).split("-").map(Number);
-    return { year, month, day };
+    const value = calendar(date);
+    return { year: value.year(), month: value.month() + 1, day: value.date() };
 }
 
 /** Date em horário local — seguro para aritmética de calendário. */
 export function toLocalDate(date: ApiTypes.CalendarDate): Date {
-    const { year, month, day } = parts(date);
-    return new Date(year, month - 1, day);
+    return calendar(date).toDate();
 }
 
 export function fromLocalDate(date: Date): ApiTypes.CalendarDate {
-    const year = String(date.getFullYear()).padStart(4, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return moment(date).format(CALENDAR);
 }
 
-export const today = (): ApiTypes.CalendarDate => fromLocalDate(new Date());
+export const today = (): ApiTypes.CalendarDate => moment().format(CALENDAR);
 
 /* ── Formatação ───────────────────────────────────────────── */
 
 /** "05/05/2026" */
 export function formatDate(date: ApiTypes.CalendarDate): string {
-    const { year, month, day } = parts(date);
-    return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+    return calendar(date).format("DD/MM/YYYY");
 }
 
 /** "5 de maio" */
 export function formatDayMonth(date: ApiTypes.CalendarDate): string {
-    const { month, day } = parts(date);
-    return `${day} de ${MESES[month - 1]}`;
+    return calendar(date).format("D [de] MMMM");
 }
 
 /** "05 mai" */
 export function formatShort(date: ApiTypes.CalendarDate): string {
-    const { month, day } = parts(date);
-    return `${String(day).padStart(2, "0")} ${MESES_CURTOS[month - 1]}`;
+    return calendar(date).format("DD MMM");
 }
 
 /** "seg" */
 export function weekdayShort(date: ApiTypes.CalendarDate): string {
-    return DIAS_CURTOS[toLocalDate(date).getDay()];
+    return calendar(date).format("ddd");
 }
 
-/** "Maio · 2026" — o cabeçalho de mês do layout. */
-export function formatMonthLabel(month: ApiTypes.ReferenceMonth | ApiTypes.CalendarDate): string {
-    const [year, monthNumber] = month.slice(0, 7).split("-").map(Number);
-    const name = MESES[monthNumber - 1];
+/** "Maio · 2026" — o cabeçalho de mês do layout.
+ *
+ *  A inicial maiúscula é nossa: em português o nome do mês é minúsculo,
+ *  e o locale devolve "maio". O cabeçalho quer o título. */
+export function formatMonthLabel(value: ApiTypes.ReferenceMonth | ApiTypes.CalendarDate): string {
+    const [name, year] = month(value).format("MMMM|YYYY").split("|");
     return `${name[0].toUpperCase()}${name.slice(1)} · ${year}`;
 }
 
@@ -105,12 +107,14 @@ export function formatMonthLabel(month: ApiTypes.ReferenceMonth | ApiTypes.Calen
  *  Nasceu do `CompetenceMode`: uma perna de cartão `purchase` tem duas
  *  datas verdadeiras — "vence 05 set" e "pesa em ago/2026" —, e a linha
  *  do gasto mostra as duas quando elas discordam. */
-export function formatMonthShort(month: ApiTypes.ReferenceMonth | ApiTypes.CalendarDate): string {
-    const [year, monthNumber] = month.slice(0, 7).split("-").map(Number);
-    return `${MESES_CURTOS[monthNumber - 1]}/${year}`;
+export function formatMonthShort(value: ApiTypes.ReferenceMonth | ApiTypes.CalendarDate): string {
+    return month(value).format("MMM/YYYY");
 }
 
-/** DateTime é instante de verdade: aqui `new Date()` é correto. */
+/** DateTime é instante de verdade, e é o único deste arquivo que não
+ *  passa pelo moment: aqui `new Date()` está certo, e o `Intl` formata
+ *  no fuso de quem lê — que é o que um carimbo de "criado em" quer
+ *  dizer. */
 export function formatDateTime(value: ApiTypes.DateTime): string {
     return new Intl.DateTimeFormat("pt-BR", {
         dateStyle: "short",
@@ -123,65 +127,58 @@ export function formatDateTime(value: ApiTypes.DateTime): string {
 /** "YYYY-MM" a partir de qualquer CalendarDate. É o formato que o
  *  endpoint de orçamento espera na entrada. */
 export const toReferenceMonth = (date: ApiTypes.CalendarDate): ApiTypes.ReferenceMonth =>
-    date.slice(0, 7);
+    calendar(date).format(MONTH);
 
-export const currentMonth = (): ApiTypes.ReferenceMonth => toReferenceMonth(today());
+export const currentMonth = (): ApiTypes.ReferenceMonth => moment().format(MONTH);
 
 /** Primeiro e último dia do mês, para as query From/To das listagens. */
-export function monthRange(month: ApiTypes.ReferenceMonth): {
+export function monthRange(value: ApiTypes.ReferenceMonth): {
     From: ApiTypes.CalendarDate;
     To: ApiTypes.CalendarDate;
 } {
-    const [year, monthNumber] = month.split("-").map(Number);
-    const lastDay = new Date(year, monthNumber, 0).getDate();
-    const mm = String(monthNumber).padStart(2, "0");
+    const start = month(value);
     return {
-        From: `${year}-${mm}-01`,
-        To: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
+        From: start.format(CALENDAR),
+        To: start.clone().endOf("month").format(CALENDAR),
     };
 }
 
-export function addMonths(month: ApiTypes.ReferenceMonth, delta: number): ApiTypes.ReferenceMonth {
-    const [year, monthNumber] = month.split("-").map(Number);
-    const shifted = new Date(year, monthNumber - 1 + delta, 1);
-    return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}`;
+export function addMonths(value: ApiTypes.ReferenceMonth, delta: number): ApiTypes.ReferenceMonth {
+    return month(value).add(delta, "months").format(MONTH);
 }
 
 /** O mesmo salto, mas de uma DATA, aparando o dia no mês curto.
  *
- *  31/01 mais um mês é 28/02, e nunca 03/03: `new Date(2026, 1, 31)`
- *  transborda para março sozinho. É o que a clonagem do mês de Renda
- *  precisa — um salário do dia 31 não pode nascer no dia 3 do mês
+ *  31/01 mais um mês é 28/02, e nunca 03/03 — o `add` do moment já
+ *  grampeia no fim do mês, que é a regra de que a clonagem do mês de
+ *  Renda precisa: um salário do dia 31 não pode nascer no dia 3 do mês
  *  seguinte. */
 export function addMonthsToDate(date: ApiTypes.CalendarDate, delta: number): ApiTypes.CalendarDate {
-    const { year, month, day } = parts(date);
-    // Dia 0 do mês seguinte = último dia do mês de destino.
-    const lastDay = new Date(year, month + delta, 0).getDate();
-    return fromLocalDate(new Date(year, month - 1 + delta, Math.min(day, lastDay)));
+    return calendar(date).add(delta, "months").format(CALENDAR);
 }
 
 /** O mesmo dia em outra data, sem passar pelo parser ISO. Dias negativos
  *  andam para trás, e o mês vira sozinho: 03/09 menos 7 é 27/08. */
 export function addDaysToDate(date: ApiTypes.CalendarDate, delta: number): ApiTypes.CalendarDate {
-    const { year, month, day } = parts(date);
-    return fromLocalDate(new Date(year, month - 1, day + delta));
+    return calendar(date).add(delta, "days").format(CALENDAR);
 }
 
 /** Quantos dias de calendário separam duas datas — negativo se `to` vem
  *  antes de `from`. É a folga do cartão vista de fora: fechou 27/08,
  *  venceu 03/09, folga de 7. */
 export function daysApart(from: ApiTypes.CalendarDate, to: ApiTypes.CalendarDate): number {
-    const millis = toLocalDate(to).getTime() - toLocalDate(from).getTime();
-    return Math.round(millis / 86_400_000);
+    return Math.round(calendar(to).diff(calendar(from), "days", true));
 }
 
 /** A data daquele dia naquele mês, APARADA no mês curto: dia 31 em
- *  fevereiro é 28, e nunca 3 de março. Mesmo cuidado do
- *  `addMonthsToDate` — um vencimento dia 31 não pode virar dia 3. */
-export function dayInMonth(month: ApiTypes.ReferenceMonth, day: number): ApiTypes.CalendarDate {
-    const [year, monthNumber] = month.split("-").map(Number);
-    const lastDay = new Date(year, monthNumber, 0).getDate();
-    return fromLocalDate(new Date(year, monthNumber - 1, Math.min(day, lastDay)));
+ *  fevereiro é 28, e nunca 3 de março.
+ *
+ *  O clamp é nosso: o `date()` do moment estoura para o mês seguinte
+ *  quando o dia não existe. Mesmo cuidado do `addMonthsToDate` — um
+ *  vencimento dia 31 não pode virar dia 3. */
+export function dayInMonth(value: ApiTypes.ReferenceMonth, day: number): ApiTypes.CalendarDate {
+    const target = month(value);
+    return target.date(Math.min(day, target.daysInMonth())).format(CALENDAR);
 }
 
 /** Os meses de um intervalo, das duas pontas inclusive.
@@ -193,8 +190,10 @@ export function monthsBetween(
     to: ApiTypes.ReferenceMonth,
 ): ApiTypes.ReferenceMonth[] {
     const months: ApiTypes.ReferenceMonth[] = [];
-    for (let month = from; month <= to; month = addMonths(month, 1)) {
-        months.push(month);
+    // "YYYY-MM" ordena como texto na mesma ordem em que ordena como
+    // data, então a parada do laço é uma comparação de string.
+    for (let current = from; current <= to; current = addMonths(current, 1)) {
+        months.push(current);
         // Trava de sanidade: intervalo invertido ou absurdo não vira laço
         // infinito nem dez mil requisições.
         if (months.length > 120) break;
@@ -208,21 +207,17 @@ export function daysBetween(
     to: ApiTypes.CalendarDate,
 ): ApiTypes.CalendarDate[] {
     const days: ApiTypes.CalendarDate[] = [];
-    const last = toLocalDate(to);
-    for (const day = toLocalDate(from); day <= last; day.setDate(day.getDate() + 1)) {
-        days.push(fromLocalDate(day));
+    const last = calendar(to);
+    // O moment muta no lugar: `day` é o mesmo objeto do começo ao fim.
+    for (const day = calendar(from); !day.isAfter(last, "day"); day.add(1, "day")) {
+        days.push(day.format(CALENDAR));
         if (days.length > 3660) break;
     }
     return days;
 }
 
 /** Todos os dias do mês, em ordem — o eixo X do relatório diário. */
-export function daysOfMonth(month: ApiTypes.ReferenceMonth): ApiTypes.CalendarDate[] {
-    const { From, To } = monthRange(month);
-    const last = toLocalDate(To).getDate();
-    const prefix = From.slice(0, 8);
-    return Array.from(
-        { length: last },
-        (_, index) => `${prefix}${String(index + 1).padStart(2, "0")}`,
-    );
+export function daysOfMonth(value: ApiTypes.ReferenceMonth): ApiTypes.CalendarDate[] {
+    const { From, To } = monthRange(value);
+    return daysBetween(From, To);
 }
