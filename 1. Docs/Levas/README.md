@@ -1,13 +1,20 @@
 # Levas
 
-Um arquivo por leva, `<N>. <Nome da leva>.md`. **A próxima é a 6** — o porquê do número está
-em [../RoadMap MVP.md](../RoadMap%20MVP.md#as-levas-daqui-pra-frente).
+Um arquivo por leva, `<N>. <Nome da leva>.md`. **A próxima é a 7** — o porquê da numeração
+começar em 6 está em [../RoadMap MVP.md](../RoadMap%20MVP.md#as-levas-daqui-pra-frente).
 
-A primeira que nasce com os dois repositórios já juntos é a
-[6. O cartão, o uso real e a gestão de membros](6.%20O%20cartão,%20o%20uso%20real%20e%20a%20gestão%20de%20membros.md),
-escrita em 09/09/2026 e ainda sem nenhuma etapa executada. O resto do que falta está na
-[fila do roadmap](../RoadMap%20MVP.md#a-fila-até-o-mvp) — que diz **o que falta**, não o que
-cada leva faz: o recorte é do plano da leva.
+| Leva | Estado |
+| --- | --- |
+| [6. O cartão, o uso real e a gestão de membros](6.%20O%20cartão,%20o%20uso%20real%20e%20a%20gestão%20de%20membros.md) | escrita em 09/09/2026, **fechada** em 09/09/2026 — 18 de 18 etapas |
+| [7. O que a lei cobra e o que só quebra em produção](7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md) | escrita em 10/09/2026, **nenhuma etapa executada** |
+
+A 6 foi a primeira que nasceu com os dois repositórios já juntos. A **7 é a primeira das duas de
+preparação para produção**, e o corte entre elas é o que se prova de que jeito: na 7 muda o que
+está versionado em `API/` e `Frontend/`, e a suíte responde; na **8** — ambiente, e-mail,
+arquivos externos, infra e backup — muda o que está em volta deles, e só subindo se sabe.
+
+O resto do que falta está na [fila do roadmap](../RoadMap%20MVP.md#a-fila-até-o-mvp) — que diz
+**o que falta**, não o que cada leva faz: o recorte é do plano da leva.
 
 As levas anteriores — três do backend e cinco do front, com numeração própria e colidindo entre
 si — estão em [../Old/](../Old/). Elas seguem valendo como referência de **formato** e de

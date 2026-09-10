@@ -56,6 +56,15 @@ registrada é **654 testes**, no fim da leva 3.
 
 Plano da leva 5: [Old/Front/levas/5. Plano de Ajustes 5.md](Old/Front/levas/5.%20Plano%20de%20Ajustes%205.md).
 
+### Leva 6 — a primeira unificada, fechada em 09/09
+
+**18 de 18 etapas**, num plano só com os dois lados na mesma fila:
+[Levas/6. O cartão, o uso real e a gestão de membros](Levas/6.%20O%20cartão,%20o%20uso%20real%20e%20a%20gestão%20de%20membros.md).
+Ela entregou os três blocos que abriam a fila abaixo — o cartão em modo `purchase` (a fatura
+que não montava, a compra no dia do fechamento, o `Charged`, o ciclo no extrato), as treze
+anotações do uso real, e a gestão de membros inteira: listar, trocar papel, remover, sair e
+transferir a propriedade.
+
 As cinco etapas que faltavam foram fechadas em 09/09, em cinco commits: `Fase #5 | Etapa 4` a
 `Etapa 8`. Com elas saíram do produto os **três botões rotulados "ainda sem API"** — o de
 conciliar extrato virou **"Extrato"** (a rota não concilia nada, e o nome tinha que dizer
@@ -77,19 +86,9 @@ nenhuma, dos dois.
 > duas levas. Amarrar item e leva neste documento foi o que fez uma leva ser definida por fora
 > antes de existir.
 
-### 1. O cartão de crédito, e a fatura que não fecha
+### 1. O fechamento do cartão guardado como dia do mês
 
-O `CompetenceMode` entrou em setembro e abriu costuras que ninguém releu. A mais cara: **a tela
-de Contas não consegue montar a fatura de um cartão em modo `purchase`** — pede as pernas por
-competência e procura por vencimento, e as duas discordam justamente quando o modo faz o que
-existe para fazer. Como quitar a fatura é a única coisa que grava `Paid` numa perna de cartão,
-o saldo de quem usa `purchase` nunca desce.
-
-Na mesma família: a compra no dia do fechamento caindo na fatura errada, o `Charged` nascendo
-`false` e obrigando a conferir compra a compra, e o extrato do cartão sem dizer que ciclo ele
-cobre.
-
-**Guardar o fechamento do cartão como dia do mês — leva própria.** A etapa 2 da leva 6
+**Leva própria.** A etapa 2 da leva 6
 reproduziu "a compra no dia do fechamento" e o defeito não é a comparação, que está certa: quem
 erra é o modelo que descreve o cartão. Hoje o fechamento é o vencimento menos uma folga em
 **dias corridos**, e o emissor brasileiro fecha num **dia fixo do mês** — as duas descrições não
@@ -100,28 +99,58 @@ fatura de 04/11** em vez da de 04/10. Um dia de erro na descrição é um mês d
 isso vale para todo cartão cuja folga atravessa a virada do mês. Trocar o modelo é migration,
 recálculo de perna já gravada e reescrita do `InvoiceDates` — por isso é leva, não etapa. Até
 lá, a tela do cartão mostra as duas datas do ciclo do mês corrente e avisa quando o fechamento
-derivado anda de mês para mês, em vez de aceitar a folga em silêncio.
+derivado anda de mês para mês, em vez de aceitar a folga em silêncio — o que a leva 6 entregou.
 
-### 2. Gestão de membros
+### 2. Compliance: o cadastro promete o que não entrega
 
-É o que sobrou do compartilhamento de workspace: **listar membros, trocar papel, remover, sair
-e transferir propriedade**. O convite e o aceite foram feitos na leva 2 do backend e na leva 4
-do front; o resto nunca entrou em leva nenhuma, de nenhum dos dois lados.
+A tela de criar conta exige o aceite de **dois documentos que não existem**, e o rodapé das
+telas públicas tem "Termos" e "Privacidade" como texto solto, sem link. O aceite morre no
+navegador: `POST /Users` não recebe campo nenhum sobre isso e não há coluna onde gravar, então
+**não existe registro de que alguém aceitou alguma coisa** — e um `curl` cria conta sem aceitar
+nada, porque o Joi não exige o que não existe.
 
-`WorkspaceMembers` já existe com papel, e `assertRole` já é chamado em 7 dos 9 pontos de
-acesso — a tabela e a checagem estão prontas, faltam as rotas e a tela.
+Falta a outra metade também: **não há como apagar a conta**. `DELETE /Users` não existe, e a
+foreign key `Workspaces.IdOwnerUser` é `CASCADE` — um delete sem guarda levaria junto o espaço
+compartilhado de outra pessoa.
 
-### 3. O que o uso real mostrou
+### 3. Produção: o código
 
-Levantado usando o app, e nada aqui é feature nova: tabela de gastos no Relatório,
-autocompletar do navegador atrapalhando os campos de valor e descrição, as datas do cliente
-pedindo uma base só, e seis defeitos de mobile — a barra do "Restante" colada no percentual,
-espaço sem criar nem trocar fora do desktop, o selo de dono no bloco errado, Extrato e
-Personalização sem virar card no telefone, e o rodapé dos formulários desalinhado.
+Nada aqui é código de feature. É o que hoje funciona na máquina de desenvolvimento e muda de
+comportamento — ou de superfície de ataque — no momento em que a mesma linha roda atrás de um
+proxy, num container, com gente de fora batendo na porta:
 
-### 4. Produção
+- **Rate limiting, que não existe em lugar nenhum do projeto.** A primeira rota que dói é a
+  pública que manda e-mail (`forgotPassword`). Hoje há **dois freios parciais e nenhum deles é
+  rate limiting**: o `MailCooldown` da API, que é um `Map` em memória e só protege o
+  `resendConfirmation`, e o `useCooldown` do cliente, que mora no navegador e qualquer um
+  contorna com `curl`. O `forgotPassword` continua sem freio nenhum do lado do servidor;
+- **o socket.io e o `/Cache`, herdados de outro projeto e nunca usados pelo cliente.** A API
+  sobe uma segunda porta com `origin: "*"`, e as três rotas de `/Cache` deixam qualquer conta
+  logada escrever sem limite na memória do processo e ler o que os outros escreveram — não são
+  escopadas por workspace. Não há `socket.io-client` no front, nem um import de socket em
+  `Frontend/src/`;
+- **`trust proxy` não setado** — atrás do nginx, `req.ip` é o nginx para o mundo inteiro, que é
+  a definição de um rate limiting que conta todo mundo como uma pessoa só;
+- **`cors()` montado e aberto**, `express.json()` sem `limit`, e nenhum cabeçalho de segurança;
+- **uma segunda variável de ambiente, não documentada, decidindo o ambiente.** O `AsyncHandler`
+  lê `process.env.PROD`, que não está em `exemple.env` nem no `CLAUDE.md`: sem alguém adivinhar
+  que ela existe, todo stack de erro vai para o stdout do container;
+- **`Utils/constants.json` lido do disco a cada requisição** pelo `AsyncHandler`, para decidir
+  dois booleanos de log. O arquivo é de outro projeto: fala de OEE, ordens de produção e MSSQL;
+- **log só em arquivo**, em `process.cwd()/Logs` — dentro de um container isso some no próximo
+  `up`, que é justamente quando alguém vai querer ler;
+- **nenhum tratamento de `SIGTERM`.** O `docker stop` corta requisição em voo e pode interromper
+  um tick de rotina depois de ele ter reivindicado o `RotineRuns` e antes de carimbar o
+  `FinishedAt` — o mês fica sem fechar, e o catch-up não cobre esta;
+- **o `knexfile` só declara a chave `development` e não há script de migration.** Com
+  `NODE_ENV=production` o CLI do Knex procura `production`, não acha, e o primeiro deploy morre
+  antes da primeira requisição;
+- **`path: "*"` do chassi desenha `element: null`** — qualquer URL errada mostra a tela em
+  branco, com a sidebar em volta.
 
-Nada aqui é código de feature, e cada item já quebrou alguma coisa uma vez:
+### 4. Produção: o ambiente
+
+O que não está versionado em `API/` nem em `Frontend/`, e que só se prova subindo:
 
 - **`NODE_ENV=production` de verdade no deploy** — sem isso o `secure` nunca é setado no cookie
   de sessão;
@@ -131,13 +160,18 @@ Nada aqui é código de feature, e cada item já quebrou alguma coisa uma vez:
 - **nginx servindo front e API na mesma origem** (`/` e `/api`) — é o que faz o
   `sameSite: 'strict'` funcionar sem CORS. Em dev o equivalente é o proxy do Vite, e a saída
   errada dos dois é afrouxar o cookie;
-- **SPF/DKIM no domínio** — enviar como `@gastosmensais.com.br` por um SMTP não autorizado cai
-  em spam, e nenhuma arquitetura conserta isso;
-- **Rate limiting, que não existe em lugar nenhum do projeto.** A primeira rota que dói é a
-  pública que manda e-mail (`forgotPassword`). Hoje há **dois freios parciais e nenhum deles é
-  rate limiting**: o `MailCooldown` da API, que é um `Map` em memória e só protege o
-  `resendConfirmation`, e o `useCooldown` do cliente, que mora no navegador e qualquer um
-  contorna com `curl`. O `forgotPassword` continua sem freio nenhum do lado do servidor.
+- **imagem e `compose`** dos dois lados, com o Postgres em container, o healthcheck sobre o
+  `GET /Utils/Health` que já existe, e as migrations rodando no deploy;
+- **certificado TLS.** Sem `https` o cookie `secure` não volta, e a sessão inteira morre;
+- **SPF/DKIM/DMARC no domínio** — enviar como `@gastosmensais.com.br` por um SMTP não autorizado
+  cai em spam, e nenhuma arquitetura conserta isso;
+- **as variáveis que se esquecem**: `APP_URL` (sem ela o link de recuperação de senha é montado
+  com o `Host` da requisição), e `WEBAUTHN_RP_ID`/`WEBAUTHN_ORIGIN`, que estão em `localhost` no
+  exemplo — valor errado não dá erro, a biometria só não funciona;
+- **os arquivos que o navegador procura sozinho**: `robots.txt`, manifesto, `apple-touch-icon`,
+  e um favicon que não seja o `logo.png` de 761 KB baixado em toda página;
+- **backup do Postgres com restore testado.** Um volume perdido é o produto inteiro, e backup
+  que nunca foi restaurado não é backup.
 
 ---
 
@@ -184,12 +218,19 @@ porque precisem de nova discussão.
 
 ## As levas daqui pra frente
 
-**A próxima é a leva 6**, e ela é a primeira unificada: um plano só, com as etapas da API e as
-do front na mesma fila.
+**A leva 6 foi a primeira unificada** — um plano só, com as etapas da API e as do front na mesma
+fila — e fechou em 09/09 com 18 de 18 etapas.
 
-**O número começa em 6 porque é o primeiro livre.** O backend chegou até a Fase #3 e o front
+**O número começou em 6 porque era o primeiro livre.** O backend chegou até a Fase #3 e o front
 até a Fase #5, e os dois históricos agora são um: recomeçar em 1 faria
 `Fase #1 | Etapa 2` existir duas vezes no mesmo `git log` querendo dizer coisas diferentes.
+
+**A próxima é a 7, e ela é a primeira de duas de preparação para produção.** O corte entre elas
+é o que se prova de que jeito: a **7** — compliance e o código que muda de comportamento em
+produção — se verifica com `npm test` e `npm run typecheck`, e é o que está versionado em `API/`
+e `Frontend/`; a **8** — ambiente, e-mail do domínio, arquivos externos, infra e backup — é o
+que está em volta dos dois, e só subindo se sabe. Juntá-las faria uma leva em que metade das
+etapas não tem critério de aceite até o dia do deploy.
 
 Cada leva ganha um arquivo em [Levas/](Levas/), no formato descrito lá. O que muda em relação
 ao que existia antes:
