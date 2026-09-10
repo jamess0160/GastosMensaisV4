@@ -256,7 +256,6 @@ export function Dashboard() {
                                     ? "—"
                                     : formatMoney(available)
                                         .replace("R$", "")
-                                        .replace("-", "")
                                         .trim()}
                             </span>
                         </div>
