@@ -76,6 +76,12 @@
     gap: 16px;
 }
 
+/* Os botões ficam CENTRALIZADOS, não encostados na borda. No telefone o
+   rodapé tem a largura da tela inteira, e dois botões num canto dela
+   deixam o resto da faixa vazia. A regra é daqui e não de cada tela:
+   `.foot` é o rodapé do `SlideOver` e do `Modal`, por onde passam todos
+   os formulários do produto — é o que impede a próxima tela de nascer
+   desalinhada. */
 .foot {
     flex-shrink: 0;
     padding: 14px 28px;
@@ -83,11 +89,16 @@
     background: var(--surface);
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 10px;
 }
 
+/* O espaçador que empurrava os botões para a direita não empurra mais
+   nada: com o rodapé centralizado, um `flex: 1` no meio da faixa
+   desfaria a centralização. Ele continua no lugar, sem ocupar espaço,
+   e o rodapé fica igual com ou sem ele. */
 .footSpacer {
-    flex: 1;
+    display: none;
 }
 
 .closeButton {
@@ -369,10 +380,5 @@
     /* O rodapé com três botões quebra em vez de espremê-los. */
     .foot {
         flex-wrap: wrap;
-    }
-
-    .footSpacer {
-        flex-basis: 100%;
-        height: 0;
     }
 }

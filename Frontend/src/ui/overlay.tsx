@@ -371,7 +371,10 @@ export function ConfirmDialog({
     );
 }
 
-/** O espaçador que empurra os botões do rodapé para a direita. */
+/** O separador entre os grupos de botões do rodapé. Ele não empurra
+ *  nada: o `.foot` centraliza os botões, e um espaçador que crescesse no
+ *  meio da faixa desfaria a centralização — ver o comentário de
+ *  `.footSpacer` em `overlay.module.css`. */
 export function FooterSpacer() {
     return <span className={styles.footSpacer} />;
 }
