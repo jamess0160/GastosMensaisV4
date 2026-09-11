@@ -1,0 +1,162 @@
+#  ---------------------------------------------------------------------------------------
+#  A orquestração dos três containers
+#  ---------------------------------------------------------------------------------------
+#
+#  Este arquivo mora na **raiz** do repositório, e não dentro de `API/` ou de `Frontend/`,
+#  porque ele é a única peça do deploy que só existe porque os dois lados moram juntos: ele
+#  descreve a relação entre eles — quem resolve o nome de quem, quem espera por quem, e qual
+#  das três portas chega a existir fora da rede do compose.
+#
+#  **Subir e migrar são duas ações.** Não há `entrypoint` que rode a migration no boot: com o
+#  `restart: unless-stopped` abaixo, uma migration que falha viraria um container em laço de
+#  reinício tentando migrar um banco quebrado várias vezes por minuto, e o `rollback` deixaria
+#  de ser uma decisão humana. A migration é um comando explícito do deploy
+#  (`docker compose exec api npm run migrate:prod`), porque falha de um jeito diferente de
+#  "o processo não sobe".
+
+services:
+
+  #  -----------------------------------------------------------------------------------
+  #  db — o Postgres, e o volume que é o produto
+  #  -----------------------------------------------------------------------------------
+  #
+  #  **Volume nomeado, nunca anônimo.** É a diferença entre um `docker compose down` que é
+  #  rotina e um `docker compose down` que apaga o produto: o volume nomeado sobrevive ao
+  #  `down`, ao `up` seguinte e à troca da imagem, e só morre quando alguém digita `-v`.
+  #
+  #  **Sem `ports`.** O banco é alcançável apenas de dentro da rede do compose, pelo nome
+  #  `db`. Um Postgres publicado numa interface do host é o alvo que os scanners encontram
+  #  primeiro — e no Docker não basta o firewall do host achar que fechou a porta, porque o
+  #  daemon escreve as próprias regras no `iptables` antes das do `ufw`. Quem precisa de um
+  #  `psql` usa `docker compose exec db psql`.
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    #  O healthcheck do banco é o que o `depends_on` da API espera, e é ele — não o da API —
+    #  que responde por "o Postgres aceita conexão". `pg_isready` é o cliente oficial para
+    #  essa pergunta e já vem na imagem.
+    #
+    #  O `$$` é escape do próprio compose: ele deixa o `$` chegar literal ao shell de dentro
+    #  do container, onde `POSTGRES_USER` e `POSTGRES_DB` existem.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    #  Ver a nota sobre rotação de log no fim deste arquivo.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  #  -----------------------------------------------------------------------------------
+  #  api — construída deste repositório, e invisível de fora
+  #  -----------------------------------------------------------------------------------
+  #
+  #  **Sem `ports` também.** Quem fala com a API é o `web`, pela rede interna do compose, em
+  #  `http://api:4000` — é o que o `proxy_pass` de `Frontend/deploy/nginx.conf` faz. Publicar
+  #  a 4000 no host seria abrir uma segunda porta de entrada que não passa pelo nginx do
+  #  container, e portanto sem a CSP, sem o cache e sem o `/api` da mesma origem que o cookie
+  #  `SameSite=Strict` exige.
+  api:
+    build: ./API
+    restart: unless-stopped
+
+    #  `service_healthy`, e não o `service_started` padrão: o container do Postgres existe
+    #  segundos antes de o processo aceitar conexão, e nesse intervalo o pool do Knex subiria
+    #  contra um banco que ainda não responde.
+    depends_on:
+      db:
+        condition: service_healthy
+
+    #  **20s, e o número é a correção de uma colisão.** O encerramento ordenado da API tem um
+    #  teto interno de 10s antes de se matar à força, e o `docker stop` manda `SIGKILL` 10s
+    #  depois do `SIGTERM`. Com os dois iguais, o `SIGKILL` chegaria no mesmo instante em que
+    #  o processo desistiria sozinho, e a mensagem que torna esse caso diagnosticável
+    #  ("Encerramento não terminou em 10s") nunca chegaria ao log. Com a janela do orquestrador
+    #  maior que o teto interno, o processo sempre decide o próprio fim.
+    stop_grace_period: 20s
+
+    #  **`node -e` com o `fetch` global do Node 22**, e não `curl` ou `wget`: a imagem
+    #  `bookworm-slim` não tem nenhum dos dois, e instalar um deles só para o healthcheck
+    #  seria acrescentar superfície a uma imagem de produção por causa de uma linha de YAML.
+    #
+    #  **Ele prova que o processo escuta, não que o banco responde**, e isso é deliberado. A
+    #  rota `/Utils/Health` é barata de propósito (`routes/Utils/Utils.controller.ts`), e quem
+    #  prova o banco é o healthcheck do `db` acima. Um healthcheck que consultasse o Postgres
+    #  faria a API ser reiniciada por causa de uma indisponibilidade do banco — reinício que
+    #  não conserta nada e que ainda descarta as requisições em voo.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/Utils/Health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  #  -----------------------------------------------------------------------------------
+  #  web — o nginx do container, e a única porta que existe
+  #  -----------------------------------------------------------------------------------
+  #
+  #  **`127.0.0.1:8080:80`, e não `8080:80`.** O bind explícito no loopback é o que impede a
+  #  porta de aparecer na rede: `"8080:80"` escuta em todas as interfaces e **fura o firewall
+  #  do host**, porque o Docker escreve as próprias regras no `iptables` antes das do `ufw` —
+  #  a porta ficaria aberta no IP público com o firewall dizendo que está fechada. Com a
+  #  Cloudflare na frente, uma porta aberta direto no IP do servidor é exatamente o caminho
+  #  que a Cloudflare existe para fechar. Quem alcança a 8080 é o nginx do host, que roda na
+  #  mesma máquina.
+  web:
+    build: ./Frontend
+    restart: unless-stopped
+
+    #  **Sem este `depends_on` o `web` não sobe**, e o modo de falhar não é óbvio: o
+    #  `proxy_pass http://api:4000/` do `Frontend/deploy/nginx.conf` usa um nome literal, e o
+    #  nginx resolve nome literal **na leitura da configuração**, não na requisição. Se `api`
+    #  ainda não existe na rede do compose, o processo morre no parse com
+    #  `[emerg] host not found in upstream "api"` — não é um 502 no primeiro acesso, é o
+    #  container do front que nunca chega a escutar.
+    #
+    #  `service_started` basta: o que o DNS interno do Docker precisa é que o container `api`
+    #  exista, não que ele esteja saudável. Esperar por `service_healthy` aqui atrasaria o
+    #  front por causa do banco, e deixaria o site fora do ar num incidente em que ele ainda
+    #  poderia servir a página e mostrar o erro da API na tela.
+    depends_on:
+      api:
+        condition: service_started
+
+    ports:
+      - "127.0.0.1:8080:80"
+
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+#  ---------------------------------------------------------------------------------------
+#  O volume, e a rotação de log dos três serviços
+#  ---------------------------------------------------------------------------------------
+#
+#  **`pgdata` é o produto.** Declarado aqui como volume nomeado do projeto, ele é a única
+#  coisa neste arquivo que não pode ser recriada a partir do repositório.
+#
+#  **A rotação de log repetida nos três serviços não é cerimônia.** A leva 7 tirou o log do
+#  disco da aplicação e o mandou para o stdout — o que move o problema para o disco do daemon,
+#  onde, no padrão do Docker, o `json-file` **cresce para sempre**. Num servidor pessoal, com
+#  um disco só, o disco cheio derruba o Postgres junto com o resto. Não há como declarar isso
+#  uma vez no compose: `logging` é por serviço, e o padrão do daemon vive em
+#  `/etc/docker/daemon.json`, que é do host e não é versionado aqui.
+volumes:
+  pgdata:

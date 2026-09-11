@@ -1,0 +1,24 @@
+#  ---------------------------------------------------------------------------------------
+#  O que a raiz ignora
+#  ---------------------------------------------------------------------------------------
+#
+#  `API/.gitignore` e `Frontend/.gitignore` continuam respondendo pelo que é de cada lado
+#  (`node_modules/`, `build/`, `dist/`, os `.env` deles). Este arquivo responde só pelo que
+#  passou a existir quando os dois viraram um repositório só: o deploy, que mora aqui.
+#
+#  **O `.env` da raiz é o do `compose`.** Ele é o arquivo que o `env_file` do
+#  `docker-compose.yml` lê no servidor, e dentro dele ficam a senha do Postgres, o
+#  `JWT_SECRET` que assina toda sessão e a senha do SMTP. Versionar esse arquivo é publicar
+#  os três — e um segredo que já foi commitado não deixa de estar commitado quando alguém o
+#  apaga no commit seguinte: o histórico continua ali.
+#
+#  Os padrões começam com `/` de propósito: assim valem para a raiz e só para ela, sem passar
+#  por cima do que `API/` e `Frontend/` já decidiram para os arquivos deles.
+/.env
+/.env.*
+
+#  O override local do compose, que é o arquivo com que se testa uma mudança de orquestração
+#  nesta máquina sem alterar o que sobe no servidor. O Docker o lê sozinho quando ele existe,
+#  e é exatamente por isso que ele não pode ser versionado: um override commitado entraria em
+#  todo `docker compose up` do servidor sem ninguém pedir.
+/docker-compose.override.yml
