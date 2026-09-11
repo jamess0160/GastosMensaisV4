@@ -1,3 +1,6 @@
+/* Os `@font-face` vêm antes dos tokens porque `--font` e `--mono`
+   nomeiam justamente as famílias que a folha de fontes declara. */
+@import "./fonts.css";
 @import "./tokens.css";
 
 *,

@@ -1,0 +1,95 @@
+/* ════════════════════════════════════════════════════════════
+   As duas famílias do produto, servidas pelo próprio app.
+
+   Até a leva 8 elas vinham do `fonts.googleapis.com`, com dois
+   `preconnect` no `index.html`: todo visitante entregava IP e
+   `User-Agent` ao Google antes de ver a tela de login, e a política
+   de privacidade — que diz que o produto não conversa com terceiros —
+   ficava errada por causa de dois arquivos que ninguém tinha baixado.
+   Com o re-aceite da leva 7 no ar, corrigir o texto custaria um modal
+   bloqueante na frente de todos os usuários; baixar os arquivos custa
+   68 KB no repositório.
+
+   É também o que torna `font-src 'self'` verdadeiro na CSP que a etapa
+   2 escreveu em `deploy/nginx.conf`. Enquanto esta folha não existiu, a
+   regra estava lá e as fontes estavam bloqueadas: o app renderizava em
+   fonte de sistema.
+
+   Os arquivos vêm do próprio Google Fonts (é a mesma origem de sempre,
+   só que baixada uma vez em vez de a cada visitante). O Vite os trata
+   como asset: nome com hash no `dist/assets/`, e com ele a regra de
+   cache imutável da etapa 2.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Só o subset `latin` ──────────────────────────────────────
+   O Google publica seis subsets por família; aqui entra um. A conta
+   foi feita no código, e não no chute: varrendo `src/` caractere a
+   caractere contra a `unicode-range` do subset `latin`, o que cai fora
+   dele é `─` e `═` (molduras de comentário), `⚠`, `Δ`, `≠` (também em
+   comentário) e `→` — o único que chega à tela, nas transferências da
+   Renda e do Extrato. E `→` (U+2192) **não está no `latin-ext`
+   tampouco**: ele já hoje é desenhado pela fonte do sistema, com o
+   Google Fonts no ar. Trazer o `latin-ext` seria trazer 90 KB — mais
+   do que os dois arquivos que ficam somados — para nenhum caractere
+   que o produto escreve.
+
+   O que o subset não cobre não vira quadradinho: a falta de um glifo
+   cai para a próxima família da pilha (`system-ui`), caractere a
+   caractere. Texto digitado pelo usuário — o nome de uma categoria, de
+   uma pessoa — em alfabeto fora do `latin` é o caso que degrada, e a
+   troca se revisa no dia em que o produto deixar de ser um MVP em
+   português para conhecidos testarem.
+   ────────────────────────────────────────────────────────────── */
+
+/* ── Inter · 400, 500, 600, 700 e 800 ─────────────────────────
+   Os cinco pesos são usados de verdade — 400 é o corpo (o padrão do
+   `body`), 500/600/700 estão espalhados por toda folha de tela, e 800
+   está no nome da marca da sidebar, no título dos documentos legais e
+   em mais alguns títulos. Nenhum peso sobrou para cortar.
+
+   E mesmo assim **é um arquivo só**: o Inter do Google é variável
+   (eixo `wght` de 100 a 900) desde a v20, e o mesmo `.woff2` atende os
+   cinco. É por isso que aqui há um `@font-face` e não cinco — cinco
+   blocos apontando para o mesmo arquivo é o que o CSS do Google
+   devolve, e é duplicação, não precisão. As estáticas por peso ainda
+   existem e somariam 118 KB contra os 47 KB deste arquivo.
+
+   O intervalo declarado é `400 800`, o que o app pede, e não o
+   `100 900` que o arquivo aguenta: um `font-weight: 300` que apareça
+   amanhã é clampado para 400 em vez de desenhar um peso que nenhuma
+   tela do layout tem.
+
+   Não há face itálica, e não havia antes: o `index.html` pedia só o
+   eixo `wght`. O `<em>` dos documentos legais e o `.suggestionNew` do
+   rateio continuam sendo inclinados pelo navegador, exatamente como
+   hoje.
+   ────────────────────────────────────────────────────────────── */
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url("../assets/fonts/inter-variable-latin.woff2") format("woff2");
+}
+
+/* ── JetBrains Mono · só o 400 ────────────────────────────────
+   Aqui o corte da etapa é real. O `index.html` pedia três pesos
+   (400/500/600) e a monoespaçada aparece em três lugares, todos
+   inline e nenhum com peso próprio: o `code` dos documentos legais
+   (`token`, `HttpOnly`, `SameSite=Strict`), o endereço que falhou no
+   404 e o `code` do `ScreenStub`. Os três herdam 400 — o `.body` do
+   legal não muda peso, o `.text` do `EmptyState` também não, e não há
+   `<code>` dentro de `<strong>` em lugar nenhum. 500 e 600 nunca foram
+   desenhados na tela.
+
+   O corte muda o arquivo, não só a declaração: pedidos os três pesos,
+   o Google devolve a variável (31 KB); pedido um, devolve a estática
+   daquele peso (21 KB).
+   ────────────────────────────────────────────────────────────── */
+@font-face {
+    font-family: "JetBrains Mono";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../assets/fonts/jetbrains-mono-400-latin.woff2") format("woff2");
+}

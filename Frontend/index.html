@@ -16,12 +16,11 @@
         <link rel="icon" href="/favicon.ico" sizes="32x32" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/site.webmanifest" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-            rel="stylesheet"
-        />
+
+        <!-- Inter e JetBrains Mono NÃO se pedem ao Google aqui: elas moram em
+             `src/assets/fonts/` e são declaradas em `src/styles/fonts.css`. O link que
+             estava nesta linha entregava o IP de todo visitante antes da tela de login,
+             e a CSP de `deploy/nginx.conf` diz `font-src 'self'`. -->
         <title>Gastos mensais</title>
     </head>
     <body>
