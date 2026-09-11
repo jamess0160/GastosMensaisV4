@@ -4,7 +4,18 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#FF6A00" />
-        <link rel="icon" type="image/png" href="/logo.png" />
+        <meta
+            name="description"
+            content="Todo dinheiro do mês em um lugar só: gastos divididos entre destinos, parcelas acompanhadas e o mês fechado sem planilha."
+        />
+
+        <!-- Derivados de `public/logo.png`, que continua servindo de IMAGEM no app mas deixou
+             de ser o ícone: 761 KB baixados em toda visita para desenhar 16 pixels na aba.
+             Precisam EXISTIR em `public/` — com o `try_files` do nginx, um ícone que falta não
+             dá 404, dá `index.html`. -->
+        <link rel="icon" href="/favicon.ico" sizes="32x32" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/site.webmanifest" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
