@@ -1,0 +1,38 @@
+#  O contexto inteiro é copiado para o daemon a cada `docker build`, e o `COPY . .` do estágio
+#  de build leva tudo que sobrar para dentro de uma camada. Como no lado da API, **este arquivo
+#  não é higiene, é correção.**
+
+#  O `.env` de desenvolvimento. Ele só tem o `VITE_API_PROXY_TARGET`, que não é segredo — mas o
+#  que é `VITE_*` o Vite **embute no bundle**, em texto claro, e uma variável que entrar aqui
+#  amanhã viraria arquivo público sem ninguém decidir isso. O `.env.example` fica: ele é
+#  documentação e não tem valor nenhum dentro.
+.env
+.env.*
+!.env.example
+
+#  Centenas de MB transferidos para o daemon a cada build. Quem instala é o `npm ci` de dentro
+#  da imagem, no Linux do container.
+node_modules
+
+#  O `dist/` da máquina de desenvolvimento não entra: quem o produz é o estágio de build, e um
+#  bundle velho copiado por cima seria o deploy de um commit que ninguém escolheu.
+dist
+dist-ssr
+
+#  Estado incremental do `tsc -b`. Copiado para dentro, ele faz o typecheck da imagem pular
+#  arquivos com base nos carimbos de tempo da outra máquina.
+*.tsbuildinfo
+.vite
+
+#  1,8 MB de material de referência do Claude Design. Fica versionado porque é a fonte das
+#  transcrições, mas nenhum `import` o alcança — só comentários o citam.
+Layout
+
+.vscode
+.gitignore
+.DS_Store
+
+#  Nem eles próprios: mudar um comentário daqui não é motivo para invalidar a camada do
+#  `COPY . .`.
+Dockerfile
+.dockerignore
