@@ -6,12 +6,20 @@ começar em 6 está em [../RoadMap MVP.md](../RoadMap%20MVP.md#as-levas-daqui-pr
 | Leva | Estado |
 | --- | --- |
 | [6. O cartão, o uso real e a gestão de membros](6.%20O%20cartão,%20o%20uso%20real%20e%20a%20gestão%20de%20membros.md) | escrita em 09/09/2026, **fechada** em 09/09/2026 — 18 de 18 etapas |
-| [7. O que a lei cobra e o que só quebra em produção](7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md) | escrita em 10/09/2026, **fechada** em 10/09/2026 — 12 de 12 etapas |
+| [7. O que a lei cobra e o que só quebra em produção](7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md) | escrita em 10/09/2026, 12 de 12 etapas fechadas no mesmo dia — **reaberta** em 11/09/2026 com a etapa 13, ainda aberta |
+| [8. O que só se prova subindo](8.%20O%20que%20só%20se%20prova%20subindo.md) | escrita em 11/09/2026, **nenhuma etapa executada** — 0 de 10 |
 
-A 6 foi a primeira que nasceu com os dois repositórios já juntos. A **7 é a primeira das duas de
-preparação para produção**, e o corte entre elas é o que se prova de que jeito: na 7 muda o que
-está versionado em `API/` e `Frontend/`, e a suíte responde; na **8** — ambiente, e-mail,
-arquivos externos, infra e backup — muda o que está em volta deles, e só subindo se sabe.
+A 6 foi a primeira que nasceu com os dois repositórios já juntos. A **7 e a 8 são a preparação
+para produção**, e o corte entre elas é o que se prova de que jeito: na 7 muda o que está
+versionado em `API/` e `Frontend/`, e a suíte responde; na **8** — imagens, `compose`, vhost,
+e-mail do domínio, arquivos externos e backup — muda o que está em volta deles, e só subindo se
+sabe. Nenhuma etapa da 8 se verifica com `npm test`.
+
+**As duas estão abertas ao mesmo tempo, e isso não é uma fila furada.** A 8 foi escrita em
+11/09, com a etapa 13 da 7 ainda por executar, porque nenhuma etapa da 8 depende dela: o plano
+se escreve inteiro antes do código, e o que ele descreve — imagem, `compose`, vhost — não
+encosta no aceite dos termos. A ordem de **execução** continua sendo a 13 primeiro: ela fecha um
+buraco de um produto que já está escrito, e a 8 sobe o produto.
 
 O resto do que falta está na [fila do roadmap](../RoadMap%20MVP.md#a-fila-até-o-mvp) — que diz
 **o que falta**, não o que cada leva faz: o recorte é do plano da leva.
@@ -104,3 +112,19 @@ passaram a apontar para o lugar errado. Daí a regra que vem junto:
 **Nenhum documento cita a etapa de outro documento.** Uma referência entre documentos nomeia a
 **leva**, no máximo; o que precisa ser dito sobre a etapa se diz pelo nome do que ela entrega,
 que não muda quando os números mudam.
+
+## Uma leva fechada pode reabrir, no fim da fila
+
+**Acrescentar uma etapa no fim não é renumerar**, e é por isso que é permitido mesmo depois de a
+leva ter fechado: a nova ganha o próximo número livre e nenhum commit existente passa a apontar
+para outro lugar. O que ela **não** pode é se encaixar no meio para ficar perto das parentes
+dela — isso é renumerar, e a regra de cima vale.
+
+Aconteceu em 11/09/2026 com a leva 7, que fechou com 12 etapas em 10/09 e ganhou a **13** no dia
+seguinte. O critério é o que separa uma etapa nova de uma leva nova: reabre quando o trabalho é
+**a mesma pergunta que a leva já estava respondendo** e depende de uma etapa dela — ali, o
+re-aceite dos termos, que lê a coluna que a etapa 2 tinha acabado de gravar. Trabalho que só
+*parece* do mesmo assunto começa leva própria.
+
+Quando isso acontece, **a reabertura fica escrita na abertura do plano**, com a data e o que a
+provocou. Uma etapa que aparece no fim de uma leva fechada, sem explicação, lê-se como esquecimento.

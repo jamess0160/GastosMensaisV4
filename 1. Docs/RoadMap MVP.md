@@ -73,9 +73,9 @@ isso), o de exportar passou a baixar o `.xlsx` do servidor, e "Esqueci minha sen
 navegação de verdade. Nasceram quatro telas: `contas/extrato`, `/esqueci-senha`,
 `/recuperar-senha` e `/confirmar-email`.
 
-### Leva 7 — a primeira de produção, fechada em 10/09
+### Leva 7 — a primeira de produção, 12 etapas em 10/09 e a 13 aberta
 
-**12 de 12 etapas**, num commit por etapa:
+**12 de 13 etapas**, num commit por etapa:
 [Levas/7. O que a lei cobra e o que só quebra em produção](Levas/7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md).
 Ela fechou os dois blocos que abriam a fila abaixo — **compliance** e **o código de produção** —
 e nada nela é feature.
@@ -95,6 +95,13 @@ limitado a 100kb e a saída do `cors()`; rate limiting por IP nas quatro rotas p
 desligamento limpo em `SIGTERM`/`SIGINT`, que espera a requisição em voo e o tick de rotina
 antes de fechar; o `knexfile` com a chave `production` e o `build/knexfile.js` saindo do
 `build`; e a tela de 404 dentro do chassi.
+
+**A leva reabriu em 11/09, com a etapa 13 — ainda aberta.** No dia seguinte ao fechamento das
+doze, a idade mínima dos dois documentos baixou de 18 para 16 anos (um adolescente pode ser
+aprendiz aos 14 e ter dinheiro próprio; o que ele não pode, antes dos 16, é assumir sozinho um
+contrato), a versão andou para `2026-09-11` — e **ninguém foi perguntado de novo**. A etapa 13 é
+a que lê a coluna que a 2 gravou: um campo derivado no `GET /Users/getSelf`, uma rota de aceite,
+e um modal bloqueante no chassi para quem está numa versão antiga ou nunca aceitou nada.
 
 ---
 
@@ -127,7 +134,10 @@ derivado anda de mês para mês, em vez de aceitar a folga em silêncio — o qu
 
 ### 2. Produção: o ambiente
 
-O que não está versionado em `API/` nem em `Frontend/`, e que só se prova subindo:
+O que não está versionado em `API/` nem em `Frontend/`, e que só se prova subindo. **Isto virou
+plano em 11/09** — as decisões de terreno (nginx do host herdado do V3, Cloudflare na frente com
+certificado de origem, imagem construída no próprio servidor, backup no mesmo disco) estão
+tomadas lá, e este item sai da fila quando a leva fechar.
 
 - **`NODE_ENV=production` de verdade no deploy** — sem isso o `secure` nunca é setado no cookie
   de sessão;
@@ -169,8 +179,8 @@ cliente enquanto não voltar como etapa de leva.**
 | **`Plans` / `Subscriptions`** | Cobrança não faz parte do fluxo de um mês | Tabelas existem, rotas não. **Quando isto voltar, os termos de uso e a política de privacidade têm que ser revisados antes**: muda o controlador (o CNPJ assina no lugar da pessoa física), entram pagamento, reembolso e cancelamento, e o processador de pagamento vira mais um operador na política |
 | **Fatura de cartão como entidade** | As datas da fatura já vivem na perna (`ClosingDate`/`DueDate`), e o extrato mostra a fatura sem precisar de tabela. Só se pagaria com conciliação, que também saiu | — |
 | **"Continuar com Google"** | Não há OAuth na API | Desenhado no layout; o botão fica desabilitado |
-| **Re-aceite dos termos quando o documento mudar** | O que fazer com quem está numa versão antiga — avisar, pedir de novo, bloquear — é decisão de produto e precisa de tela | A leva 7 gravou `TermsVersion` no cadastro, que é o que torna a pergunta respondível depois **sem migration** |
 | **Exportação de dados para portabilidade** | A exportação `.xlsx` da leva 3 já entrega o conteúdo financeiro, e é o que a política de privacidade cita | Um formato formal, com os dados cadastrais junto, só se paga quando alguém pedir |
+| **Backup fora da máquina** | Decidido em 11/09, junto com a leva 8: o `pg_dump` fica no mesmo disco do banco. Cobre migration ruim, comando errado e corrupção lógica — as causas prováveis; **não cobre a perda do servidor**, que é a total. Aceitável enquanto o dado é de teste | O script, o agendamento e o restore testado são etapa da leva 8; falta só o destino externo. **O gatilho para isto voltar é o primeiro usuário que não seja conhecido**, e certamente o lançamento com cobrança |
 
 Onde um botão faz parte da composição visual, ele fica **desabilitado e rotulado**, nunca
 escondido: some do produto sem sumir do layout. Depois da leva 5 sobrou **um só**: o "Continuar
@@ -208,10 +218,12 @@ fila — e fechou em 09/09 com 18 de 18 etapas.
 até a Fase #5, e os dois históricos agora são um: recomeçar em 1 faria
 `Fase #1 | Etapa 2` existir duas vezes no mesmo `git log` querendo dizer coisas diferentes.
 
-**A 7 fechou em 10/09, com 12 de 12 etapas, e a próxima é a 8.** As duas são a preparação para
-produção, e o corte entre elas é o que se prova de que jeito: a **7** — compliance e o código
-que muda de comportamento em produção — se verificou com `npm test` e `npm run typecheck`, e é
-o que está versionado em `API/` e `Frontend/`; a **8** — ambiente, e-mail do domínio, arquivos
+**A 7 fechou 12 etapas em 10/09 e reabriu em 11/09 com a etapa 13; a 8 foi escrita em 11/09 e
+ainda não teve etapa executada.** As duas
+são a preparação para produção, e o corte entre elas é o que se prova de que jeito: a **7** —
+compliance e o código que muda de comportamento em produção — se verifica com `npm test` e
+`npm run typecheck`, e é o que está versionado em `API/` e `Frontend/`; a **8** — ambiente,
+e-mail do domínio, arquivos
 externos, infra e backup — é o que está em volta dos dois, e só subindo se sabe. Juntá-las faria
 uma leva em que metade das etapas não tem critério de aceite até o dia do deploy.
 
