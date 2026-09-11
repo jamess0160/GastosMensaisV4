@@ -54,12 +54,6 @@ export function Privacy() {
                     </p>
                 </LegalCallout>
                 <p>
-                    O CPF aparece parcialmente ocultado de propósito: publicar o número completo
-                    numa página aberta e indexável expõe um dado pessoal sem tornar este documento
-                    mais exigível. O número completo é fornecido a quem o solicitar formalmente pelo
-                    canal acima.
-                </p>
-                <p>
                     <strong>Não há encarregado (DPO) formalmente nomeado.</strong> A Resolução
                     CD/ANPD nº 2/2022 dispensa a nomeação para agentes de tratamento de pequeno
                     porte, mantendo a obrigação de oferecer um canal de comunicação com o titular. O

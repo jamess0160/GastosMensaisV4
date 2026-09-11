@@ -353,8 +353,8 @@ export function Workspace() {
                             </form>
                         ) : (
                             <div className={styles.note}>
-                                Só o dono do espaço muda o nome e convida novas pessoas. Você pode lançar e
-                                consulta normalmente.
+                                Só o dono do espaço muda o nome e convida novas pessoas. Você pode
+                                lançar e consulta normalmente.
                             </div>
                         )}
                     </div>

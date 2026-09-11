@@ -241,8 +241,8 @@ export function WorkspaceSwitcher({
                                         {isCurrent(candidate)
                                             ? "Espaço atual"
                                             : pending
-                                                ? "Trocando…"
-                                                : "Entrar neste espaço"}
+                                              ? "Trocando…"
+                                              : "Entrar neste espaço"}
                                     </span>
                                 </span>
                             </button>

@@ -205,8 +205,8 @@ export function Dashboard() {
     const usedPercent = hasBudget
         ? (budgetSpent / budgetLimit) * 100
         : inflows > 0
-            ? (expenses / inflows) * 100
-            : 0;
+          ? (expenses / inflows) * 100
+          : 0;
 
     /* ── As três quebras do layout ───────────────────────────
        As três saem da MESMA lista de pernas: categoria vem do gasto,
@@ -254,9 +254,7 @@ export function Dashboard() {
                             >
                                 {report.isPending
                                     ? "—"
-                                    : formatMoney(available)
-                                        .replace("R$", "")
-                                        .trim()}
+                                    : formatMoney(available).replace("R$", "").trim()}
                             </span>
                         </div>
 
@@ -380,10 +378,7 @@ export function Dashboard() {
                                 ) : undefined
                             }
                         />
-                        <KpiCard
-                            label="Parcelas do mês"
-                            value={installments}
-                        />
+                        <KpiCard label="Parcelas do mês" value={installments} />
                     </div>
                 </div>
 
@@ -578,7 +573,7 @@ export function Dashboard() {
                                     slice.IdPerson === null
                                         ? "Sem destino"
                                         : (personIndex.get(slice.IdPerson)?.Name ??
-                                            "Pessoa arquivada"),
+                                          "Pessoa arquivada"),
                                 color:
                                     slice.IdPerson === null
                                         ? "var(--ink-3)"
@@ -752,11 +747,11 @@ export function Dashboard() {
                                                 setBudgetDraft((c) =>
                                                     c
                                                         ? {
-                                                            ...c,
-                                                            AlertPercent: Number(
-                                                                event.target.value,
-                                                            ),
-                                                        }
+                                                              ...c,
+                                                              AlertPercent: Number(
+                                                                  event.target.value,
+                                                              ),
+                                                          }
                                                         : c,
                                                 )
                                             }
