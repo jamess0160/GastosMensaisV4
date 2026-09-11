@@ -36,6 +36,37 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+    #  **As credenciais do banco são as mesmas três variáveis que a API lê**, e não um segundo
+    #  par que alguém precisa lembrar de manter igual. `${DB_LOGIN}` e companhia são
+    #  interpolados pelo compose a partir do `.env` da raiz — o arquivo que mora no servidor e
+    #  que o `.gitignore` mantém fora do git —, de modo que o usuário que o `initdb` cria e o
+    #  usuário com que o Knex se conecta não têm como divergir. A lista do que preencher é o
+    #  `API/exemple.env`.
+    #
+    #  **O `:?` é deliberado**: sem a variável, o `docker compose up` para aqui com essa
+    #  mensagem em vez de subir um Postgres sem senha.
+    #
+    #  E as três só valem no **primeiro** boot, quando o volume está vazio e o `initdb` roda.
+    #  Num volume já inicializado elas são ignoradas em silêncio — trocar a senha depois é um
+    #  `ALTER USER` dentro do banco, não uma edição aqui.
+    #
+    #  **O `env_file` da API não entra neste serviço**, de propósito: o container do Postgres
+    #  não tem por que carregar o `JWT_SECRET` e a senha do SMTP no próprio ambiente.
+    environment:
+      POSTGRES_USER: ${DB_LOGIN:?defina DB_LOGIN no .env da raiz}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env da raiz}
+      POSTGRES_DB: ${DB_SCHEMA:?defina DB_SCHEMA no .env da raiz}
+
+      #  **`TZ` no banco também, e não só na API.** O `now()` do Postgres e o carimbo de hora
+      #  de cada linha do log dele saem no fuso do container: em UTC, o log do banco e o log da
+      #  API contam a mesma falha com três horas de diferença, e quem faz a conta é o operador,
+      #  às duas da manhã. O `initdb` do primeiro boot também lê o fuso do sistema para escrever
+      #  o `timezone` do `postgresql.conf`, que é o que o `now()` devolve depois.
+      #
+      #  O que a variável decide no app, e a armadilha de ela ser ignorada em silêncio, estão
+      #  na nota do `TZ` no serviço `api` abaixo.
+      TZ: America/Sao_Paulo
+
     #  O healthcheck do banco é o que o `depends_on` da API espera, e é ele — não o da API —
     #  que responde por "o Postgres aceita conexão". `pg_isready` é o cliente oficial para
     #  essa pergunta e já vem na imagem.
@@ -68,6 +99,53 @@ services:
   api:
     build: ./API
     restart: unless-stopped
+
+    #  **Em produção não existe arquivo `.env` dentro da imagem**, e é daqui que as variáveis
+    #  vêm. A `.dockerignore` da etapa 1 mantém o `.env` fora da camada de propósito
+    #  (credencial numa camada é credencial publicada no dia em que a imagem for), e o arquivo
+    #  apontado abaixo mora no servidor, ao lado deste `docker-compose.yml`, sem ser versionado
+    #  (`/.env` no `.gitignore` da raiz).
+    #
+    #  **Isso funciona sem tocar no carregamento atual porque `Utils.configEnv()` chama o
+    #  `dotenv` sem `override`**: variável já presente no `process.env` vence o arquivo, e um
+    #  arquivo ausente simplesmente não é lido — o `dotenv` não é um erro de boot, é um `no-op`.
+    #  O `.env` continua sendo o caminho de desenvolvimento e, aqui dentro, não faz nada. Isso é
+    #  o comportamento correto, não uma coincidência feliz.
+    #
+    #  A lista completa do que preencher é o `API/exemple.env`.
+    env_file:
+      - .env
+
+    #  As duas variáveis que **não** saem do `.env`, porque são do ambiente e não do operador.
+    #  Declaradas aqui elas vencem qualquer valor que o `env_file` acima traga, que é a ordem
+    #  certa: o arquivo descreve a instalação, o compose descreve o ambiente.
+    environment:
+      #  **`NODE_ENV=production` é o que liga o comportamento de produção do código da leva 7**:
+      #  o `secure` do cookie de sessão (sem ela o cookie sai sem `Secure` mesmo em https), o
+      #  log no stdout em vez de arquivo, o SMTP real no lugar do `jsonTransport` e o stack de
+      #  erro fora do stdout do container. Ela não pode vir do `.env`: o `dotenv` só é lido
+      #  *depois* de alguém já ter perguntado qual é o ambiente, para decidir se o `.env.test`
+      #  entra por cima. É também o que faz o `migrate:prod` achar a chave `production` do
+      #  `knexfile`.
+      NODE_ENV: production
+
+      #  **`TZ` é a variável que ninguém tinha escrito**, e errá-la não dá erro — dá um número
+      #  errado na tela. `Utils.currentMonth()` lê o mês corrente do relógio do processo, e esse
+      #  mês é o valor padrão de três rotas: o saldo das contas (`GET /Accounts`), o relatório
+      #  do mês e o extrato. Num container em UTC — o padrão de toda imagem Docker — das 21h às
+      #  23h59 do último dia do mês, no horário de Brasília, as três respondem sobre o **mês
+      #  seguinte**: o usuário abre o app às dez da noite do dia 31 e vê o saldo de um mês que
+      #  ainda não começou, com o extrato vazio. Nada dá erro e nada vai para o log.
+      #
+      #  (As rotinas mensais, em `day: 1, hour: 3`, sobrevivem a UTC por acidente — três da
+      #  manhã em UTC ainda é dia 1º no Brasil. Depender disso é depender de o horário do
+      #  agendamento nunca mudar.)
+      #
+      #  **Ela depende do `tzdata` instalado na imagem** (`API/Dockerfile` o instala por causa
+      #  disto): sem o pacote, a libc não acha o arquivo do fuso e **ignora o valor em
+      #  silêncio**, deixando o processo em UTC com a variável ali, aparentemente certa. A prova
+      #  é um comando, não uma leitura — `docker compose exec api date` tem de dizer `-03`.
+      TZ: America/Sao_Paulo
 
     #  `service_healthy`, e não o `service_started` padrão: o container do Postgres existe
     #  segundos antes de o processo aceitar conexão, e nesse intervalo o pool do Knex subiria
