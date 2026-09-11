@@ -34,8 +34,6 @@
 		"moment": "^2.29.4",
 		"nodemailer": "^10.0.1",
 		"pg": "^8.22.0",
-		"ts-node": "^10.9.1",
-		"webpack-node-externals": "^3.0.0",
 		"winston": "^3.13.0",
 		"winston-daily-rotate-file": "^5.0.0"
 	},
@@ -53,12 +51,14 @@
 		"supertest": "^6.3.3",
 		"ts-jest": "^29.1.0",
 		"ts-loader": "^9.5.1",
+		"ts-node": "^10.9.1",
 		"tsconfig-paths": "^4.2.0",
 		"tsconfig-paths-webpack-plugin": "^4.1.0",
 		"tsx": "^4.20.4",
 		"typescript": "^5.9.3",
 		"webpack": "^5.94.0",
-		"webpack-cli": "^5.1.4"
+		"webpack-cli": "^5.1.4",
+		"webpack-node-externals": "^3.0.0"
 	},
 	"nodemonConfig": {
 		"ext": ".ts,.js",

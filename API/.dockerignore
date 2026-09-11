@@ -1,0 +1,30 @@
+#  O contexto inteiro é copiado para o daemon a cada `docker build`, e o `COPY . .` do estágio
+#  de build leva tudo que sobrar para dentro de uma camada da imagem. **Este arquivo não é
+#  higiene, é correção.**
+
+#  O `.env` de desenvolvimento, que é a razão de este arquivo existir: credencial de banco numa
+#  camada é credencial publicada no dia em que a imagem for. Em produção não há `.env` dentro
+#  da imagem — as variáveis vêm do orquestrador, e o `dotenv` (chamado sem `override`)
+#  simplesmente não acha arquivo nenhum para ler.
+.env
+.env.test
+
+#  Centenas de MB transferidos para o daemon a cada build, com binário nativo compilado para o
+#  SO da máquina de desenvolvimento. Quem instala é o `npm ci` de dentro da imagem.
+node_modules
+
+#  Log de desenvolvimento, em disco. Dentro do container o log vai para o stdout.
+Logs
+
+#  O `build/` da máquina de desenvolvimento não entra: quem o produz é o estágio de build, e um
+#  bundle velho copiado por cima seria o deploy de um commit que ninguém escolheu.
+build
+
+.vscode
+.gitignore
+*.zip
+
+#  Nem eles próprios: mudar um comentário daqui não é motivo para invalidar a camada do
+#  `COPY . .`.
+Dockerfile
+.dockerignore
