@@ -40,7 +40,7 @@ Etapa por etapa, com commit e data: [Old/API/Levas executadas.md](Old/API/Levas%
 que fecha a última pendência que o front tinha contra a API.
 
 **16 suítes de integração**, sem um único teste unitário e sem nada mockado. A última contagem
-registrada é **725 testes**, no fim da leva 7.
+registrada é **732 testes**, no fim da leva 7.
 
 ### Front — cinco levas, todas fechadas
 
@@ -73,9 +73,9 @@ isso), o de exportar passou a baixar o `.xlsx` do servidor, e "Esqueci minha sen
 navegação de verdade. Nasceram quatro telas: `contas/extrato`, `/esqueci-senha`,
 `/recuperar-senha` e `/confirmar-email`.
 
-### Leva 7 — a primeira de produção, 12 etapas em 10/09 e a 13 aberta
+### Leva 7 — a primeira de produção, 12 etapas em 10/09 e a 13 em 11/09
 
-**12 de 13 etapas**, num commit por etapa:
+**13 de 13 etapas**, num commit por etapa:
 [Levas/7. O que a lei cobra e o que só quebra em produção](Levas/7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md).
 Ela fechou os dois blocos que abriam a fila abaixo — **compliance** e **o código de produção** —
 e nada nela é feature.
@@ -96,12 +96,18 @@ desligamento limpo em `SIGTERM`/`SIGINT`, que espera a requisição em voo e o t
 antes de fechar; o `knexfile` com a chave `production` e o `build/knexfile.js` saindo do
 `build`; e a tela de 404 dentro do chassi.
 
-**A leva reabriu em 11/09, com a etapa 13 — ainda aberta.** No dia seguinte ao fechamento das
-doze, a idade mínima dos dois documentos baixou de 18 para 16 anos (um adolescente pode ser
-aprendiz aos 14 e ter dinheiro próprio; o que ele não pode, antes dos 16, é assumir sozinho um
-contrato), a versão andou para `2026-09-11` — e **ninguém foi perguntado de novo**. A etapa 13 é
-a que lê a coluna que a 2 gravou: um campo derivado no `GET /Users/getSelf`, uma rota de aceite,
-e um modal bloqueante no chassi para quem está numa versão antiga ou nunca aceitou nada.
+**A leva reabriu em 11/09, com a etapa 13, e fechou no mesmo dia.** No dia seguinte ao
+fechamento das doze, a idade mínima dos dois documentos baixou de 18 para 16 anos (um
+adolescente pode ser aprendiz aos 14 e ter dinheiro próprio; o que ele não pode, antes dos 16, é
+assumir sozinho um contrato), a versão andou para `2026-09-11` — e **ninguém foi perguntado de
+novo**. A 13 é a que lê a coluna que a 2 gravou: `GET /Users/getSelf` ganhou o `TermsOutdated`
+**derivado** (calculado a cada leitura, como o `Balance` e o `Spent` — a comparação é da API, e
+o cliente não refaz nenhuma), `POST /Users/acceptTerms` carimba a versão do servidor sem receber
+corpo, e um modal **bloqueante** no chassi cobre o app para quem está numa versão antiga ou
+nunca aceitou nada. As saídas dele são duas — aceitar, ou sair da conta —, e a decisão que o
+plano original adiava está tomada: **toda** edição dos documentos pede aceite de novo, inclusive
+a de uma vírgula, porque manter "mudança relevante" e "ajuste de redação" seria um julgamento a
+cada commit, e errá-lo para menos é a própria falha que a etapa conserta.
 
 ---
 
@@ -218,8 +224,8 @@ fila — e fechou em 09/09 com 18 de 18 etapas.
 até a Fase #5, e os dois históricos agora são um: recomeçar em 1 faria
 `Fase #1 | Etapa 2` existir duas vezes no mesmo `git log` querendo dizer coisas diferentes.
 
-**A 7 fechou 12 etapas em 10/09 e reabriu em 11/09 com a etapa 13; a 8 foi escrita em 11/09 e
-ainda não teve etapa executada.** As duas
+**A 7 fechou 12 etapas em 10/09, reabriu em 11/09 com a etapa 13 e fechou com ela no mesmo dia;
+a 8 foi escrita em 11/09 e ainda não teve etapa executada.** As duas
 são a preparação para produção, e o corte entre elas é o que se prova de que jeito: a **7** —
 compliance e o código que muda de comportamento em produção — se verifica com `npm test` e
 `npm run typecheck`, e é o que está versionado em `API/` e `Frontend/`; a **8** — ambiente,

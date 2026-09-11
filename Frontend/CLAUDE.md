@@ -259,6 +259,16 @@ continua usando tudo, porque bloquear o login é o que custa cadastro. A dispens
 memória** e volta no reload: um valor persistido no navegador discordaria do servidor sem que
 nada acusasse.
 
+**O re-aceite dos termos também mora no chassi**
+([src/app/TermsGate.tsx](src/app/TermsGate.tsx)), e é o **oposto** da faixa acima: ele cobre o
+app inteiro e as saídas são duas — aceitar, ou sair da conta. Não fecha no Escape, no clique
+fora nem em botão nenhum, porque um "agora não" registraria que a pessoa usou o produto sob um
+documento que ela não aceitou. Quem decide se o aceite está velho é a **API**, no `TermsOutdated`
+do `getSelf`: o cliente não compara versão nenhuma — a que ele conhece é a `LEGAL_VERSION`, em
+`"DD/MM/AAAA"`, e a do banco é `"YYYY-MM-DD"`, então a comparação ficaria do lado que não grava
+nada e errar não quebraria teste. Depois do `POST /Users/acceptTerms` o que tira o modal da
+frente é a **releitura da conta**, não um estado local dizendo "já cliquei".
+
 **A exportação para Excel mora no chassi** ([src/app/exportSpreadsheet.ts](src/app/exportSpreadsheet.ts)),
 porque sai de dois lugares com dois significados: a sidebar e o menu do mobile baixam o
 **histórico inteiro** (é o que `GET /Reports/Export` faz sem `From`/`To`), e o botão do

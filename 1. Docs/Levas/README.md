@@ -6,7 +6,7 @@ começar em 6 está em [../RoadMap MVP.md](../RoadMap%20MVP.md#as-levas-daqui-pr
 | Leva | Estado |
 | --- | --- |
 | [6. O cartão, o uso real e a gestão de membros](6.%20O%20cartão,%20o%20uso%20real%20e%20a%20gestão%20de%20membros.md) | escrita em 09/09/2026, **fechada** em 09/09/2026 — 18 de 18 etapas |
-| [7. O que a lei cobra e o que só quebra em produção](7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md) | escrita em 10/09/2026, 12 de 12 etapas fechadas no mesmo dia — **reaberta** em 11/09/2026 com a etapa 13, ainda aberta |
+| [7. O que a lei cobra e o que só quebra em produção](7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md) | escrita em 10/09/2026, 12 de 12 etapas fechadas no mesmo dia — **reaberta** em 11/09/2026 com a etapa 13, **fechada** no mesmo dia: 13 de 13 |
 | [8. O que só se prova subindo](8.%20O%20que%20só%20se%20prova%20subindo.md) | escrita em 11/09/2026, **nenhuma etapa executada** — 0 de 10 |
 
 A 6 foi a primeira que nasceu com os dois repositórios já juntos. A **7 e a 8 são a preparação
@@ -15,11 +15,11 @@ versionado em `API/` e `Frontend/`, e a suíte responde; na **8** — imagens, `
 e-mail do domínio, arquivos externos e backup — muda o que está em volta deles, e só subindo se
 sabe. Nenhuma etapa da 8 se verifica com `npm test`.
 
-**As duas estão abertas ao mesmo tempo, e isso não é uma fila furada.** A 8 foi escrita em
+**As duas estiveram abertas ao mesmo tempo, e isso não foi uma fila furada.** A 8 foi escrita em
 11/09, com a etapa 13 da 7 ainda por executar, porque nenhuma etapa da 8 depende dela: o plano
 se escreve inteiro antes do código, e o que ele descreve — imagem, `compose`, vhost — não
-encosta no aceite dos termos. A ordem de **execução** continua sendo a 13 primeiro: ela fecha um
-buraco de um produto que já está escrito, e a 8 sobe o produto.
+encosta no aceite dos termos. A ordem de **execução** foi a 13 primeiro, no mesmo 11/09: ela
+fecha um buraco de um produto que já está escrito, e a 8 sobe o produto.
 
 O resto do que falta está na [fila do roadmap](../RoadMap%20MVP.md#a-fila-até-o-mvp) — que diz
 **o que falta**, não o que cada leva faz: o recorte é do plano da leva.
