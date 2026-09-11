@@ -1,0 +1,50 @@
+#  ---------------------------------------------------------------------------------------
+#  O agendamento do backup — exemplo versionado, copiado para /etc/systemd/system
+#  ---------------------------------------------------------------------------------------
+#
+#  O par deste arquivo é o `gastosmensais-backup.service`, ao lado: um timer dispara a unidade
+#  de mesmo nome, e quem descreve o comando é ela. A instalação dos dois está no cabeçalho do
+#  `.service`.
+#
+#  **`03:30`, e o horário é uma decisão.** O motor de rotinas da API roda o fechamento mensal
+#  às três da manhã do dia 1º (`day: 1, hour: 3`, no fuso do container, que é o de Brasília) —
+#  é a hora em que o banco escreve mais no mês inteiro. Meia hora depois o dump pega o mês já
+#  fechado, e não um fechamento pela metade. O `pg_dump` não trava nada e enxerga um instante
+#  consistente de qualquer jeito; o que se evita aqui é a leitura mais cara do mês competindo
+#  com a escrita mais cara do mês, no mesmo disco de um servidor pessoal.
+#
+#  **`Persistent=true` é o que faz este timer servir num servidor que desliga.** Sem ele, um
+#  desligamento que atravesse as 3h30 significa um dia sem backup, em silêncio; com ele, o
+#  systemd guarda o último disparo e executa assim que a máquina volta. É a diferença entre um
+#  agendamento e uma promessa.
+#
+#  **`RandomizedDelaySec` não existe aqui de propósito.** Ele serve para não sincronizar
+#  centenas de máquinas contra um servidor comum; numa máquina só, ele apenas torna o horário
+#  do arquivo imprevisível — e o horário previsível é o que permite olhar para o diretório e
+#  saber, sem abrir o journal, se o de hoje saiu.
+#
+#  ---------------------------------------------------------------------------------------
+#  Se a máquina não tiver systemd: a linha do cron
+#  ---------------------------------------------------------------------------------------
+#
+#  A alternativa equivalente, em `sudo crontab -e`. Ela vale o registro porque o script foi
+#  escrito para funcionar nos dois: ele resolve a raiz do repositório a partir do próprio
+#  caminho, e não do `$PWD` — que no cron é o `$HOME` de quem agendou, e não o clone:
+#
+#      30 3 * * *  /opt/gastosmensais/deploy/backup.sh
+#
+#  O que se perde no cron, e é o motivo de o systemd ser o caminho preferido: não há
+#  `Persistent=true` (um boot depois do horário é um dia sem backup), a saída vira um e-mail
+#  local que ninguém lê em vez de uma linha de journal, e não há `systemctl list-timers` — a
+#  pergunta "quando foi o último backup?" passa a ser respondida pelo `ls` do diretório.
+
+[Unit]
+Description=Dispara o backup diário do banco do Gastos Mensais
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=gastosmensais-backup.service
+
+[Install]
+WantedBy=timers.target

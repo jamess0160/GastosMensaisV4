@@ -1,0 +1,64 @@
+#  ---------------------------------------------------------------------------------------
+#  A unidade que roda o backup — exemplo versionado, como o vhost do nginx
+#  ---------------------------------------------------------------------------------------
+#
+#  **Este arquivo não é lido por ninguém aqui dentro.** O systemd que o usa é o do host, e o
+#  arquivo real é uma cópia dele em `/etc/systemd/system/gastosmensais-backup.service`. A
+#  instalação é uma vez só, e está no `1. Docs/Deploy.md`:
+#
+#      sudo install -d -m 0700 /var/backups/gastosmensais
+#      sudo cp deploy/gastosmensais-backup.service deploy/gastosmensais-backup.timer /etc/systemd/system/
+#      sudo systemctl daemon-reload
+#      sudo systemctl enable --now gastosmensais-backup.timer
+#
+#  E as três perguntas que se faz depois, nesta ordem:
+#
+#      systemctl list-timers gastosmensais-backup     # quando dispara, e quando disparou
+#      sudo systemctl start gastosmensais-backup      # força uma execução agora, sem esperar
+#      journalctl -u gastosmensais-backup -n 50       # o que o script disse
+#
+#  **`Type=oneshot`**, e não `simple`: o script roda, termina e o systemd o considera
+#  bem-sucedido pelo código de saída. Com `simple`, um processo que termina rápido é lido como
+#  serviço que morreu, e a unidade ficaria vermelha em toda execução de sucesso.
+#
+#  **`WorkingDirectory` é o clone do repositório**, e é o caminho a conferir antes de copiar
+#  este arquivo para `/etc`. O script resolve a raiz a partir de si mesmo e não depende dela,
+#  mas o `ExecStart` abaixo é um caminho absoluto: se o repositório não estiver em
+#  `/opt/gastosmensais`, as duas linhas mudam juntas.
+#
+#  **Roda como root** — não por preguiça, e sim porque são duas permissões que nenhum usuário
+#  comum tem: falar com o socket do Docker (quem fala com ele é root de fato, com ou sem o
+#  grupo `docker`) e escrever em `/var/backups`, que é 0700 porque o dump é o banco inteiro em
+#  claro.
+#
+#  **Não há `Restart=`.** Uma falha do backup não se conserta repetindo o comando três segundos
+#  depois: ou o banco está fora do ar, ou o disco está cheio, ou o diretório sumiu — e os três
+#  querem alguém lendo o journal, não um laço. O timer volta amanhã.
+
+[Unit]
+Description=Backup do banco do Gastos Mensais (pg_dump -Fc)
+Documentation=file:///opt/gastosmensais/deploy/backup.sh
+
+#  O Docker precisa estar de pé: o script conversa com o daemon, não com o Postgres. Sem esta
+#  ordem, um backup que caísse num boot (por causa do `Persistent=true` do timer) rodaria antes
+#  de o compose ter subido e falharia com "cannot connect to the Docker daemon".
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/gastosmensais
+ExecStart=/opt/gastosmensais/deploy/backup.sh
+User=root
+
+#  Um dump que ainda está escrevendo não é interrompido por impaciência do systemd: o padrão
+#  (`TimeoutStartSec=90s`) mataria o `pg_dump` de um banco grande no meio, e o `.part` do
+#  script existe justamente para esse caso não virar um arquivo com nome final. Meia hora é
+#  folga larga para o tamanho deste banco, e continua sendo um teto — um dump pendurado para
+#  sempre seguraria o timer do dia seguinte.
+TimeoutStartSec=30min
+
+#  O script escreve no stdout; o journal é o log. Não há arquivo de log em disco, pela mesma
+#  razão que a leva 7 tirou o log da API do disco: um segundo lugar para encher o disco.
+StandardOutput=journal
+StandardError=journal

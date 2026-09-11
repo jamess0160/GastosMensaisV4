@@ -1,0 +1,22 @@
+#  ---------------------------------------------------------------------------------------
+#  O fim de linha dos arquivos que o Linux executa
+#  ---------------------------------------------------------------------------------------
+#
+#  Este arquivo existe por uma falha só, e ela é silenciosa do lado de cá: o desenvolvimento
+#  acontece no Windows, com `core.autocrlf=true`, e nessa configuração **o git troca LF por
+#  CRLF no checkout**. Um `deploy/backup.sh` que chegue ao servidor com CRLF não roda — o
+#  kernel lê a primeira linha inteira, `\r` incluído, e responde:
+#
+#      /usr/bin/env bash^M: bad interpreter: No such file or directory
+#
+#  A mensagem é obscura o bastante para custar uma hora, e ela só aparece no servidor, no dia
+#  do deploy. `eol=lf` trava o fim de linha no checkout de **qualquer** máquina,
+#  independentemente do `core.autocrlf` de quem clonou.
+#
+#  **O escopo é deliberadamente estreito.** Um `* text=auto` aqui renormalizaria o repositório
+#  inteiro num commit de infra, misturando a mudança de todo arquivo com a de três. O que
+#  entra são os arquivos lidos por um programa do Linux — o shell, o systemd e o nginx — e não
+#  os que só um editor lê.
+
+*.sh          text eol=lf
+deploy/**     text eol=lf
