@@ -118,6 +118,12 @@ cada commit, e errá-lo para menos é a própria falha que a etapa conserta.
 sobra na fila não é dívida de um lado contra o outro: é trabalho que nunca entrou em leva
 nenhuma, dos dois.
 
+**"Produção: o ambiente" saiu daqui em 11/09**, quando virou a [leva 8](Levas/8.%20O%20que%20só%20se%20prova%20subindo.md)
+inteira: imagem dos dois lados, `compose`, vhost do host, e-mail do domínio, os arquivos que o
+navegador procura sozinho, backup com restore testado e o runbook. O que a leva ainda não fechou
+está na tabela de etapas dela, e o que se faz com tudo isso está em [Deploy.md](Deploy.md) — um
+item de fila não é o lugar de nenhum dos dois.
+
 > **Esta fila diz o que falta, não o que cada leva faz.** Quem decide o recorte de uma leva é o
 > plano dela, em [Levas/](Levas/) — um item daqui pode virar uma etapa, várias, ou atravessar
 > duas levas. Amarrar item e leva neste documento foi o que fez uma leva ser definida por fora
@@ -138,38 +144,6 @@ recálculo de perna já gravada e reescrita do `InvoiceDates` — por isso é le
 lá, a tela do cartão mostra as duas datas do ciclo do mês corrente e avisa quando o fechamento
 derivado anda de mês para mês, em vez de aceitar a folga em silêncio — o que a leva 6 entregou.
 
-### 2. Produção: o ambiente
-
-O que não está versionado em `API/` nem em `Frontend/`, e que só se prova subindo. **Isto virou
-plano em 11/09** — as decisões de terreno (nginx do host herdado do V3, Cloudflare na frente com
-certificado de origem, imagem construída no próprio servidor, backup no mesmo disco) estão
-tomadas lá, e este item sai da fila quando a leva fechar.
-
-- **`NODE_ENV=production` de verdade no deploy** — sem isso o `secure` nunca é setado no cookie
-  de sessão;
-- **`TZ=America/Sao_Paulo` no processo** — `moment` sem timezone usa o relógio do servidor, e
-  em UTC uma rotina de "dia 1º às 00:30" dispara às 21:30 do dia 31 no Brasil e materializa o
-  mês errado;
-- **nginx servindo front e API na mesma origem** (`/` e `/api`) — é o que faz o
-  `sameSite: 'strict'` funcionar sem CORS. Em dev o equivalente é o proxy do Vite, e a saída
-  errada dos dois é afrouxar o cookie;
-- **imagem e `compose`** dos dois lados, com o Postgres em container, o healthcheck sobre o
-  `GET /Utils/Health` que já existe, e as migrations rodando no deploy;
-- **certificado TLS.** Sem `https` o cookie `secure` não volta, e a sessão inteira morre;
-- **SPF/DKIM/DMARC no domínio** — enviar como `@gastosmensais.com.br` por um SMTP não autorizado
-  cai em spam, e nenhuma arquitetura conserta isso. **O provedor escolhido em 10/09 é o Resend,
-  por SMTP** (`smtp.resend.com:465`, usuário literal `resend`, a API key como senha): o
-  `Mailer` é nodemailer sobre SMTP genérico e não muda uma linha, então isto é troca de `.env`.
-  A verificação do domínio no Resend é o que entrega os registros de SPF e DKIM prontos; o
-  DMARC continua sendo escrito à mão;
-- **as variáveis que se esquecem**: `APP_URL` (sem ela o link de recuperação de senha é montado
-  com o `Host` da requisição), e `WEBAUTHN_RP_ID`/`WEBAUTHN_ORIGIN`, que estão em `localhost` no
-  exemplo — valor errado não dá erro, a biometria só não funciona;
-- **os arquivos que o navegador procura sozinho**: `robots.txt`, manifesto, `apple-touch-icon`,
-  e um favicon que não seja o `logo.png` de 761 KB baixado em toda página;
-- **backup do Postgres com restore testado.** Um volume perdido é o produto inteiro, e backup
-  que nunca foi restaurado não é backup.
-
 ---
 
 ## Fora do MVP, e por quê
@@ -186,7 +160,7 @@ cliente enquanto não voltar como etapa de leva.**
 | **Fatura de cartão como entidade** | As datas da fatura já vivem na perna (`ClosingDate`/`DueDate`), e o extrato mostra a fatura sem precisar de tabela. Só se pagaria com conciliação, que também saiu | — |
 | **"Continuar com Google"** | Não há OAuth na API | Desenhado no layout; o botão fica desabilitado |
 | **Exportação de dados para portabilidade** | A exportação `.xlsx` da leva 3 já entrega o conteúdo financeiro, e é o que a política de privacidade cita | Um formato formal, com os dados cadastrais junto, só se paga quando alguém pedir |
-| **Backup fora da máquina** | Decidido em 11/09, junto com a leva 8: o `pg_dump` fica no mesmo disco do banco. Cobre migration ruim, comando errado e corrupção lógica — as causas prováveis; **não cobre a perda do servidor**, que é a total. Aceitável enquanto o dado é de teste | O script, o agendamento e o restore testado são etapa da leva 8; falta só o destino externo. **O gatilho para isto voltar é o primeiro usuário que não seja conhecido**, e certamente o lançamento com cobrança |
+| **Backup fora da máquina** | Decidido em 11/09, junto com a leva 8: o `pg_dump` fica no mesmo disco do banco. Cobre migration ruim, comando errado e corrupção lógica — as causas prováveis; **não cobre a perda do servidor**, que é a total. Aceitável enquanto o dado é de teste | O script (`deploy/backup.sh`), o agendamento (`deploy/gastosmensais-backup.timer`) e o procedimento de restore ([Deploy.md](Deploy.md#5-restaurar-o-backup)) já existem, entregues pela etapa 9 da leva 8; falta só o destino externo. **O gatilho para isto voltar é o primeiro usuário que não seja conhecido**, e certamente o lançamento com cobrança |
 
 Onde um botão faz parte da composição visual, ele fica **desabilitado e rotulado**, nunca
 escondido: some do produto sem sumir do layout. Depois da leva 5 sobrou **um só**: o "Continuar
@@ -225,7 +199,8 @@ até a Fase #5, e os dois históricos agora são um: recomeçar em 1 faria
 `Fase #1 | Etapa 2` existir duas vezes no mesmo `git log` querendo dizer coisas diferentes.
 
 **A 7 fechou 12 etapas em 10/09, reabriu em 11/09 com a etapa 13 e fechou com ela no mesmo dia;
-a 8 foi escrita em 11/09 e ainda não teve etapa executada.** As duas
+a 8 foi escrita em 11/09 e está em execução** — nove das dez etapas fechadas no mesmo dia,
+faltando a do e-mail do domínio, que depende de conta no provedor e de registro no DNS. As duas
 são a preparação para produção, e o corte entre elas é o que se prova de que jeito: a **7** —
 compliance e o código que muda de comportamento em produção — se verifica com `npm test` e
 `npm run typecheck`, e é o que está versionado em `API/` e `Frontend/`; a **8** — ambiente,
