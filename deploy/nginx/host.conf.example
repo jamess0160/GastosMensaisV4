@@ -1,0 +1,247 @@
+#  ---------------------------------------------------------------------------------------
+#  O vhost do nginx **do host** — exemplo versionado
+#  ---------------------------------------------------------------------------------------
+#
+#  **Este arquivo não é lido por ninguém.** O nginx que o usa é o do host, que já existe no
+#  servidor desde o V3 e continua servindo o V3 no mesmo processo — ele não vira container
+#  justamente por isso: trocá-lo de lugar seria derrubar o V3 para subir o V4. O arquivo real
+#  é uma **cópia deste, aplicada à mão**, em `/etc/nginx/sites-available/gastosmensais.conf`
+#  (com o link em `sites-enabled/`).
+#
+#  O procedimento, sempre nesta ordem: editar **aqui**, `sudo cp` para lá, `sudo nginx -t` e
+#  `sudo systemctl reload nginx`. O `reload` troca a configuração sem derrubar conexão nenhuma
+#  — e o `nginx -t` antes dele existe porque um `reload` com erro de sintaxe **mantém a
+#  configuração antiga no ar sem avisar**, o que é pior do que falhar.
+#
+#  **Ele é versionado como exemplo porque é o único pedaço do deploy que o `git` não vê.** Sem
+#  uma cópia aqui não há com o que comparar o que está no servidor: um `diff` entre os dois é a
+#  única coisa capaz de denunciar uma edição feita só de um lado, às duas da manhã, e esquecida.
+#  Tudo que descreve o **produto** — o fallback do SPA, a CSP, o cache, o gzip, o roteamento de
+#  `/api` — mora em `Frontend/deploy/nginx.conf`, dentro da imagem; aqui fica só o que é do
+#  host: o certificado, o nome do domínio e o encaminhamento para a porta local.
+#
+#  ---------------------------------------------------------------------------------------
+#  A cadeia de proxies, que é o assunto inteiro deste arquivo
+#  ---------------------------------------------------------------------------------------
+#
+#      usuário → Cloudflare → nginx do host (este arquivo) → nginx do container `web` → api
+#
+#  São três saltos, e `API/Utils/server.ts` declara `trust proxy` igual a **um**. Os dois
+#  números estão certos ao mesmo tempo, e é este arquivo que faz a conta fechar:
+#
+#  1. `real_ip_header CF-Connecting-IP` + `set_real_ip_from` fazem o salto da Cloudflare
+#     **desaparecer**: o `$remote_addr` deste nginx deixa de ser o IP do datacenter da
+#     Cloudflare e passa a ser o IP do usuário;
+#  2. `proxy_set_header X-Forwarded-For $remote_addr` **sobrescreve** o cabeçalho em vez de
+#     acrescentar a ele. É a linha que descarta qualquer `X-Forwarded-For` que tenha vindo de
+#     fora e recomeça a cadeia a partir de um valor que o servidor apurou.
+#
+#  O nginx do container **repassa** esse cabeçalho como está (`Frontend/deploy/nginx.conf`), em
+#  vez de acrescentar o próprio salto a ele, então a API recebe um elemento só:
+#
+#      X-Forwarded-For: <IP do usuário>
+#
+#  e o `trust proxy` igual a 1 — que conta **saltos a partir do socket**, e não elementos do
+#  cabeçalho — confia no par da conexão (o container `web`) e fica com esse valor. **Um salto é
+#  o que a API enxerga porque este arquivo normalizou tudo que vinha antes** — e é por isso que
+#  a conta se resolve na origem da cadeia, e não no número: um vhost que exigisse mudar o
+#  código da API exigiria de novo no dia da migração para a VPS, em que este arquivo muda de
+#  máquina e o código não muda.
+#
+#  **Errar essa conta não dá erro, dá um número.** Curto demais, o Express pega o IP do proxy
+#  anterior: como todo request chega pelos mesmos poucos IPs da Cloudflare, o rate limiting de
+#  `API/routes/Users/sections/RateLimits.section.ts` passa a contar o mundo inteiro como uma
+#  pessoa só — cinco recuperações de senha por hora **no total**, e o sexto usuário do dia é
+#  bloqueado por causa dos outros cinco. Longo demais, o Express aceita como verdadeiro um
+#  `X-Forwarded-For` escrito pelo próprio cliente, e o freio passa a ser contornável trocando um
+#  cabeçalho a cada tentativa.
+
+#  ---------------------------------------------------------------------------------------
+#  As faixas da Cloudflare
+#  ---------------------------------------------------------------------------------------
+#
+#  Fonte: https://www.cloudflare.com/ips-v4 e https://www.cloudflare.com/ips-v6
+#  Consultadas em **11/09/2026**.
+#
+#  A procedência e a data estão escritas porque **as listas mudam** — a Cloudflare acrescenta
+#  faixas — e uma lista desatualizada **não dá erro**: o `set_real_ip_from` simplesmente deixa
+#  de casar, o `$remote_addr` volta a ser o do datacenter, e todo usuário que entrar por uma
+#  faixa nova vira um IP só para o rate limiting. Reconferir junto com a atualização do
+#  servidor, ou automatizar com um `include` de um arquivo gerado por `cron`. O que não dá é
+#  confiar numa lista sem data.
+#
+#  `set_real_ip_from` é a **allowlist**: só uma conexão vinda de uma destas faixas tem o seu
+#  `CF-Connecting-IP` acreditado. Um cliente que alcance o IP do servidor direto e mande o
+#  cabeçalho não casa com nenhuma faixa e é ignorado — que é exatamente o que impede este
+#  mecanismo de virar a porta dos fundos que ele fecha.
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 104.16.0.0/13;
+set_real_ip_from 104.24.0.0/14;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 131.0.72.0/22;
+set_real_ip_from 2400:cb00::/32;
+set_real_ip_from 2606:4700::/32;
+set_real_ip_from 2803:f800::/32;
+set_real_ip_from 2405:b500::/32;
+set_real_ip_from 2405:8100::/32;
+set_real_ip_from 2a06:98c0::/29;
+set_real_ip_from 2c0f:f248::/32;
+
+#  **`CF-Connecting-IP`, e não `X-Forwarded-For`.** A Cloudflare escreve os dois, mas o
+#  `X-Forwarded-For` dela é uma *lista* que começa com o que o cliente mandou — e ler uma lista
+#  escrita em parte pelo cliente é de onde vem metade dos erros de IP real. O `CF-Connecting-IP`
+#  é um valor só, apurado pela borda, e não tem como ser estendido por quem chama.
+#
+#  Por ser um valor único, o `real_ip_recursive` não tem o que fazer aqui e fica no padrão
+#  (`off`): ele só existe para andar da direita para a esquerda dentro de uma lista.
+real_ip_header CF-Connecting-IP;
+
+#  ---------------------------------------------------------------------------------------
+#  :80 — o redirecionamento
+#  ---------------------------------------------------------------------------------------
+#
+#  Com a Cloudflare em **Full (strict)** a borda fala `https` com a origem, e este bloco quase
+#  nunca é usado: quem bate aqui é um scanner no IP nu, ou alguém que descobriu o IP de origem.
+#  Redirecionar é mais barato do que servir o app em claro, e é o que impede um
+#  `X-Forwarded-Proto: http` de chegar à API por uma porta lateral — com ele o `req.secure` é
+#  falso e o HSTS do helmet não sai.
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name gastosmensais.com.br www.gastosmensais.com.br;
+
+    return 301 https://$host$request_uri;
+}
+
+#  ---------------------------------------------------------------------------------------
+#  :443 — o app
+#  ---------------------------------------------------------------------------------------
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+
+    #  **Os dois nomes, de propósito.** O `APP_URL` hoje é `https://www.gastosmensais.com.br`
+    #  (é o domínio dos links que saem por e-mail) e o `WEBAUTHN_RP_ID` documentado é o apex
+    #  `gastosmensais.com.br` — um RP ID no apex vale para ele e para os seus subdomínios, o
+    #  contrário não. Travar este `server_name` em um dos dois faria o outro cair no
+    #  `default_server` do host, que é o **V3**: quem digitasse o nome "errado" veria o app
+    #  antigo, em vez de um erro que se possa diagnosticar.
+    #
+    #  Aceitar os dois **não** decide qual é o canônico; essa decisão ainda não foi tomada, e
+    #  quando for cabe num `server` a mais aqui, com um `return 301` para o escolhido, mais o
+    #  ajuste de `APP_URL` e `WEBAUTHN_ORIGIN`. Enquanto isso, o `Host $host` abaixo repassa ao
+    #  app exatamente o nome que o usuário pediu.
+    server_name gastosmensais.com.br www.gastosmensais.com.br;
+
+    #  **O certificado é o de origem da Cloudflare**, o mesmo mecanismo que o V3 já usa neste
+    #  host. Ele não é confiável para um navegador, e não precisa ser: quem o valida é a
+    #  Cloudflare, e o cadeado que o usuário vê é o dela. É ele que torna o modo **Full
+    #  (strict)** possível — e Full (strict), nunca *Flexible*, é parte desta etapa. No modo
+    #  *Flexible* a Cloudflare fala `http` com a origem: o tráfego entre ela e o servidor
+    #  atravessa a internet em claro (inclusive o cookie de sessão e o corpo do login), o
+    #  `X-Forwarded-Proto` chega como `http` e o HSTS nunca sai. **Nada disso aparece para quem
+    #  olha o cadeado no navegador**, porque o cadeado é o da Cloudflare.
+    ssl_certificate     /etc/ssl/cloudflare/gastosmensais.com.br.pem;
+    ssl_certificate_key /etc/ssl/cloudflare/gastosmensais.com.br.key;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    #  Tira a versão do nginx do cabeçalho `Server` e da página de erro. Não é segurança por si
+    #  só; é não anunciar qual CVE procurar.
+    server_tokens off;
+
+    #  ---------------------------------------------------------------------------------
+    #  O limite de corpo
+    #  ---------------------------------------------------------------------------------
+    #
+    #  A API declara `express.json` com limite de 100kb e responde **413 com o `{ msg }` do
+    #  app** quando o corpo passa disso. Este teto fica um pouco **acima** dele de propósito:
+    #  abaixo, o nginx cortaria antes e o usuário receberia a página de erro HTML do nginx no
+    #  lugar da resposta do app; acima, quem responde os casos reais é a API, e o nginx é só a
+    #  barreira contra o corpo absurdo — que nem chega a ser bufferizado.
+    #
+    #  **A rota do `.xlsx` não é exceção aqui**: `GET /api/Reports/Export` é *saída*, não
+    #  entrada, e o `client_max_body_size` só governa o corpo que sobe. O que ela precisa é de
+    #  tempo, e isso está no `location` dela, no fim do arquivo.
+    client_max_body_size 128k;
+
+    #  ---------------------------------------------------------------------------------
+    #  Os cabeçalhos que atravessam a cadeia
+    #  ---------------------------------------------------------------------------------
+    #
+    #  Declarados no nível do `server` para valerem em todo `location` — com uma pegadinha do
+    #  nginx que vale saber: `proxy_set_header` **não é somado, é substituído em bloco**. Um
+    #  `location` que declare um único `proxy_set_header` deixa de herdar todos estes. É por
+    #  isso que o `location` do `Export`, lá embaixo, não declara nenhum.
+    #
+    #  `X-Forwarded-For $remote_addr` — **sobrescrevendo, não acrescentando**, e é a linha mais
+    #  importante deste arquivo. Com `$proxy_add_x_forwarded_for` no lugar dela, um cliente que
+    #  mandasse `X-Forwarded-For: 1.2.3.4` faria a cadeia chegar à API com três elementos e o
+    #  `trust proxy` igual a 1 descartaria só o último: o IP escolhido pelo cliente viraria o
+    #  `req.ip`, e o rate limiting por IP deixaria de existir.
+    proxy_set_header X-Forwarded-For $remote_addr;
+
+    #  É deste cabeçalho que sai o `req.secure` do Express, e dele depende o HSTS que o helmet
+    #  emite. Sem ele o Express acha que a conexão é `http` mesmo com o usuário em `https`, e o
+    #  `Strict-Transport-Security` simplesmente não aparece na resposta — sem erro nenhum.
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    #  O nome que o usuário pediu, e não `127.0.0.1:8080`. O app não constrói link a partir do
+    #  `Host` (é para isso que existe o `APP_URL`), mas um `Host` errado é o que faz um redirect
+    #  do nginx de dentro apontar para a porta local, e é o que aparece no log.
+    proxy_set_header Host $host;
+
+    #  ---------------------------------------------------------------------------------
+    #  `/` — tudo, inclusive `/api`, para uma porta só
+    #  ---------------------------------------------------------------------------------
+    #
+    #  **Não há um `location /api` aqui, e a ausência é a decisão.** Quem separa o app da API é
+    #  o nginx do container (`Frontend/deploy/nginx.conf`), versionado; o host encaminha o site
+    #  inteiro para a porta local e não sabe que existe uma API. É o que faz a "mesma origem"
+    #  que o cookie `SameSite=Strict` exige ser um fato de dentro do `compose`, e não uma
+    #  propriedade que depende deste arquivo — o pedaço do deploy que o `git` não vê.
+    #
+    #  `127.0.0.1:8080` é o bind do serviço `web` no `docker-compose.yml`, preso ao loopback de
+    #  propósito: a porta não existe na rede, só nesta máquina, e quem a alcança é este nginx.
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+    }
+
+    #  ---------------------------------------------------------------------------------
+    #  `/api/Reports/Export` — a única rota que não responde JSON
+    #  ---------------------------------------------------------------------------------
+    #
+    #  Ela monta um `.xlsx` com o `exceljs` e o escreve direto no `res`. Um período longo, num
+    #  workspace com muito lançamento, passa dos **60 segundos** que o `proxy_read_timeout` usa
+    #  por padrão — e o modo de falhar é o pior possível: o nginx desiste no meio, devolve
+    #  **502**, e a API continua montando a planilha do outro lado. Para quem está na tela o
+    #  relatório "deu erro"; para quem lê o log da API ele terminou bem.
+    #
+    #  **Nenhum `proxy_set_header` aqui, de propósito**: declarar um só faria este `location`
+    #  perder os três do `server` acima (a diretiva é substituída em bloco, não somada) — e
+    #  perder o `X-Forwarded-For` numa rota autenticada é perder o IP real justamente onde ele
+    #  é lido.
+    #
+    #  Também não há exceção de `client_max_body_size`: o `.xlsx` é a **resposta**, e o corpo
+    #  que sobe nesta rota é vazio — os parâmetros são `?From=&To=`.
+    location = /api/Reports/Export {
+        proxy_read_timeout 300s;
+        proxy_pass http://127.0.0.1:8080;
+    }
+}

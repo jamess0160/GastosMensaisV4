@@ -25,6 +25,14 @@ class Server {
     //  `true` confiaria na cadeia inteira de X-Forwarded-For, e aí o próprio cliente escolhe o
     //  IP que o Express enxerga mandando o cabeçalho. O número é a quantidade de proxies entre
     //  a internet e este processo, e aqui existe exatamente um.
+    //
+    //  **Um, e não três, porque a cadeia é normalizada antes de chegar aqui**: a cadeia real é
+    //  `usuário → Cloudflare → nginx do host → nginx do container web → api`, e é o vhost do
+    //  host (`deploy/nginx/host.conf.example`) que apaga os dois primeiros saltos — ele lê o
+    //  `CF-Connecting-IP` e **reescreve** o `X-Forwarded-For` do zero; o nginx do container
+    //  repassa esse valor sem acrescentar nada (`Frontend/deploy/nginx.conf`). Chega aqui um
+    //  `X-Forwarded-For` de um elemento só, que é o IP do usuário. Antes de mexer neste
+    //  número, é naqueles dois arquivos que se mexe.
     private proxy() {
         this.app.set('trust proxy', 1)
     }
