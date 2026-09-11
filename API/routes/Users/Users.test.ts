@@ -648,6 +648,101 @@ describe("Users", () => {
 
             expect(response.status).toBe(406)
         })
+
+        //  **O TermsOutdated é DERIVADO, e estes três testes são a trava disso.** Ele não é
+        //  coluna: sai de `TermsVersion !== TERMS_VERSION` a cada leitura, como o Balance e o
+        //  Spent. Se um dia virar coluna, o primeiro a quebrar é o teste da versão velha —
+        //  que é o caso que aconteceu de verdade, no dia seguinte ao fechamento da leva.
+        it("diz que o aceite está em dia para quem gravou a versão vigente", async () => {
+            let current = await UsersFactory.create()
+            await setTermsVersion(current.user.IdUser, TERMS_VERSION)
+
+            let response = await new TestClient(current.token).get("/Users/getSelf")
+
+            expect(response.status).toBe(200)
+            expect(response.body.TermsOutdated).toBe(false)
+        })
+
+        it("diz que o aceite está velho para quem gravou uma versão anterior", async () => {
+            let outdated = await UsersFactory.create()
+            await setTermsVersion(outdated.user.IdUser, "2026-09-10")
+
+            let response = await new TestClient(outdated.token).get("/Users/getSelf")
+
+            expect(response.status).toBe(200)
+            expect(response.body.TermsOutdated).toBe(true)
+        })
+
+        //  Nulo é a MESMA resposta da versão velha, e de propósito: não consta que essa pessoa
+        //  tenha aceitado coisa nenhuma. Um segundo campo para distinguir os dois grupos só
+        //  serviria para o cliente ter uma segunda chance de errar a comparação — o que muda
+        //  entre eles é o TEXTO do modal, e para isso o `TermsVersion` já está na resposta.
+        it("diz que o aceite está velho para quem nunca aceitou nada", async () => {
+            let never = await UsersFactory.create()
+
+            let response = await new TestClient(never.token).get("/Users/getSelf")
+
+            expect(response.status).toBe(200)
+            expect(response.body.TermsVersion).toBeNull()
+            expect(response.body.TermsOutdated).toBe(true)
+        })
+    })
+
+    describe("POST /Users/acceptTerms", () => {
+
+        it("recusa sem sessão", async () => {
+            let response = await client.anonymous().post("/Users/acceptTerms")
+
+            expect(response.status).toBe(401)
+        })
+
+        //  O QUE fica gravado é a versão da API, e o corpo é vazio justamente para não haver
+        //  por onde mandar outra: o mesmo motivo do cadastro, um degrau depois.
+        it("carimba o aceite com a versão do servidor", async () => {
+            let outdated = await UsersFactory.create()
+            await setTermsVersion(outdated.user.IdUser, "2026-09-10")
+
+            let response = await new TestClient(outdated.token).post("/Users/acceptTerms")
+
+            expect(response.status).toBe(200)
+            expect(response.body.msg).toBeTruthy()
+
+            let stored = await findByEmail(outdated.user.Email)
+
+            expect(stored?.TermsVersion).toBe(TERMS_VERSION)
+            expect(stored?.TermsAcceptedAt).toBeInstanceOf(Date)
+        })
+
+        //  A volta completa: o modal do chassi aparece pelo TermsOutdated e some pelo mesmo
+        //  campo. É o que prova que a rota e o getSelf leem a mesma constante.
+        it("deixa o getSelf em dia para quem nunca tinha aceitado nada", async () => {
+            let never = await UsersFactory.create()
+            let session = new TestClient(never.token)
+
+            expect((await session.get("/Users/getSelf")).body.TermsOutdated).toBe(true)
+
+            expect((await session.post("/Users/acceptTerms")).status).toBe(200)
+
+            let response = await session.get("/Users/getSelf")
+
+            expect(response.body.TermsVersion).toBe(TERMS_VERSION)
+            expect(response.body.TermsOutdated).toBe(false)
+        })
+
+        //  Idempotente como o confirmEmail, e pela mesma razão: a data é a prova de QUANDO
+        //  esta pessoa concordou com ESTE texto, e um segundo clique moveria a prova.
+        it("não reescreve a data de quem já está na versão vigente", async () => {
+            let current = await UsersFactory.create()
+            let session = new TestClient(current.token)
+
+            await session.post("/Users/acceptTerms")
+
+            let first = (await findByEmail(current.user.Email))?.TermsAcceptedAt
+
+            expect((await session.post("/Users/acceptTerms")).status).toBe(200)
+
+            expect((await findByEmail(current.user.Email))?.TermsAcceptedAt).toEqual(first)
+        })
     })
 
     describe("POST /Users", () => {
@@ -1360,6 +1455,15 @@ function buildUpdatePayload(overrides: Partial<UsersNamespace.UpdateUserPayload>
     let { Password, AcceptedTerms, ...payload } = buildPayload()
 
     return { ...payload, ...overrides }
+}
+
+//  Semeia o aceite direto no banco: aqui ele é arranjo de estado, não o objeto do teste — a
+//  factory nasce com as duas colunas nulas, que é o terceiro caso e não os outros dois.
+function setTermsVersion(IdUser: number, TermsVersion: string) {
+    return TestDatabase.connection()
+        .update({ TermsVersion, TermsAcceptedAt: new Date() })
+        .from("Users")
+        .where("IdUser", IdUser)
 }
 
 function findByEmail(Email: string) {

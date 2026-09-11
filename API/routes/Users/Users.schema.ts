@@ -93,12 +93,26 @@ class Schema {
             //  o schema não descreve derruba a rota com 406 pelo unknown.
             TermsAcceptedAt: Joi.date().allow(null).required(),
             TermsVersion: Joi.string().allow(null).required(),
+            //  DERIVADO, e não coluna: `TermsVersion !== TERMS_VERSION`, calculado a cada
+            //  leitura. É o que o modal do chassi lê para saber se bloqueia, e está do lado
+            //  do servidor porque a versão vigente é dele — a comparação no cliente seria
+            //  entre duas constantes em formatos diferentes, e errar não quebraria teste.
+            TermsOutdated: Joi.boolean().required(),
             LastLogin: Joi.date().required(),
             TrialStartAt: Joi.date().required(),
             TrialEndAt: Joi.date().allow(null).required(),
             Active: Joi.boolean().required(),
             CreatedAt: Joi.date().required(),
             UpdatedAt: Joi.date().required(),
+        })),
+    ]
+
+    //  Sem body, como o logout: a rota não recebe nada — a versão que fica gravada é a da API,
+    //  e um campo de versão no corpo seria exatamente a porta por onde alguém afirmaria ter
+    //  concordado com um documento antigo. Só a resposta é descrita.
+    public readonly acceptTerms = [
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
         })),
     ]
 

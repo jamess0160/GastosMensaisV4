@@ -39,6 +39,14 @@ Users_route.post("/Users/resendConfirmation", RateLimits.resendConfirmation, Use
 
 Users_route.get("/Users/getSelf", Users_schema.getSelf, AsyncHandler(Users_controller.getSelf))
 
+//  O re-aceite dos termos, para quem já tem conta. AUTENTICADA e sem corpo: quem aceita é o
+//  dono do token, e com o que ele concorda é a constante da API. Vem logo abaixo do getSelf
+//  porque é o par dele — o `TermsOutdated` de lá é a pergunta, esta rota é a resposta.
+//
+//  Sem freio de IP: o token já é a porta, e um teto aqui prenderia o escritório inteiro no dia
+//  em que o documento mudasse.
+Users_route.post("/Users/acceptTerms", Users_schema.acceptTerms, AsyncHandler(Users_controller.acceptTerms))
+
 Users_route.post("/Users", RateLimits.create, Users_schema.create, AsyncHandler(Users_controller.create, false))
 
 Users_route.put("/Users/IdUser=:IdUser", Users_schema.update, AsyncHandler(Users_controller.update))

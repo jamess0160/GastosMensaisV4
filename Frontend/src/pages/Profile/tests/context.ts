@@ -10,6 +10,7 @@ const user: ApiTypes.User = {
     EmailConfirmedAt: "2026-08-01T12:00:00.000Z",
     TermsAcceptedAt: "2026-08-01T00:00:00.000Z",
     TermsVersion: "2026-09-10",
+    TermsOutdated: false,
     LastLogin: "2026-08-30T12:00:00.000Z",
     TrialStartAt: null,
     TrialEndAt: null,

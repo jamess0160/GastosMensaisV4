@@ -10,6 +10,7 @@ import { ForgotPassword } from './sections/POST/forgotPassword'
 import { ResetPassword } from './sections/POST/resetPassword'
 import { ConfirmEmail } from './sections/POST/confirmEmail'
 import { ResendConfirmation } from './sections/POST/resendConfirmation'
+import { AcceptTerms } from './sections/POST/acceptTerms'
 import { Remove } from './sections/DELETE/remove'
 
 class Controller {
@@ -90,6 +91,12 @@ class Controller {
 
     getSelf = async (req: Request, res: Response) => {
         res.json(await new GetSelf().run(res.locals.IdUser, res))
+    }
+
+    //  A conta que aceita é a do token, e não há corpo: nem quem, nem com o que, vem do
+    //  cliente. É a mesma forma do logout — a rota inteira é um ato, não uma edição.
+    acceptTerms = async (req: Request, res: Response) => {
+        res.json(await new AcceptTerms().run(res.locals.IdUser))
     }
 
     create = async (req: Request, res: Response) => {

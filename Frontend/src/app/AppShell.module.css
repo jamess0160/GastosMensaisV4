@@ -66,6 +66,82 @@
     color: var(--ink-2);
 }
 
+/* O modal do re-aceite dos termos.
+
+   Ele é o OPOSTO da faixa acima: cobre o app inteiro e não tem como
+   fechar. O `z-index` é o maior do projeto (o mais alto depois dele é o
+   59/60 do select) porque nada pode ficar por cima — inclusive um
+   slide-over que já estivesse aberto quando a conta foi relida. */
+.gateScrim {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: rgba(20, 18, 15, 0.5);
+}
+
+.gate {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 71;
+    width: min(480px, calc(100vw - 32px));
+    max-height: 86vh;
+    overflow-y: auto;
+    padding: 24px;
+    background: var(--screen);
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    box-shadow: var(--sh-modal);
+}
+
+.gateTitle {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+}
+
+.gateBody {
+    margin-top: 10px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--ink-2);
+}
+
+.gateLinks {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.gateLinks a {
+    color: var(--brand);
+}
+
+.gateError {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--neg-soft);
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--neg);
+}
+
+/* Aceitar à direita, sair à esquerda: o botão de saída existe, mas não
+   é o caminho que a tela recomenda. */
+.gateActions {
+    margin-top: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
 /* ── Mobile ───────────────────────────────────────────────── */
 @media (max-width: 900px) {
     /* A sidebar sai inteira: a barra inferior a substitui. Escondê-la

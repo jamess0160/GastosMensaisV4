@@ -1,5 +1,6 @@
 import { BaseModel, MaybeArray } from "root/Utils/Base"
 import { Database } from "root/Utils/database"
+import { TERMS_VERSION } from "./sections/TermsVersion"
 
 export class class_Users_model extends BaseModel {
 
@@ -35,6 +36,16 @@ export class class_Users_model extends BaseModel {
     //  quem confirma nao escolhe a data - ela e o instante do banco, e nao o do processo.
     confirmEmail(IdUser: number) {
         return this.update(IdUser, { EmailConfirmedAt: this.KnexConnection.fn.now() as unknown as Database.Users["EmailConfirmedAt"] })
+    }
+
+    //  O carimbo do re-aceite, e quem aceita não escolhe NENHUM dos dois valores: a data é o
+    //  instante do banco, como no `confirmEmail`, e a versão é a constante da API — o corpo da
+    //  rota é vazio justamente para não haver por onde mandar uma versão antiga.
+    acceptTerms(IdUser: number) {
+        return this.update(IdUser, {
+            TermsAcceptedAt: this.KnexConnection.fn.now() as unknown as Database.Users["TermsAcceptedAt"],
+            TermsVersion: TERMS_VERSION,
+        })
     }
 
     update(IdUser: number, record: Partial<Database.Users>) {

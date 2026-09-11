@@ -77,9 +77,26 @@ class Connection {
         return data;
     }
 
-    /** `Password` nunca sai na resposta. */
+    /** `Password` nunca sai na resposta.
+     *
+     *  O `TermsOutdated` vem daqui calculado pela API, e é o que o
+     *  `TermsGate` do chassi lê. Não o recalcule no cliente. */
     async getSelf(): Promise<ApiTypes.User> {
         const { data } = await http.get<ApiTypes.User>(`${this.route}/getSelf`);
+        return data;
+    }
+
+    /** Aceitar os termos de novo, depois de o documento mudar.
+     *
+     *  **Sem corpo, e é de propósito**: a versão que fica gravada é a da
+     *  API. Se o cliente pudesse mandá-la, poderia afirmar ter
+     *  concordado com um documento antigo — o oposto do que a coluna
+     *  serve para provar. O que ele diz é só "aceito".
+     *
+     *  Depois do 200, releia a conta: é o `TermsOutdated` do `getSelf`
+     *  que faz o modal do chassi sair da frente. */
+    async acceptTerms(): Promise<{ msg: string }> {
+        const { data } = await http.post<{ msg: string }>(`${this.route}/acceptTerms`);
         return data;
     }
 

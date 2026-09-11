@@ -4,6 +4,7 @@ import styles from "./AppShell.module.css";
 import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { MonthProvider } from "./monthScope";
+import { TermsGate } from "./TermsGate";
 import { ScreenRoutes, useScreenLocation } from "./modalRoute";
 import { SessionProvider, useSessionQuery, useUnauthorizedRedirect } from "./session";
 import { ApiUnauthorizedError } from "@/api/client";
@@ -73,6 +74,16 @@ export function AppShell() {
                             </span>
                         </div>
                     )}
+
+                    {/* O re-aceite dos termos, e ele é o OPOSTO da
+                        faixa acima: cobre o app inteiro e as saídas
+                        são duas — aceitar, ou sair da conta.
+
+                        Ele vem ANTES do `MonthProvider` porque não é
+                        de uma tela nem de um mês: é a permissão de
+                        continuar prestando o serviço sob o texto novo.
+                        Em dia, não desenha nada. */}
+                    <TermsGate user={session.data} />
 
                     {/* O mês vive aqui e não dentro de cada tela: trocar
                         de página não pode zerar o mês que se está

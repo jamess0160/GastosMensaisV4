@@ -50,11 +50,23 @@ export namespace ApiTypes {
          *  `null` nos dois para quem se cadastrou antes de os documentos
          *  existirem: não houve backfill, porque carimbar um aceite que
          *  não aconteceu é justamente o que faria o registro não valer
-         *  nada. Nada é bloqueado por eles estarem `null` — o re-aceite
-         *  é decisão de produto, e estas colunas são o que a torna
-         *  possível depois sem migration. */
+         *  nada. Quem está nesse caso cai no `TermsOutdated` abaixo,
+         *  pelo mesmo caminho de quem aceitou uma versão anterior. */
         TermsAcceptedAt: DateTime | null;
         TermsVersion: string | null;
+        /** O aceite gravado é de uma versão que não é mais a vigente —
+         *  ou não existe aceite nenhum. É o que o `TermsGate` do chassi
+         *  lê para bloquear o app até a pessoa aceitar de novo.
+         *
+         *  **Campo DERIVADO, e a comparação é da API.** Não existe
+         *  coluna: o servidor compara `TermsVersion` com a constante
+         *  dele a cada leitura. O cliente NÃO REFAZ essa conta — a
+         *  versão que ele conhece é a `LEGAL_VERSION` do `LegalLayout`,
+         *  em `"DD/MM/AAAA"`, e a do banco é `"YYYY-MM-DD"`: duas
+         *  constantes em dois formatos que precisam concordar, do lado
+         *  que não grava nada. É a mesma regra do `Balance` e do
+         *  `Spent` — o número que decide sai de um lugar só. */
+        TermsOutdated: boolean;
         LastLogin: DateTime | null;
         TrialStartAt: DateTime | null;
         TrialEndAt: DateTime | null;
