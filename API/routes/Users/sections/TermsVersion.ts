@@ -11,4 +11,4 @@
 //  **O cliente nunca manda a versao.** Ele manda `AcceptedTerms: true`, e quem diz COM O QUE
 //  ele concordou e a API: aceitar a versao do corpo seria aceitar que o cliente afirmasse ter
 //  concordado com um documento antigo, que e o oposto do que a coluna prova.
-export const TERMS_VERSION = "2026-09-10"
+export const TERMS_VERSION = "2026-09-11"

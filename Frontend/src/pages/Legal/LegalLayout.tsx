@@ -26,7 +26,7 @@ import { IconChevronLeft } from "@/ui/icons";
  *  É a versão: não há numeração paralela a manter em sincronia. Mudou o
  *  texto de qualquer um dos dois, muda esta data — e é ela que o aceite
  *  do cadastro grava. */
-export const LEGAL_VERSION = "10/09/2026";
+export const LEGAL_VERSION = "11/09/2026";
 
 /** O canal do titular e o suporte do produto, no mesmo endereço.
  *

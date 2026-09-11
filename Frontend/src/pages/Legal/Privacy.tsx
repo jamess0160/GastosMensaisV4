@@ -347,10 +347,25 @@ export function Privacy() {
 
             <LegalSection id="menores" number={10} title="Crianças e adolescentes">
                 <p>
-                    O serviço é destinado a maiores de 18 anos e não coleta dados de crianças e
-                    adolescentes de forma intencional. Se identificarmos uma conta criada por menor
-                    de idade, ela será encerrada e os dados, eliminados. Responsáveis que suspeitem
-                    disso podem nos avisar pelo canal de contato.
+                    A conta é destinada a quem tem <strong>16 anos ou mais</strong>, e entre 16 e 18
+                    anos o uso pressupõe o consentimento de quem responde legalmente pelo
+                    adolescente. <strong>Não tratamos dados de crianças</strong> — abaixo de 16 anos
+                    não criamos conta, e a alternativa prevista nos{" "}
+                    <Link to="/termos#conta">termos de uso</Link> é o espaço compartilhado por
+                    convite, em que a conta é do responsável.
+                </p>
+                <p>
+                    Quando há adolescente envolvido, o tratamento é feito{" "}
+                    <strong>no melhor interesse dele</strong>, como manda o art. 14 da LGPD, e vale
+                    a mesma regra de minimização que vale para todo mundo:{" "}
+                    <strong>não perguntamos a data de nascimento</strong> e não guardamos idade,
+                    porque nada no aplicativo depende dela — pedir o dado só para conferir a idade
+                    seria coletar mais do que o serviço precisa.
+                </p>
+                <p>
+                    Se identificarmos uma conta criada por quem não podia criá-la, ela é encerrada e
+                    os dados, eliminados. Responsáveis que suspeitem disso podem nos avisar pelo
+                    canal de contato.
                 </p>
             </LegalSection>
 

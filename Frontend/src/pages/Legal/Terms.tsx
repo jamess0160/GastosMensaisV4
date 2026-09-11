@@ -72,8 +72,20 @@ export function Terms() {
                     feito por você.
                 </p>
                 <p>
-                    O serviço é destinado a <strong>maiores de 18 anos</strong>. Não criamos contas
-                    para crianças e adolescentes e não coletamos dados deles de forma intencional.
+                    A conta é destinada a quem tem <strong>16 anos ou mais</strong>. Entre 16 e 18
+                    anos, o uso do serviço pressupõe o consentimento de quem responde legalmente
+                    pelo adolescente — quem já é emancipado na forma da lei é tratado como maior
+                    para todos os efeitos destes termos.
+                </p>
+                <p>
+                    <strong>Abaixo de 16 anos não criamos conta</strong>, e isso não é uma opinião
+                    sobre quem pode cuidar do próprio dinheiro: aos 14 já se pode trabalhar como
+                    aprendiz, mas quem tem menos de 16 anos não pode, sozinho, assumir um contrato
+                    como este. O caminho para essa idade é outro e existe no aplicativo: a conta é
+                    de quem responde pelo adolescente, que <strong>compartilha o espaço</strong> por
+                    convite. O adolescente lança e acompanha os próprios gastos ali, e quem assinou
+                    estes termos é quem podia assiná-los. Note que, num espaço compartilhado, quem
+                    tem acesso enxerga os lançamentos de todos.
                 </p>
                 <p>
                     Se você desconfiar de acesso indevido, troque a senha imediatamente pela tela de
