@@ -1,11 +1,12 @@
 #  ---------------------------------------------------------------------------------------
-#  A orquestração dos três containers
+#  A orquestração dos quatro containers
 #  ---------------------------------------------------------------------------------------
 #
 #  Este arquivo mora na **raiz** do repositório, e não dentro de `API/` ou de `Frontend/`,
 #  porque ele é a única peça do deploy que só existe porque os dois lados moram juntos: ele
-#  descreve a relação entre eles — quem resolve o nome de quem, quem espera por quem, e qual
-#  das três portas chega a existir fora da rede do compose.
+#  descreve a relação entre eles — quem resolve o nome de quem, quem espera por quem, e quais
+#  das portas chegam a existir fora da rede do compose (duas, as do `proxy`, e nenhuma das
+#  outras).
 #
 #  **Subir e migrar são duas ações.** Não há `entrypoint` que rode a migration no boot: com o
 #  `restart: unless-stopped` abaixo, uma migration que falha viraria um container em laço de
@@ -185,16 +186,19 @@ services:
         max-file: "3"
 
   #  -----------------------------------------------------------------------------------
-  #  web — o nginx do container, e a única porta que existe
+  #  web — o nginx do produto, e agora sem porta nenhuma
   #  -----------------------------------------------------------------------------------
   #
-  #  **`127.0.0.1:8080:80`, e não `8080:80`.** O bind explícito no loopback é o que impede a
-  #  porta de aparecer na rede: `"8080:80"` escuta em todas as interfaces e **fura o firewall
-  #  do host**, porque o Docker escreve as próprias regras no `iptables` antes das do `ufw` —
-  #  a porta ficaria aberta no IP público com o firewall dizendo que está fechada. Com a
-  #  Cloudflare na frente, uma porta aberta direto no IP do servidor é exatamente o caminho
-  #  que a Cloudflare existe para fechar. Quem alcança a 8080 é o nginx do host, que roda na
-  #  mesma máquina.
+  #  **`ports` saiu daqui na migração para a VPS, e a ausência é a mudança.** Enquanto o TLS
+  #  terminava num nginx instalado no host, este serviço precisava de uma porta publicada
+  #  (`127.0.0.1:8080:80`) para aquele nginx alcançá-lo — presa ao loopback justamente porque
+  #  `"8080:80"` escuta em todas as interfaces e **fura o firewall do host**: o Docker escreve
+  #  as próprias regras no `iptables` antes das do `ufw`, e a porta ficaria aberta no IP
+  #  público com o firewall dizendo que está fechada.
+  #
+  #  Agora quem termina o TLS é o serviço `proxy`, **dentro da mesma rede do compose**, e ele
+  #  alcança este container pelo nome `web` na porta 80 — sem publicar nada no host. Uma porta
+  #  a menos na máquina é uma porta a menos para errar.
   web:
     build: ./Frontend
     restart: unless-stopped
@@ -214,8 +218,77 @@ services:
       api:
         condition: service_started
 
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  #  -----------------------------------------------------------------------------------
+  #  proxy — a borda, e o único serviço que o mundo alcança
+  #  -----------------------------------------------------------------------------------
+  #
+  #  **Este serviço substitui o nginx do host.** Até a VPS, quem terminava o TLS era um nginx
+  #  instalado na máquina e configurado à mão — o único pedaço do deploy que o `git` não via.
+  #  Ele existia porque a máquina antiga era compartilhada com outros serviços e trocá-lo de
+  #  lugar seria derrubar todos eles. Numa VPS que só hospeda este projeto esse motivo sumiu,
+  #  e com ele a desvantagem: a configuração de produção volta para dentro do repositório, em
+  #  `deploy/proxy/nginx.conf`.
+  proxy:
+    build: ./deploy/proxy
+    restart: unless-stopped
+
+    #  **Aqui o bind em todas as interfaces é o certo, e é a inversão da regra que vale para
+    #  todos os outros serviços deste arquivo.** `db`, `api` e `web` não publicam porta
+    #  nenhuma de propósito; este publica duas, porque ele *é* a porta de entrada. Não há
+    #  `127.0.0.1:` na frente porque quem precisa alcançá-lo é a Cloudflare, de fora.
+    #
+    #  **E é por isso que o `ufw` não é o que protege esta máquina.** O Docker escreve as
+    #  próprias regras no `iptables` antes das do `ufw`: uma porta publicada aqui fica aberta
+    #  no IP público mesmo com o `ufw` jurando que está fechada. O que fecha o resto é não
+    #  publicar — e o que restringe estas duas a quem vem da Cloudflare, se um dia for
+    #  preciso, é a cadeia `DOCKER-USER`, não o `ufw`. O runbook
+    #  (`1. Docs/Começando do zero.md`) traz as regras.
     ports:
-      - "127.0.0.1:8080:80"
+      - "80:80"
+      - "443:443"
+
+    #  **O certificado não entra na imagem, entra por volume, e `:ro`.** Ele é o único segredo
+    #  desta configuração, e um segredo numa camada é um segredo publicado no dia em que a
+    #  imagem for. O par é o de origem da Cloudflare, com validade de 15 anos — é o que
+    #  dispensa certbot, volume de ACME e `deploy-hook` de recarga a cada 60 dias.
+    #
+    #  O diretório é criado à mão no servidor, com a chave em modo 600 e dono `root`. O nginx
+    #  de dentro do container roda o processo mestre como `root` (é o padrão da imagem oficial,
+    #  e é o que permite escutar nas portas 80 e 443), então ele lê a chave; os *workers*, que
+    #  atendem a requisição, caem para o usuário `nginx` depois de o arquivo já estar na
+    #  memória.
+    volumes:
+      - /etc/ssl/cloudflare:/etc/ssl/cloudflare:ro
+
+    #  **Sem este `depends_on` o `proxy` não sobe**, pelo mesmo motivo que o `web` depende do
+    #  `api`: o `proxy_pass http://web:80` de `deploy/proxy/nginx.conf` usa um nome literal, e
+    #  o nginx resolve nome literal **na leitura da configuração**, não na requisição. Se `web`
+    #  ainda não existe na rede do compose, o processo morre no parse com
+    #  `[emerg] host not found in upstream "web"`.
+    depends_on:
+      web:
+        condition: service_started
+
+    #  O `healthz` mora no `default_server` da porta 80 de `deploy/proxy/nginx.conf`, e a razão
+    #  está lá: com `Host: 127.0.0.1` a requisição não casa com o `server_name` do app e cai no
+    #  bloco padrão, que responde 200 sem tocar no `web` nem na API.
+    #
+    #  **Ele prova que este nginx está de pé, e só isso, de propósito.** Um healthcheck que
+    #  atravessasse a cadeia até a API marcaria a borda como doente por causa de uma queda do
+    #  banco — e uma borda saudável com a API fora é exatamente o estado em que o usuário
+    #  precisa receber o erro da API na tela, em vez de uma conexão recusada.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
     logging:
       driver: json-file
@@ -224,13 +297,13 @@ services:
         max-file: "3"
 
 #  ---------------------------------------------------------------------------------------
-#  O volume, e a rotação de log dos três serviços
+#  O volume, e a rotação de log dos quatro serviços
 #  ---------------------------------------------------------------------------------------
 #
 #  **`pgdata` é o produto.** Declarado aqui como volume nomeado do projeto, ele é a única
 #  coisa neste arquivo que não pode ser recriada a partir do repositório.
 #
-#  **A rotação de log repetida nos três serviços não é cerimônia.** A leva 7 tirou o log do
+#  **A rotação de log repetida nos quatro serviços não é cerimônia.** A leva 7 tirou o log do
 #  disco da aplicação e o mandou para o stdout — o que move o problema para o disco do daemon,
 #  onde, no padrão do Docker, o `json-file` **cresce para sempre**. Num servidor pessoal, com
 #  um disco só, o disco cheio derruba o Postgres junto com o resto. Não há como declarar isso

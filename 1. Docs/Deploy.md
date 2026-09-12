@@ -6,13 +6,17 @@ sequência de comandos que se copia e cola, na ordem.
 
 O **porquê** de cada decisão não está aqui — está nos comentários dos arquivos que os comandos
 tocam (`docker-compose.yml`, `API/Dockerfile`, `Frontend/deploy/nginx.conf`,
-`deploy/nginx/host.conf.example`, `deploy/backup.sh`) e no plano da
+`deploy/proxy/nginx.conf`, `deploy/backup.sh`) e no plano da
 [leva 8](Levas/8.%20O%20que%20só%20se%20prova%20subindo.md). Se um comando daqui parecer errado, a
 explicação está lá; não a improvise no meio de um incidente.
 
+> **Máquina nova, do zero?** Este documento começa com o repositório já clonado e o Docker já
+> instalado. Antes dele vem [Começando do zero](Começando%20do%20zero.md), que cobre a VPS crua:
+> usuário, SSH, firewall, Docker, git, Cloudflare e certificado.
+
 | Procedimento | Quando |
 | --- | --- |
-| [1. Subir pela primeira vez](#1-subir-pela-primeira-vez) | Máquina nova, ou o dia do primeiro deploy |
+| [1. Subir pela primeira vez](#1-subir-pela-primeira-vez) | Máquina já preparada, no dia do primeiro deploy |
 | [2. Atualizar](#2-atualizar) | Todo deploy depois do primeiro |
 | [3. Migration e rollback](#3-migration-e-rollback) | Sempre que o `git pull` trouxe arquivo em `API/migrations/` |
 | [4. Ver o log](#4-ver-o-log) | "Deu erro e não sei o quê" |
@@ -27,8 +31,8 @@ explicação está lá; não a improvise no meio de um incidente.
 | A orquestração | `docker-compose.yml`, na raiz do clone | sim |
 | As variáveis de ambiente | `.env`, **na raiz do clone** | **não** (`/.env` no `.gitignore`) |
 | O banco | volume Docker nomeado `pgdata` | não — **é o produto** |
-| O vhost do servidor | `/etc/nginx/sites-available/gastosmensais.conf` | só o exemplo, em `deploy/nginx/host.conf.example` |
-| O certificado de origem | `/etc/ssl/cloudflare/` | não, e nunca |
+| O nginx de borda | container `proxy`, de `deploy/proxy/nginx.conf` | **sim** — não há mais cópia à mão em `/etc/nginx` |
+| O certificado de origem | `/etc/ssl/cloudflare/`, montado `:ro` no `proxy` | não, e nunca |
 | Os dumps | `/var/backups/gastosmensais/` | não |
 | O agendamento do backup | `/etc/systemd/system/gastosmensais-backup.{service,timer}` | só o exemplo, em `deploy/` |
 | O log da aplicação | o stdout do container — ver o [procedimento 4](#4-ver-o-log) | não existe em disco |
@@ -48,8 +52,18 @@ docker --version           # Engine 20.10+
 docker compose version     # v2 — é "docker compose", com espaço, não "docker-compose"
 git --version
 openssl version
-nginx -v                   # o do host, que já existe e já serve o V3
 ```
+
+E o grupo `docker`, que é o pré-requisito que não aparece em nenhuma versão:
+
+```bash
+id -nG | tr ' ' '
+' | grep docker    # sem isto, todo comando abaixo responde permission denied
+```
+
+**Se ele não imprimir nada**, pare aqui: `sudo usermod -aG docker $USER`, saia do SSH e entre de
+novo. Prefixar tudo com `sudo` funciona e deixa metade dos comandos rodando como `root` e metade
+não — o que só dá problema três passos adiante.
 
 ### 1.2 O clone
 
@@ -190,12 +204,18 @@ entregue.**
 
 ```bash
 docker compose build
+docker compose run --rm --entrypoint nginx proxy -t
 docker compose up -d
 docker compose ps
 ```
 
-O `build` do primeiro dia demora: são duas imagens, dois `npm ci` e o webpack, no processador do
-servidor. Espere os três serviços em `running`, e o `db` e o `api` em `healthy`.
+O `build` do primeiro dia demora: são três imagens, dois `npm ci` e o webpack, no processador do
+servidor. Espere os **quatro** serviços em `running`, e `db`, `api` e `proxy` em `healthy`.
+
+**O `nginx -t` no meio não é cerimônia.** O `proxy` é o único serviço que o `build` aceita e o
+boot rejeita: o certificado que ele lê vem de um volume do host, não da imagem, e um par
+trocado ou um arquivo ausente só aparece quando o processo tenta subir. Rodá-lo antes do
+`up -d` transforma isso numa mensagem legível em vez de um container reiniciando em laço.
 
 **O log vai gritar `relation "RotineRuns" does not exist` a cada tick, e isso é normal aqui.** O
 banco existe e está vazio: subir e migrar são duas ações, de propósito. A mensagem para no passo
@@ -215,33 +235,30 @@ Confira que a API respondeu e que o fuso pegou:
 
 ```bash
 docker compose exec api date          # precisa dizer -03. Se disser UTC, o tzdata da imagem sumiu
-curl -s http://127.0.0.1:8080/api/Utils/Health
-curl -sI http://127.0.0.1:8080/ | head -1
+curl -s http://127.0.0.1/healthz      # "ok" — prova que o nginx de borda está de pé
+curl -sk --resolve www.gastosmensais.com.br:443:127.0.0.1      https://www.gastosmensais.com.br/api/Utils/Health
+curl -sI --resolve www.gastosmensais.com.br:80:127.0.0.1      http://www.gastosmensais.com.br/ | head -1        # 301
 ```
+
+**O `--resolve` não é firula, e sem ele a leitura fica errada.** Um `curl https://127.0.0.1/`
+manda `127.0.0.1` como SNI e como `Host`: isso não casa com o `server_name` do app, cai no
+`default_server` de `deploy/proxy/nginx.conf` e a conexão é fechada sem resposta (444) — que se
+lê como "o app não subiu". O `--resolve` mantém o nome e força só o destino. O `-k` é porque o
+certificado de origem da Cloudflare não é confiável para o `curl`, e não precisa ser.
 
 O `date` é a prova que não se pode pular: `TZ=America/Sao_Paulo` sem o pacote de fusos na imagem
 **não dá erro** — a libc ignora o valor e o processo fica em UTC, com a variável ali,
 aparentemente certa. O `docker compose config` mostraria o valor correto de qualquer jeito.
 
-### 1.7 O nginx do host (só no servidor)
+### 1.7 O certificado e a Cloudflare (só no servidor)
 
-O nginx é o do host, já existe e **continua servindo o V3 no mesmo processo**. Todo cuidado aqui
-é para não derrubá-lo.
+**Não há mais nginx do host.** Quem termina o TLS é o container `proxy`, construído de
+`deploy/proxy/nginx.conf` — versionado, revisado em diff e idêntico em qualquer máquina. O que
+continua fora do repositório é só o segredo: o par de certificado e chave, montado como volume
+`:ro`.
 
-**Antes de copiar, duas conferências que mudam o arquivo:**
-
-```bash
-nginx -v                                          # a versão
-nginx -V 2>&1 | grep -o with-http_realip_module   # precisa imprimir algo
-```
-
-- **`http2 on;` exige nginx ≥ 1.25.1.** No nginx do Debian 12 (1.22) a diretiva não existe e a
-  forma é `listen 443 ssl http2;` — troque as duas linhas antes de copiar, ou o `nginx -t` falha;
-- **sem o `http_realip_module` o `set_real_ip_from` nem carrega**, e todo o desenho de IP real do
-  arquivo deixa de existir. Em Debian/Ubuntu ele vem no pacote padrão; se não vier, é trocar o
-  pacote do nginx, não remover as linhas.
-
-O certificado de origem da Cloudflare, em `/etc/ssl/cloudflare/`, dono `root`, chave **600**:
+O certificado de origem da Cloudflare, em `/etc/ssl/cloudflare/`, dono `root`, chave **600** —
+os nomes dos arquivos estão escritos dentro do `nginx.conf` e não são livres:
 
 ```bash
 sudo install -d -m 0755 /etc/ssl/cloudflare
@@ -249,22 +266,18 @@ sudo install -m 0644 -o root -g root <cert>.pem /etc/ssl/cloudflare/gastosmensai
 sudo install -m 0600 -o root -g root <key>.key  /etc/ssl/cloudflare/gastosmensais.com.br.key
 ```
 
-Aplicar o vhost — **sempre nesta ordem**:
+Confira que o par bate — os dois `md5` têm de ser **iguais**. Um certificado com a chave de
+outro falha no boot do `proxy` com uma mensagem que não diz qual dos dois arquivos está errado:
 
 ```bash
-sudo cp deploy/nginx/host.conf.example /etc/nginx/sites-available/gastosmensais.conf
-sudo ln -sf /etc/nginx/sites-available/gastosmensais.conf /etc/nginx/sites-enabled/
-sudo nginx -t                     # NUNCA pule: um reload com erro de sintaxe mantém a
-                                  # configuração antiga no ar sem avisar
-sudo systemctl reload nginx       # reload, não restart: não derruba conexão nenhuma
+sudo openssl x509 -noout -modulus -in /etc/ssl/cloudflare/gastosmensais.com.br.pem | openssl md5
+sudo openssl rsa  -noout -modulus -in /etc/ssl/cloudflare/gastosmensais.com.br.key | openssl md5
 ```
 
-**Confira que o vhost do V3 não reivindica `gastosmensais.com.br` nem
-`www.gastosmensais.com.br`.** Dois `server_name` iguais e quem responde é o primeiro que o nginx
-carregar — o sintoma é o app antigo aparecendo no domínio novo, sem erro em lugar nenhum:
+Trocar o certificado depois **não exige rebuild**, porque ele não está na imagem:
 
 ```bash
-grep -rn "gastosmensais" /etc/nginx/sites-enabled/
+docker compose restart proxy
 ```
 
 **Na Cloudflare, quatro coisas, e nenhuma é opcional:**
@@ -275,12 +288,14 @@ grep -rn "gastosmensais" /etc/nginx/sites-enabled/
   aparece no cadeado do navegador**, porque o cadeado é o dela;
 - **Always Use HTTPS** ligado;
 - **DNS: o apex e o `www`, os dois proxiados** (nuvem laranja). Os registros de e-mail do passo
-  1.4 são a exceção, e ficam cinza;
-- As faixas de IP da Cloudflare dentro do `host.conf.example` estão datadas de **11/09/2026** e
-  **envelhecem**. Uma lista desatualizada não dá erro: o `set_real_ip_from` deixa de casar, o
-  `$remote_addr` volta a ser o do datacenter, e todo usuário que entrar por uma faixa nova vira
-  um IP só para o rate limiting. Reconferir em <https://www.cloudflare.com/ips-v4> junto com a
-  atualização do servidor.
+  1.4 são a exceção, e ficam cinza. **Desligar a nuvem laranja derruba o app**: o certificado de
+  origem não é confiável para um navegador, e quem o valida é a Cloudflare;
+- As faixas de IP da Cloudflare dentro de `deploy/proxy/nginx.conf` estão datadas de
+  **11/09/2026** e **envelhecem**. Uma lista desatualizada não dá erro: o `set_real_ip_from`
+  deixa de casar, o `$remote_addr` volta a ser o do datacenter, e todo usuário que entrar por uma
+  faixa nova vira um IP só para o rate limiting. Reconferir em
+  <https://www.cloudflare.com/ips-v4> junto com a atualização do servidor — e, como a lista vive
+  no repositório, a atualização dela é um commit e um `docker compose build proxy`.
 
 ### 1.8 O backup (só no servidor)
 
@@ -334,8 +349,10 @@ E, se o `git pull` trouxe arquivo novo em `API/migrations/`, o
 >
 > **`docker compose build web` e `docker compose build api` são comandos válidos, e é por isso
 > que este aviso existe.** O repositório único garantia sozinho que os dois lados andassem no
-> mesmo passo — um commit era o produto —, e a partir do momento em que existem duas imagens,
-> essa garantia passa a depender de quem digita.
+> mesmo passo — um commit era o produto —, e a partir do momento em que `web` e `api` são
+> duas imagens separadas, essa garantia passa a depender de quem digita. (O `proxy` é a
+> terceira imagem e fica fora deste raciocínio: ele não carrega código do app, e reconstruí-lo
+> sozinho depois de mexer em `deploy/proxy/nginx.conf` é legítimo.)
 >
 > O caso que dói é a versão dos documentos legais. Ela vive em **duas constantes, em dois lados
 > e dois formatos**: `API/routes/Users/sections/TermsVersion.ts` (`"2026-09-11"`), que é o que a
@@ -428,13 +445,19 @@ sudo systemctl start gastosmensais-backup && ls -lt /var/backups/gastosmensais/ 
 ```bash
 docker compose logs -f api          # a aplicação, ao vivo
 docker compose logs --tail=200 api  # as últimas 200 linhas e sai
-docker compose logs -f              # os três serviços, entrelaçados
+docker compose logs -f              # os quatro serviços, entrelaçados
 docker compose logs db              # o Postgres
+docker compose logs proxy           # o nginx de borda: TLS, 301, 444 e erro de certificado
 ```
+
+**Um 502 na tela quase nunca está no log do `proxy`.** Ele registra o que *ele* fez; quem
+recusou a conexão foi o `web` ou a `api`, e é o log deles que diz por quê. A ordem de leitura
+num incidente é `api`, depois `web`, e o `proxy` só quando o sintoma é TLS, redirecionamento ou
+conexão fechada sem resposta.
 
 **Não procure por uma pasta `Logs/`.** Ela não existe dentro do container e não existe no
 servidor: em `NODE_ENV=production` a aplicação escreve no **stdout**, e o log é o do Docker. É
-por isso que os três serviços declaram rotação (`json-file`, 10 MB × 3) — sem ela, o padrão do
+por isso que os quatro serviços declaram rotação (`json-file`, 10 MB × 3) — sem ela, o padrão do
 Docker cresce para sempre, e num servidor pessoal o disco cheio derruba o Postgres junto.
 
 Os arquivos, se precisar olhar o disco:
@@ -456,8 +479,7 @@ docker compose exec api date                         # o fuso
 # `-U "$DB_LOGIN"` daqui vira `-U ""`.
 docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt"'
 
-sudo journalctl -u nginx -n 50                       # o nginx do host
-sudo tail -50 /var/log/nginx/error.log
+docker compose exec proxy nginx -t                   # a configuração da borda, já no ar
 journalctl -u gastosmensais-backup -n 50             # o backup
 ```
 
@@ -552,14 +574,19 @@ produção, e nenhum deles é `npm test`.
 
 ### O básico, do próprio servidor
 
-- [ ] `docker compose ps` — os três `running`, `db` e `api` `healthy`;
+- [ ] `docker compose ps` — os quatro `running`, e `db`, `api` e `proxy` `healthy`;
 - [ ] `docker compose exec api date` diz **`-03`**. É a prova do `tzdata`, e o `compose config`
       não substitui;
-- [ ] `curl -s http://127.0.0.1:8080/api/Utils/Health` responde;
+- [ ] `curl -s http://127.0.0.1/healthz` responde `ok`;
+- [ ] `curl -sk --resolve www.gastosmensais.com.br:443:127.0.0.1
+      https://www.gastosmensais.com.br/api/Utils/Health` responde — o `--resolve` é obrigatório,
+      e o porquê está no [passo 1.6](#16-a-migration);
 - [ ] o log **não** repete `relation "RotineRuns" does not exist` — se repetir, a migration não
       rodou;
-- [ ] a porta 8080 **não** responde do IP público, só do loopback:
-      `curl --max-time 5 http://<ip público>:8080/` tem de falhar;
+- [ ] **só a 80 e a 443 respondem do IP público.** As duas são do `proxy`, e nenhum outro
+      serviço publica porta: `docker compose ps` não mostra `->` em `db`, `api` nem `web`;
+- [ ] chegar pelo **IP nu** não serve o app: `curl -k --max-time 5 https://<ip público>/` fecha
+      sem resposta (é o `default_server` devolvendo 444), e não devolve a página;
 - [ ] o Postgres **não** é alcançável de fora: `psql -h <ip do servidor> -p 5432` recusa;
 - [ ] `docker compose down && docker compose up -d` preserva os dados — o volume `pgdata` é
       nomeado, e só um `-v` o apaga.
@@ -584,9 +611,9 @@ produção, e nenhum deles é `npm test`.
 - [ ] **o IP real:** errar a senha do login **seis vezes** de um celular na rede móvel **não**
       bloqueia o login de outro dispositivo. Se bloquear, a API está vendo um IP só para todo
       mundo — o `X-Forwarded-For` está errado em algum ponto da cadeia, e o lugar de olhar é o
-      `proxy_set_header` do `host.conf.example` (que **sobrescreve**) e o do
+      `proxy_set_header` de `deploy/proxy/nginx.conf` (que **sobrescreve**) e o do
       `Frontend/deploy/nginx.conf` (que **repassa**, sem acrescentar salto). Confira o que a API
-      enxerga pelo log de acesso do nginx do host antes de mexer em `trust proxy`;
+      enxerga pelo log de acesso do `proxy` antes de mexer em `trust proxy`;
 - [ ] o modo SSL da Cloudflare lê **Full (strict)**;
 - [ ] a biometria **cadastra e autentica** no domínio real (é a prova do `WEBAUTHN_RP_ID`).
 
