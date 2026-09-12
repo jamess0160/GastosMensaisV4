@@ -483,16 +483,23 @@ docker compose exec api npm run migrate:prod
 A linha que importa é `Batch 1 run: <N> migrations` — hoje são **28**. Ela **não** é a última da
 saída: o `npm` costuma imprimir um `npm notice` sobre versão nova depois dela, e isso não é erro.
 
-### Os quatro comandos que provam que a cadeia está de pé
+### Os cinco comandos que provam que a cadeia está de pé
 
 ```bash
 docker compose exec api date                         # precisa dizer -03, não UTC
 curl -s http://127.0.0.1/healthz                     # "ok" — o nginx de borda
 curl -sI --resolve www.gastosmensais.com.br:80:127.0.0.1 \
      http://www.gastosmensais.com.br/ | head -1      # 301, o redirecionamento
+curl -skI --resolve gastosmensais.com.br:443:127.0.0.1 \
+     https://gastosmensais.com.br/ | head -2         # 301 do apex para o www
 curl -sk --resolve www.gastosmensais.com.br:443:127.0.0.1 \
      https://www.gastosmensais.com.br/api/Utils/Health
 ```
+
+**O `www` é o canônico**, e o quarto comando é a prova disso. O app responde num nome só; o apex
+existe para redirecionar. Ele não é preferência de estilo: o cookie de sessão é host-only, então
+o app servido nos dois nomes seriam duas sessões, e o `WEBAUTHN_ORIGIN` — que é comparado
+literalmente — teria de listar os dois para a biometria funcionar em qualquer um deles.
 
 **O `--resolve` não é firula.** Um `curl https://127.0.0.1/` manda `127.0.0.1` como SNI e como
 `Host`, não casa com o `server_name` do app e cai no `default_server`, que fecha a conexão sem

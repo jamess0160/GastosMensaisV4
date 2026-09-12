@@ -121,6 +121,11 @@ JWT_SECRET=<a saída do openssl rand -base64 48>
 # RP_ID é o domínio NU (sem esquema, sem porta) e fica no apex: uma passkey do apex vale no www,
 # o contrário não. Errar qualquer um dos dois NÃO dá erro — a biometria só não funciona, e quem
 # cadastrou a digital descobre na hora de usar.
+#
+# ORIGIN é a origem EXATA, e a comparação é literal: um www a mais ou a menos é outra origem, e
+# o erro aparece no cadastro como `Unexpected registration response origin`. Ela combina com o
+# APP_URL e com o server_name do app em `deploy/proxy/nginx.conf` — os três dizem o CANÔNICO, que
+# é o www. O apex responde, e responde com um 301 para cá.
 WEBAUTHN_RP_ID=gastosmensais.com.br
 WEBAUTHN_RP_NAME=Gastos Mensais
 WEBAUTHN_ORIGIN=https://www.gastosmensais.com.br
@@ -238,6 +243,7 @@ docker compose exec api date          # precisa dizer -03. Se disser UTC, o tzda
 curl -s http://127.0.0.1/healthz      # "ok" — prova que o nginx de borda está de pé
 curl -sk --resolve www.gastosmensais.com.br:443:127.0.0.1      https://www.gastosmensais.com.br/api/Utils/Health
 curl -sI --resolve www.gastosmensais.com.br:80:127.0.0.1      http://www.gastosmensais.com.br/ | head -1        # 301
+curl -skI --resolve gastosmensais.com.br:443:127.0.0.1        https://gastosmensais.com.br/ | head -2           # 301 para o www
 ```
 
 **O `--resolve` não é firula, e sem ele a leitura fica errada.** Um `curl https://127.0.0.1/`
@@ -318,9 +324,14 @@ Force uma execução agora, sem esperar as 3h30:
 ```bash
 sudo systemctl start gastosmensais-backup
 journalctl -u gastosmensais-backup -n 50
-ls -lh /var/backups/gastosmensais/
+sudo ls -lh /var/backups/gastosmensais/
 systemctl list-timers gastosmensais-backup
 ```
+
+**O `sudo` do `ls` não é distração.** O diretório é `0700 root:root` porque o dump é o banco
+inteiro em claro, e sem ele a resposta é `Permission denied` — que se lê como "o backup falhou"
+quando é o contrário: é a permissão certa. Vale para todo acesso a `/var/backups/gastosmensais/`
+daqui em diante, inclusive os do [procedimento 5](#5-restaurar-o-backup).
 
 E **restaure esse primeiro dump** antes de considerar o backup existente: o ensaio geral do
 [procedimento 5](#5-restaurar-o-backup). Um backup nunca restaurado não é backup, é um arquivo
@@ -435,7 +446,7 @@ no mesmo `migrate:prod`, o rollback derruba as três. E migration que apaga colu
 um susto e um incidente:
 
 ```bash
-sudo systemctl start gastosmensais-backup && ls -lt /var/backups/gastosmensais/ | head -3
+sudo systemctl start gastosmensais-backup && sudo ls -lt /var/backups/gastosmensais/ | head -3
 ```
 
 ---
@@ -496,13 +507,19 @@ o banco inteiro é desfazer o trabalho de todos os outros usuários junto.
 Comece escolhendo o arquivo:
 
 ```bash
-DUMP=$(ls -1t /var/backups/gastosmensais/*.dump | head -1)
+DUMP=$(sudo sh -c 'ls -1t /var/backups/gastosmensais/*.dump | head -1')
 echo "$DUMP"
-docker compose exec -T db pg_restore --list < "$DUMP" | head   # prova que o arquivo está inteiro
+sudo cat "$DUMP" | docker compose exec -T db pg_restore --list | head   # prova que o arquivo está inteiro
 ```
 
 Um arquivo `.part` no diretório é um dump que **não terminou** — nunca o use. O `ls` acima só
 pega `.dump` de propósito.
+
+**Por que `sudo sh -c` e `sudo cat |`, e não `sudo ls` e `< "$DUMP"`.** O diretório é `0700
+root:root` (passo [1.8](#18-o-backup-só-no-servidor)), e quem expande o `*.dump` e quem abre o
+`<` é o **seu** shell, não o `sudo` — os dois falham com `Permission denied` antes de o Docker
+ser chamado. Daí o `sudo sh -c` (o glob roda como root) e o `sudo cat` (o arquivo é aberto como
+root e desce pelo cano). Todos os blocos abaixo seguem a mesma forma.
 
 ### 5.1 Ensaio geral, num banco descartável
 
@@ -510,7 +527,7 @@ pega `.dump` de propósito.
 
 ```bash
 docker compose exec -T db sh -c 'createdb -U "$POSTGRES_USER" gastosmensais_restore_test'
-docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d gastosmensais_restore_test --no-owner' < "$DUMP"
+sudo cat "$DUMP" | docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d gastosmensais_restore_test --no-owner'
 docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d gastosmensais_restore_test -c "select (select count(*) from \"Users\") as users, (select count(*) from \"Workspaces\") as workspaces, (select count(*) from \"Accounts\") as accounts, (select count(*) from \"Expenses\") as expenses, (select count(*) from \"ExpensePayments\") as pernas"'
 docker compose exec -T db sh -c 'dropdb -U "$POSTGRES_USER" gastosmensais_restore_test'
 ```
@@ -530,8 +547,8 @@ Restaurar por cima de uma tabela que existe exige **limpá-la antes** — o `pg_
 duplicadas:
 
 ```bash
-docker compose exec -T db pg_restore --list < "$DUMP"     # o que existe dentro do arquivo
-docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t Expenses --data-only' < "$DUMP"
+sudo cat "$DUMP" | docker compose exec -T db pg_restore --list     # o que existe dentro do arquivo
+sudo cat "$DUMP" | docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t Expenses --data-only'
 ```
 
 ### 5.3 O banco inteiro — o caso do desastre
@@ -543,7 +560,7 @@ tinha.
 ```bash
 docker compose stop api
 docker compose exec -T db sh -c 'dropdb -U "$POSTGRES_USER" "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
-docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < "$DUMP"
+sudo cat "$DUMP" | docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 docker compose start api
 docker compose logs --tail=50 api
 ```
@@ -593,7 +610,10 @@ produção, e nenhum deles é `npm test`.
 
 ### O navegador, no domínio real
 
-- [ ] `https://www.gastosmensais.com.br` abre, e o apex também;
+- [ ] `https://www.gastosmensais.com.br` abre, e o **apex redireciona** para ele — digitar
+      `gastosmensais.com.br` tem de acabar na barra de endereço com o `www`, não abrir o app no
+      apex. É a prova do canônico, e é dela que dependem a sessão (o cookie é host-only: no apex
+      seria outra) e a biometria (o `WEBAUTHN_ORIGIN` só tem o `www`);
 - [ ] **atualizar a página** em `/privacidade` devolve o app, não o 404 do nginx (é o `try_files`);
 - [ ] o cabeçalho `Content-Security-Policy` vem na resposta da página;
 - [ ] um arquivo de `/assets/` vem com `Cache-Control: immutable`, e o `index.html` **não**;
@@ -615,7 +635,9 @@ produção, e nenhum deles é `npm test`.
       `Frontend/deploy/nginx.conf` (que **repassa**, sem acrescentar salto). Confira o que a API
       enxerga pelo log de acesso do `proxy` antes de mexer em `trust proxy`;
 - [ ] o modo SSL da Cloudflare lê **Full (strict)**;
-- [ ] a biometria **cadastra e autentica** no domínio real (é a prova do `WEBAUTHN_RP_ID`).
+- [ ] a biometria **cadastra e autentica** no domínio real (é a prova do `WEBAUTHN_RP_ID` e do
+      `WEBAUTHN_ORIGIN`). `Unexpected registration response origin` aqui não é erro de código: é
+      a origem da barra de endereço não constando da lista — confira que você está no canônico.
 
 ### As duas imagens são do mesmo commit
 
