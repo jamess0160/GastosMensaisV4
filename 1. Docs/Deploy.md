@@ -1,7 +1,7 @@
 # Deploy — o runbook
 
 **Este documento não descreve o projeto, descreve a máquina.** Ele é o único do repositório
-escrito para ser lido às duas da manhã, com o app fora do ar: seis procedimentos, cada um uma
+escrito para ser lido às duas da manhã, com o app fora do ar: sete procedimentos, cada um uma
 sequência de comandos que se copia e cola, na ordem.
 
 O **porquê** de cada decisão não está aqui — está nos comentários dos arquivos que os comandos
@@ -22,6 +22,7 @@ explicação está lá; não a improvise no meio de um incidente.
 | [4. Ver o log](#4-ver-o-log) | "Deu erro e não sei o quê" |
 | [5. Restaurar o backup](#5-restaurar-o-backup) | Migration ruim, `delete` errado, banco perdido |
 | [6. A lista de fumaça](#6-a-lista-de-fumaça) | Depois de todo deploy grande, não só do primeiro |
+| [7. Abrir o banco no DBeaver](#7-abrir-o-banco-no-dbeaver) | Olhar dado de produção sem ser num incidente |
 
 ## Onde cada coisa mora
 
@@ -600,11 +601,22 @@ produção, e nenhum deles é `npm test`.
       e o porquê está no [passo 1.6](#16-a-migration);
 - [ ] o log **não** repete `relation "RotineRuns" does not exist` — se repetir, a migration não
       rodou;
-- [ ] **só a 80 e a 443 respondem do IP público.** As duas são do `proxy`, e nenhum outro
-      serviço publica porta: `docker compose ps` não mostra `->` em `db`, `api` nem `web`;
+- [ ] **só a 80 e a 443 respondem do IP público.** As duas são do `proxy`; `api` e `web` não
+      publicam nada, e o `db` publica **preso à loopback**. O `docker compose ps` tem de mostrar
+      exatamente isto, e o prefixo é o item que se confere:
+
+      ```
+      db      ...  127.0.0.1:5432->5432/tcp
+      proxy   ...  0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp
+      ```
+
+      Um `0.0.0.0:5432->5432/tcp` no `db` é **o banco na internet** — e o `ufw` não vai avisar,
+      porque o Docker escreve as regras dele antes das do `ufw`. Derrube o `db` na hora;
 - [ ] chegar pelo **IP nu** não serve o app: `curl -k --max-time 5 https://<ip público>/` fecha
       sem resposta (é o `default_server` devolvendo 444), e não devolve a página;
-- [ ] o Postgres **não** é alcançável de fora: `psql -h <ip do servidor> -p 5432` recusa;
+- [ ] o Postgres **não** é alcançável de fora: `psql -h <ip do servidor> -p 5432` recusa. Esta
+      é a prova do `127.0.0.1:` acima, e é a que não pode ser feita de dentro do servidor —
+      rode-a da sua máquina;
 - [ ] `docker compose down && docker compose up -d` preserva os dados — o volume `pgdata` é
       nomeado, e só um `-v` o apaga.
 
@@ -680,3 +692,122 @@ E um item que depende do calendário, e por isso fica pendurado: no **primeiro f
 da subida, abrir `GET /Reports/Month` sem parâmetro **às 22h do último dia do mês** e conferir
 que ele responde sobre o mês **corrente**, não o seguinte. É a única verificação daqui que não se
 pode antecipar.
+
+---
+
+## 7. Abrir o banco no DBeaver
+
+**Este é o único procedimento daqui que não é para um incidente.** Num incidente o caminho é o
+`docker compose exec db psql` — ele não depende de mais nada estar de pé, e é o que está nos
+procedimentos [3](#3-migration-e-rollback) e [5](#5-restaurar-o-backup). Este aqui é para o resto
+do tempo: conferir uma conta, entender um número, olhar dado.
+
+Ele é feito **uma vez**. Depois é abrir o DBeaver.
+
+### 7.1 O usuário só-leitura
+
+**Faça este passo antes do túnel, e não depois.** O risco maior aqui não é quem entra — é um
+`UPDATE` sem `WHERE` numa grade de GUI, às onze da noite. Este app não tem estado parcial: uma
+linha errada em `ExpensePayments` não dá erro, dá um saldo plausível.
+
+Gere a senha e crie o papel:
+
+```bash
+openssl rand -base64 24
+docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+```
+
+```sql
+CREATE ROLE dbeaver LOGIN PASSWORD '<a saída do openssl acima>';
+GRANT CONNECT ON DATABASE gastosmensais TO dbeaver;
+GRANT USAGE ON SCHEMA public TO dbeaver;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO dbeaver;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO dbeaver;
+```
+
+**O `psql` é com o `$POSTGRES_USER` de propósito, e o `ALTER DEFAULT PRIVILEGES` é a razão.**
+Ele só vale para as tabelas criadas pelo papel que o executa, e quem cria tabela aqui é o
+`DB_LOGIN` — o mesmo usuário com que o Knex roda as migrations. Rodado como outro papel, ele não
+dá erro: simplesmente não se aplica, e **toda tabela que uma migration futura criar nasce
+invisível** para o `dbeaver`. Você descobre meses depois, procurando uma tabela que "sumiu".
+
+Confira que ele lê e não escreve:
+
+```bash
+docker compose exec db psql -U dbeaver -d "$POSTGRES_DB" -c 'select count(*) from "Users"'
+docker compose exec db psql -U dbeaver -d "$POSTGRES_DB" -c 'delete from "Users"'   # tem de dar: permission denied
+```
+
+O segundo comando é o que prova o passo. Se ele apagar alguma coisa, pare tudo e vá para o
+[procedimento 5](#5-restaurar-o-backup).
+
+### 7.2 A porta, que já está no compose
+
+O `db` publica `127.0.0.1:5432:5432` — **preso à loopback da VPS**, e é o `docker-compose.yml`
+que traz o porquê. Só confirme, no servidor:
+
+```bash
+docker compose ps db        # 127.0.0.1:5432->5432/tcp, e não 0.0.0.0:5432->5432/tcp
+```
+
+Se o `git pull` de um deploy trouxe essa linha pela primeira vez, ela só passa a valer depois de
+recriar o container — e a API vai junto:
+
+```bash
+docker compose up -d db
+docker compose restart api
+```
+
+**O `restart api` não é excesso de zelo.** Recriar o `db` mata as conexões TCP que o pool do
+Knex já tinha abertas, e ele não descobre isso sozinho: as primeiras requisições depois do
+`up -d db` falham com erro de conexão, num app que "estava no ar". Reiniciar a API esvazia o pool
+de uma vez, e são os mesmos segundos de queda de todo deploy.
+
+**E prove da sua máquina que a porta não vazou** — esta é a verificação que não se pode fazer de
+dentro do servidor:
+
+```bash
+psql -h <ip da vps> -p 5432 -U dbeaver     # tem de recusar a conexão
+```
+
+### 7.3 O DBeaver
+
+Nova conexão PostgreSQL. Na aba **SSH**:
+
+| Campo | Valor |
+| --- | --- |
+| Use SSH Tunnel | marcado |
+| Host / Port | `<ip da vps>` / `22` |
+| User Name | `tiago` |
+| Authentication Method | `Public Key` |
+| Private Key | `C:\Users\tiago\.ssh\id_ed25519` |
+
+Na aba **Main**:
+
+| Campo | Valor |
+| --- | --- |
+| Host | `127.0.0.1` |
+| Port | `5432` |
+| Database | o `DB_SCHEMA` do `.env` da raiz |
+| Username / Password | `dbeaver` / a senha do passo 7.1 |
+
+**O `127.0.0.1` do Host é resolvido na VPS, não no seu Windows.** É o outro lado do túnel, e é o
+que confunde na primeira vez: o endereço que você digita ali é o que a *VPS* enxerga depois que o
+SSH já entrou. Escrever o IP da VPS nesse campo é pedir para o próprio servidor conectar no
+próprio IP público — onde, se o passo 7.2 está certo, não há nada escutando.
+
+Antes de salvar, em **General** → *Connection type*, escolha **Production**. Ele passa a exigir
+commit manual e a confirmar a execução de SQL, e pinta a conexão de vermelho na árvore — o que
+importa no dia em que a conexão de produção e a de desenvolvimento estiverem lado a lado.
+
+### 7.4 Quando precisar escrever
+
+Troque o usuário para o `DB_LOGIN` do `.env`, conscientemente, e **rode o backup antes**:
+
+```bash
+sudo systemctl start gastosmensais-backup && sudo ls -lt /var/backups/gastosmensais/ | head -3
+```
+
+É o mesmo cuidado do [procedimento 3](#3-migration-e-rollback), pela mesma razão: o que se
+desfaz aqui se desfaz pelo [procedimento 5](#5-restaurar-o-backup), e ele precisa de um dump
+recente para ser útil.

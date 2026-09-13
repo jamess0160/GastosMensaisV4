@@ -29,7 +29,7 @@ Vite. A saída errada, dos dois lados, é afrouxar o cookie.
 | --- | --- |
 | [1. Docs/RoadMap MVP.md](1.%20Docs/RoadMap%20MVP.md) | **O documento único.** O que existe em código hoje, o que falta para o MVP e o que ficou de fora com o porquê. **Leia antes de começar qualquer coisa** |
 | [1. Docs/Levas/](1.%20Docs/Levas/) | Um plano por leva, e o formato de um plano em [Levas/README.md](1.%20Docs/Levas/README.md) |
-| [1. Docs/Deploy.md](1.%20Docs/Deploy.md) | **O runbook.** O único documento que não descreve o projeto: descreve a máquina. Seis procedimentos — subir, atualizar, migrar e desfazer, ver o log, restaurar o backup, e a lista de fumaça. Escrito para ser lido com o app fora do ar |
+| [1. Docs/Deploy.md](1.%20Docs/Deploy.md) | **O runbook.** O único documento que não descreve o projeto: descreve a máquina. Sete procedimentos — subir, atualizar, migrar e desfazer, ver o log, restaurar o backup, a lista de fumaça, e abrir o banco no DBeaver. Escrito para ser lido com o app fora do ar |
 | [1. Docs/Old/](1.%20Docs/Old/) | Congelado em 09/09/2026: tudo que descrevia o projeto quando ele era dois repositórios. **Não é mantido** — vale pelo porquê das decisões, não pelo estado que descreve |
 
 Três documentos morreram na junção e **não devem ser recriados**:

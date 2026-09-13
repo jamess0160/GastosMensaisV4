@@ -5,8 +5,8 @@
 #  Este arquivo mora na **raiz** do repositório, e não dentro de `API/` ou de `Frontend/`,
 #  porque ele é a única peça do deploy que só existe porque os dois lados moram juntos: ele
 #  descreve a relação entre eles — quem resolve o nome de quem, quem espera por quem, e quais
-#  das portas chegam a existir fora da rede do compose (duas, as do `proxy`, e nenhuma das
-#  outras).
+#  das portas chegam a existir fora da rede do compose (duas no IP público, as do `proxy`; uma
+#  só na loopback do host, a do `db`; e nenhuma do `api` e do `web`).
 #
 #  **Subir e migrar são duas ações.** Não há `entrypoint` que rode a migration no boot: com o
 #  `restart: unless-stopped` abaixo, uma migration que falha viraria um container em laço de
@@ -25,15 +25,38 @@ services:
   #  rotina e um `docker compose down` que apaga o produto: o volume nomeado sobrevive ao
   #  `down`, ao `up` seguinte e à troca da imagem, e só morre quando alguém digita `-v`.
   #
-  #  **Sem `ports`.** O banco é alcançável apenas de dentro da rede do compose, pelo nome
-  #  `db`. Um Postgres publicado numa interface do host é o alvo que os scanners encontram
-  #  primeiro — e no Docker não basta o firewall do host achar que fechou a porta, porque o
-  #  daemon escreve as próprias regras no `iptables` antes das do `ufw`. Quem precisa de um
-  #  `psql` usa `docker compose exec db psql`.
   db:
     image: postgres:17-alpine
     restart: unless-stopped
 
+    #  -----------------------------------------------------------------------------------
+    #  A porta, e o prefixo que é o assunto inteiro desta linha
+    #  -----------------------------------------------------------------------------------
+    #
+    #  **`127.0.0.1:` não é detalhe de formatação — é a diferença entre uma porta na loopback
+    #  da VPS e um Postgres na internet.** Escrito `"5432:5432"`, o Docker publica em **todas**
+    #  as interfaces, inclusive o IP público, e o `ufw` não impede: o daemon escreve as próprias
+    #  regras no `iptables` **antes** das dele, então `ufw status` continua jurando que a porta
+    #  está fechada enquanto ela responde ao mundo. Um Postgres exposto é encontrado por scanner
+    #  em horas, e o banco é a única coisa aqui que não se recria a partir deste repositório.
+    #
+    #  O mesmo cuidado, pela mesma razão, está no `web` (que hoje não publica nada) e no
+    #  `proxy` (que publica de propósito, porque *é* a porta de entrada).
+    #
+    #  **Ela existe para o túnel SSH**, e só para ele: `db` continua sem ser alcançável de fora
+    #  da máquina. Quem abre um cliente gráfico no banco de produção — o DBeaver — faz SSH até a
+    #  VPS e encontra o Postgres em `127.0.0.1:5432` do outro lado do túnel. O procedimento, com
+    #  o usuário só-leitura que ele deve usar, está no `1. Docs/Deploy.md`.
+    #
+    #  **Isto não aposenta o `docker compose exec db psql`.** Ele continua sendo o caminho do
+    #  incidente, porque não depende de mais nada estar de pé — e é o que está escrito no
+    #  runbook, que é lido com o app fora do ar.
+    ports:
+      - "127.0.0.1:5432:5432"
+
+    #  **Volume nomeado, nunca anônimo.** É a diferença entre um `docker compose down` que é
+    #  rotina e um `docker compose down` que apaga o produto: o volume nomeado sobrevive ao
+    #  `down`, ao `up` seguinte e à troca da imagem, e só morre quando alguém digita `-v`.
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -239,9 +262,10 @@ services:
     restart: unless-stopped
 
     #  **Aqui o bind em todas as interfaces é o certo, e é a inversão da regra que vale para
-    #  todos os outros serviços deste arquivo.** `db`, `api` e `web` não publicam porta
-    #  nenhuma de propósito; este publica duas, porque ele *é* a porta de entrada. Não há
-    #  `127.0.0.1:` na frente porque quem precisa alcançá-lo é a Cloudflare, de fora.
+    #  todos os outros serviços deste arquivo.** `api` e `web` não publicam porta nenhuma, e o
+    #  `db` publica presa à loopback; este publica duas no IP público, porque ele *é* a porta de
+    #  entrada. Não há `127.0.0.1:` na frente porque quem precisa alcançá-lo é a Cloudflare, de
+    #  fora — e é a única linha deste arquivo de que isso é verdade.
     #
     #  **E é por isso que o `ufw` não é o que protege esta máquina.** O Docker escreve as
     #  próprias regras no `iptables` antes das do `ufw`: uma porta publicada aqui fica aberta
