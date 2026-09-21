@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Council · Preço e Marketing — App de Controle Financeiro</title>
+<style>
+  :root{
+    --bg:#ffffff; --fg:#16181d; --muted:#5d6470; --line:#e4e7ec; --soft:#f7f8fa;
+    --accent:#2f5eff; --warn:#b4530a; --ok:#0f7b4f; --danger:#b32020;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#111317; --fg:#e8eaee; --muted:#9aa3b1; --line:#282c34; --soft:#181b21;
+           --accent:#7f9dff; --warn:#e0913f; --ok:#4bbf8a; --danger:#f07070; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       line-height:1.6;font-size:16px}
+  .wrap{max-width:820px;margin:0 auto;padding:48px 24px 80px}
+  header{border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:36px}
+  .kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  h1{font-size:28px;line-height:1.25;margin:10px 0 14px;letter-spacing:-.02em}
+  h2{font-size:19px;margin:40px 0 12px;letter-spacing:-.01em;padding-top:8px}
+  h3{font-size:15px;margin:22px 0 6px}
+  p{margin:0 0 12px}
+  .q{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:16px 18px;font-size:14.5px;color:var(--muted)}
+  .q strong{color:var(--fg)}
+  .verdict{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;
+           padding:22px 24px;background:var(--soft);margin:8px 0 12px}
+  .verdict .big{font-size:22px;font-weight:650;letter-spacing:-.01em;margin-bottom:6px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0}
+  .card{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--soft)}
+  .card .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .card .val{font-size:20px;font-weight:650;margin-top:4px;letter-spacing:-.01em}
+  .card .sub{font-size:13px;color:var(--muted);margin-top:4px}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:14px 0}
+  .scroll{overflow-x:auto}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  td.adv{font-weight:600;white-space:nowrap}
+  .pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;
+        border:1px solid var(--line);background:var(--bg)}
+  .pill.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+  .pill.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+  .pill.bad{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,transparent)}
+  ul{margin:0 0 12px;padding-left:20px}
+  li{margin-bottom:7px}
+  details{border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:var(--soft)}
+  summary{cursor:pointer;padding:13px 16px;font-weight:600;font-size:14.5px;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸ ";color:var(--muted)}
+  details[open] summary::before{content:"▾ "}
+  details .body{padding:0 16px 16px;font-size:14.5px;color:var(--fg)}
+  .spectrum{border:1px solid var(--line);border-radius:10px;padding:18px 16px;background:var(--soft);margin:16px 0}
+  .bar{position:relative;height:3px;background:var(--line);border-radius:99px;margin:34px 8px 8px}
+  .tick{position:absolute;top:-30px;transform:translateX(-50%);text-align:center;font-size:12px;width:76px}
+  .tick .dot{display:block;width:9px;height:9px;border-radius:99px;background:var(--accent);margin:6px auto -6px;position:relative;top:24px}
+  .tick .n{font-weight:650;font-size:13px}
+  .tick .w{color:var(--muted);font-size:11px;display:block}
+  .unan{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+  footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+  .flag{border-left:3px solid var(--warn);padding-left:14px;margin:14px 0;font-size:14.5px}
+  code{background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">LLM Council · Veredito</div>
+  <h1>Preço de licença e orçamento de marketing<br>App de controle financeiro pessoal</h1>
+  <div class="q">
+    <strong>A pergunta:</strong> Desenvolvedor solo brasileiro construindo um app de controle financeiro pessoal (PF), simples,
+    multiusuário. Infra estimada em R$100–200/mês. Hipótese: licença de R$15–20/mês, ~10 assinantes cobrem a operação,
+    excedente vai para marketing e melhorias. Concorrência: Mobills, Organizze, Minhas Economias, YNAB, planilhas grátis
+    e apps de banco com gestão embutida. <strong>Decisões:</strong> (1) preço mensal; (2) % do faturamento em marketing inicial.
+  </div>
+</header>
+
+<h2>O veredito</h2>
+<div class="verdict">
+  <div class="big">R$29/mês · 0% em mídia paga</div>
+  <p style="margin-bottom:0;color:var(--muted)">
+    Anual a R$249 (≈R$20,75/mês). Plano casal/família R$45. Marketing pago só depois de retenção M3 ≥ 50%
+    em uma coorte de 30+ pagantes que você não conhece pessoalmente. Até lá o orçamento é <em>tempo</em>, não dinheiro.
+  </p>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="lbl">Preço individual</div>
+    <div class="val">R$29/mês</div>
+    <div class="sub">Anual R$249 · fundador R$19 travado 24 meses (não vitalício)</div>
+  </div>
+  <div class="card">
+    <div class="lbl">Plano casal</div>
+    <div class="val">R$45/mês</div>
+    <div class="sub">O único uso que banco não cobre e planilha cobre mal</div>
+  </div>
+  <div class="card">
+    <div class="lbl">Marketing agora</div>
+    <div class="val">0%</div>
+    <div class="sub">Unânime nos 5 conselheiros</div>
+  </div>
+  <div class="card">
+    <div class="lbl">Gatilho para ligar ads</div>
+    <div class="val">M3 ≥ 50%</div>
+    <div class="sub">Em coorte de 30+ pagantes desconhecidos</div>
+  </div>
+</div>
+
+<h2>Onde o conselho concorda</h2>
+<p>Cinco conselheiros pensando de ângulos opostos convergiram sozinhos em quatro pontos. Isso é sinal de alta confiança.</p>
+<ul>
+  <li><strong>“% do faturamento em marketing” é a pergunta errada — 5 de 5.</strong> 20% de R$200 é R$40. Isso compra ~15 cliques
+      e zero aprendizado. Percentual de faturamento é métrica de empresa que já tem faturamento; hoje você tem uma planilha.</li>
+  <li><strong>R$15–20 é o pior lugar do mercado — 4 de 5 subiram o preço.</strong> É preço de incumbente com 1/10 das features,
+      e barato atrai justamente quem mais cancela.</li>
+  <li><strong>“10 assinantes cobrem o custo” é uma armadilha.</strong> Cobrem o servidor, não o seu tempo. O risco não é
+      falir — é passar dois anos preso num projeto que nunca precisou provar nada.</li>
+  <li><strong>O gargalo não é preço, é atrito de entrada de dados.</strong> Ninguém abandona esses apps pela interface;
+      abandona porque digitar gasto por três semanas é insuportável. Enquanto for lançamento manual, você não compete
+      com R$19 — compete com “dá trabalho”, e o Nubank já resolve de graça.</li>
+</ul>
+
+<h2>Onde o conselho briga</h2>
+
+<div class="spectrum">
+  <div class="kicker" style="margin-bottom:4px">Posições de preço (equivalente mensal)</div>
+  <div class="bar">
+    <div class="tick" style="left:4%"><span class="n">R$9</span><span class="w">Outsider<br>(anual R$99–119)</span><span class="dot"></span></div>
+    <div class="tick" style="left:28%"><span class="n">R$19,90</span><span class="w">Executor</span><span class="dot"></span></div>
+    <div class="tick" style="left:50%"><span class="n">R$29</span><span class="w">Contrarian</span><span class="dot"></span></div>
+    <div class="tick" style="left:72%"><span class="n">R$39</span><span class="w">Expansionist</span><span class="dot"></span></div>
+    <div class="tick" style="left:95%"><span class="n">R$49–79</span><span class="w">1º Princípios<br>(troca o cliente)</span><span class="dot"></span></div>
+  </div>
+</div>
+
+<div class="spectrum">
+  <div class="kicker" style="margin-bottom:8px">Marketing pago agora</div>
+  <div class="unan">
+    <span class="pill ok">Contrarian 0%</span>
+    <span class="pill ok">1º Princípios 0%</span>
+    <span class="pill ok">Expansionist 0%</span>
+    <span class="pill ok">Outsider 0%</span>
+    <span class="pill ok">Executor 0%</span>
+    <span style="color:var(--muted);font-size:13px">— unanimidade rara</span>
+  </div>
+</div>
+
+<h3>Briga 1 — o preço</h3>
+<p>O Executor quer R$19,90 <em>hoje</em> para parar de pensar e começar a cobrar; o Expansionist quer R$39 porque
+“R$20 é uma promessa pequena”; o Outsider, falando como consumidor, diz que R$19,90/mês soa caro porque ele compara
+com Netflix, não com Mobills — e propõe anual barato. A revisão anônima derrubou o Outsider nesse ponto:
+R$99–119/ano é ≈R$9/mês, margem negativa assim que houver qualquer custo por usuário. E derrubou parte do Expansionist:
+premium de R$39 exige marca, que um dev sem nome ainda não tem.</p>
+
+<h3>Briga 2 — Open Finance é obrigatório ou é inviável?</h3>
+<p>Três conselheiros dizem que sem conexão automática de conta o produto é “planilha com login”. Mas <strong>três revisores
+independentes apontaram que Pluggy/Belvo exigem CNPJ, contrato e mínimo mensal na casa dos milhares</strong> — ou seja,
+a solução que salva o produto pode ser inacessível na fase atual. Essa é a incerteza mais cara da mesa e ela é
+resolvível com uma pergunta comercial, não com mais análise.</p>
+
+<h3>Briga 3 — para quem é isso?</h3>
+<p>PF genérica (hipótese original) vs. MEI/autônomo que mistura pessoal e empresarial e paga R$49–79 sem piscar
+vs. casal/família, que o Outsider disse que compraria “sem pensar no preço” e que o Expansionist aponta como o
+caso de uso de maior retenção do mercado — dois cônjuges nunca cancelam juntos.</p>
+
+<h2>Pontos cegos que só o peer review pegou</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>Achado</th><th>Impacto</th></tr></thead>
+  <tbody>
+    <tr><td class="adv">Pluggy/Belvo exigem CNPJ + mínimo mensal</td><td>Se confirmado, invalida a tese de Open Finance de três conselheiros e reordena todo o roadmap. <span class="pill bad">crítico</span></td></tr>
+    <tr><td class="adv">App store leva 15–30%</td><td>Se for app nativo, R$19,90 vira ~R$14 líquido antes do gateway. Reforça preço mais alto ou cobrança fora da loja.</td></tr>
+    <tr><td class="adv">Recorrência de cartão falha 10–15%/mês no Brasil</td><td>Corrói LTV já apertado. Exige dunning e PIX recorrente desde o dia 1.</td></tr>
+    <tr><td class="adv">Consentimento de Open Finance expira em 12 meses</td><td>Churn estrutural embutido — precisa de fluxo de renovação, não é “ligar e esquecer”.</td></tr>
+    <tr><td class="adv">“Founding member vitalício R$497” é passivo eterno</td><td>Receita única contra custo variável recorrente por conta conectada. <span class="pill bad">ideia morta</span></td></tr>
+    <tr><td class="adv">Nenhum conselheiro nomeou um canal</td><td>Cinco disseram “0% em ads” e “recrute 50 na mão”, nenhum disse <em>onde</em>. Unanimidade sem alternativa concreta.</td></tr>
+    <tr><td class="adv">Bus factor do dev solo</td><td>“Por que confiar meu dinheiro a alguém que pode sumir?” Exportação aberta de dados é feature de <em>vendas</em>, não de engenharia.</td></tr>
+    <tr><td class="adv">CNPJ, imposto e custo de cobrar</td><td>Gateway + tributo comem 10–15% da mensalidade, antes de qualquer marketing.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="flag">
+  <strong>Bandeira vermelha fora do escopo da pergunta, mas levantada pelo Contrarian:</strong> o app guarda dado financeiro de
+  terceiros e o próprio <code>CLAUDE.md</code> do projeto documenta chave e IV AES fixos em <code>Utils/criptManager.ts</code>.
+  Sob LGPD, dev solo não tem margem de erro aqui. Isso é anterior ao primeiro cliente pagante.
+</div>
+
+<h2>A recomendação</h2>
+<p><strong>Preço: R$29/mês, anual R$249, plano casal R$45.</strong> R$29 é o único ponto que sobrevive à aritmética:
+com CAC pago de R$50–150 e retenção mediana da categoria, R$18/mês dá economia unitária negativa no dia um, e R$39
+exige uma marca que você ainda não tem. R$29 fica acima do ruído gratuito, abaixo do YNAB, e deixa espaço para
+desconto sem virar brinquedo. Para os 100 primeiros, ofereça R$19 travado por <strong>24 meses</strong> — nunca vitalício.</p>
+
+<p><strong>Marketing: 0% do faturamento em mídia paga, e a métrica correta não é percentual — é gatilho.</strong>
+Substitua o orçamento em dinheiro por um orçamento em tempo: 40% da sua semana em distribuição, manualmente.
+Ligue ads apenas quando uma coorte de 30+ pagantes <em>que você não conhece</em> passar de 50% de retenção no mês 3.
+A partir daí, teto absoluto em reais (não percentual): CAC pago máximo de 40% do LTV bruto de 12 meses. O número de
+“20–40% da receita em marketing” existe, mas é de SaaS maduro — aplicá-lo agora é dividir zero por zero.</p>
+
+<p><strong>E o reenquadramento que o conselho fez e você deveria levar a sério:</strong> a decisão que realmente importa não é
+R$15 ou R$20 — é para quem. “Mais um app de gastos” não vence o app do banco em preço nenhum. “O lugar onde eu e minha
+esposa vemos a mesma conta” ou “o app do MEI que separa PF de PJ” vence — e o mesmo código serve os dois.</p>
+
+<h2>A primeira coisa a fazer</h2>
+<div class="verdict">
+  <div class="big">Pré-venda para 10 estranhos a R$29, esta semana.</div>
+  <p style="margin-bottom:0">
+    Landing page com o posicionamento escolhido (aposte em <em>casal/família</em>), checkout recorrente do Asaas ou Mercado Pago
+    com PIX, e cobrança de verdade — não lista de espera, não gratuito. Um único teste responde as duas perguntas do conselho
+    e mais uma que você não fez: se ninguém desconhecido paga R$29, o problema nunca foi preço nem marketing.
+  </p>
+</div>
+
+<h2>Os pareceres na íntegra</h2>
+
+<details>
+  <summary>O Contrarian — “o gargalo não é preço, é retenção”</summary>
+  <div class="body">
+    <p>Seus dois números escondem a pergunta que você está evitando: <strong>quantas pessoas que não são suas amigas usaram isso
+    por 90 dias seguidos?</strong> Se a resposta é zero, preço e marketing são decisões fictícias.</p>
+    <p>A falha fatal não é preço, é entrada manual de dados. Mobills e Organizze têm Open Finance — o gasto aparece sozinho.
+    O seu exige que a pessoa digite o pão de queijo. Apps de finanças pessoais perdem 60–80% dos usuários em 60 dias justamente
+    por isso. E o Nubank faz de graça, dentro do app onde o dinheiro já está. Quando você for buscar agregador (Pluggy, Belvo),
+    sua infra de R$100–200/mês vira R$1–3 por conta conectada por mês — a conta some.</p>
+    <p>“10 assinantes cobrem o custo” é uma armadilha psicológica. Cobre custo de servidor, não seu tempo. Você vai comemorar
+    R$180/mês e passar dois anos preso num projeto que nunca precisou provar nada.</p>
+    <p>Marketing como % do faturamento é raciocínio circular: 20% de R$180 são R$36. CAC de app financeiro no Brasil é R$50–150
+    pago. Com R$18/mês e retenção mediana de 4 meses, LTV bruto é R$72 — menos taxa de gateway, 10–15% de cartão recusado,
+    imposto. Economia unitária negativa no dia um.</p>
+    <p>E: você guarda dado financeiro de terceiros, sozinho, com auth própria e chave AES fixa no código. LGPD não perdoa dev solo.</p>
+    <p><strong>Se for cobrar: R$29, não R$15–20.</strong> Preço de incumbente com 1/10 das features é a pior posição do mercado, e barato
+    atrai quem mais cancela. <strong>Marketing: 0%</strong>, até 20 estranhos passarem de 60 dias com retenção acima de 40%.</p>
+  </div>
+</details>
+
+<details>
+  <summary>O Pensador de Primeiros Princípios — “não seja mais barato que o Mobills, seja para outra pessoa”</summary>
+  <div class="body">
+    <p>Você está precificando um produto que ainda não tem motivo para existir. As duas perguntas são consequências de uma
+    decisão que não foi tomada: para quem, e por que não o app do banco.</p>
+    <p><strong>1. “Infra = R$100–200/mês fixo.”</strong> Falso no momento em que você resolver o único problema real dessa categoria:
+    entrada de dados. Ninguém abandona Mobills por causa da interface — abandona porque digitar gasto por 3 semanas é insuportável.
+    A solução é Open Finance (Pluggy, Belvo), que cobra por conexão por usuário. Seu custo vira variável, R$5–15/usuário/mês.
+    A R$15 de preço, sua margem some. Se você não resolve entrada de dados, é planilha com login e perde para o grátis.
+    Essa é a decisão real — e ela define o preço, não o contrário.</p>
+    <p><strong>2. “10 assinantes cobrem a operação.”</strong> Cobrem a AWS, não você. R$200/mês contra um custo de oportunidade de
+    R$100+/hora de dev. Breakeven de verdade não é a fatura de infra, é o seu tempo. Defina o número mínimo abaixo do qual você
+    mata o projeto — algo como 150 assinantes pagantes em 12 meses — e trate qualquer coisa abaixo disso como sinal de encerramento,
+    não de “precisa de mais marketing”.</p>
+    <p><strong>3. “Marketing como % do faturamento.”</strong> 20% de R$300 é R$60. Métrica inexistente. Antes de retenção provada
+    (60%+ ativos no mês 3), o orçamento correto em mídia paga é R$0. Distribuição paga em tempo, não em caixa.</p>
+    <p><strong>Reenquadramento:</strong> PF genérica a R$15–20 é o pior segmento do Brasil — maior CAC, maior churn, substituto grátis
+    com dados melhores. MEI e autônomo misturam pessoal e empresarial, nenhum banco resolve, e pagam R$49–79 sem piscar.
+    Mesmo código, cliente diferente.</p>
+  </div>
+</details>
+
+<details>
+  <summary>O Expansionista — “R$20 não é barato, é uma promessa pequena”</summary>
+  <div class="body">
+    <p>Quem cobra R$15–20 está vendendo “onde foi meu dinheiro”. Isso o Nubank te dá de graça e o Mobills te dá com anúncio.
+    Você não ganha essa guerra e nem deveria querer.</p>
+    <p>Cobre R$39/mês. E justifique com a única coisa que os apps de banco estruturalmente não fazem: <strong>visão consolidada
+    entre instituições</strong>. Open Finance via Pluggy/Belvo custa por conexão, mas transforma o produto de “planilha bonita”
+    em “o único lugar onde eu vejo tudo”. Isso sustenta R$39 e mata a comparação com grátis.</p>
+    <p>Três alavancas que você já tem construídas e não está cobrando por:</p>
+    <ul>
+      <li><strong>Socket.io + cache multiusuário = plano casal.</strong> Finança compartilhada é o caso de uso com maior retenção
+      do mercado — dois cônjuges nunca cancelam junto. R$59/mês, e o CAC se divide por dois usuários.</li>
+      <li><strong>MEI/autônomo</strong> misturando PF e PJ. Segmento enorme, mal atendido, paga R$79 sem piscar porque o
+      concorrente mental é o contador.</li>
+      <li><strong>Founding member vitalício: R$497, 100 vagas.</strong> R$50k de caixa antes de você ter retenção provada.
+      Capital de risco sem diluição.</li>
+    </ul>
+    <p><strong>Marketing: 0% do faturamento.</strong> Percentual de R$200 é ruído. Sua moeda é tempo — 40% dele em distribuição.
+    Recrute os 50 primeiros à mão, um a um. Ads só depois que o mês 3 de retenção passar de 60%.</p>
+    <p>O maior risco aqui não é errar o preço para cima. É construir por 18 meses um produto de R$20 e descobrir que R$39
+    teria custado o mesmo trabalho.</p>
+  </div>
+</details>
+
+<details>
+  <summary>O Outsider — “eu já tenho isso de graça no Nubank”</summary>
+  <div class="body">
+    <p>Sou o cara que ia baixar esse app. Três coisas que travam antes de qualquer discussão de preço.</p>
+    <p><strong>Primeira: eu já tenho isso de graça.</strong> Abro o Nubank e vejo meus gastos por categoria, sem digitar nada.
+    Se o seu app me pede pra lançar despesa na mão, você não está competindo por R$19 — está competindo contra “dá trabalho”.
+    Preço nenhum resolve isso.</p>
+    <p><strong>Segunda: por que eu confiaria dinheiro a um app sem nome?</strong> Vou procurar quem é você, quantas pessoas usam,
+    o que acontece com meus dados. Não achando nada, fecho. Isso é anterior ao preço.</p>
+    <p><strong>Terceira: R$19,90/mês me soa caro</strong> porque eu comparo com Spotify e Netflix, não com Mobills. Um app que me
+    lembra que gastei demais custando o mesmo que meu entretenimento? Cancelo em fevereiro, junto com a academia.</p>
+    <p><strong>Preço:</strong> cobre anual, R$99–119, pago de uma vez. Controle financeiro é promessa de Ano Novo — eu pago animado
+    em janeiro e esqueço. No mensal eu desisto no terceiro mês e você nunca vê retenção real.</p>
+    <p><strong>Marketing: 0% agora.</strong> Anúncio de app financeiro feito por desconhecido cheira a golpe. Você compraria?
+    Gaste tempo, não dinheiro: coloque 30 pessoas reais usando e pergunte por que voltaram.</p>
+    <p><strong>O que eu compraria de verdade:</strong> o app onde eu e minha esposa vemos a mesma conta. Isso o Nubank não faz.
+    Isso a planilha faz mal. Se o produto for “financeiro do casal/família”, eu pago sem pensar no preço. Se for “mais um app
+    de gastos”, nenhum preço funciona.</p>
+  </div>
+</details>
+
+<details>
+  <summary>O Executor — “seu risco não é o preço, é nunca ter cobrado de ninguém”</summary>
+  <div class="body">
+    <p><strong>Preço: R$19,90/mês, com anual a R$179 (25% off). Decida hoje e pare de pensar nisso.</strong></p>
+    <p>Os R$9,90 são armadilha: mesmo esforço de suporte, metade da receita, e sinaliza “brinquedo” contra Mobills/Organizze.
+    R$19,90 fica abaixo do YNAB e acima do ruído gratuito. E o anual é o que importa — ele resolve seu caixa de infra por
+    12 meses de uma vez e mata o churn mensal por esquecimento.</p>
+    <p><strong>Marketing como % do faturamento: zero, porque a conta não existe.</strong> Com 10 assinantes você fatura R$200/mês.
+    20% disso é R$40. R$40 não compra nada em ads — compra 15 cliques e nenhum dado. Percentual de faturamento é métrica de
+    empresa com faturamento. Você tem uma planilha.</p>
+    <p>O que fazer na segunda-feira:</p>
+    <ul>
+      <li><strong>Checkout antes de qualquer feature.</strong> Asaas ou Mercado Pago com assinatura recorrente e PIX. Um dia de
+      trabalho. Sem isso, tudo o resto é hobby.</li>
+      <li><strong>Importação de OFX/CSV.</strong> Ninguém migra de planilha ou do Mobills digitando 6 meses de lançamento à mão.
+      Se seu app não importa extrato, seu preço é irrelevante — não há venda.</li>
+      <li><strong>Trinta pessoas, na mão.</strong> Grupos de WhatsApp, comunidades de finanças, seu círculo. Cobre desde o primeiro.
+      Gratuito não valida nada.</li>
+      <li><strong>Teto fixo de R$300/mês em ads</strong>, e só depois de 3 meses com retenção acima de 70%.</li>
+    </ul>
+    <p>Seu risco real não é ancorar preço errado. É construir seis meses e nunca ter cobrado de ninguém.</p>
+  </div>
+</details>
+
+<h2>Rodada de revisão cruzada</h2>
+<details>
+  <summary>Destaques do peer review anônimo (5 revisores)</summary>
+  <div class="body">
+    <p><strong>Resposta mais forte: 5 votos de 5 para o Pensador de Primeiros Princípios.</strong> Unanimidade absoluta.
+    Razão dada repetidamente: é a única que ataca a <em>premissa</em> em vez do número — mostra que “infra fixa de R$100–200”
+    morre no instante em que você resolve entrada de dados, e substitui “% de marketing” por um critério de morte verificável
+    (150 assinantes pagantes em 12 meses). “Entrega decisão, não só diagnóstico.”</p>
+    <p><strong>Maiores pontos cegos apontados:</strong></p>
+    <ul>
+      <li><strong>Executor (3 votos):</strong> “É a mais acionável e por isso a mais perigosa.” Manda travar R$19,90 e partir para
+      checkout sem perguntar se o produto tem razão de existir contra o app do banco. Teto de R$300/mês em ads com CAC de
+      R$50–150 compra de 2 a 6 usuários — não é orçamento, é ruído. E OFX/CSV é curativo: quem exporta OFX manualmente já é
+      quem usa planilha.</li>
+      <li><strong>Outsider (1 voto):</strong> ótima etnografia, mas o anual de R$99–119 equivale a ~R$9/mês — exatamente a faixa
+      que outros dois conselheiros provam ser margem negativa. Confunde “o que eu pagaria hoje” com “o que sustenta o produto”,
+      e o anual antecipado esconde churn por 12 meses.</li>
+      <li><strong>Expansionist (1 voto):</strong> “founding member vitalício” é passivo eterno de suporte e infra por conta
+      conectada — receita única contra custo recorrente. E assume que um dev sem marca consegue ancorar premium, exatamente
+      o que o Outsider demole.</li>
+    </ul>
+    <p><strong>O que todos os cinco deixaram passar (consolidado):</strong> viabilidade contratual de Pluggy/Belvo (CNPJ, contrato,
+    mínimo mensal na casa dos milhares — citado por 3 revisores independentes); corte de 15–30% de app store; falha de recorrência
+    de cartão de 10–15%/mês no Brasil; expiração anual do consentimento de Open Finance como churn estrutural; CNPJ, tributação e
+    teto do MEI; plano de saída/exportação de dados como argumento de venda contra o bus factor do dev solo; e — o mais notável —
+    cinco “0% em marketing” sem ninguém nomear <em>qual canal</em> substitui a mídia paga (comunidades de planilha, finfluencers,
+    ASO, ou distribuição B2B2C via contadores, que derrubaria o CAC que todos citam como fatal).</p>
+  </div>
+</details>
+
+<footer>
+  Conselho realizado em 31 de julho de 2026 · 5 conselheiros independentes, 5 revisões cruzadas anônimas, 1 síntese.<br>
+  Pauta: preço mensal da licença e percentual de faturamento em marketing inicial — app de controle financeiro pessoal, Brasil.<br>
+  Transcrição completa em <code>council/council-transcript-2026-07-31.md</code>.
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Council — 03/08/2026 · Gastos Mensais</title>
+<style>
+  :root{
+    --bg:#ffffff; --fg:#16181d; --muted:#6b7280; --line:#e5e7eb; --soft:#f7f8fa;
+    --accent:#2f5fd0; --ok:#0f7b52; --warn:#b45309; --bad:#b42318;
+    --c1:#b42318; --c2:#6d28d9; --c3:#0f7b52; --c4:#b45309; --c5:#1d4ed8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    line-height:1.62;font-size:16px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+  header{border-bottom:2px solid var(--fg);padding-bottom:20px;margin-bottom:36px}
+  .kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  h1{font-size:30px;line-height:1.2;margin:10px 0 6px;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:15px}
+  h2{font-size:21px;margin:44px 0 14px;letter-spacing:-.01em;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:16px;margin:26px 0 8px}
+  p{margin:0 0 14px}
+  ul{margin:0 0 14px;padding-left:22px}
+  li{margin-bottom:9px}
+  a{color:var(--accent)}
+  code{background:var(--soft);padding:1px 5px;border-radius:4px;font-size:13.5px}
+  .q{background:var(--soft);border-left:3px solid var(--fg);padding:16px 20px;border-radius:0 6px 6px 0;margin-bottom:8px}
+  .q p{margin:0;font-size:15px}
+  .q .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px}
+
+  .headline{border:2px solid var(--fg);border-radius:10px;padding:22px 24px;margin:28px 0 8px;background:var(--soft)}
+  .headline .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .headline p{margin:8px 0 0;font-size:17px;line-height:1.5}
+
+  table{width:100%;border-collapse:collapse;font-size:14.5px;margin:0 0 18px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--soft);font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .scroll{overflow-x:auto;margin-bottom:18px}
+
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;letter-spacing:.03em;white-space:nowrap}
+  .p-ok{background:#e7f5ee;color:var(--ok)}
+  .p-bad{background:#fdeceb;color:var(--bad)}
+  .p-warn{background:#fdf3e3;color:var(--warn)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0 24px}
+  .stat{border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:var(--soft)}
+  .stat .n{font-size:24px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+  .stat .l{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.4}
+
+  .spectrum{border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:24px}
+  .srow{display:grid;grid-template-columns:minmax(130px,1.1fr) 2fr;gap:0;border-bottom:1px solid var(--line)}
+  .srow:last-child{border-bottom:0}
+  .srow > div{padding:11px 14px}
+  .srow .who{background:var(--soft);font-weight:600;font-size:14px;border-right:1px solid var(--line)}
+  .srow .pos{font-size:14px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:7px;vertical-align:middle}
+
+  details{border:1px solid var(--line);border-radius:8px;margin-bottom:10px;overflow:hidden}
+  details[open]{background:#fcfcfd}
+  summary{cursor:pointer;padding:13px 16px;font-weight:600;font-size:15px;list-style:none;display:flex;align-items:center;gap:10px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";margin-left:auto;color:var(--muted);font-weight:400;font-size:19px;line-height:1}
+  details[open] summary::after{content:"–"}
+  summary:hover{background:var(--soft)}
+  .body{padding:4px 20px 18px;font-size:15px;border-top:1px solid var(--line)}
+  .body p:first-child{margin-top:14px}
+
+  .flag{border:1px solid var(--warn);background:#fffaf0;border-radius:8px;padding:16px 20px;margin:18px 0 24px}
+  .flag .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--warn);font-weight:700;margin-bottom:6px}
+  .flag p:last-child{margin-bottom:0}
+
+  .first{border:2px solid var(--accent);border-radius:10px;padding:22px 24px;margin:22px 0}
+  .first .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .first h3{margin:8px 0 12px;font-size:19px}
+  .first ol{margin:0;padding-left:20px}
+  .first li{margin-bottom:10px;font-size:15px}
+  .first li em{color:var(--muted);font-style:normal;font-size:13.5px;display:block;margin-top:2px}
+
+  footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  @media (max-width:640px){
+    .wrap{padding:32px 16px 64px} h1{font-size:24px}
+    .srow{grid-template-columns:1fr} .srow .who{border-right:0;border-bottom:1px solid var(--line)}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">LLM Council · Terceiro conselho · 03 de agosto de 2026</div>
+  <h1>Gastos Mensais — entendimento, trial, indicação e afiliados</h1>
+  <div class="sub">5 conselheiros independentes · 5 revisões cruzadas anônimas · 1 síntese do Chairman</div>
+</header>
+
+<div class="q">
+  <div class="lbl">A pergunta trazida ao conselho</div>
+  <p>Avaliar o <em>Entendimento</em> registrado nas notas de 02/08 e responder três perguntas novas: (1) trial de 30 dias com primeiro mês grátis após validar o pagamento; (2) programa de indicação entre usuários com 25% off dos dois lados; (3) programa de afiliados para contadores e coaches financeiros com comissão de 25% sobre 3 meses.</p>
+</div>
+
+<div class="headline">
+  <div class="lbl">O veredito em uma frase</div>
+  <p><strong>4 dos 6 itens do seu entendimento estão corretos</strong> — mas o item 5 (Mercado Livre em vez de Asaas) compara produtos diferentes e troca R$1,90/mês por R$160 de LTV por cliente. <strong>As três perguntas são todas de aquisição, e você ainda não tem o que adquirir.</strong> A integração Open Finance não existe.</p>
+</div>
+
+<div class="grid">
+  <div class="stat"><div class="n">4 / 5</div><div class="l">votos: o <strong>Contrarian</strong> foi o parecer mais forte</div></div>
+  <div class="stat"><div class="n">5 / 5</div><div class="l">votos: o <strong>Expansionista</strong> teve o maior ponto cego</div></div>
+  <div class="stat"><div class="n">5 / 5</div><div class="l">revisores pegaram a mesma falha do conselho inteiro</div></div>
+  <div class="stat"><div class="n">1 de 4</div><div class="l">perguntas do conselho anterior de fato respondidas pela Polp</div></div>
+</div>
+
+<h2>Onde o conselho concorda</h2>
+<ul>
+  <li><strong>O item 5 está errado — 4 de 4 que tocaram no tema.</strong> Os R$1,99 do Asaas são tarifa de <em>Pix avulso</em>, não de Pix Automático. Você comparou uma tarifa fixa com uma taxa percentual e ignorou o custo dominante: falha involuntária de cartão, 10–15%/mês. Em LTV: Pix a 5% de churn = <strong>R$274/cliente</strong>; cartão a 12% somado = <strong>R$114</strong>. A escolha que importa não é Asaas vs Mercado Pago — é <strong>Pix Automático vs assinatura no cartão</strong>. Os dois gateways já oferecem Pix Automático.</li>
+  <li><strong>Você declarou a incerteza resolvida com 1 de 4 respostas — 4 de 5.</strong> A resposta que veio (por consentimento) destrava o preço. Mas a pergunta que define o break-even era a 4: <em>existe mínimo mensal?</em> Com piso contratual, break-even ≈ 16–18. Sem piso, o único custo fixo é a VM e o break-even é <strong>5 assinantes</strong>.</li>
+  <li><strong>As três perguntas são de aquisição, e não há o que adquirir — 4 de 5.</strong> Trial, referral e afiliados distribuem um produto que não roda.</li>
+  <li><strong>"Compartilhar acesso no plano base" tem que sair do lançamento.</strong> Em código é multi-tenancy: todo <code>WHERE user_id</code> vira <code>WHERE workspace_id</code>, mais tabela de membros, convite e permissões — <strong>5 a 8 dias</strong>. Em negócio, é o plano casal que você descartou, entregue de graça a quem mais pagaria.</li>
+  <li><strong>Trial de 30 dias: não — 4 de 5.</strong> Empurra o gate de retenção do mês 3 para o mês 4; cada trialista queima R$4–12 de consentimento real; e o cliente esquece e fica com raiva da cobrança que não viu chegar.</li>
+</ul>
+
+<h2>Onde o conselho briga</h2>
+
+<div class="spectrum">
+  <div class="srow"><div class="who">Preço do add-on</div><div class="pos"><strong>Contrarian:</strong> R$9,90 ÷ R$4 = 2,475x bruto; depois de gateway e imposto, <strong>1,95x</strong> — abaixo da sua própria regra de 2,5x. Exige R$12,90.<br><strong>Outsider:</strong> R$19,90 + 9,90 + 9,90 = <strong>R$39,70</strong> e eu fecho a página.<br><em>Os dois estão certos — o problema é a estrutura, não o número.</em></div></div>
+  <div class="srow"><div class="who">Duração do trial</div><div class="pos"><strong>Expansionista (voz isolada):</strong> 30 dias, porque o "aha" deste produto é o <em>fechamento do mês</em> e 14 dias não entregam isso.<br><strong>Contrarian / Outsider:</strong> 14 dias. <strong>Primeiros Princípios:</strong> 7 dias + reembolso de 30.<br><em>A briga tem uma saída que ninguém viu — ver recomendação.</em></div></div>
+  <div class="srow"><div class="who">Afiliados</div><div class="pos"><strong>Contrarian:</strong> mate agora. <strong>Expansionista:</strong> vire revenda, painel do contador a R$9,90/cliente.<br><strong>Revisor 1 derruba mecanicamente:</strong> consentimento de Open Finance é <strong>por CPF do titular, autenticado no app do banco dele</strong>. O contador não pode consentir pelos 80 clientes.</div></div>
+</div>
+
+<h3>Posições lado a lado</h3>
+<div class="spectrum">
+  <div class="srow"><div class="who"><span class="dot" style="background:var(--c1)"></span>Contrarian</div><div class="pos">Add-on R$12,90 · trial 14d · referral só após 30 pagantes · afiliados: matar</div></div>
+  <div class="srow"><div class="who"><span class="dot" style="background:var(--c2)"></span>Primeiros Princípios</div><div class="pos">Break-even pode ser 5, não 16 · trial 7d + reembolso · tudo depois do gate M3 · 3 parceiros a dedo</div></div>
+  <div class="srow"><div class="who"><span class="dot" style="background:var(--c3)"></span>Expansionista</div><div class="pos">2 conexões no base · trial 30d (e 60 no anual) · 1 mês grátis nos dois lados · revenda B2B</div></div>
+  <div class="srow"><div class="who"><span class="dot" style="background:var(--c4)"></span>Outsider</div><div class="pos">Não entendi o preço · o bloqueio é <strong>confiança</strong>, não preço · não mando link por R$5 · desconfio do contador</div></div>
+  <div class="srow"><div class="who"><span class="dot" style="background:var(--c5)"></span>Executor</div><div class="pos">R$1,99 confirmado; 0,22–0,35% <strong>não</strong> confirmado · trial ~0 dias, referral 3–4, afiliados 5–7 · faça Open Finance</div></div>
+</div>
+
+<h2>O ponto cego que só a revisão cruzada pegou</h2>
+
+<div class="flag">
+  <div class="lbl">Convergência de 5 de 5 revisores</div>
+  <p><strong>Nenhum dos cinco conselheiros tratou o ciclo de vida do consentimento.</strong> No Open Finance o consentimento <strong>expira em até 12 meses</strong> e exige reautenticação no banco. Isso atinge o modelo em três frentes:</p>
+  <ul>
+    <li><strong>Churn silencioso.</strong> É o maior matador de retenção da categoria — o app simplesmente para de atualizar e o cliente cancela.</li>
+    <li><strong>Custo desconhecido na renovação.</strong> Você não sabe se a Polp cobra por consentimento <em>criado</em> ou <em>ativo</em>. Se renovação conta como novo, seu custo por cliente dobra no aniversário.</li>
+    <li><strong>Vazamento de caixa puro.</strong> Se um cliente cancela e você não revoga o consentimento no offboarding, você continua pagando <strong>R$4/mês por ex-cliente, para sempre</strong>. É uma rotina de meia hora que precisa existir antes do primeiro cliente.</li>
+  </ul>
+</div>
+
+<p>Outros pontos cegos levantados na revisão:</p>
+<ul>
+  <li><strong>Enforcement de contagem de conexões.</strong> Sem trava técnica no dia 1, o cliente do plano base conecta 3 bancos e paga por 1 — margem real cai de R$13,70 para <strong>R$1,70</strong>.</li>
+  <li><strong>Os 0,22–0,35% do Pix Automático nunca foram confirmados.</strong> Vieram do conselho de 02/08; três conselheiros os trataram como fato. O Executor foi o único a verificar e não achou fonte.</li>
+  <li><strong>Pix Automático depende do banco do pagador ter aderido.</strong> Precisa de fallback.</li>
+  <li><strong>Teto do MEI (~R$81k/ano)</strong> e exigência de CNPJ da Polp continuam sem resposta.</li>
+  <li><strong>Alternativa nunca considerada:</strong> validar disposição a pagar com importação OFX/CSV em ~2 semanas, antes de comprometer 6 em Open Finance. Se ninguém importa um extrato, ninguém conecta um banco.</li>
+</ul>
+
+<h2>Avaliação do seu entendimento</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th style="width:34%">Item registrado</th><th style="width:14%">Veredito</th><th>Por quê</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1.</strong> Break-even 14–17; meta de 150 morta</td><td><span class="pill p-warn">Parcial</span></td><td>Meta morta: <strong>correto</strong>. O número <strong>não está confirmado</strong> — pode ser 5 (sem piso) ou 18 (com piso e tarifa de R$1,99). Falta a pergunta do mínimo mensal.</td></tr>
+    <tr><td><strong>2.</strong> Polp cobra por consentimento, com escala de volume</td><td><span class="pill p-ok">Correto</span></td><td>É o destravamento da mesa e resolve a maior incerteza do conselho anterior. Incompleto: falta saber o que <em>conta</em> como consentimento e se renovação rebilha.</td></tr>
+    <tr><td><strong>3.</strong> R$19,90 (1 conexão) + R$9,90/adicional, com acesso compartilhado no base</td><td><span class="pill p-warn">Parcial</span></td><td>Direção certa (bate com o ramo "por conexão" do conselho de 02/08), execução errada: add-on abaixo da sua regra de 2,5x, e acesso compartilhado é o plano casal de graça + 5–8 dias de refactor.</td></tr>
+    <tr><td><strong>4.</strong> Sem plano gratuito</td><td><span class="pill p-ok">Correto</span></td><td>Consistente com o conselho anterior. Mas a objeção real do cliente não é preço — é <strong>confiança</strong>, e free não resolve isso.</td></tr>
+    <tr><td><strong>5.</strong> Mercado Livre porque o Asaas cobra R$1,99 por Pix</td><td><span class="pill p-bad">Errado</span></td><td>Comparação de produtos diferentes. A decisão real é Pix Automático vs cartão — e cartão custa 10–15%/mês de falha involuntária, ~R$160 de LTV por cliente.</td></tr>
+    <tr><td><strong>6.</strong> Nota "Como calcular churn"</td><td><span class="pill p-ok">Correto</span></td><td>Sólida, e já inclui consentimento expirado como categoria estrutural de churn — que é exatamente o ponto cego que a revisão cruzada elegeu.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>A recomendação</h2>
+
+<h3>Preço — mude o eixo, não o número</h3>
+<div class="headline">
+  <div class="lbl">Estrutura recomendada</div>
+  <p><strong>Um plano só: R$29,90/mês, até 3 conexões incluídas. Conexão além da terceira: R$12,90.</strong></p>
+</div>
+<div class="scroll">
+<table>
+  <thead><tr><th>Cenário de uso</th><th>Receita</th><th>Custo OF</th><th>Gateway + imposto</th><th>Margem</th></tr></thead>
+  <tbody>
+    <tr><td>1 conexão (caso comum no início)</td><td>R$29,90</td><td>R$4,00</td><td>~R$3,79</td><td><strong>R$22,11</strong></td></tr>
+    <tr><td>2 conexões</td><td>R$29,90</td><td>R$8,00</td><td>~R$3,79</td><td><strong>R$18,11</strong></td></tr>
+    <tr><td>3 conexões (pior caso)</td><td>R$29,90</td><td>R$12,00</td><td>~R$3,79</td><td><strong>R$14,11</strong></td></tr>
+    <tr><td><em>Comparação: R$19,90 com 1 conexão</em></td><td><em>R$19,90</em></td><td><em>R$4,00</em></td><td><em>~R$3,19</em></td><td><em>R$12,71</em></td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li><strong>A margem melhora em todos os cenários</strong> — inclusive no pior. Você deixa de ter um upsell que destrói margem.</li>
+  <li><strong>O Outsider entende em 2 segundos</strong> e o preço não muda quando ele conecta o segundo banco. A objeção dele nunca foi o nível do preço — foi não saber quanto ia pagar.</li>
+  <li><strong>Resolve o enforcement:</strong> um teto de 3 é uma trava simples e generosa, em vez de metering por unidade que vaza margem se mal implementado.</li>
+  <li><strong>O add-on respeita sua regra:</strong> R$12,90 líquido ≈ R$10,20 sobre custo de R$4 = <strong>2,55x</strong>.</li>
+  <li><strong>Um plano só porque você tem zero clientes.</strong> Segmentar antes de ter dado de uso é otimização prematura.</li>
+  <li><strong>Corte do lançamento:</strong> acesso compartilhado. Volta quando um cliente pagante pedir.</li>
+</ul>
+
+<h3>Pergunta 1 — Trial</h3>
+<p><strong>14 dias com tudo ligado e pagamento autorizado no cadastro. Não 30.</strong> Mas o Expansionista tem razão sobre o "aha", e a solução não é esticar o trial: <strong>o Open Finance devolve até 12 meses de histórico de transações na primeira sincronização</strong>. Você entrega o fechamento de mês — na verdade, de vários meses — <strong>no minuto 1</strong>, não no dia 30. Isso mata a única boa razão para os 30 dias.</p>
+<p>Três obrigações que o Outsider deixou explícitas, sem as quais o trial com pagamento autorizado gera raiva e chargeback: <strong>aviso por e-mail 3 dias antes da primeira cobrança</strong>, <strong>botão de cancelar em 2 cliques</strong>, e a frase <em>"cancele quando quiser"</em> visível já na tela de cadastro.</p>
+
+<h3>Pergunta 2 — Indicação entre usuários</h3>
+<p><strong>A mecânica está errada e o timing também.</strong> Não construa antes de <strong>30 pagantes e do gate de 50% de retenção no mês 3</strong>. Referral é multiplicador: com zero clientes, multiplica zero.</p>
+<p>Quando construir, <strong>não use 25% off</strong>. O Outsider é literal: <em>"não queimo minha imagem por cinco reais"</em> — e desconto percentual comunica que seu preço é inflado. Use <strong>1 mês grátis para os dois</strong>: custo real ~R$8 de consentimento, CAC efetivo ~R$24 contra teto de R$76–120, e o preço de tabela fica intacto. Duas travas obrigatórias: o crédito do indicador só libera <strong>após o primeiro pagamento confirmado</strong> do indicado, e trave por CPF contra autoindicação.</p>
+
+<h3>Pergunta 3 — Afiliados (contadores e coaches)</h3>
+<p><strong>Não faça um programa. Faça 5 conversas.</strong> A comissão de 25% por 3 meses (R$22,43 no preço novo) não move um contador, e o programa custa 5–7 dias de código mais painel, contrato, nota fiscal e retenção de imposto. Pior: a versão "revenda" é <strong>mecanicamente impossível</strong> — o consentimento de Open Finance é dado pelo titular, autenticado no app do banco dele; o contador não consente por ninguém.</p>
+<p>O que funciona agora: escolha <strong>3 a 5 parceiros a dedo</strong>, dê um <strong>cupom manual</strong> (planilha, zero código), pague por Pix na mão. E resolva o problema que o Outsider levantou: <strong>declare a comissão na página</strong> — <em>"seu contador recebe uma comissão por esta indicação"</em>. Descoberta depois, ela destrói a confiança nos dois; declarada antes, vira sinal de transparência num produto que pede acesso à conta bancária.</p>
+
+<div class="flag">
+  <div class="lbl">A objeção que nenhuma das três perguntas endereça</div>
+  <p>O Outsider não travou no preço — travou em <strong>confiança</strong>: <em>"você tá me pedindo pra conectar minha conta bancária num app sem marca e sem review"</em>. Nenhum trial, desconto ou comissão resolve isso. O que resolve: CNPJ visível, política de privacidade e LGPD na página, o nome e o rosto de quem fez, o selo do Open Finance, e as primeiras 20 avaliações. Isso é trabalho de landing page, não de billing — e vale mais que os três mecanismos somados.</p>
+</div>
+
+<h2>A primeira coisa a fazer</h2>
+<div class="first">
+  <div class="lbl">Uma coisa só</div>
+  <h3>Termine o e-mail para a Polp. Hoje. Ele ficou pela metade e está bloqueando tudo.</h3>
+  <p>Você fez 1 das 4 perguntas do conselho anterior. Agora são 7 — e as três últimas são novas, vindas unanimemente da revisão cruzada:</p>
+  <ol>
+    <li>Existe <strong>mínimo mensal, fidelidade ou prazo de contrato</strong>? Os R$160 são piso ou mensalidade de plataforma?<em>decide se seu break-even é 5 ou 18</em></li>
+    <li>Vocês são <strong>participante autorizado do Open Finance pelo BCB (AISP)</strong>? Qual o número de autorização — ou operam sobre outro provedor?<em>decide se as 6 semanas de integração valem alguma coisa</em></li>
+    <li>Exige <strong>CNPJ</strong>? Qual porte?</li>
+    <li>Quais <strong>instituições</strong> estão cobertas e qual o <strong>SLA</strong>?</li>
+    <li><strong>O que conta como 1 consentimento?</strong> Conta bancária, instituição, ou produto — conta corrente e cartão do mesmo banco são 1 ou 2?<em>decide o texto da sua tela de preço</em></li>
+    <li><strong>Renovação de consentimento conta como um novo consentimento cobrado?</strong><em>decide se seu custo por cliente dobra no aniversário</em></li>
+    <li><strong>Consentimento revogado ou expirado para de ser cobrado imediatamente?</strong><em>decide se você vai pagar R$4/mês por ex-clientes para sempre</em></li>
+  </ol>
+  <p style="margin:14px 0 0">São 20 minutos de escrita e definem: seu break-even, seu preço de add-on, o texto da sua página, e se o fornecedor existe. Comece a integração Open Finance na segunda <strong>independentemente</strong> — mas mande o e-mail antes, porque a resposta da pergunta 2 pode zerar as 6 semanas.</p>
+</div>
+
+<h2>Pareceres completos</h2>
+
+<details>
+<summary><span class="dot" style="background:var(--c1)"></span>O Contrarian <span class="pill p-ok" style="margin-left:auto">Mais forte · 4 de 5 votos</span></summary>
+<div class="body">
+<p><strong>O entendimento tem três erros e uma falsa sensação de resolução.</strong></p>
+<p>Você declarou a incerteza resolvida tendo respondido 1 de 4 perguntas. A pergunta 4 (mínimo mensal) é a que define seu break-even, não a 1. Se os R$160 são piso contratual, break-even = 16. Se não há piso, seu custo fixo é R$60 e break-even = 5. Você não sabe qual dos dois mundos habita e já reprecificou tudo. E se a Polp não for AISP autorizada pelo BCB — ela revende Pluggy/Belvo/Klavi — o R$4 é preço de intermediário, não piso estrutural.</p>
+<p><strong>O add-on viola sua própria regra.</strong> R$9,90 ÷ R$4 = 2,475x, não 2,5x. E R$4,80 não desconta imposto nem gateway: sobra ~R$4,20 = <strong>1,95x</strong>. Add-on tem que ser R$12,90.</p>
+<p><strong>A margem de R$13,70 pressupõe 1 conexão por assinante — ninguém tem 1 banco.</strong> Brasileiro médio tem 3 relacionamentos. Sem enforcement técnico rígido de contagem de consentimentos no dia 1, o cliente conecta 3 e paga 1: margem real R$1,70.</p>
+<p><strong>Mercado Pago: você comparou o preço errado.</strong> R$1,99 é a tarifa de cobrança Pix avulsa do Asaas (com isenção nas 100 primeiras/mês), não a de Pix Automático. Você trocou 0,22–0,35% por MDR de cartão de ~5% mais 10–15% de falha involuntária/mês. Com 100 assinantes: economiza ~R$100 em tarifa e perde ~R$240/mês em churn involuntário. O Mercado Pago já opera Pix Automático via API — se for MP, use Pix Automático, nunca assinatura por cartão.</p>
+<p><strong>Assento compartilhado grátis no plano base</strong> é exatamente o plano casal que você descartou, entregue de graça, ao segmento de maior disposição a pagar.</p>
+<p><strong>Trial 30 dias: não.</strong> Cada trial que conecta 3 bancos custa R$12. A 40% de conversão, R$30 de CAC de infraestrutura antes de qualquer marketing, contra teto de R$76. E 30 dias empurra o gate de retenção do mês 3 para o mês 4 — atrasa o único sinal que importa. 14 dias, pagamento autorizado no cadastro.</p>
+<p><strong>Referral: matemática ótima, timing péssimo.</strong> R$9,95 de CAC é o melhor canal da mesa. Mas referral é multiplicador de zero e você tem zero clientes. Não construa antes de 30 pagantes. Quando construir: desconto do indicador só libera após o primeiro pagamento confirmado do indicado, travado por CPF.</p>
+<p><strong>Afiliados contador/coach: mate agora.</strong> Contador atende PJ; seu produto é finanças pessoais. Coach financeiro vende curso de R$997 com 50% — você oferece R$14,93 total. Não move ninguém, e custa tracking, contrato, nota e retenção de imposto.</p>
+</div>
+</details>
+
+<details>
+<summary><span class="dot" style="background:var(--c2)"></span>O Pensador de Primeiros Princípios</summary>
+<div class="body">
+<p><strong>O entendimento tem um erro aritmético que invalida a própria premissa.</strong></p>
+<p>Se a Polp cobra por consentimento, então R$160 não é custo fixo — é custo variável. O único fixo é a VM: R$60. Break-even = 60 ÷ 13,70 ≈ 5 assinantes, não 15–16. Ou o R$160 é um piso mensal (40 consentimentos) — e aí ele já sabe a resposta da pergunta "exige mínimo mensal?", contradizendo o item 6. Uma das duas afirmações é falsa. Muda o negócio de "preciso de 16 clientes" para "preciso de 5", ou revela um compromisso contratual não declarado. <strong>Descubra qual antes de qualquer outra decisão.</strong></p>
+<p>O item 5 é o pior erro. Ele compara R$1,99 de tarifa contra uma taxa percentual, e ignora o custo real: falha involuntária de cartão. LTV = margem ÷ churn. Pix: 13,70 ÷ 0,05 = R$274. Cartão com 12% de falha somada: 13,70 ÷ 0,12 = R$114. Ele economiza R$1,90/mês e queima R$160 de LTV por cliente. E a busca não confirma a Polp como participante autorizada pelo BCB — ela se descreve como camada de integração.</p>
+<p><strong>As três perguntas são a pergunta errada.</strong> Todas as três são mecanismos de aquisição. Você tem zero clientes e a feature principal não existe. Não há retenção para amplificar.</p>
+<p><strong>1. Trial 30 dias: não.</strong> O trial não é grátis — cada trialista queima R$4 de caixa (100 trials = R$400 sem receita). Pior: 30 dias adiam em um mês o único sinal que importa. Faça 7 dias + garantia de reembolso de 30 dias. Estritamente melhor: você recebe o dinheiro, testa o pagamento de verdade, e o cliente tem mais proteção.</p>
+<p><strong>2. Indicação:</strong> CAC de R$9,94 contra teto de R$120 — matematicamente barato, e irrelevante. Desconto não gera boca-a-boca; ele amplifica um boca-a-boca que ainda não existe. E convida autoindicação com duas contas. Depois do gate de 50% no mês 3.</p>
+<p><strong>3. Afiliados:</strong> CAC de R$14,92, também barato. Mas contador atende PJ, não pessoa física endividada. E programa de afiliado é gestão de parceiros — trabalho de time, não de dev solo sem produto. Se quiser testar: 3 parceiros a dedo, cupom manual, zero código.</p>
+<p>Gaste as 3–6 semanas na integração. Ela é o negócio inteiro.</p>
+</div>
+</details>
+
+<details>
+<summary><span class="dot" style="background:var(--c3)"></span>O Expansionista <span class="pill p-bad" style="margin-left:auto">Maior ponto cego · 5 de 5 votos</span></summary>
+<div class="body">
+<p><strong>O entendimento é fiel em 4 de 5, e o erro é justamente o que mata o upside.</strong> Itens 1, 2, 4 e 6: corretos. Item 3 subestima. Item 5 está errado.</p>
+<p><strong>Item 3:</strong> o brasileiro de classe média não tem 1 banco — tem banco salário + Nubank + corretora + cartão. Seu ARPU real não é R$19,90, é R$29,80–39,70 (2 a 3 conexões). O plano base não é o produto; o add-on é. Coloque 2 conexões no base para matar a objeção na hora do cadastro e deixe o R$9,90 correr a partir da terceira. Margem esperada por assinante: ~R$18–23, não R$13,70.</p>
+<p><strong>Item 5 (erro):</strong> os R$1,99 do Asaas são de Pix avulso, não de Pix Automático (0,22–0,35% = R$0,05 em R$19,90). No Mercado Pago você cai em cartão recorrente com MDR de 2%–3,5% — economia irrelevante — e perde o split de pagamento nativo, que é exatamente a infraestrutura que faz a pergunta 3 funcionar sozinha.</p>
+<p><strong>O que ninguém viu:</strong> a curva de volume não é economia, é fosso. A 10.000 consentimentos você paga R$2,50; qualquer entrante paga R$4. 37,5% de vantagem estrutural de custo, permanente.</p>
+<p><strong>1. Trial 30 dias: sim, e é mais forte que 14 aqui.</strong> O "aha" deste produto é o fechamento do mês — 14 dias não entrega isso. Com pagamento autorizado, converte 40–60%. Custo real do trial: R$4. Seu CAC nesse canal é R$4 contra R$50–150 de mercado. Ofereça 60 dias no anual.</p>
+<p><strong>2. Referral: tímido e mal enquadrado.</strong> 25% off diz "meu preço é inflado". Dê 1 mês grátis para os dois: custo real R$8 de consentimento, CAC ~R$24 — 1/3 do mercado — e o preço permanece intacto. Sem teto nas indicações.</p>
+<p><strong>3. Afiliados 25%/3 meses = R$14,93 por cliente.</strong> Nenhum contador levanta da cadeira por R$15. Vire revenda: painel do contador, R$9,90/cliente. Um contador com 80 clientes = R$792/mês, ~R$550 de margem — equivale a 40 assinantes B2C. E 125 contadores levam você aos 10.000 consentimentos; via B2C seriam 5.000 assinantes.</p>
+<p>Construa o Open Finance uma vez. Venda-o duas.</p>
+</div>
+</details>
+
+<details>
+<summary><span class="dot" style="background:var(--c4)"></span>O Outsider</summary>
+<div class="body">
+<p>Sou eu, na loja de apps, procurando "controle de gastos". Reação crua:</p>
+<p><strong>O preço me confunde antes de me assustar.</strong> "1 conexão bancária" — o que conta como conexão? Minha conta do Nubank e o cartão de crédito do Nubank são uma ou duas? E a Caixa da minha esposa? Eu tenho Nubank, Itaú e o cartão da Bradescard. Fazendo a conta na unha: R$19,90 + 9,90 + 9,90 = R$39,70 por mês. Isso é Netflix com Spotify junto. Pra um app que me mostra que eu gastei demais no iFood. Se eu não entendo quanto vou pagar na tela de preço, eu fecho. E eu não entendi.</p>
+<p><strong>Sem plano grátis eu nem chego na tela de preço.</strong> O problema não é pagar, é que eu não faço ideia de quem é você. Você tá me pedindo pra conectar minha conta bancária num app sem marca, sem review, sem nada, e pagar antes de ver. Banco é medo. Eu conecto minha conta no Mobills porque tem 100 mil avaliações. No seu, eu vou pensar "e se esse cara sumir com meus dados?". Isso é maior que qualquer objeção de preço.</p>
+<p><strong>Trial com cartão cadastrado: eu já fui pego assim.</strong> Trinta dias é tempo demais, eu esqueço, aí vem R$19,90 no fim do mês e eu fico puto — e puto com app de finanças é pior, porque é justamente a cobrança que eu não vi chegando. Se for fazer, 7 ou 14 dias e me avisa 3 dias antes. E se for por Mercado Pago, minha dúvida imediata é: como eu cancelo? Se eu não vir "cancele quando quiser, em 2 cliques", não cadastro.</p>
+<p><strong>O link pro amigo: não mando.</strong> 25% de R$19,90 é cinco reais. Eu não queimo minha imagem por cinco reais. Indicar app de finanças é meio constrangedor — parece que eu tô dizendo "você tá desorganizado". Se fosse um mês inteiro grátis pros dois, aí sim eu mandaria no grupo da família.</p>
+<p><strong>Contador: eu desconfiaria na hora.</strong> Não porque contador é desonesto, mas porque eu percebo esse jogo. E ninguém me pergunta se eu quero comissão do meu contador. Se ele falar "eu ganho uma parte, mas uso com todos os clientes", tudo bem. Se eu descobrir sozinho depois, perdi a confiança nos dois.</p>
+</div>
+</details>
+
+<details>
+<summary><span class="dot" style="background:var(--c5)"></span>O Executor</summary>
+<div class="body">
+<p><strong>Sobre as taxas — o usuário está parcialmente certo, e isso muda a conta.</strong></p>
+<p>Confirmei na tabela oficial: Asaas cobra R$1,99 por transação recebida em Pix e boleto. <strong>Não achei linha separada para Pix Automático</strong> — a página não distingue. Os 0,22%–0,35% citados no conselho de 02/08 eu <strong>não confirmei</strong> em fonte alguma; provavelmente é a tarifa que o BCB deixa os PSPs cobrarem entre si, não o preço de balcão do Asaas. Trate como não verificado até abrir chamado no Asaas perguntando literalmente: "qual a tarifa por cobrança recebida via Pix Automático na minha conta?".</p>
+<p>Sobre o Mercado Pago: o próprio blog deles tem página de produto de Pix Automático para assinaturas, então "MP é cartão-only" está desatualizado. Mas não consegui confirmar a taxa do MP para Pix Automático. Duas perguntas, um chamado em cada, resposta em 48h.</p>
+<p>Impacto na margem: R$1,99 em vez de R$1,00 derruba a margem base de R$13,70 para R$12,71. Break-even vai de ~16 para ~18 assinantes. Sobrevive.</p>
+<p><strong>Custo de construir:</strong> Trial 30 dias: ~0 dias — Asaas e MP têm campo de data da primeira cobrança nativo; meio dia com webhook. Referral: 3–4 dias — nenhum gateway tem "25% off só nessa parcela" bem resolvido em assinatura; você acaba cancelando e recriando a cobrança do ciclo. Afiliados: 5–7 dias — referral + painel + cálculo de comissão + rotina de pagamento (pague na mão via Pix). Contador não converte sem material de venda — mais 1 semana sua.</p>
+<p><strong>Segunda-feira:</strong> você tem zero clientes e o produto central não existe. Trial, referral e afiliados são features para distribuir algo que não roda. <strong>Faz Open Finance. Só isso.</strong> As 3 perguntas restantes à Polp vão junto no mesmo e-mail — se a Polp não for AISP autorizada, as 3 a 6 semanas viram zero e você economizou um mês.</p>
+<p><strong>"Compartilhar acesso" em código:</strong> isso é multiusuário, e é a coisa mais cara da lista. Todo <code>WHERE user_id = ?</code> vira <code>WHERE workspace_id = ?</code>. Migration de schema, refactor de toda query, tabela de membros, convite por e-mail, decisão de permissão. <strong>5 a 8 dias.</strong> Lance solo. Adicione quando o primeiro cliente pedir.</p>
+</div>
+</details>
+
+<details>
+<summary>Rodada de revisão cruzada — destaques e placar</summary>
+<div class="body">
+<p><strong>Mapeamento de anonimização:</strong> A = Executor · B = Contrarian · C = Outsider · D = Expansionista · E = Primeiros Princípios</p>
+<p><strong>Revisor 1 — Mais forte: B.</strong> Ataca o entendimento em quatro frentes verificáveis: o furo do mínimo mensal, o add-on a 2,475x, o vazamento de margem sem enforcement, e o "acesso compartilhado" como plano casal de graça. <em>Maior ponto cego: D</em> — o modelo de revenda ignora que consentimento é por CPF titular, autenticado no app do banco do cliente; o contador não pode consentir pelos 80 clientes. <em>Todos perderam:</em> ninguém perguntou o que conta como um consentimento nem se consentimento cancelado continua sendo cobrado.</p>
+<p><strong>Revisor 2 — Mais forte: B.</strong> Ataca o entendimento como sistema. <em>Maior ponto cego: D</em> — trata 0,22–0,35% como fato e projeta ARPU de R$29,80–39,70 sem teste de disposição a pagar; C demonstra que R$39,70 faz o cliente fechar a tela. <em>Todos perderam:</em> o consentimento expira em até 12 meses e exige reautenticação — evento anual de churn e possível recobrança. E sem rotina de revogação no offboarding, você paga por ex-clientes. Também: teto do MEI (~R$81k/ano).</p>
+<p><strong>Revisor 3 — Mais forte: B.</strong> Com menção obrigatória a A, a única com honestidade epistêmica sobre os 0,22–0,35%. <em>Maior ponto cego: D</em> — monta canal B2B, trial de 60 dias e indicação ilimitada sobre um produto que não existe; desconto por volume que qualquer concorrente negocia não é fosso. <em>Todos perderam:</em> Pix Automático depende do banco do pagador ter aderido; e ninguém propôs validar disposição a pagar com OFX/CSV em 2 semanas antes de comprometer 6.</p>
+<p><strong>Revisor 4 — Mais forte: B.</strong> É a única que ataca o entendimento em vez de responder as perguntas. <em>Maior ponto cego: D</em> — é a única que <em>adiciona escopo</em> para um dev solo sem produto. <em>Todos perderam:</em> ciclo de vida do consentimento; status AISP/BCB da Polp (risco jurídico e LGPD como controlador); concentração em fornecedor único sem plano B.</p>
+<p><strong>Revisor 5 — Mais forte: A.</strong> Voto dissidente: é a única que separa fato verificado de premissa herdada, e a única que precifica a moeda real de um dev solo — dias de trabalho. <em>Maior ponto cego: D.</em> <em>Todos perderam:</em> ninguém perguntou à Polp se renovação conta como novo consentimento; nem plano B se a Polp morrer.</p>
+<p><strong>Placar:</strong> mais forte — B (Contrarian) 4 votos, A (Executor) 1 voto. Maior ponto cego — D (Expansionista) 5 votos. <strong>Convergência inédita: 5 de 5 revisores apontaram a mesma falha do conselho inteiro</strong> — o ciclo de vida do consentimento.</p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Conselho realizado em 03/08/2026.</strong> Pauta: avaliação do entendimento registrado em 02/08 e resposta a três perguntas sobre trial, indicação entre usuários e afiliados. 5 conselheiros independentes · 5 revisões cruzadas anônimas · 1 síntese do Chairman.</p>
+  <p>Conselhos anteriores: 02/08/2026 (preço e plano gratuito) · 31/07/2026 (preço e marketing). Transcrição completa desta sessão: <code>council-transcript-2026-08-03.md</code></p>
+</footer>
+
+</div>
+</body>
+</html>

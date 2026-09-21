@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Council — Gastos Mensais · 02/08/2026</title>
+<style>
+  :root{
+    --bg:#fbfbfa; --card:#fff; --ink:#1c1c1a; --muted:#6b6b66; --line:#e4e3df;
+    --accent:#2f5d50; --warn:#a8442a; --ok:#2f6b3f; --hl:#f3efe4;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:860px; margin:0 auto; padding:48px 24px 80px}
+  header{border-bottom:2px solid var(--ink); padding-bottom:22px; margin-bottom:36px}
+  .eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:0 0 10px}
+  h1{font-size:30px; line-height:1.2; margin:0 0 12px; letter-spacing:-.02em}
+  .sub{color:var(--muted); font-size:14px; margin:0}
+  .sub a{color:var(--muted)}
+  h2{font-size:13px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted);
+     margin:44px 0 16px; padding-bottom:8px; border-bottom:1px solid var(--line)}
+  h3{font-size:17px; margin:24px 0 8px}
+  p{margin:0 0 14px}
+  .q{background:var(--hl); border-left:3px solid var(--accent); padding:18px 22px; border-radius:0 6px 6px 0; margin-bottom:8px}
+  .q p{margin:0; font-size:15px}
+  .q .lbl{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:8px}
+
+  .verdict{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:28px; margin-bottom:18px;
+           box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .verdict.big{border:2px solid var(--ink)}
+  .vk{font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted); margin:0 0 10px}
+  .headline{font-size:22px; line-height:1.35; font-weight:600; margin:0 0 14px; letter-spacing:-.01em}
+  .price{font-size:15px}
+
+  .alert{background:#fdf6f3; border:1px solid #e9c9bd; border-left:4px solid var(--warn); border-radius:0 8px 8px 0;
+         padding:20px 24px; margin:0 0 26px}
+  .alert .vk{color:var(--warn)}
+  .alert strong{color:var(--warn)}
+
+  table{width:100%; border-collapse:collapse; font-size:14px; margin:6px 0 18px}
+  th,td{text-align:left; padding:11px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600}
+  td.num{font-variant-numeric:tabular-nums; white-space:nowrap}
+  .scroll{overflow-x:auto; -webkit-overflow-scrolling:touch}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:6px 0 20px}
+  .cell{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px}
+  .cell .who{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:8px}
+  .cell .val{font-size:19px; font-weight:600; letter-spacing:-.01em; margin-bottom:4px}
+  .cell .note{font-size:12.5px; color:var(--muted); line-height:1.45}
+  .yes{color:var(--ok)} .no{color:var(--warn)}
+
+  .spectrum{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:20px 18px 14px; margin:6px 0 22px}
+  .bar{position:relative; height:3px; background:linear-gradient(90deg,#cfe0d6,#e9c9bd); border-radius:2px; margin:34px 12px 8px}
+  .pin{position:absolute; top:-30px; transform:translateX(-50%); text-align:center; width:100px}
+  .pin b{display:block; font-size:14px; font-variant-numeric:tabular-nums}
+  .pin span{display:block; font-size:10.5px; color:var(--muted); letter-spacing:.04em; text-transform:uppercase; margin-top:1px}
+  .pin::after{content:""; position:absolute; left:50%; bottom:-11px; width:9px; height:9px; margin-left:-4.5px;
+              background:var(--ink); border-radius:50%}
+  .ends{display:flex; justify-content:space-between; font-size:11px; color:var(--muted); padding:0 12px;
+        letter-spacing:.06em; text-transform:uppercase}
+
+  details{background:var(--card); border:1px solid var(--line); border-radius:8px; margin-bottom:10px; overflow:hidden}
+  summary{cursor:pointer; padding:15px 20px; font-weight:600; font-size:15px; list-style:none; display:flex;
+          justify-content:space-between; align-items:center; gap:12px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+"; color:var(--muted); font-weight:400; font-size:19px; line-height:1; flex-shrink:0}
+  details[open] summary::after{content:"–"}
+  summary:hover{background:var(--hl)}
+  .body{padding:4px 22px 20px; border-top:1px solid var(--line); font-size:15px}
+  .body p:first-child{margin-top:16px}
+  .tag{font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:400}
+
+  ul{margin:0 0 16px; padding-left:20px} li{margin-bottom:8px}
+  .first{background:var(--ink); color:#f6f5f2; border-radius:10px; padding:28px}
+  .first .vk{color:#a8a6a0}
+  .first h3{margin:0 0 12px; font-size:20px; color:#fff}
+  .first ol{margin:14px 0 8px; padding-left:22px}
+  .first li{margin-bottom:9px}
+  .first .why{font-size:14px; color:#c9c7c1; margin-top:16px; margin-bottom:0}
+  footer{margin-top:52px; padding-top:20px; border-top:1px solid var(--line); font-size:12.5px; color:var(--muted)}
+  code{background:var(--hl); padding:1px 5px; border-radius:3px; font-size:13px}
+
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#16171a; --card:#1e2024; --ink:#e9e8e4; --muted:#9a988f; --line:#32343a;
+          --accent:#7fb3a0; --warn:#e0937a; --ok:#8fc79f; --hl:#25272c;}
+    header{border-bottom-color:var(--ink)}
+    .verdict.big{border-color:#54575e}
+    .alert{background:#2a1f1b; border-color:#5a3d31}
+    .first{background:#0e0f11; color:#e9e8e4}
+    .first h3{color:#fff}
+    .bar{background:linear-gradient(90deg,#3d5a4d,#6b463a)}
+    .pin::after{background:var(--ink)}
+  }
+  :root[data-theme="dark"]{--bg:#16171a; --card:#1e2024; --ink:#e9e8e4; --muted:#9a988f; --line:#32343a;
+        --accent:#7fb3a0; --warn:#e0937a; --ok:#8fc79f; --hl:#25272c;}
+  :root[data-theme="dark"] .first{background:#0e0f11; color:#e9e8e4}
+  :root[data-theme="dark"] .alert{background:#2a1f1b; border-color:#5a3d31}
+  :root[data-theme="light"]{--bg:#fbfbfa; --card:#fff; --ink:#1c1c1a; --muted:#6b6b66; --line:#e4e3df;
+        --accent:#2f5d50; --warn:#a8442a; --ok:#2f6b3f; --hl:#f3efe4;}
+  :root[data-theme="light"] .first{background:#1c1c1a; color:#f6f5f2}
+  :root[data-theme="light"] .alert{background:#fdf6f3; border-color:#e9c9bd}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">LLM Council · Sessão 2</p>
+  <h1>Gastos Mensais: o preço está bom e vale a pena ter plano gratuito?</h1>
+  <p class="sub">02 de agosto de 2026 · 5 conselheiros · 5 revisões cruzadas anônimas · 1 síntese<br>
+  Revisita o <a href="council-transcript-2026-07-31.md">conselho de 31/07/2026</a> à luz das suas notas.</p>
+</header>
+
+<div class="q">
+  <div class="lbl">A pergunta</div>
+  <p>Avaliar as notas tomadas após o primeiro conselho — inclusive as decisões que o contrariaram. Preço básico R$19,90 (1 integração Open Finance) e "casal" R$29,90 (3 integrações). Custo: VM R$60/mês + Polp R$160/mês fixo + R$4 por usuário. Meta de sobrevivência definida: 150 usuários/mês. Plano gratuito considerado: sem Open Finance, sem relatórios, sem exportação, cadastros limitados.</p>
+</div>
+
+<h2>O achado que reordena tudo</h2>
+
+<div class="alert">
+  <p class="vk">Convergência inédita — 5 de 5 revisores, independentemente</p>
+  <p><strong>Ninguém verificou se os R$4 da Polp são por USUÁRIO ou por CONEXÃO.</strong> Suas notas dizem "por usuário". Quatro dos cinco conselheiros calcularam como se fosse por conexão — R$12 no plano de 3 — e construíram sobre isso toda a tese de que sua escada de preços tem margem invertida.</p>
+  <p style="margin-bottom:0">Se for por conexão, sua estrutura está economicamente quebrada. Se for por usuário, o problema simplesmente não existe e a recomendação se inverte. <strong>É a incerteza mais cara da mesa — e se resolve com um e-mail.</strong></p>
+</div>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Cenário</th><th class="num">Básico R$19,90</th><th class="num">"Casal" R$29,90</th><th>O que isso significa</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>R$4 por conexão</strong></td>
+      <td class="num">≈ R$13,70</td>
+      <td class="num">≈ R$14,80</td>
+      <td>Você cobra R$10 a mais para entregar R$8 a mais de custo. O upgrade rende <strong>R$1,10</strong>. Escada invertida.</td>
+    </tr>
+    <tr>
+      <td><strong>R$4 por usuário</strong><br><span class="tag">o que suas notas dizem</span></td>
+      <td class="num">≈ R$13,70</td>
+      <td class="num">≈ R$22,60</td>
+      <td>Sem inversão. Mas então <strong>precificar por conexão é irracional</strong> — você cria fricção num recurso que não te custa nada.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+<p style="font-size:13px;color:var(--muted);margin-top:-8px">Margem de contribuição por assinante, já descontados gateway (~5%) e imposto (~6%). Custo fixo em ambos: R$220/mês.</p>
+
+<h2>Onde o conselho concorda</h2>
+
+<div class="verdict">
+  <h3 style="margin-top:0">A meta de 150 usuários está morta <span class="tag">5 de 5</span></h3>
+  <p>Ela veio da fatura de R$2.500 da Pluggy — um fornecedor que você já descartou. Com Polp + VM, o custo fixo é R$220/mês e o <strong>break-even real fica entre 14 e 17 assinantes</strong>. Você está adiando decisões por causa de um número que você mesmo invalidou.</p>
+
+  <h3>O rótulo "plano casal" tem que morrer <span class="tag">4 de 5</span></h3>
+  <p>Você mesmo escreveu que casal com dois acessos não faz sentido — mas manteve o nome num plano que só entrega mais conexões bancárias. Não é detalhe de marketing: o Outsider fecha a página por desconfiança. "Se chama casal mas minha esposa não tem login? Isso me faz desconfiar do resto do app."</p>
+
+  <h3>Plano gratuito: não <span class="tag">4 de 5</span></h3>
+  <p>O free que você desenhou remove Open Finance — que é, pelo seu próprio diagnóstico, a única coisa que impede o produto de ser uma planilha. Você gastaria esforço de aquisição para entregar a versão que você mesmo classificou como não-vendável.</p>
+
+  <h3>Mercado Pago com assinatura por cartão está errado</h3>
+  <p>Cartão-only é exatamente o canal que falha 10–15%/mês no Brasil. <strong>Pix Automático</strong> (em produção no BC desde jan/2026, via Asaas) resolve tanto o "PIX" quanto o "pagar conforme usa" — taxa 0,22–0,35%, ~2–3 dias de dev.</p>
+
+  <h3>O gargalo continua não sendo preço</h3>
+  <p>É a integração de Open Finance: 3 a 6 semanas solo (OAuth, consentimento, sync, deduplicação, categorização, renovação em 12 meses). Preço e free só importam depois dela.</p>
+</div>
+
+<h2>Onde o conselho briga</h2>
+
+<div class="spectrum">
+  <div class="bar">
+    <div class="pin" style="left:8%"><b>R$19,90</b><span>Executor · Outsider</span></div>
+    <div class="pin" style="left:47%"><b>R$24,90</b><span>Contrarian · 1ºs Princípios</span></div>
+    <div class="pin" style="left:88%"><b>R$49,90</b><span>Expansionista (topo)</span></div>
+  </div>
+  <div class="ends"><span>manter</span><span>subir</span></div>
+</div>
+
+<p><strong>A briga do preço tem uma raiz identificável.</strong> O conselho de 31/07 condenou R$19,90 sob a premissa de <em>CAC pago de R$50–150</em>. Você decidiu 0% de mídia paga. Com CAC ≈ 0, R$19,90 fecha. A objeção original não foi respondida — <strong>ela foi anulada por uma mudança de premissa que você mesmo fez.</strong></p>
+
+<p><strong>O que o plano de entrada deve entregar.</strong> O Outsider: "1 conexão me deixa com metade dos gastos digitados na mão — pago R$19,90 e continuo digitando." Três revisores rebatem: dar 2 conexões dobra o custo variável do tier de menor margem. Essa briga só se resolve com o dado da Polp.</p>
+
+<p><strong>Free permanente vs. trial.</strong> O Expansionista é voz isolada a favor (custo marginal ~zero sem Open Finance, gera SEO e boca-a-boca). Dois revisores derrubaram: sem tráfego, free não é canal — é suporte.</p>
+
+<h2>Posição de cada conselheiro</h2>
+
+<div class="grid">
+  <div class="cell"><div class="who">Contrarian</div><div class="val">R$24,90</div><div class="note">+R$9,90/conexão extra<br><span class="no">Free: não</span> · trial 14d</div></div>
+  <div class="cell"><div class="who">1ºs Princípios</div><div class="val">R$24,90</div><div class="note">+R$9/conexão · anual R$249<br><span class="no">Free: não</span> · trial 21d</div></div>
+  <div class="cell"><div class="who">Expansionista</div><div class="val">R$19,90→49,90</div><div class="note">escada + add-on R$8<br><span class="yes">Free: sim</span> · meta 4%</div></div>
+  <div class="cell"><div class="who">Outsider</div><div class="val">R$19,90</div><div class="note">mas com 2 contas<br><span class="no">Free: não</span> · trial 14d</div></div>
+  <div class="cell"><div class="who">Executor</div><div class="val">R$19,90</div><div class="note">+R$9,90/conexão · anual R$199<br><span class="no">Free: não</span> · trial 14d</div></div>
+</div>
+
+<h2>Pontos cegos que só o peer review pegou</h2>
+
+<div class="verdict">
+<ul>
+  <li><strong>Por usuário ou por conexão?</strong> — 5 de 5 revisores. Ver acima. Reordena a decisão inteira.</li>
+  <li><strong>Risco de fornecedor único, não auditado.</strong> Polp custa 6% do preço da Pluggy. Ninguém perguntou: é participante autorizado (AISP) pelo BCB? Cobertura de instituições? SLA? Mínimo mensal? O que acontece se repreçar ou fechar?</li>
+  <li><strong>Churn não foi modelado por ninguém.</strong> Break-even de 14 assinantes sem taxa de cancelamento é número decorativo. A 8%/mês, a base se consome antes de crescer.</li>
+  <li><strong>Trial "com tudo liberado" tem custo variável.</strong> Cada trial que conecta banco custa dinheiro antes de qualquer pagamento. Autorizar o pagamento na entrada resolve.</li>
+  <li><strong>O gate de retenção do primeiro conselho foi esquecido.</strong> 50% no mês 3, coorte de 30+ pagantes desconhecidos — <em>esse</em> é o gatilho de marketing, não os 150 usuários.</li>
+  <li><strong>LGPD segue sem endereçamento</strong>, com chave/IV AES fixos em <code>Utils/criptManager.ts</code> — e um plano free colocaria dados financeiros de não-pagantes sob a mesma exposição.</li>
+</ul>
+</div>
+
+<h2>A recomendação</h2>
+
+<div class="verdict big">
+  <p class="vk">Preço</p>
+  <p class="headline">A estrutura está errada. O número está aceitável.</p>
+  <p>Você não tem um problema de R$19,90 vs R$29. Tem um problema de <strong>eixo de diferenciação</strong>: escolheu separar seus planos por número de conexões bancárias, e a resposta certa depende do dado que ninguém verificou.</p>
+  <p class="price"><strong>Se a Polp cobra por conexão:</strong> mate o segundo plano e venda conexão avulsa como add-on (R$9,90) — uma linha de código em vez de uma tela nova. Nunca abaixo de 2,5x o custo.</p>
+  <p class="price"><strong>Se cobra por usuário</strong> (o que suas notas dizem): precificar por conexão é irracional. Você cria fricção artificial num recurso que não te custa nada — e que é justamente o que gera lock-in: quanto mais contas conectadas, menor o churn. Nesse caso, <strong>conexões ilimitadas em todos os planos pagos</strong>, e diferencie por relatórios, exportação e multiusuário.</p>
+  <hr style="border:0;border-top:1px solid var(--line);margin:22px 0">
+  <p class="headline" style="font-size:19px">Assumindo o cenário das suas notas: um plano só, R$24,90/mês, conexões ilimitadas, tudo liberado. Anual R$249 via PIX à vista.</p>
+  <p><strong>Um plano só</strong> porque você tem zero clientes. Dois planos com zero clientes é otimização prematura: dobra a superfície de suporte, dobra o código de billing, e você não tem nenhum dado que diga onde a linha de corte deveria estar. Segmente depois dos primeiros 50 pagantes, com uso real.</p>
+  <p><strong>R$24,90 e não R$19,90</strong> porque a diferença de R$5 não muda conversão nessa faixa — a barreira psicológica está acima de R$30 — mas te dá a margem que vai financiar o CAC no dia em que você ligar aquisição paga. <strong>E não R$29</strong> porque o argumento do primeiro conselho contra R$19,90 dependia de CAC pago, premissa que você removeu.</p>
+</div>
+
+<div class="verdict big">
+  <p class="vk">Plano gratuito</p>
+  <p class="headline">Não faça. Faça trial de 14 dias com tudo ligado — inclusive Open Finance — e Pix Automático autorizado no cadastro.</p>
+  <p>Cobra sozinho no dia 15. Isso resolve três coisas de uma vez: o cliente vê o valor antes de pagar, você não paga conexão de curioso indefinidamente, e a conversão sobe de 8–15% para 40–60%.</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Sua pergunta</th><th>Resposta do conselho</th></tr></thead>
+    <tbody>
+      <tr><td>Qual taxa de conversão esperar?</td>
+          <td>Freemium B2C: <strong>2–5%</strong> é a faixa real; 4%+ é bom. Trial <em>com</em> pagamento autorizado na entrada: <strong>40–60%</strong>. Trial sem cartão: <strong>8–15%</strong>.</td></tr>
+      <tr><td>Por quantos planos pagos um free se paga?</td>
+          <td>Enquadramento errado. O custo de um free sem Open Finance é infra — centavos. O custo real é <strong>seu tempo de suporte</strong> e a diluição da sua atenção, e isso nenhum número de assinantes paga.</td></tr>
+      <tr><td>Qual o mínimo de conversão aceitável?</td>
+          <td>Para o free se pagar com break-even de ~15 pagantes: <strong>~375 free users a 4%</strong>, ou <strong>~750 a 2%</strong>. Você não tem 375 visitantes — muito menos cadastros.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="verdict">
+  <p class="vk">E a meta de 150 usuários</p>
+  <p>Substitua por dois números distintos que você estava misturando num só:</p>
+  <ul style="margin-bottom:6px">
+    <li><strong>~15 assinantes</strong> = break-even de caixa. Para de sangrar dinheiro.</li>
+    <li><strong>~150 assinantes</strong> = break-even do <em>seu tempo</em>. Continua válido como critério de morte do projeto — mas não tem nada a ver com quando ligar marketing.</li>
+  </ul>
+  <p style="margin-bottom:0">O gatilho de marketing segue sendo o do primeiro conselho: <strong>50% de retenção no mês 3, numa coorte de 30+ pagantes desconhecidos.</strong></p>
+</div>
+
+<h2>A primeira coisa a fazer</h2>
+
+<div class="first">
+  <p class="vk">Uma ação, hoje</p>
+  <h3>Mande um e-mail para a Polp — e não escreva uma linha de código de billing antes da resposta.</h3>
+  <ol>
+    <li>Os R$4 são cobrados <strong>por usuário cadastrado</strong> ou <strong>por conexão bancária ativa</strong>?</li>
+    <li>Vocês são participante autorizado do Open Finance pelo Banco Central (AISP)? Qual o número de autorização?</li>
+    <li>Quais instituições estão cobertas e qual o SLA de disponibilidade?</li>
+    <li>Exige CNPJ? Tem mínimo mensal, fidelidade ou prazo de contrato?</li>
+  </ol>
+  <p class="why">A pergunta 1 decide sozinha se sua estrutura de planos é boa ou economicamente invertida — o conselho inteiro se dividiu exatamente sobre isso, e os cinco revisores apontaram, independentemente, que ninguém verificou. As perguntas 2 a 4 decidem se a Polp existe como fornecedor viável, ou se você volta para a realidade de R$2.500/mês da Pluggy — onde a meta de 150 usuários volta a valer e todo o resto muda.</p>
+</div>
+
+<h2>Pareceres completos</h2>
+
+<details>
+<summary><span>O Contrarian <span class="tag">R$24,90 · sem free</span></span></summary>
+<div class="body">
+<p><strong>A matemática que ele não fez.</strong></p>
+<p>Custo fixo real: R$160 (Polp) + R$60 (VM) = R$220/mês.</p>
+<p>Plano básico R$19,90 – R$4 (OF) – ~R$1,00 (gateway) – ~R$1,20 (imposto) = <strong>R$13,70 líquidos</strong>. Margem 69%.<br>
+Plano "casal" R$29,90 – R$12 (3 OF) – ~R$1,30 – ~R$1,80 = <strong>R$14,80 líquidos</strong>. Margem 50%.</p>
+<p>Aí está a falha fatal: ele cobra <strong>R$10 a mais para entregar R$8 a mais de custo</strong>. O upgrade rende R$1,10. A estrutura de preço está invertida em relação à estrutura de custo — quanto mais o produto vende o plano "bom", pior fica a margem. E se o usuário do plano de R$29,90 usar só 1 conexão, ele pagou por capacidade ociosa e vai reclamar; se usar 3, você quase trabalha de graça.</p>
+<p>Segundo furo: o gatilho de "150 usuários/mês" foi derivado do custo Pluggy de R$2.500. Com Polp, o break-even é <strong>17 assinantes</strong>, não 150. Ele está carregando uma meta de marketing herdada de premissas que ele mesmo já descartou.</p>
+<p>Terceiro: R$13,70 é a margem <em>antes</em> de 10–15% de falha de recorrência no cartão. Real: ~R$12. E se algum dia for app nativo, a loja come R$6 e sobra R$8 — o plano básico vira caridade.</p>
+<p>O plano free proposto (sem OF, sem relatórios, sem exportação) não custa dinheiro — custa pior: ele demonstra exatamente a "planilha paga" que o conselho identificou como o problema. Você vai gastar aquisição para ensinar as pessoas que seu produto é medíocre.</p>
+<p><strong>(A)</strong> R$24,90 básico com 1 integração; R$39,90 com 3. Integração extra R$9,90. Nunca venda conexão abaixo de 3x o custo.<br>
+<strong>(B)</strong> Sem free. Trial de 14 dias <strong>com</strong> Open Finance ligado — o valor está lá, não na versão capada.</p>
+</div>
+</details>
+
+<details>
+<summary><span>O Pensador de Primeiros Princípios <span class="tag">R$24,90 · sem free</span></span></summary>
+<div class="body">
+<p><strong>A premissa quebrada: você derivou a meta de usuários de um custo que ainda não pagou, por uma feature que ainda não validou.</strong></p>
+<p>"150 usuários/mês" não veio do mercado, veio da fatura da Pluggy. Você inverteu a causalidade — está dimensionando o negócio para caber num fornecedor. A pergunta real não é "qual preço cobre o Open Finance". É: <em>por que Open Finance?</em> Porque resolve atrito de entrada de dados. Isso é um fim; Open Finance é só um meio — e o mais caro de todos. OFX/CSV dos bancos, leitura de notificação no Android, encaminhamento de e-mail de fatura: custo variável zero. Se o atrito é mesmo o gargalo, teste o gargalo com o meio de R$0 antes de comprar o de R$4/usuário. Se ninguém importa um OFX, ninguém vai conectar conta bancária tampouco.</p>
+<p><strong>O erro estrutural no preço:</strong> R$19,90 → R$29,90 é +50% de receita para +200% de custo variável. Com Polp a R$4/conexão, o plano "caro" tem margem igual ou pior que o básico. Você construiu um upsell que destrói margem. Some 5% de gateway e 10–15% de falha de recorrência: R$29,90 vira ~R$24 líquido menos R$12 de custo = R$12. Idêntico ao básico. Seu produto premium é economicamente inútil.</p>
+<p><strong>"Vale plano free?" também é a pergunta errada.</strong> Free não é modelo de receita, é canal de distribuição — e só funciona com viralidade ou tráfego de topo. Você tem zero marketing e zero usuários. Free sem distribuição é só custo fixo.</p>
+<p><strong>(A) Preço:</strong> R$24,90 base com 1 conexão, +R$9 por conexão adicional. Anual R$249 pago à vista no PIX — resolve sua pergunta 1 e mata a falha de recorrência.<br>
+<strong>(B) Free:</strong> não. Trial de 21 dias sem cartão. Só isso.</p>
+</div>
+</details>
+
+<details>
+<summary><span>O Expansionista <span class="tag">escada até R$49,90 · free sim</span></span></summary>
+<div class="body">
+<p><strong>O custo variável que ele teme é o melhor ativo dessa estrutura.</strong></p>
+<p>Polp a R$160 + R$4/usuário destrói o argumento dos 150 usuários. Com Pluggy, o break-even era ~150 pagantes. Com Polp, é 11. O indicador mínimo dele está errado por um fator de 13x — e ele está postergando marketing por causa de um número fantasma. Margem bruta a R$19,90 com R$4 de custo: 80%. Isso é margem de SaaS de verdade, não de app de nicho.</p>
+<p><strong>O plano de 3 integrações não é "casal" — é o produto real.</strong> Quem tem Nubank + Itaú + corretora é uma pessoa só. Ele acabou de inventar precificação por conexão sem perceber, e isso responde a pergunta 1 dele: "pagar conforme usa" = crédito de conexão via PIX. Add-on de R$8 por conexão extra é margem de 100%. Não trave o teto em R$29,90 — quem tem 6 contas paga R$49,90 sem piscar.</p>
+<p><strong>A adjacência escondida:</strong> cada cliente de um contador ou assessor é uma conexão. O mesmo motor de R$4/conexão vira produto B2B com ticket 10x. Não construa agora — mas não modele preço de forma que impeça isso.</p>
+<p><strong>Free:</strong> o custo marginal de um free sem Open Finance é essencialmente zero (VM já paga). O "risco de consumir a operação" não existe se free = sem conexão bancária. O que free realmente faz: substitui a planilha grátis, gera SEO e boca-a-boca com CAC zero, e transforma a dor de digitar manualmente no melhor argumento de venda que ele tem.</p>
+<p><strong>(A)</strong> Mantenha R$19,90 como entrada, mas crie R$29,90 (3 conexões) e R$49,90 (ilimitado/6). Add-on de conexão avulsa a R$8. Anual com desconto pago via PIX à vista.<br>
+<strong>(B)</strong> Sim. Free permanente, sem Open Finance, sem relatórios. Meta 4% de conversão; abaixo de 2% o funil está quebrado, não o preço.</p>
+</div>
+</details>
+
+<details>
+<summary><span>O Outsider <span class="tag">R$19,90 com 2 contas · sem free</span></span></summary>
+<div class="body">
+<p>Sou o cara que baixaria isso. Reagindo do jeito que reagiria na loja.</p>
+<p><strong>"1 integração Open Finance."</strong> Eu não sei o que isso é. E quando entendo — "conecta 1 banco" — já é problema: eu tenho Nubank, conta salário no Itaú e um cartão do Inter. Uma conta só me deixa com metade dos gastos digitados na mão. Ou seja, pago R$19,90 e continuo digitando. Fecho a página aqui.</p>
+<p><strong>O "plano casal" me irrita.</strong> Se chama casal mas minha esposa não tem login? Então não é plano de casal, é plano de 3 bancos com nome errado. Isso me faz desconfiar do resto do app. Renomeia: "Básico 1 conta" / "Completo 3 contas". Aí eu entendo em 2 segundos e não me sinto enganado.</p>
+<p><strong>O gratuito, como está descrito, é ofensivo.</strong> "Sem gráficos, sem exportação, sem integração, cadastros limitados, dados corridos mês a mês" — isso é uma planilha pior que a planilha grátis que eu já baixo no Google. Ninguém vira cliente de um app que me deixou com gosto ruim na boca. Free assim não vende o pago, ele prova que o pago não vale.</p>
+<p><strong>O que me faria pagar:</strong> ver os gastos do MEU banco, categorizados, sem eu digitar nada, ANTES de dar meu cartão. 14 dias com tudo liberado. Se depois disso eu voltar pro Nubank, o app não era bom mesmo.</p>
+<p><strong>Preço:</strong> R$19,90 é Spotify. Spotify eu uso todo dia. Isso eu abro 2x por mês. Dói.</p>
+<p><strong>(A)</strong> Mantenha R$19,90, mas entregue 2 contas nele — 1 conta não resolve a vida de ninguém. E R$34,90 no completo com login pro cônjuge de verdade.<br>
+<strong>(B)</strong> Não faça free permanente. Faça trial de 14 dias com tudo. Um free capado destrói mais confiança do que gera conversão.</p>
+</div>
+</details>
+
+<details>
+<summary><span>O Executor <span class="tag">5/5 votos como parecer mais forte</span></span></summary>
+<div class="body">
+<p><strong>Trava de segunda-feira: resolvida.</strong> Pix Automático do BC está em produção desde janeiro/2026 e o Asaas já expõe via API (Jornada 3: consentimento captado no pagamento da primeira cobrança, taxa 0,22–0,35%). Conta PJ/MEI, sandbox, <code>POST /pixAutomatico/authorizations</code>, webhook <code>PAYMENT_RECEIVED</code>/<code>PAYMENT_OVERDUE</code>. Isso é 2 a 3 dias de dev, não um projeto. Não use "assinatura Mercado Pago" — cartão-only é exatamente o canal que falha 10–15%/mês. Faça Pix Automático como padrão e cartão como fallback.</p>
+<p><strong>Agora a conta de esforço que mata o preço dele.</strong> Polp: R$160 fixo + R$4/usuário. Básico R$19,90 − R$4 − taxa ≈ <strong>R$15,80 de margem</strong>. Casal R$29,90 − R$12 ≈ <strong>R$17,80</strong>. Ele cobra 50% a mais para ganhar R$2. O plano avançado é pior que o básico por conta atendida. Conserta assim: básico R$19,90 com 1 conexão, <strong>+R$9,90 por conexão extra</strong> (add-on, não plano). Cobrar por unidade de custo variável é uma linha de código; inventar plano é uma tela nova.</p>
+<p>Fixo mensal: R$160 + R$60 VM = R$220. <strong>Break-even em 14 assinantes.</strong> Esse é o número dele, não 150.</p>
+<p>O bloqueio real não é preço nem free: é a integração Open Finance. Estime 3 a 6 semanas solo (OAuth, tela de consentimento, sync, deduplicação, categorização, renovação de consentimento em 12 meses). Sem ela nada mais importa.</p>
+<p><strong>(A) Preço:</strong> R$19,90/mês com 1 conexão + R$9,90 por conexão extra. Anual R$199. Mata o "casal".<br>
+<strong>(B) Free:</strong> não. Freemium converte 2–4%; para os 14 pagantes você precisaria de ~400 usuários free, e você tem zero tráfego — free só adiciona suporte. Faça <strong>trial de 14 dias com Pix Automático autorizado na entrada</strong>. Cobra sozinho no dia 15.</p>
+<p style="font-size:13px;color:var(--muted)">Fontes: docs.asaas.com/docs/pix-automatico · docs.asaas.com/docs/pix-automatico-implementacao</p>
+</div>
+</details>
+
+<h2>Rodada de revisão cruzada</h2>
+
+<details>
+<summary><span>Placar e destaques das 5 revisões anônimas</span></summary>
+<div class="body">
+<p><strong>Placar:</strong> o Executor recebeu <strong>5 votos de 5</strong> como parecer mais forte — unanimidade. Pontos cegos apontados: Outsider 4 votos, Expansionista 1 voto.</p>
+<p><strong>Por que o Executor venceu (consenso dos revisores):</strong> foi a única que removeu o bloqueio operacional real — Pix Automático via Asaas, com endpoint, taxa e webhook nomeados — em vez de apenas reprecificar. Corrigiu o break-even (14, não 150), converteu o falso "casal" em add-on alinhado à unidade de custo, e foi a única a estimar o custo de construir a integração Open Finance (3–6 semanas solo), que é o gargalo que precede preço e free.</p>
+<p><strong>O ponto cego do Outsider (4 votos):</strong> diagnóstico de percepção excelente ("plano casal sem login é enganação"), mas zero economia unitária. Pedir 2 conexões no plano de R$19,90 dobra o custo variável do tier de menor margem; "login de verdade pro cônjuge" a R$34,90 significa multiusuário, permissões e dados compartilhados — semanas de dev, no plano que menos paga.</p>
+<p><strong>O ponto cego do Expansionista (1 voto):</strong> prega free permanente com "CAC zero", SEO e boca-a-boca — mas ele tem zero tráfego. Free sem distribuição não é canal, é suporte. E ainda empilha um produto B2B para contadores num dev solo que não entregou nem a primeira integração.</p>
+<p><strong>O que os cinco conselheiros deixaram passar</strong> (levantado independentemente por todos os revisores):</p>
+<ul>
+  <li>Se os R$4 da Polp são por usuário ou por conexão — 5 de 5 revisores.</li>
+  <li>Due diligence da Polp: autorização AISP no BCB, cobertura de instituições, SLA, mínimo mensal, plano B se o fornecedor repreçar ou fechar.</li>
+  <li>Churn: break-even de 14 sem taxa de cancelamento não significa nada. A 8%/mês, a base se consome antes de crescer.</li>
+  <li>O gate de retenção definido no conselho de 31/07 (50% no mês 3) — nenhum dos cinco revisitou.</li>
+  <li>LGPD com dados bancários numa operação solo.</li>
+</ul>
+</div>
+</details>
+
+<footer>
+  <p>Conselho realizado em 02/08/2026 · 5 conselheiros independentes · 5 revisões cruzadas anônimas · 1 síntese do Chairman.<br>
+  Transcrição completa: <code>council-transcript-2026-08-02.md</code> · Conselho anterior: <code>council-transcript-2026-07-31.md</code></p>
+</footer>
+
+</div>
+</body>
+</html>
