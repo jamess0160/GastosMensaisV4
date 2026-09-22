@@ -1020,30 +1020,75 @@ describe("Expenses", () => {
     //  nenhum: é sempre o dia em que o dinheiro sai da conta.
     describe("POST /Expenses — CompetenceMode do cartão", () => {
 
-        //  O mesmo dia, o mesmo cartão, dois modos: em 'purchase' a compra pesa em agosto,
-        //  em 'invoice' ela pesa em setembro, com a fatura. A CashDate é a mesma nos dois.
-        it("conta no mês da compra em 'purchase' e no do vencimento em 'invoice'", async () => {
+        //  O mesmo dia, o mesmo cartão, dois modos — e os dois respondem sobre a **mesma
+        //  fatura**, em dois pontos dela: 'purchase' pesa no mês em que ela FECHA, 'invoice' no
+        //  mês em que ela VENCE. Num cartão que fecha 27 e vence 04 esses dois meses são
+        //  diferentes, que é o que faz o teste enxergar a diferença. A CashDate é a mesma nos
+        //  dois: quem paga a fatura é o vencimento, em modo nenhum.
+        it("conta no mês em que a fatura fecha em 'purchase' e no do vencimento em 'invoice'", async () => {
             let workspace = await buildWorkspace()
 
-            let everyday = await createCard(workspace, { CompetenceMode: "purchase" })
-            let deferred = await createCard(workspace, { CompetenceMode: "invoice" })
+            let everyday = await createCard(workspace, { DueDay: 4, ClosingDay: 27, CompetenceMode: "purchase" })
+            let deferred = await createCard(workspace, { DueDay: 4, ClosingDay: 27, CompetenceMode: "invoice" })
 
-            //  Compra de 21/08 num cartão que vence no dia 28 com folga de 8: já fechou, então
-            //  a fatura é a de setembro
-            let onEveryday = await createExpense(workspace, { ExpenseDate: "2026-08-21", Payments: [{ IdPaymentMethod: everyday, Value: 100 }] })
-            let onDeferred = await createExpense(workspace, { ExpenseDate: "2026-08-21", Payments: [{ IdPaymentMethod: deferred, Value: 100 }] })
+            //  Compra de 20/08: pegou a fatura que fecha em 27/08 e é cobrada em 04/09
+            let onEveryday = await createExpense(workspace, { ExpenseDate: "2026-08-20", Payments: [{ IdPaymentMethod: everyday, Value: 100 }] })
+            let onDeferred = await createExpense(workspace, { ExpenseDate: "2026-08-20", Payments: [{ IdPaymentMethod: deferred, Value: 100 }] })
 
             expect((await findPayments(onEveryday.IdExpense))[0]).toMatchObject({
-                DueDate: "2026-09-28",
-                CompetenceDate: "2026-08-21",
-                CashDate: "2026-09-28",
+                DueDate: "2026-09-04",
+                CompetenceDate: "2026-08-20",
+                CashDate: "2026-09-04",
             })
 
             expect((await findPayments(onDeferred.IdExpense))[0]).toMatchObject({
-                DueDate: "2026-09-28",
-                CompetenceDate: "2026-09-28",
-                CashDate: "2026-09-28",
+                DueDate: "2026-09-04",
+                CompetenceDate: "2026-09-04",
+                CashDate: "2026-09-04",
             })
+        })
+
+        //  **O teste que abriu o retorno.** Quatro compras em volta do fechamento de um cartão
+        //  que fecha dia 30, e a linha que separa os dois meses tem que cair entre 30 e 31.
+        //
+        //  Antes o mês vinha da data da compra, e a de 31/08 pesava em agosto — numa fatura que
+        //  já tinha fechado no dia 30, que não a cobraria e que não a mostraria. Ela consumia um
+        //  orçamento que nunca tocou. O modo 'invoice' erra o mesmo caso na direção oposta: a
+        //  fatura que pega essa compra só vence em outubro.
+        //
+        //  O dia é preservado e só o mês anda: 31/08 + 1 mês é 30/09 (o `addMonthsToDate`
+        //  grampeia), e é isso que mantém o gráfico diário do Relatório dizendo o que diz.
+        it("joga a compra feita depois do fechamento no mês do ciclo seguinte", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { DueDay: 10, ClosingDay: 30, CompetenceMode: "purchase" })
+
+            let competenceOf = async (ExpenseDate: string) => {
+                let created = await createExpense(workspace, { ExpenseDate, Payments: [{ IdPaymentMethod: card, Value: 100 }] })
+
+                return (await findPayments(created.IdExpense))[0].CompetenceDate
+            }
+
+            //  Ainda na fatura que fecha em 30/08
+            expect(await competenceOf("2026-08-29")).toBe("2026-08-29")
+            //  **No dia do fechamento ainda é daquela fatura** — a mesma convenção do `cycleOf`
+            expect(await competenceOf("2026-08-30")).toBe("2026-08-30")
+            //  Um dia depois, e o mês inteiro muda
+            expect(await competenceOf("2026-08-31")).toBe("2026-09-30")
+            expect(await competenceOf("2026-09-01")).toBe("2026-09-01")
+        })
+
+        //  A mesma linha no cartão que motivou a leva — fecha 27, vence 04. Um dia de diferença
+        //  na compra vira um mês de diferença no orçamento, e é por isso que o `ClosingDay`
+        //  cadastrado errado não é detalhe de cadastro.
+        it("separa 27 de 28 num cartão que fecha no dia 27", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { DueDay: 4, ClosingDay: 27, CompetenceMode: "purchase" })
+
+            let onClosing = await createExpense(workspace, { ExpenseDate: "2026-09-27", Payments: [{ IdPaymentMethod: card, Value: 100 }] })
+            let afterClosing = await createExpense(workspace, { ExpenseDate: "2026-09-28", Payments: [{ IdPaymentMethod: card, Value: 100 }] })
+
+            expect((await findPayments(onClosing.IdExpense))[0].CompetenceDate).toBe("2026-09-27")
+            expect((await findPayments(afterClosing.IdExpense))[0].CompetenceDate).toBe("2026-10-28")
         })
 
         //  **O teste da etapa.** Se 'purchase' significasse simplesmente CompetenceDate =
@@ -1082,20 +1127,21 @@ describe("Expenses", () => {
             let workspace = await buildWorkspace()
             let card = await createCard(workspace, { CompetenceMode: "purchase" })
 
-            let created = await createExpense(workspace, { ExpenseDate: "2026-08-21", Payments: [{ IdPaymentMethod: card, Value: 100 }] })
+            //  Compra de 10/08 num cartão que fecha dia 20: ainda pegou a fatura de agosto
+            let created = await createExpense(workspace, { ExpenseDate: "2026-08-10", Payments: [{ IdPaymentMethod: card, Value: 100 }] })
 
-            expect((await findPayments(created.IdExpense))[0].CompetenceDate).toBe("2026-08-21")
+            expect((await findPayments(created.IdExpense))[0].CompetenceDate).toBe("2026-08-10")
 
             let update = await workspace.client.put(`/PaymentMethods/IdPaymentMethod=${card}`, { Name: "Cartão", CompetenceMode: "invoice" })
 
             expect(update.status).toBe(200)
 
-            expect((await findPayments(created.IdExpense))[0].CompetenceDate).toBe("2026-08-21")
+            expect((await findPayments(created.IdExpense))[0].CompetenceDate).toBe("2026-08-10")
 
             //  A compra seguinte já nasce no modo novo: o que é congelado é a perna, não a regra
-            let next = await createExpense(workspace, { ExpenseDate: "2026-08-21", Payments: [{ IdPaymentMethod: card, Value: 100 }] })
+            let next = await createExpense(workspace, { ExpenseDate: "2026-08-10", Payments: [{ IdPaymentMethod: card, Value: 100 }] })
 
-            expect((await findPayments(next.IdExpense))[0].CompetenceDate).toBe("2026-09-28")
+            expect((await findPayments(next.IdExpense))[0].CompetenceDate).toBe("2026-08-28")
         })
 
         //  **O saldo não pode mudar com o modo** — o parâmetro responde "quanto eu gastei",

@@ -266,10 +266,11 @@ describe("Reports", () => {
         //  'purchase' — que é o default de todo cartão — fez elas divergirem em toda compra.
         it("desconta da abertura a compra que pesou no mês passado e vence neste", async () => {
             let workspace = await buildWorkspace()
-            let card = await createCard(workspace, "purchase")
+            let card = await createCard(workspace, "purchase", { DueDay: 4, ClosingDay: 27 })
 
-            //  Vence dia 28 com folga de 8, então fecha dia 20: a compra de 25/08 cai na fatura
-            //  de 28/09. Competência 25/08 — pesou em agosto; caixa 28/09 — sai em setembro.
+            //  Fecha 27 e vence 04, ou seja, a fatura é cobrada no mês seguinte ao que ela
+            //  fecha: a compra de 25/08 entrou na fatura que fechou em 27/08 e vence em 04/09.
+            //  Competência 25/08 — pesou em agosto; caixa 04/09 — sai em setembro.
             await createExpense(workspace, {
                 TotalValue: 500,
                 ExpenseDate: "2026-08-25",
@@ -284,7 +285,7 @@ describe("Reports", () => {
             //  O saldo de 31/08 ainda contém os 500: a fatura não tinha vencido
             expect(response.body.OpeningBalance).toBe(1000)
             expect(response.body.PastCommitments).toBe(500)
-            //  **E não é atrasado nenhum**: a fatura vence em 28/09. Antes, toda compra de
+            //  **E não é atrasado nenhum**: a fatura vence em 04/09. Antes, toda compra de
             //  cartão do mês passado caía no vencido e a tela anunciava "R$ 500 vencidos"
             expect(response.body.OverduePayable).toBe(0)
             //  Contada uma vez só: 1000 − 500
@@ -298,7 +299,7 @@ describe("Reports", () => {
         //  PastCommitments não filtra Paid: o que decide é a data, nunca o estado.
         it("não mexe no Available quando a fatura do mês passado é paga", async () => {
             let workspace = await buildWorkspace()
-            let card = await createCard(workspace, "purchase")
+            let card = await createCard(workspace, "purchase", { DueDay: 4, ClosingDay: 27 })
 
             await createExpense(workspace, {
                 TotalValue: 500,
@@ -308,7 +309,7 @@ describe("Reports", () => {
 
             let before = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-09`)
 
-            await workspace.client.post(`/PaymentMethods/IdPaymentMethod=${card}/payInvoice`, { DueDate: "2026-09-28" })
+            await workspace.client.post(`/PaymentMethods/IdPaymentMethod=${card}/payInvoice`, { DueDate: "2026-09-04" })
 
             let after = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-09`)
 
@@ -324,12 +325,12 @@ describe("Reports", () => {
         //  termos não podem se sobrepor, ou a mesma perna desce o indicador duas vezes.
         it("separa a dívida vencida do compromisso que ainda vai vencer", async () => {
             let workspace = await buildWorkspace()
-            let card = await createCard(workspace, "purchase")
+            let card = await createCard(workspace, "purchase", { DueDay: 4, ClosingDay: 27 })
 
             //  Débito em julho, nunca pago: as duas datas no passado
             await createExpense(workspace, { TotalValue: 300, ExpenseDate: "2026-07-10" })
 
-            //  Cartão em agosto, fatura em 28/09: pesou antes, o dinheiro ainda está na conta
+            //  Cartão em agosto, fatura em 04/09: pesou antes, o dinheiro ainda está na conta
             await createExpense(workspace, {
                 TotalValue: 500,
                 ExpenseDate: "2026-08-25",
@@ -726,16 +727,18 @@ describe("Reports", () => {
             expect(empty.Accounts.find((item: { IdAccount: number }) => item.IdAccount === second.body.IdAccount)).toBeUndefined()
         })
 
-        //  Num cartão 'purchase' a competência é o mês da compra e a fatura é outra: agrupar
-        //  pela competência partiria a fatura em pedaços que o emissor nunca cobrou
+        //  Num cartão 'purchase' a competência é o mês em que a fatura FECHA, e num cartão que
+        //  fecha no mês anterior ao do vencimento esse não é o mês em que ela é cobrada:
+        //  agrupar pela competência partiria a fatura em pedaços que o emissor nunca cobrou
         it("monta a fatura do cartão 'purchase' pelo vencimento, não pela competência", async () => {
             let workspace = await buildWorkspace()
-            let card = await createCard(workspace, "purchase")
+            let card = await createCard(workspace, "purchase", { DueDay: 4, ClosingDay: 27 })
 
-            //  Compra de 21/08: pesa em agosto, mas a fatura vence em 28/09
+            //  Compra de 20/08: entrou na fatura que fechou em 27/08, então pesa em agosto —
+            //  mas essa fatura só vence em 04/09
             await createExpense(workspace, {
                 TotalValue: 200,
-                ExpenseDate: "2026-08-21",
+                ExpenseDate: "2026-08-20",
                 Payments: [{ IdPaymentMethod: card, Value: 200 }],
             })
 
@@ -744,21 +747,23 @@ describe("Reports", () => {
             let september = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-09`)).body
 
             expect(september.Cards).toHaveLength(1)
-            expect(september.Cards[0]).toMatchObject({ DueDate: "2026-09-28", Total: 200 })
-            expect(september.Cards[0].Entries[0].Date).toBe("2026-08-21")
+            expect(september.Cards[0]).toMatchObject({ DueDate: "2026-09-04", Total: 200 })
+            expect(september.Cards[0].Entries[0].Date).toBe("2026-08-20")
         })
 
         //  O recorte pelo vencimento é o certo e não muda — o que faltava era a resposta DIZER
-        //  de quais compras a fatura é feita. Em setembro ela é feita de agosto, e num cartão
-        //  'purchase' agosto é o mês em que essas compras pesaram: sem o ciclo, olhar a tela
-        //  não permite saber nem uma coisa nem a outra.
+        //  de quais compras a fatura é feita. A de setembro é feita de compras que começaram em
+        //  agosto, e o ciclo é a única coisa na tela que diz isso: sem ele, uma linha de 21/08
+        //  numa fatura de setembro parece lançamento no mês errado.
         it("declara o ciclo que a fatura cobre e o modo do cartão", async () => {
             let workspace = await buildWorkspace()
             let card = await createCard(workspace, "purchase")
 
-            //  Vence dia 28 com folga de 8: a fatura de 28/09 fecha em 20/09, e a anterior
-            //  fechou em 20/08 — o ciclo abre no dia seguinte. A compra de 21/08 é a primeira
-            //  que ele pega, que é o que amarra o ciclo declarado à regra que postou a perna.
+            //  Fecha 20 e vence 28: a fatura de 28/09 fecha em 20/09, e a anterior fechou em
+            //  20/08 — o ciclo abre no dia seguinte. A compra de 21/08 é a primeira que ele
+            //  pega, que é o que amarra o ciclo declarado à regra que postou a perna: é o mesmo
+            //  `ClosingDay` que mandou essa compra para esta fatura e para a competência de
+            //  setembro, o mês em que a fatura fecha.
             await createExpense(workspace, {
                 TotalValue: 200,
                 ExpenseDate: "2026-08-21",
@@ -1007,14 +1012,23 @@ async function buildWorkspace(account_: { InitialBalance?: number, InitialBalanc
 }
 
 //  O modo é explícito porque a competência do cartão depende dele: 'invoice' é o cartão que
-//  pesa no mês da fatura, que é o que estes testes montam
-async function createCard(workspace: TestWorkspace, CompetenceMode: "invoice" | "purchase") {
+//  pesa no mês da fatura, que é o que estes testes montam.
+//
+//  Os dois dias são sobrescrevíveis porque a relação entre eles muda o que o cartão consegue
+//  demonstrar: o padrão fecha 20 e vence 28, então fatura e competência caem no mesmo mês; quem
+//  precisa de competência num mês e caixa no outro pede `{ DueDay: 4, ClosingDay: 27 }`, que é
+//  o cartão que fecha no mês anterior ao do vencimento.
+async function createCard(
+    workspace: TestWorkspace,
+    CompetenceMode: "invoice" | "purchase",
+    card: { DueDay?: number, ClosingDay?: number } = {},
+) {
     let response = await workspace.client.post(`/PaymentMethods`, {
         IdAccount: workspace.IdAccount,
         Name: "Cartão",
         Kind: "credit_card",
-        DueDay: 28,
-        ClosingDay: 20,
+        DueDay: card.DueDay ?? 28,
+        ClosingDay: card.ClosingDay ?? 20,
         CompetenceMode,
     })
 

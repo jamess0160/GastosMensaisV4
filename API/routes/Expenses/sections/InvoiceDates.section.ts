@@ -52,18 +52,39 @@ class Controller {
      * **`CashDate` é quando o dinheiro sai da conta** — `coalesce(DueDate, ExpenseDate)`,
      * sempre, sem depender de modo nenhum. É o corte do saldo e do extrato.
      *
-     * **`CompetenceDate` é quando a perna pesa**, e é ela que o cartão governa:
+     * **`CompetenceDate` é quando a perna pesa**, e é ela que o cartão governa. Os dois modos
+     * respondem a mesma pergunta sobre a **fatura** que pegou a compra, em dois pontos dela:
      *
-     *     invoice    ->  o vencimento — a compra de 20/08 pesa no mês da fatura
-     *     purchase   ->  ExpenseDate + (n−1) meses — o cartão contado como débito
+     *     purchase   ->  o mês em que essa fatura FECHA
+     *     invoice    ->  o mês em que essa fatura VENCE
+     *
+     * **Quem decide o mês é o ciclo, não a data da compra**, e é aí que o `cycleShift` entra.
+     * Num cartão que fecha dia 30, a compra de 31/08 não está na fatura de agosto: ela chegou
+     * depois do fechamento, vai ser cobrada com a fatura seguinte, e pesar em agosto consumiria
+     * um orçamento que ela nunca tocou. `dia(ExpenseDate) > ClosingDay` é a linha entre os dois
+     * casos — e ela cai **depois** do dia do fechamento, porque a compra feita *no* dia em que
+     * a fatura fecha ainda é daquela fatura, a mesma convenção do `cycleOf` logo abaixo.
+     *
+     * Três coisas nessa fórmula, e todas mudam o resultado:
+     *
+     * - **o dia da compra é preservado, o mês é que anda.** Escrever a competência como o
+     *   próprio `ClosingDate` daria o mesmo mês e arruinaria o único lugar que lê a competência
+     *   como *dia* — o gráfico diário do Relatório —, empilhando o mês inteiro de compras num
+     *   pico no dia do fechamento;
+     * - **o `addMonthsToDate` grampeia**, e é por isso que ele é a operação certa aqui: 31/08
+     *   mais um mês é 30/09, nunca 03/10. O dia que não existe no mês de destino vira o último
+     *   dele e o mês — que é o que a competência quer dizer — sai certo;
+     * - **o `cycleShift` nunca passa de 1.** Com o fechamento sendo um dia do mês, a compra ou
+     *   pegou a fatura que fecha no mês dela ou pegou a do mês seguinte; não há terceiro caso.
      *
      * O avanço por parcela no modo `purchase` **não é detalhe**: sem ele, 600 em 6x jogaria
      * 600 inteiros no mês da compra e mataria a regra "a parcela pesa 100 por mês", que é a
      * razão de o orçamento somar pernas em vez de gastos. E é a mesma fórmula que o carnê e o
-     * crediário fora do cartão já usam — o modo novo não inventa conceito nenhum.
+     * crediário fora do cartão já usam — o modo não inventa conceito nenhum.
      *
-     * Fora do cartão o modo é nulo e não há o que escolher: sem fatura, consumo e pagamento
-     * acontecem no mesmo dia e as duas datas coincidem.
+     * Fora do cartão o modo é nulo e não há o que escolher: sem fatura não há fechamento, o
+     * `cycleShift` é sempre 0 e as duas datas coincidem, porque consumo e pagamento acontecem
+     * no mesmo dia.
      */
     private withDates(
         dates: { ClosingDate: string | null, DueDate: string | null },
@@ -73,8 +94,10 @@ class Controller {
     ) {
         let CashDate = dates.DueDate ?? ExpenseDate
 
+        let cycleShift = this.isCreditCard(paymentMethod) ? this.monthsToClosing(paymentMethod, ExpenseDate) : 0
+
         let CompetenceDate = paymentMethod.CompetenceMode === "purchase"
-            ? Utils.addMonthsToDate(ExpenseDate, index)
+            ? Utils.addMonthsToDate(ExpenseDate, cycleShift + index)
             : CashDate
 
         return { ...dates, CashDate, CompetenceDate }
@@ -170,6 +193,10 @@ class Controller {
 
     //  Zero quando a compra ainda pegou a fatura que fecha no mês dela, um quando ela passou do
     //  fechamento. Não há terceiro valor possível: o fechamento acontece uma vez por mês.
+    //
+    //  **Uma conta, dois leitores.** Ela diz em que mês a fatura desta compra fecha, e isso é o
+    //  que o `creditCardInvoice` precisa para achar o vencimento *e* o que o `withDates` precisa
+    //  para saber em que mês a compra pesa. Duas cópias divergiriam no único dia que importa.
     private monthsToClosing(card: CardCycleSource, ExpenseDate: string) {
         return ExpenseDate <= Utils.setDayOfMonth(ExpenseDate, card.ClosingDay!) ? 0 : 1
     }

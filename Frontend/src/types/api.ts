@@ -390,10 +390,14 @@ export namespace ApiTypes {
     /** Em qual mês a compra do cartão PESA — a única configuração do
      *  cadastro que muda um número já mostrado na tela.
      *
-     *  | Modo | A compra de 21/08 num cartão que vence dia 28 | 600 em 6× |
-     *  |---|---|---|
-     *  | `purchase` *(default)* | pesa em **agosto** | 100/mês a partir de agosto |
-     *  | `invoice` | pesa em **setembro**, com a fatura | 100/mês a partir de setembro |
+     *  **Quem decide o mês é o CICLO, não a data da compra**, e os dois
+     *  modos falam da mesma fatura em dois pontos dela. Num cartão que
+     *  fecha 27 e vence 04:
+     *
+     *  | Modo | A compra de 20/08 | A compra de 28/09 | 600 em 6× |
+     *  |---|---|---|---|
+     *  | `purchase` *(default)* | pesa em **agosto** — o mês em que a fatura dela fecha | pesa em **outubro**: ela passou do fechamento de setembro | 100/mês a partir do mês do ciclo |
+     *  | `invoice` | pesa em **setembro**, com o vencimento | pesa em **novembro** | 100/mês a partir do vencimento |
      *
      *  Ele governa a COMPETÊNCIA, nunca o caixa: o `Balance` da conta é
      *  idêntico nos dois modos, porque o dinheiro sai quando a fatura é

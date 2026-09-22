@@ -99,10 +99,17 @@ export const cycleLabel = (cycle: InvoiceCycle): string =>
 
 /** O modo, em uma frase curta. É a única configuração do cadastro que
  *  muda um número já exibido na tela, então ela precisa ser legível sem
- *  abrir o formulário — no painel do cartão e no cabeçalho da fatura. */
+ *  abrir o formulário — no painel do cartão e no cabeçalho da fatura.
+ *
+ *  Os dois falam da MESMA fatura, em dois pontos dela — e é por isso
+ *  que "pesa no mês da compra" saiu: quem decide o mês é o ciclo, não a
+ *  data. A compra de 28/09 num cartão que fecha 27 pegou a fatura que
+ *  fecha em 27/10 e vence em 04/11, então ela pesa em outubro no
+ *  `purchase` e em novembro no `invoice`. Em nenhum dos dois ela pesa
+ *  em setembro, por mais que tenha sido comprada em setembro. */
 export const COMPETENCE_LABEL: Record<ApiTypes.CompetenceMode, string> = {
-    purchase: "pesa no mês da compra",
-    invoice: "pesa no mês da fatura",
+    purchase: "pesa no mês em que a fatura fecha",
+    invoice: "pesa no mês em que a fatura vence",
 };
 
 /* ── A fatura ─────────────────────────────────────────────── */

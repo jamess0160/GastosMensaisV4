@@ -1111,8 +1111,8 @@ export function Accounts() {
                                 label="Como você usa esse cartão?"
                                 help={
                                     cardDraft.CompetenceMode === "purchase"
-                                        ? "As compras nesse cartão diminuem o tanto de dinheiro que você pode gastar nesse mês."
-                                        : "As compras nesse cartão diminuem o tanto de dinheiro que você pode gastar no mês que vêm."
+                                        ? "As compras diminuem o dinheiro que você pode gastar no mês em que a fatura delas fecha. O que você passar depois do dia do fechamento já conta no mês seguinte."
+                                        : "As compras diminuem o dinheiro que você pode gastar no mês em que a fatura delas vence, que é quando você vai pagar por elas."
                                 }
                             >
                                 {() => (
