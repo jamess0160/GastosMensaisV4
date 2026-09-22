@@ -1,5 +1,5 @@
 import { HttpResponse, http as msw } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { server } from "@/test/server";
 import { saveAccount } from "../sections/saveAccount";
 import { saveCard } from "../sections/saveCard";
@@ -134,10 +134,28 @@ describe("saveCard", () => {
 
         expect(body?.Kind).toBe("credit_card");
         expect(body?.IdAccount).toBe(1);
-        // A tela pergunta duas datas; a API guarda vencimento + folga.
-        expect(body?.DueDay).toBe(5);
-        expect(body?.ClosingOffsetDays).toBe(7);
-        expect(body).not.toHaveProperty("ClosingDay");
+        // Os dois dias vão como foram digitados: não há conversão entre
+        // o que a tela pergunta e o que a API guarda.
+        expect(body?.ClosingDay).toBe(27);
+        expect(body?.DueDay).toBe(4);
+        expect(body).not.toHaveProperty("ClosingOffsetDays");
+    });
+
+    /*  A ORDEM ENTRE OS DOIS DIAS NÃO É ERRO. `ClosingDay > DueDay` é o
+        cartão que fecha no mês anterior ao do vencimento, e é exatamente
+        o par do rascunho padrão (27 e 04) — o que a folga não conseguia
+        descrever em todos os meses. Salva de primeira, sem aviso
+        nenhum, porque não há mais deriva sobre a qual avisar. */
+    it("aceita fechamento depois do vencimento, sem aviso nenhum", async () => {
+        server.use(
+            msw.post("*/api/PaymentMethods", () => HttpResponse.json({ IdPaymentMethod: 9 })),
+        );
+        const context = fakeAccountsContext();
+
+        await saveCard(context);
+
+        expect(context.failSubmit).not.toHaveBeenCalled();
+        expect(context.finishSubmit).toHaveBeenCalledOnce();
     });
 
     it("NÃO manda Kind nem IdAccount no PUT — a API não os aceita", async () => {
@@ -157,39 +175,26 @@ describe("saveCard", () => {
         expect(body).not.toHaveProperty("IdAccount");
     });
 
-    it("recusa fatura que fecha depois de vencer, sem gastar requisição", async () => {
+    it("recusa dia fora de 1..31, sem gastar requisição", async () => {
         const context = fakeAccountsContext({
-            cardDraft: aCardDraft({ ClosingDate: "2026-09-10", DueDate: "2026-09-05" }),
+            cardDraft: aCardDraft({ ClosingDay: 45 }),
         });
 
         await saveCard(context);
 
-        expect(context.failSubmit).toHaveBeenCalledWith("A fatura tem que fechar antes de vencer.");
+        expect(context.failSubmit).toHaveBeenCalledWith("Os dois dias têm que estar entre 1 e 31.");
         expect(context.beginSubmit).not.toHaveBeenCalled();
     });
 
-    it("recusa folga acima de 28 dias — é o limite do schema", async () => {
+    it("recusa cartão sem os dois dias da fatura", async () => {
         const context = fakeAccountsContext({
-            cardDraft: aCardDraft({ ClosingDate: "2026-08-01", DueDate: "2026-09-05" }),
+            cardDraft: aCardDraft({ ClosingDay: null, DueDay: null }),
         });
 
         await saveCard(context);
 
         expect(context.failSubmit).toHaveBeenCalledWith(
-            "O fechamento precisa cair entre 1 e 28 dias antes do vencimento.",
-        );
-        expect(context.beginSubmit).not.toHaveBeenCalled();
-    });
-
-    it("recusa cartão sem as datas da fatura", async () => {
-        const context = fakeAccountsContext({
-            cardDraft: aCardDraft({ ClosingDate: null, DueDate: null }),
-        });
-
-        await saveCard(context);
-
-        expect(context.failSubmit).toHaveBeenCalledWith(
-            "Informe o fechamento e o vencimento da última fatura.",
+            "Informe o dia em que a fatura fecha e o dia em que ela vence.",
         );
         expect(context.beginSubmit).not.toHaveBeenCalled();
     });
@@ -234,66 +239,26 @@ describe("saveCard", () => {
         );
     });
 
-    /*  A ETAPA 2 DA LEVA 6. O fechamento aqui é uma subtração de dias
-        corridos a partir do vencimento; o emissor fecha num dia fixo do
-        mês. Quando a subtração atravessa a virada, as duas descrições
-        discordam por um dia em parte do ano — e um dia no fechamento é um
-        mês no caixa. Trocar o modelo é leva própria; o que a tela não pode
-        fazer é aceitar isso em silêncio. */
-    it("avisa uma vez antes de salvar uma folga cujo fechamento anda de mês para mês", async () => {
-        // Fechou 29/08 e venceu 05/09: folga de 7 dias atravessando a
-        // virada, então o fechamento derivado cai no 26, 27, 28 ou 29
-        // conforme o tamanho do mês anterior.
-        const context = fakeAccountsContext({
-            cardDraft: aCardDraft({ cycleAcknowledged: false }),
-        });
-
-        await saveCard(context);
-
-        expect(context.acknowledgeCycleDrift).toHaveBeenCalledOnce();
-        expect(context.beginSubmit).not.toHaveBeenCalled();
-        expect(context.failSubmit).toHaveBeenCalledOnce();
-        expect(vi.mocked(context.failSubmit).mock.calls[0][0]).toContain("você leu o dia 29");
-    });
-
-    it("salva no segundo envio, com o aviso do ciclo lido", async () => {
-        let body: Record<string, unknown> | undefined;
-        server.use(
-            msw.post("*/api/PaymentMethods", async ({ request }) => {
-                body = (await request.json()) as Record<string, unknown>;
-                return HttpResponse.json({ IdPaymentMethod: 9 });
-            }),
-        );
-        const context = fakeAccountsContext({
-            cardDraft: aCardDraft({ cycleAcknowledged: true }),
-        });
-
-        await saveCard(context);
-
-        // O aviso informa, não impede: o cartão real existe e precisa ser
-        // cadastrado com a melhor descrição que o modelo permite.
-        expect(body?.DueDay).toBe(5);
-        expect(body?.ClosingOffsetDays).toBe(7);
-        expect(context.finishSubmit).toHaveBeenCalledOnce();
-    });
-
-    it("salva de primeira o cartão cujo fechamento cai sempre no mesmo dia", async () => {
+    /*  O AVISO DE DERIVA DA LEVA 6 MORREU AQUI, e o que o substitui não
+        é outro aviso antes de salvar: é o dado certo no modelo. A folga
+        produzia fechamentos em dias diferentes conforme o tamanho do mês,
+        e a tela avisava uma vez antes de gravar o que ela sabia estar
+        aproximado. Com os dois dias do mês não há aproximação nenhuma —
+        a conferência que sobra é a da CONVERSÃO dos cartões antigos, e
+        ela é uma faixa no formulário de edição, não um envio recusado. */
+    it("salva de primeira o cartão que fecha e vence no mesmo mês", async () => {
         server.use(
             msw.post("*/api/PaymentMethods", () => HttpResponse.json({ IdPaymentMethod: 9 })),
         );
-        // Vence 28 e fecha 8 dias antes: o dia 20 do MESMO mês, todo mês.
-        // A subtração nunca atravessa a virada, então não há o que avisar.
+        // Fecha 05 e vence 15: `ClosingDay <= DueDay`, o outro caso que
+        // existe no mundo.
         const context = fakeAccountsContext({
-            cardDraft: aCardDraft({
-                ClosingDate: "2026-08-20",
-                DueDate: "2026-08-28",
-                cycleAcknowledged: false,
-            }),
+            cardDraft: aCardDraft({ ClosingDay: 5, DueDay: 15 }),
         });
 
         await saveCard(context);
 
-        expect(context.acknowledgeCycleDrift).not.toHaveBeenCalled();
+        expect(context.failSubmit).not.toHaveBeenCalled();
         expect(context.finishSubmit).toHaveBeenCalledOnce();
     });
 

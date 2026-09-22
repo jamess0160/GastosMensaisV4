@@ -1,13 +1,6 @@
 import { errorMessage } from "@/api/client";
 import { PaymentMethodsConnection } from "@/api/PaymentMethods.connection";
-import {
-    cardCycleFromDates,
-    checkCardCycle,
-    closingDaysLabel,
-    MAX_CLOSING_OFFSET_DAYS,
-    MIN_CLOSING_OFFSET_DAYS,
-} from "@/lib/card";
-import { currentMonth, formatDate } from "@/lib/date";
+import { MAX_DAY_OF_MONTH, MIN_DAY_OF_MONTH } from "@/lib/card";
 import type { AccountsContext } from "../controller";
 
 /** Criar ou editar um cartão de crédito.
@@ -25,13 +18,30 @@ import type { AccountsContext } from "../controller";
  *  guardado à toa. Não há leitura defensiva nem campo legado — o banco
  *  é ajustado junto.
  *
- *  O CICLO DA FATURA. A tela pergunta duas datas — quando a última
- *  fatura fechou e quando ela venceu —, e o que a API guarda é o par
- *  `DueDay` + `ClosingOffsetDays`: o dia do vencimento e quantos dias
- *  antes dele a fatura fecha. A conversão é a de `src/lib/card.ts`.
- *  Mandar `null` em qualquer um dos dois no PUT responde 406, daí a
- *  conferência local antes. Eles não são detalhe: em cartão, um dia de
- *  diferença na compra vira um mês de diferença no caixa.
+ *  O CICLO DA FATURA SÃO DOIS DIAS DO MÊS, e a tela pergunta exatamente
+ *  os dois que estão escritos na fatura: em que dia ela fecha e em que
+ *  dia ela vence. Não há mais conversão no caminho.
+ *
+ *  Até a leva 9 a tela pedia as duas DATAS da última fatura e derivava
+ *  delas uma folga em dias. A folga errava por construção: `04/09 − 8` é
+ *  27/08 e `04/10 − 8` é 26/09, o mesmo cartão com dois dias de
+ *  fechamento, porque os meses têm tamanhos diferentes. Com isso a
+ *  compra de 27/09 ia para a fatura de novembro em vez da de outubro —
+ *  um dia de erro na descrição virando um mês de erro no caixa. Junto
+ *  com a folga saiu o aviso de deriva que esta section dava antes de
+ *  salvar: não há mais deriva sobre a qual avisar.
+ *
+ *  **NENHUM DOS DOIS TEM DEFAULT.** A folga tinha (7 dias), e ali o
+ *  default era defensável porque uma folga se deduz do que o setor
+ *  pratica; um dia do mês não se deduz de nada. Mandar `null` em
+ *  qualquer um dos dois no PUT responde 406, daí a conferência local
+ *  antes.
+ *
+ *  **A ORDEM ENTRE OS DOIS DIAS NÃO É ERRO.** `ClosingDay > DueDay` é o
+ *  cartão que fecha no mês ANTERIOR ao do vencimento (fecha 27, vence
+ *  04) e `ClosingDay <= DueDay` é o que fecha e vence no mesmo mês
+ *  (fecha 05, vence 15). Os dois casos existem no mundo, então não há o
+ *  que recusar aqui além do intervalo de 1 a 31.
  *
  *  O `CompetenceMode` vai nos DOIS corpos, sempre. Ele tem default
  *  `purchase` no servidor, então omiti-lo no POST daria no mesmo — mas
@@ -39,21 +49,10 @@ import type { AccountsContext } from "../controller";
  *  opcional e omiti-lo manteria o valor, o que também não serve: o
  *  seletor existe para trocar.
  *
- *  E A FOLGA NÃO É ACEITA EM SILÊNCIO. Fechamento por dias corridos e
- *  fechamento em dia fixo do mês são descrições diferentes do mesmo
- *  cartão, e elas discordam por um dia sempre que a subtração atravessa
- *  a virada do mês (fecha 27 e vence 04: agosto tem 8 dias de folga,
- *  setembro tem 7). Quem digita as duas datas de UM mês grava a folga
- *  daquele mês. Trocar o modelo é migration mais recomputação de perna
- *  gravada, e não cabe aqui — o que cabe é avisar: o primeiro envio é
- *  recusado com a divergência escrita, e o segundo salva. A tela já mostra o
- *  mesmo em `CycleHint`, antes de qualquer clique.
- *
- *  E TROCAR O MODO VALE PARA O FUTURO. `ClosingDate`, `DueDate`,
+ *  E TROCAR O CADASTRO VALE PARA O FUTURO. `ClosingDate`, `DueDate`,
  *  `CompetenceDate` e `CashDate` são congeladas na perna no lançamento e
  *  ninguém as revisita: virar a chave em novembro não reescreve agosto —
- *  a alternativa seria mês fechado mudando de número sozinho. É a mesma
- *  regra que já valia para o vencimento e a folga. */
+ *  a alternativa seria mês fechado mudando de número sozinho. */
 export async function saveCard(context: AccountsContext): Promise<void> {
     const draft = context.cardDraft;
     if (!draft) return;
@@ -62,36 +61,13 @@ export async function saveCard(context: AccountsContext): Promise<void> {
         context.failSubmit("Informe o nome do cartão.");
         return;
     }
-    if (!draft.ClosingDate || !draft.DueDate) {
-        context.failSubmit("Informe o fechamento e o vencimento da última fatura.");
+    if (draft.ClosingDay === null || draft.DueDay === null) {
+        context.failSubmit("Informe o dia em que a fatura fecha e o dia em que ela vence.");
         return;
     }
-
-    const cycle = cardCycleFromDates(draft.ClosingDate, draft.DueDate);
-
-    if (cycle.ClosingOffsetDays < MIN_CLOSING_OFFSET_DAYS) {
-        context.failSubmit("A fatura tem que fechar antes de vencer.");
-        return;
-    }
-    if (cycle.ClosingOffsetDays > MAX_CLOSING_OFFSET_DAYS) {
+    if (!isDayOfMonth(draft.ClosingDay) || !isDayOfMonth(draft.DueDay)) {
         context.failSubmit(
-            `O fechamento precisa cair entre ${MIN_CLOSING_OFFSET_DAYS} e ${MAX_CLOSING_OFFSET_DAYS} dias antes do vencimento.`,
-        );
-        return;
-    }
-
-    /*  O aviso do ciclo: uma vez, com o caso concreto, e só depois o
-        salvamento. `cycleAcknowledged` volta a `false` a cada troca de
-        data no formulário, então o aviso reaparece para um par novo. */
-    const check = checkCardCycle(draft.ClosingDate, draft.DueDate, currentMonth());
-
-    if (check.drifts && !draft.cycleAcknowledged) {
-        context.acknowledgeCycleDrift();
-        context.failSubmit(
-            `Confira: com essas datas, a fatura que vence em ${formatDate(check.due)} fecha em ` +
-                `${formatDate(check.closing)}. A folga conta dias corridos, então o fechamento cai ` +
-                `${closingDaysLabel(check.closingDays)} conforme o mês, e você leu o dia ` +
-                `${check.typedClosingDay}. Se estiver certo, salve de novo.`,
+            `Os dois dias têm que estar entre ${MIN_DAY_OF_MONTH} e ${MAX_DAY_OF_MONTH}.`,
         );
         return;
     }
@@ -100,7 +76,8 @@ export async function saveCard(context: AccountsContext): Promise<void> {
 
     const common = {
         Name: draft.Name.trim(),
-        ...cycle,
+        ClosingDay: draft.ClosingDay,
+        DueDay: draft.DueDay,
         CompetenceMode: draft.CompetenceMode,
         Color: draft.Color,
     };
@@ -125,3 +102,6 @@ export async function saveCard(context: AccountsContext): Promise<void> {
         context.failSubmit(errorMessage(cause));
     }
 }
+
+const isDayOfMonth = (day: number): boolean =>
+    Number.isInteger(day) && day >= MIN_DAY_OF_MONTH && day <= MAX_DAY_OF_MONTH;

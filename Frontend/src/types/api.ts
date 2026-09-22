@@ -416,12 +416,15 @@ export namespace ApiTypes {
          *  pede ao cliente. Só faz sentido em credit_card; null nas
          *  outras. */
         DueDay: number | null;
-        /** Quantos dias ANTES do vencimento a fatura fecha (1-28, default
-         *  7). Não existe um campo com o dia do fechamento: ele é
-         *  `DueDay − ClosingOffsetDays` e MUDA de mês para mês —
-         *  vencendo dia 5 com folga de 7, a fatura fecha em 26/02 e em
-         *  29/03. Ver `src/lib/card.ts`. */
-        ClosingOffsetDays: number | null;
+        /** O dia do mês em que a fatura FECHA (1-31). Só faz sentido em
+         *  credit_card; null nas outras.
+         *
+         *  Os dois dias são gravados como a pessoa os lê na fatura, e
+         *  nenhum é derivado do outro. `ClosingDay > DueDay` quer dizer
+         *  que a fatura fecha no mês ANTERIOR ao do vencimento (fecha
+         *  27, vence 04); `ClosingDay <= DueDay`, que fecha e vence no
+         *  mesmo mês. Ver `src/lib/card.ts`. */
+        ClosingDay: number | null;
         /** Só em `credit_card`; `null` nas outras formas. O default do
          *  servidor é `purchase`, inclusive nos cartões que já existiam
          *  — então todo cartão tem um modo, mesmo os que ninguém
@@ -479,11 +482,12 @@ export namespace ApiTypes {
         IdAccount: number;
         Name: string;
         Kind: "credit_card";
-        /** O único obrigatório do par: a folga tem default 7 no
-         *  servidor, e omiti-la é o caminho certo quando o formulário
-         *  não pergunta por ela. */
+        /** Os dois são obrigatórios e nenhum tem default: um dia do mês
+         *  não se deduz de nada, e inventar um é gravar exatamente o
+         *  dado errado. A tela pergunta os dois, porque estão os dois
+         *  escritos na fatura. */
         DueDay: number;
-        ClosingOffsetDays?: number;
+        ClosingDay: number;
         /** Default **`purchase`** no servidor: omitir é o caminho certo
          *  quando o formulário não pergunta — e mandar `purchase`
          *  explicitamente é o mesmo cartão. */
@@ -499,13 +503,13 @@ export namespace ApiTypes {
      *  lançamento e ninguém as revisita — virar a chave do
      *  `CompetenceMode` em novembro não reescreve agosto.
      *
-     *  As duas recusas do trio `DueDay`/`ClosingOffsetDays`/
-     *  `CompetenceMode`: mandar `null` em qualquer um deles num cartão é
-     *  406, e mandar qualquer um deles FORA de um cartão é 406 também. */
+     *  As duas recusas do trio `DueDay`/`ClosingDay`/`CompetenceMode`:
+     *  mandar `null` em qualquer um deles num cartão é 406, e mandar
+     *  qualquer um deles FORA de um cartão é 406 também. */
     export interface PaymentMethodUpdateBody {
         Name: string;
         DueDay?: number;
-        ClosingOffsetDays?: number;
+        ClosingDay?: number;
         CompetenceMode?: CompetenceMode;
         IconPath?: string | null;
         Color?: Color | null;
@@ -1134,7 +1138,7 @@ export namespace ApiTypes {
          *  essas linhas sob o rótulo do mês errado sem ter como dizer
          *  que são de outro. Vêm do servidor porque aqui não há o
          *  cadastro do cartão: `Cards` traz o par (cartão, vencimento),
-         *  não o `DueDay` nem a folga. */
+         *  não o `DueDay` nem o `ClosingDay`. */
         CycleStart: CalendarDate;
         CycleEnd: CalendarDate;
         /** Em qual mês estas compras pesam — o modo do cartão, junto da

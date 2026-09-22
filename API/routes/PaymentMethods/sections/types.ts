@@ -3,7 +3,7 @@ export namespace PaymentMethodsNamespace {
     /** Os campos que só existem em Kind='credit_card'. Ver PaymentMethodKind.section.ts. */
     export interface CreditCardFields {
         DueDay?: number | null
-        ClosingOffsetDays?: number | null
+        ClosingDay?: number | null
         CompetenceMode?: "invoice" | "purchase" | null
     }
 

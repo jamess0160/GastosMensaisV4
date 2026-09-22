@@ -1,27 +1,41 @@
-import { addDaysToDate, addMonths, dayInMonth, daysApart, formatShort, parts } from "./date";
+import { addDaysToDate, addMonths, dayInMonth, formatShort } from "./date";
 import { sumMoney } from "./aggregate";
 import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
    O ciclo da fatura, nos dois sentidos.
 
-   A API descreve o cartão por VENCIMENTO e FOLGA (`DueDay` +
-   `ClosingOffsetDays`), que é o dado que o emissor pede ao cliente —
-   nenhum banco brasileiro deixa escolher o dia do fechamento.
+   A API descreve o cartão por DOIS DIAS DO MÊS — `ClosingDay` e
+   `DueDay` —, que é o que a pessoa lê na própria fatura. Nenhum dos
+   dois é derivado do outro.
 
-   O usuário, na tela, tem outra coisa na mão: as duas DATAS da última
-   fatura, que ele lê no app do banco. Este arquivo é a tradução entre
-   as duas formas, e é onde fica visível que a data de fechamento NÃO é
-   um dia fixo do calendário: ela muda de mês para mês.
+   Até a leva 9 o cartão guardava o vencimento e uma FOLGA em dias, e o
+   fechamento saía da subtração. Isso errava por construção, porque os
+   meses têm tamanhos diferentes: num cartão que fecha 27 e vence 04,
+   `04/09 − 8` é 27/08 (certo) e `04/10 − 8` é 26/09 (errado). Com isso
+   a compra de 27/09 era dada como perdida naquela fatura e cobrada na
+   de 04/11 — um dia de erro na descrição virando um mês no caixa.
+
+   Sumiram daqui a conversão `cardCycleFromDates` e o aviso
+   `checkCardCycle`: a primeira existia só para alimentar o modelo da
+   folga, e o segundo avisava sobre uma deriva que não existe mais.
    ════════════════════════════════════════════════════════════ */
 
-/** O que o servidor aplica quando a folga é omitida. Não há padrão de
- *  mercado — fica tipicamente entre 6 e 10 dias, e 7 é o meio. */
-export const DEFAULT_CLOSING_OFFSET_DAYS = 7;
+/** O intervalo que o Joi aceita nos dois dias. É o mesmo nos dois
+ *  porque é a mesma coisa: um dia do mês. */
+export const MIN_DAY_OF_MONTH = 1;
+export const MAX_DAY_OF_MONTH = 31;
 
-/** O intervalo que o Joi aceita em `ClosingOffsetDays`. */
-export const MIN_CLOSING_OFFSET_DAYS = 1;
-export const MAX_CLOSING_OFFSET_DAYS = 28;
+/** A única coisa que o modelo infere, e ela é estável porque compara
+ *  dois dias NOMINAIS — não duas datas de meses de tamanhos diferentes,
+ *  que era o defeito da folga.
+ *
+ *      ClosingDay >  DueDay -> fecha no mês ANTERIOR ao do vencimento
+ *      ClosingDay <= DueDay -> fecha e vence no MESMO mês
+ *
+ *  Os dois casos existem no mundo: "fecha 27, vence 04" e "fecha 05,
+ *  vence 15". */
+const monthShift = (closingDay: number, dueDay: number): number => (closingDay > dueDay ? 1 : 0);
 
 export interface InvoiceDates {
     closing: ApiTypes.CalendarDate;
@@ -30,17 +44,21 @@ export interface InvoiceDates {
 
 /** As duas datas da fatura QUE VENCE naquele mês.
  *
- *  Vencendo dia 5 com folga de 7, a fatura fecha em 26/02 e em 29/03 —
- *  é a subtração que muda, não o cartão. O vencimento é aparado no mês
- *  curto (dia 31 em fevereiro é 28), e o fechamento pode cair no mês
- *  anterior, que é o normal em vencimento no começo do mês. */
+ *  Os dois dias são aparados no mês curto (dia 31 em fevereiro é 28), e
+ *  o fechamento cai no mês anterior quando ele é depois do dia de
+ *  vencer — que é o normal em vencimento no começo do mês. */
 export function invoiceDates(
     month: ApiTypes.ReferenceMonth,
     dueDay: number | null,
-    offsetDays: number | null,
+    closingDay: number | null,
 ): InvoiceDates {
-    const due = dayInMonth(month, dueDay ?? 1);
-    return { closing: addDaysToDate(due, -(offsetDays ?? DEFAULT_CLOSING_OFFSET_DAYS)), due };
+    const due = dueDay ?? 1;
+    const closing = closingDay ?? due;
+
+    return {
+        closing: dayInMonth(addMonths(month, -monthShift(closing, due)), closing),
+        due: dayInMonth(month, due),
+    };
 }
 
 export interface InvoiceCycle {
@@ -57,18 +75,18 @@ export interface InvoiceCycle {
  *  porque a compra feita NO dia do fechamento ainda entrou naquela
  *  outra.
  *
- *  E é por isso que o ciclo quase nunca cabe num mês só: vencendo dia 04
- *  com folga de 7, a fatura de setembro cobre de 29/07 a 28/08. Num
- *  cartão em `purchase` essas compras pesaram em agosto e a fatura está
- *  na tela de setembro — que é exatamente o que a linha do ciclo existe
- *  para dizer. */
+ *  E é por isso que o ciclo quase nunca cabe num mês só: fechando 28 e
+ *  vencendo 04, a fatura de setembro cobre de 29/07 a 28/08. Num cartão
+ *  em `purchase` essas compras pesaram em agosto e a fatura está na tela
+ *  de setembro — que é exatamente o que a linha do ciclo existe para
+ *  dizer. */
 export function invoiceCycle(
     month: ApiTypes.ReferenceMonth,
     dueDay: number | null,
-    offsetDays: number | null,
+    closingDay: number | null,
 ): InvoiceCycle {
-    const { closing } = invoiceDates(month, dueDay, offsetDays);
-    const previous = invoiceDates(addMonths(month, -1), dueDay, offsetDays);
+    const { closing } = invoiceDates(month, dueDay, closingDay);
+    const previous = invoiceDates(addMonths(month, -1), dueDay, closingDay);
 
     return { start: addDaysToDate(previous.closing, 1), end: closing };
 }
@@ -86,86 +104,6 @@ export const COMPETENCE_LABEL: Record<ApiTypes.CompetenceMode, string> = {
     purchase: "pesa no mês da compra",
     invoice: "pesa no mês da fatura",
 };
-
-/** O caminho de volta: as duas datas que o usuário leu na fatura viram
- *  o par que a API guarda.
- *
- *  O dia do vencimento é o da data, e a folga é a distância entre as
- *  duas — nenhum dos dois depende do mês em que ele digitou. */
-export function cardCycleFromDates(
-    closing: ApiTypes.CalendarDate,
-    due: ApiTypes.CalendarDate,
-): { DueDay: number; ClosingOffsetDays: number } {
-    return { DueDay: parts(due).day, ClosingOffsetDays: daysApart(closing, due) };
-}
-
-/** O ciclo conferido contra a fatura que a pessoa tem na mão.
- *
- *  A FOLGA E O EMISSOR NÃO DESCREVEM A MESMA COISA. Aqui o fechamento é
- *  uma subtração de dias corridos a partir do vencimento; o emissor
- *  brasileiro fecha num DIA FIXO do mês. As duas descrições coincidem
- *  enquanto a subtração fica dentro do mês do vencimento, e discordam
- *  quando ela atravessa a virada — o mês anterior tem 28, 30 ou 31 dias,
- *  e o fechamento derivado anda junto:
- *
- *      fecha 27, vence 04  ->  27/08 a 04/09 = 8 dias
- *                              27/09 a 04/10 = 7 dias
- *
- *  Quem cadastrou lendo as duas datas de UM mês grava a folga daquele
- *  mês, e ela erra por um dia em metade do ano. Um dia de erro no
- *  fechamento é um mês de erro no caixa.
- *
- *  Trocar o modelo — guardar o fechamento como dia do mês — é migration,
- *  recálculo de perna já gravada e reescrita do `InvoiceDates` da API.
- *  O que cabe aqui é NÃO ACEITAR EM SILÊNCIO: a tela mostra o que a
- *  folga produz e diz quando isso discorda da fatura lida. */
-export interface CycleCheck extends InvoiceDates {
-    /** O dia do mês em que a fatura lida pela pessoa fechou. */
-    typedClosingDay: number;
-    /** Os dias em que o fechamento derivado cai nos doze meses a partir
-     *  de `month`, sem repetição e em ordem. Um valor só = a folga
-     *  descreve este cartão o ano inteiro. */
-    closingDays: number[];
-    /** Algum desses meses fecha num dia diferente do que foi lido. */
-    drifts: boolean;
-}
-
-/** As duas datas do ciclo no mês pedido, mais a conferência acima. */
-export function checkCardCycle(
-    closing: ApiTypes.CalendarDate,
-    due: ApiTypes.CalendarDate,
-    month: ApiTypes.ReferenceMonth,
-): CycleCheck {
-    const { DueDay, ClosingOffsetDays } = cardCycleFromDates(closing, due);
-    const typedClosingDay = parts(closing).day;
-    const days = new Set<number>();
-
-    /*  Doze meses, e não o mês pedido só: quem digitou a fatura DESTE mês
-        acerta nele por construção — a divergência aparece nos vizinhos. */
-    for (let index = 0; index < 12; index++) {
-        const cycle = invoiceDates(addMonths(month, index), DueDay, ClosingOffsetDays);
-        days.add(parts(cycle.closing).day);
-    }
-
-    const closingDays = [...days].sort((first, second) => first - second);
-
-    return {
-        ...invoiceDates(month, DueDay, ClosingOffsetDays),
-        typedClosingDay,
-        closingDays,
-        drifts: closingDays.some((day) => day !== typedClosingDay),
-    };
-}
-
-/** Os dias em que o fechamento cai, na forma mais curta que ainda diz a
- *  verdade: "no dia 20", "no dia 26 ou 27", "entre os dias 24 e 27". Mora
- *  aqui, e não na tela, porque a frase do formulário e a do `saveCard`
- *  têm que dizer o mesmo — são o mesmo aviso, em dois momentos. */
-export function closingDaysLabel(days: readonly number[]): string {
-    return days.length <= 2
-        ? `no dia ${days.join(" ou ")}`
-        : `entre os dias ${days[0]} e ${days[days.length - 1]}`;
-}
 
 /* ── A fatura ─────────────────────────────────────────────── */
 
@@ -233,7 +171,7 @@ export function invoiceOf(
     method: ApiTypes.PaymentMethod,
     month: ApiTypes.ReferenceMonth,
 ): Invoice {
-    const { closing, due } = invoiceDates(month, method.DueDay, method.ClosingOffsetDays);
+    const { closing, due } = invoiceDates(month, method.DueDay, method.ClosingDay);
     const expected = card?.Expected ?? [];
     /* O ciclo inteiro: é ele que o `payInvoice` quita, e é por ele que
        o painel conta as linhas e decide se a fatura já saiu da conta. */
@@ -249,7 +187,7 @@ export function invoiceOf(
            sem fatura nenhuma, em que não há linha para explicar. */
         cycle: card
             ? { start: card.CycleStart, end: card.CycleEnd }
-            : invoiceCycle(month, method.DueDay, method.ClosingOffsetDays),
+            : invoiceCycle(month, method.DueDay, method.ClosingDay),
         entries,
         total: card?.Total ?? 0,
         /* O previsto é somado aqui porque não é o que a fatura cobra:

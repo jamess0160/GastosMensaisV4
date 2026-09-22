@@ -706,7 +706,7 @@ async function createCard(workspace: TestWorkspace) {
         Name: "Cartão",
         Kind: "credit_card",
         DueDay: 28,
-        ClosingOffsetDays: 8,
+        ClosingDay: 20,
     })
 
     //  Guardado no arranjo porque quem quita perna de cartão é a **fatura**, e a fatura é

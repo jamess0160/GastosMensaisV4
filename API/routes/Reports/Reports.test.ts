@@ -1014,7 +1014,7 @@ async function createCard(workspace: TestWorkspace, CompetenceMode: "invoice" | 
         Name: "Cartão",
         Kind: "credit_card",
         DueDay: 28,
-        ClosingOffsetDays: 8,
+        ClosingDay: 20,
         CompetenceMode,
     })
 

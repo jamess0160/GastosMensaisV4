@@ -266,10 +266,10 @@ class Controller {
                 "ExpensePayments.Charged",
                 "ExpensePayments.Paid",
                 { PaymentMethodName: "PaymentMethods.Name" },
-                //  O ciclo sai do cartão, não da perna: o vencimento e a folga são o que
+                //  O ciclo sai do cartão, não da perna: os dois dias do mês são o que
                 //  descreve a fatura, e o modo é o que diz em que mês essas compras pesam.
                 "PaymentMethods.DueDay",
-                "PaymentMethods.ClosingOffsetDays",
+                "PaymentMethods.ClosingDay",
                 "PaymentMethods.CompetenceMode",
                 "Expenses.Description",
                 "Expenses.ExpenseDate",
@@ -390,7 +390,7 @@ interface CardPaymentRow {
     Paid: boolean
     PaymentMethodName: string
     DueDay: number | null
-    ClosingOffsetDays: number | null
+    ClosingDay: number | null
     CompetenceMode: "invoice" | "purchase" | null
     Description: string
     ExpenseDate: string

@@ -5,7 +5,7 @@ import { PaymentMethodsNamespace } from "./types"
 //  **As regras do Kind, num lugar só** — quais campos existem em cada um, e em que tipo de
 //  conta cada um pode nascer.
 //
-//  DueDay/ClosingOffsetDays decidem em qual fatura uma compra cai, e só fazem sentido em
+//  DueDay/ClosingDay decidem em qual fatura uma compra cai, e só fazem sentido em
 //  cartão de crédito. O banco não tem CHECK para isso: um pix gravado com DueDay=10 passa na
 //  inserção e só aparece lá na etapa 5, como uma data de vencimento em cima de um pagamento à
 //  vista.
@@ -14,11 +14,11 @@ import { PaymentMethodsNamespace } from "./types"
 //  POST ele consegue usar o `when` sobre o Kind do body, mas no PUT o Kind que manda é o da
 //  linha gravada, que o schema não enxerga.
 //  A lista encolheu com a saída de Brand e LastDigits, mas não sumiu: DueDay,
-//  ClosingOffsetDays e CompetenceMode continuam sendo campos exclusivos de cartão que o banco
+//  ClosingDay e CompetenceMode continuam sendo campos exclusivos de cartão que o banco
 //  não protege. O CompetenceMode entrou pelo mesmo argumento dos outros dois: fora do cartão
 //  não existe defasagem entre consumo e pagamento, então não há dois meses entre os quais
 //  escolher — um pix com CompetenceMode='invoice' seria um valor sem significado nenhum.
-const creditCardOnly = ["DueDay", "ClosingOffsetDays", "CompetenceMode"] as const
+const creditCardOnly = ["DueDay", "ClosingDay", "CompetenceMode"] as const
 
 class Controller {
 
@@ -63,7 +63,7 @@ class Controller {
             return
         }
 
-        //  Em cartão, apagar vencimento, folga de fechamento ou modo de competência não é
+        //  Em cartão, apagar vencimento, dia de fechamento ou modo de competência não é
         //  edição parcial: é deixar a compra sem fatura, ou sem mês em que pesar. Omitir mantém
         //  o que está gravado; mandar null é recusado.
         let cleared = creditCardOnly.filter((field) => field in body && body[field] === null)

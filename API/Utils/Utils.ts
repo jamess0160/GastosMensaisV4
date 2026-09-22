@@ -171,11 +171,11 @@ export namespace Utils {
     /**
      * Soma dias corridos (negativo subtrai). Atravessa mês e ano sem grampear nada.
      *
-     * É o oposto de `setDayOfMonth`, e é de propósito: o fechamento do cartão é o vencimento
-     * menos a folga do emissor, e uma folga é uma contagem de dias, não um dia do mês. Por
-     * isso o resultado é sempre uma data que existe — 15/03 − 7 é 08/03, 15/02 − 7 é 08/02 —
-     * enquanto um "dia 30" precisa virar 28 em fevereiro e deixa de bater com a comparação
-     * que decide a fatura. Ver InvoiceDates.section.ts.
+     * É o oposto de `setDayOfMonth`: uma contagem de dias corridos sempre cai num dia que
+     * existe, enquanto um "dia 30" precisa virar 28 em fevereiro. Quem quer um dia do mês usa
+     * o outro — o fechamento do cartão é um dia do mês e passa por lá. Aqui sobra o que é
+     * mesmo contagem de dias: o dia seguinte ao fechamento da fatura anterior, que é onde o
+     * ciclo começa (InvoiceDates.section.ts), e o "ontem" da rotina vencida.
      */
     export function addDaysToDate(date: string, days: number) {
         return toCalendar(date).add(days, "days").format(calendarFormat)

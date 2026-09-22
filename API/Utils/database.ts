@@ -148,12 +148,15 @@ export namespace Database {
         /** So em Kind='credit_card'. O dia do mes em que a fatura vence. */
         DueDay: number | null
         /**
-         * So em Kind='credit_card'. Quantos dias antes do vencimento a fatura fecha.
+         * So em Kind='credit_card'. **O dia do mes em que a fatura fecha.**
          *
-         * E a folga do emissor, nao um dia do mes: o cliente escolhe o vencimento e o
-         * fechamento sai dele por subtracao. Ver InvoiceDates.section.ts.
+         * Os dois dias sao gravados como a pessoa os le na fatura, e nenhum deles e
+         * derivado do outro. O emissor brasileiro NAO fecha N dias antes de vencer: ele
+         * fecha num dia fixo do mes, e guardar a folga (o antigo ClosingOffsetDays) fazia
+         * o fechamento andar de mes para mes - 04/09 menos 8 dias e 27/08, mas 04/10
+         * menos 8 dias e 26/09. Ver InvoiceDates.section.ts.
          */
-        ClosingOffsetDays: number | null
+        ClosingDay: number | null
         /**
          * So em Kind='credit_card'. **Em qual mes a compra deste cartao pesa.**
          *

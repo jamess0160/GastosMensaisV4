@@ -98,7 +98,7 @@ describe("Accounts", () => {
                 Name: "Cartão cancelado",
                 Kind: "credit_card",
                 DueDay: 28,
-                ClosingOffsetDays: 8,
+                ClosingDay: 20,
             })
 
             await workspaceClient.delete(`/Accounts/IdAccount=${archived.body.IdAccount}`)
@@ -286,7 +286,7 @@ describe("Accounts", () => {
 
             expect(methods.map((item) => item.Kind)).toEqual(["pix", "debit"])
             //  Fatura só existe em cartão
-            expect(methods.every((item) => item.DueDay === null && item.ClosingOffsetDays === null)).toBe(true)
+            expect(methods.every((item) => item.DueDay === null && item.ClosingDay === null)).toBe(true)
         })
 
         it("usa checking e saldo zero como padrão", async () => {
@@ -322,9 +322,9 @@ describe("Accounts", () => {
 
             expect(methods).toHaveLength(1)
             expect(methods[0]).toMatchObject({ Kind: "debit", Name: "Vale Alimentação" })
-            //  Vale não tem fatura: nem vencimento, nem folga de fechamento
+            //  Vale não tem fatura: nem dia de vencimento, nem dia de fechamento
             expect(methods[0].DueDay).toBeNull()
-            expect(methods[0].ClosingOffsetDays).toBeNull()
+            expect(methods[0].ClosingDay).toBeNull()
         })
 
         //  **O galho novo não pode mexer nos dois que já existem.** O cash continua com a

@@ -1,101 +1,47 @@
 import { describe, expect, it } from "vitest";
-import {
-    cardCycleFromDates,
-    checkCardCycle,
-    cycleLabel,
-    DEFAULT_CLOSING_OFFSET_DAYS,
-    invoiceCycle,
-    invoiceDates,
-    invoiceOf,
-} from "@/lib/card";
+import { cycleLabel, invoiceCycle, invoiceDates, invoiceOf } from "@/lib/card";
 import type { ApiTypes } from "@/types/api";
 
 describe("invoiceDates", () => {
-    it("fecha a fatura N dias ANTES do vencimento", () => {
-        expect(invoiceDates("2026-09", 10, 7)).toEqual({
+    it("usa os dois dias do mês, e eles não mudam de mês para mês", () => {
+        // Fecha 03 e vence 10: `ClosingDay <= DueDay`, os dois no mesmo mês.
+        expect(invoiceDates("2026-09", 10, 3)).toEqual({
             closing: "2026-09-03",
             due: "2026-09-10",
         });
+        expect(invoiceDates("2026-10", 10, 3)).toEqual({
+            closing: "2026-10-03",
+            due: "2026-10-10",
+        });
     });
 
-    it("deixa o fechamento cair no mês anterior quando o vencimento é no começo", () => {
-        // Vencendo dia 5 com folga de 7, a data do fechamento MUDA de mês
-        // para mês — é a subtração que muda, não o cartão.
-        expect(invoiceDates("2026-03", 5, 7).closing).toBe("2026-02-26");
-        expect(invoiceDates("2026-04", 5, 7).closing).toBe("2026-03-29");
+    /*  O CARTÃO QUE MOTIVOU A LEVA 9: fecha 27, vence 04. A folga que o
+        modelo antigo guardava produzia 27/08 para a fatura de setembro e
+        26/09 para a de outubro — o mesmo cartão com dois dias de
+        fechamento, porque os meses têm tamanhos diferentes. Aqui o dia 27
+        é o dia 27 nos três meses. */
+    it("fecha no mês ANTERIOR quando o fechamento é depois do dia de vencer", () => {
+        expect(invoiceDates("2026-09", 4, 27).closing).toBe("2026-08-27");
+        expect(invoiceDates("2026-10", 4, 27).closing).toBe("2026-09-27");
+        expect(invoiceDates("2026-11", 4, 27).closing).toBe("2026-10-27");
     });
 
-    it("apara o vencimento no mês curto", () => {
-        // Dia 31 em fevereiro é 28, e nunca 3 de março.
-        expect(invoiceDates("2026-02", 31, 7)).toEqual({
-            closing: "2026-02-21",
+    it("apara os dois dias no mês curto", () => {
+        // Dia 31 em fevereiro é 28, e nunca 3 de março — nos dois dias.
+        expect(invoiceDates("2026-02", 31, 30)).toEqual({
+            closing: "2026-02-28",
             due: "2026-02-28",
         });
     });
 
-    it("usa a folga padrão quando o cartão não tem uma", () => {
-        expect(invoiceDates("2026-09", 10, null).closing).toBe(
-            invoiceDates("2026-09", 10, DEFAULT_CLOSING_OFFSET_DAYS).closing,
-        );
-    });
-});
-
-describe("cardCycleFromDates", () => {
-    it("tira o dia do vencimento e a folga das duas datas", () => {
-        expect(cardCycleFromDates("2026-08-29", "2026-09-05")).toEqual({
-            DueDay: 5,
-            ClosingOffsetDays: 7,
+    it("cai no fechamento quando o cartão não tem um", () => {
+        // Sem `ClosingDay` não há o que inferir, e inventar um dia é
+        // exatamente o que esta leva tirou do modelo: o fallback iguala
+        // os dois dias em vez de chutar uma folga.
+        expect(invoiceDates("2026-09", 10, null)).toEqual({
+            closing: "2026-09-10",
+            due: "2026-09-10",
         });
-    });
-
-    it("é o caminho de volta de invoiceDates", () => {
-        const { closing, due } = invoiceDates("2026-09", 10, 12);
-        expect(cardCycleFromDates(closing, due)).toEqual({
-            DueDay: 10,
-            ClosingOffsetDays: 12,
-        });
-    });
-
-    it("devolve folga não positiva quando as datas estão invertidas", () => {
-        // Quem recusa é `saveCard`: aqui a conta é só a subtração.
-        expect(cardCycleFromDates("2026-09-10", "2026-09-05").ClosingOffsetDays).toBe(-5);
-    });
-});
-
-describe("checkCardCycle", () => {
-    /*  O caso real que abriu a etapa 2 da leva 6: um cartão que fecha
-        dia 27 e vence dia 04. Lendo a fatura de agosto (27/08 a 04/09) a
-        folga gravada é 8; em setembro (27/09 a 04/10) ela seria 7, e o
-        fechamento derivado de setembro cai no dia 26. Uma compra do dia
-        27/09 vai parar na fatura de 04/11 — um dia de diferença na
-        descrição virando um mês de diferença no caixa. */
-    it("acusa o fechamento que anda de mês para mês", () => {
-        const check = checkCardCycle("2026-08-27", "2026-09-04", "2026-09");
-
-        expect(check.typedClosingDay).toBe(27);
-        expect(check.drifts).toBe(true);
-        // Fevereiro puxa o fechamento para o dia 24; os meses de 31 dias
-        // o devolvem ao 27, que é o único que o emissor usaria.
-        expect(check.closingDays).toContain(26);
-        expect(check.closingDays.length).toBeGreaterThan(1);
-    });
-
-    it("não acusa nada quando a subtração não atravessa a virada do mês", () => {
-        // Vence 28 e fecha 8 dias antes: o dia 20 do mesmo mês, sempre.
-        // Aqui folga e dia fixo do mês descrevem o MESMO cartão.
-        const check = checkCardCycle("2026-08-20", "2026-08-28", "2026-09");
-
-        expect(check.drifts).toBe(false);
-        expect(check.closingDays).toEqual([20]);
-    });
-
-    it("devolve as duas datas do mês pedido, e não as que foram digitadas", () => {
-        // O ciclo digitado é o de uma fatura passada; o que a tela mostra
-        // para conferência é a fatura do mês corrente.
-        const check = checkCardCycle("2026-08-27", "2026-09-04", "2026-10");
-
-        expect(check.due).toBe("2026-10-04");
-        expect(check.closing).toBe("2026-09-26");
     });
 });
 
@@ -110,7 +56,7 @@ const card: ApiTypes.PaymentMethod = {
     Name: "Nubank",
     Kind: "credit_card",
     DueDay: 4,
-    ClosingOffsetDays: 7,
+    ClosingDay: 28,
     CompetenceMode: "purchase",
     IconPath: null,
     Color: null,
@@ -137,10 +83,10 @@ const entry = (values: Partial<ApiTypes.StatementCardEntry> = {}): ApiTypes.Stat
 
 describe("invoiceCycle", () => {
     it("abre no dia seguinte ao fechamento da fatura anterior", () => {
-        // Vencendo dia 4 com folga de 7: a fatura de setembro fecha em
-        // 28/08 e a de agosto fechou em 28/07 — a compra do dia 28/07
-        // ainda é da outra, então esta começa no 29.
-        expect(invoiceCycle("2026-09", 4, 7)).toEqual({
+        // Fecha 28 e vence 04: a fatura de setembro fecha em 28/08 e a
+        // de agosto fechou em 28/07 — a compra do dia 28/07 ainda é da
+        // outra, então esta começa no 29.
+        expect(invoiceCycle("2026-09", 4, 28)).toEqual({
             start: "2026-07-29",
             end: "2026-08-28",
         });
@@ -150,17 +96,29 @@ describe("invoiceCycle", () => {
         // A fatura que a tela de setembro mostra é feita de compras de
         // julho e agosto. Num cartão em `purchase` foi lá que elas
         // pesaram — e nada na tela dizia isso.
-        expect(cycleLabel(invoiceCycle("2026-09", 4, 7))).toBe("compras de 29 jul a 28 ago");
+        expect(cycleLabel(invoiceCycle("2026-09", 4, 28))).toBe("compras de 29 jul a 28 ago");
     });
 
-    it("acompanha a virada do mês, porque o fechamento derivado anda junto", () => {
-        // Vencendo dia 5 com folga de 7, o fechamento cai sempre no mês
-        // ANTERIOR ao do vencimento: fevereiro fechou em 29/01 e março
-        // fecha em 26/02 — dias diferentes, porque a folga é uma
-        // subtração de dias corridos e os meses não têm o mesmo tamanho.
-        expect(invoiceCycle("2026-03", 5, 7)).toEqual({
-            start: "2026-01-30",
-            end: "2026-02-26",
+    it("fecha no mesmo dia em todo mês, inclusive atravessando a virada", () => {
+        // Fecha 27 e vence 04 — o cartão da leva 9. O ciclo anda um mês
+        // inteiro de cada vez e sempre termina no dia 27: era a folga
+        // que fazia o fim do ciclo pular para o 26 em metade do ano.
+        expect(invoiceCycle("2026-10", 4, 27)).toEqual({
+            start: "2026-08-28",
+            end: "2026-09-27",
+        });
+        expect(invoiceCycle("2026-11", 4, 27)).toEqual({
+            start: "2026-09-28",
+            end: "2026-10-27",
+        });
+    });
+
+    it("apara o fim do ciclo no mês curto", () => {
+        // Fecha 30 e vence 05: fevereiro acaba no 28, e é lá que a
+        // fatura de março fecha.
+        expect(invoiceCycle("2026-03", 5, 30)).toEqual({
+            start: "2026-01-31",
+            end: "2026-02-28",
         });
     });
 });
@@ -235,7 +193,7 @@ describe("invoiceOf", () => {
 
         expect(invoice.due).toBe("2026-08-04");
         //  Sem fatura não há o que recortar, e o ciclo é o calculado do cadastro
-        expect(invoice.cycle).toEqual({ start: "2026-06-28", end: "2026-07-28" });
+        expect(invoice.cycle).toEqual({ start: "2026-06-29", end: "2026-07-28" });
         expect(invoice.total).toBe(0);
         expect(invoice.entries).toHaveLength(0);
         expect(invoice.paid).toBe(false);

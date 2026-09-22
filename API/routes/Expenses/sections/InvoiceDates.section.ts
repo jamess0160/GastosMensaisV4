@@ -105,16 +105,17 @@ class Controller {
      * **O ciclo que uma fatura cobre** — a primeira compra que ela pega e a última.
      *
      * É a regra de cima lida ao contrário: lá a compra procura a fatura, aqui a fatura declara
-     * quais compras são dela. A fatura que vence em 04/09 fecha `ClosingOffsetDays` dias antes
-     * e leva tudo que foi comprado **depois** do fechamento da fatura anterior — daí o `+1`,
-     * porque a compra feita *no* dia do fechamento ainda entrou naquela outra.
+     * quais compras são dela. A fatura que vence em 04/10 fecha no `ClosingDay` do mês que a
+     * `monthShift` aponta e leva tudo que foi comprado **depois** do fechamento da fatura
+     * anterior — daí o `+1`, porque a compra feita *no* dia do fechamento ainda entrou naquela
+     * outra.
      *
      * Existe porque o extrato do cartão é recortado por vencimento: em setembro ele mostra uma
      * fatura feita de compras de agosto, e sem dizer o ciclo não há como saber, olhando, em
      * que mês aquelas linhas pesam.
      *
      * O vencimento anterior é contado **a partir do próprio vencimento**, com o `DueDay` posto
-     * de volta — o mesmo cuidado do `dueOf`: vencendo dia 31, a fatura de março não pode
+     * de volta — o mesmo cuidado do `dueIn`: vencendo dia 31, a fatura de março não pode
      * herdar o 28 que fevereiro grampeou.
      */
     public cycleOf(card: CardCycleSource, DueDate: string) {
@@ -127,78 +128,87 @@ class Controller {
     }
 
     /**
-     * **O vencimento é a âncora; o fechamento nasce dele.** É assim que o emissor funciona — o
-     * cliente escolhe o dia de vencer e o banco fecha a fatura N dias antes — e é o que deixa
-     * as duas datas sempre coerentes entre si.
+     * **O cartão guarda os dois dias que a pessoa lê na fatura, e nenhum deles é derivado do
+     * outro.** `ClosingDay` é o dia do mês em que o emissor fecha; `DueDay` é o dia em que ele
+     * cobra. É assim que o emissor brasileiro funciona — ele **não** fecha N dias antes de
+     * vencer, ele fecha num dia fixo do mês.
      *
-     * Guardar o fechamento como dia do mês custava dois defeitos que a folga não tem. O dia 30
-     * precisava ser grampeado em fevereiro, enquanto a comparação que decide a fatura seguia
-     * usando o nominal: as duas metades da regra passavam a falar de datas diferentes. E a
-     * rolagem do vencimento tinha que ser **inferida** de dois números soltos, porque o modelo
-     * não guardava a relação entre eles — aqui ela é a própria subtração.
+     * O modelo anterior guardava a folga (`ClosingOffsetDays`) e derivava o fechamento por
+     * subtração, e isso errava por construção: `04/09 − 8` é 27/08, mas `04/10 − 8` é 26/09 —
+     * o mesmo cartão, dois dias de fechamento, porque os meses têm tamanhos diferentes. Quem
+     * cadastrava lendo a fatura de agosto gravava a folga certa para agosto e errada para
+     * setembro, e **um dia de erro na descrição vira um mês de erro no caixa**.
+     *
+     * A única coisa que este modelo ainda infere é a relação entre os dois dias, e ela é
+     * estável porque compara dois dias **nominais**, não duas datas de meses de tamanhos
+     * diferentes:
+     *
+     *     ClosingDay >  DueDay  ->  a fatura fecha no mês ANTERIOR ao do vencimento  (27 / 04)
+     *     ClosingDay <= DueDay  ->  fecha e vence no MESMO mês                       (05 / 15)
+     *
+     * **O vencimento continua sendo a âncora do parcelamento:** a parcela `n` vence no `DueDay`
+     * do mês `n`, com o grampeamento do mês curto vindo do `setDayOfMonth`. O que mudou é só
+     * de onde sai o fechamento.
      */
     private creditCardInvoice(paymentMethod: Database.PaymentMethods, ExpenseDate: string, index: number) {
-        //  Regra do fechamento: a compra entra na **primeira fatura que ainda não fechou**. É a
-        //  linha que separa a compra do dia 20 da do dia 21 num cartão que fecha no 20 — e agora
-        //  são duas datas reais sendo comparadas, não um dia nominal contra uma data grampeada.
-        //  Em "YYYY-MM-DD" a ordem lexicográfica é a ordem cronológica, que é o motivo de o
-        //  formato ser esse.
+        //  **O mês em que a fatura desta compra fecha**, e o laço de rolagem morreu junto com a
+        //  folga. Ele existia porque "uma rolagem só nem sempre basta" quando a folga é grande
+        //  perto do dia de vencer; com o fechamento sendo um dia do mês, a pergunta "esta compra
+        //  pegou a fatura que fecha neste mês?" é uma comparação respondida de uma vez.
         //
-        //  O laço existe porque **uma rolagem só nem sempre basta**: quando a folga é grande
-        //  perto do dia de vencer, a fatura que vence no mês seguinte também já fechou (vence
-        //  no dia 5 com folga de 7 e a compra é do dia 27 — a de março fechou em 26/02). Duas
-        //  rodadas sempre bastam, e é o teto de 28 dias da folga no Joi que garante isso: a
-        //  fatura de dois meses à frente fecha, no pior caso, no dia seguinte ao último dia do
-        //  mês da compra.
-        let monthsAhead = 0
-
-        while (monthsAhead < 2 && ExpenseDate > this.closingOf(paymentMethod, ExpenseDate, monthsAhead)) {
-            monthsAhead++
-        }
+        //  A comparação é entre duas datas reais e o `setDayOfMonth` grampeia o dia que não
+        //  existe no mês curto — a compra de 28/02 num cartão que fecha no dia 30 entra na
+        //  fatura de fevereiro, que é a que o emissor fecha no último dia dele. Em "YYYY-MM-DD"
+        //  a ordem lexicográfica é a ordem cronológica, que é o motivo de o formato ser esse.
+        let closingMonth = Utils.addMonthsToDate(ExpenseDate, this.monthsToClosing(paymentMethod, ExpenseDate) + index)
 
         return {
-            ClosingDate: this.closingOf(paymentMethod, ExpenseDate, monthsAhead + index),
-            DueDate: this.dueOf(paymentMethod, ExpenseDate, monthsAhead + index),
+            ClosingDate: Utils.setDayOfMonth(closingMonth, paymentMethod.ClosingDay!),
+            DueDate: this.dueIn(paymentMethod, closingMonth),
         }
+    }
+
+    //  Zero quando a compra ainda pegou a fatura que fecha no mês dela, um quando ela passou do
+    //  fechamento. Não há terceiro valor possível: o fechamento acontece uma vez por mês.
+    private monthsToClosing(card: CardCycleSource, ExpenseDate: string) {
+        return ExpenseDate <= Utils.setDayOfMonth(ExpenseDate, card.ClosingDay!) ? 0 : 1
     }
 
     /**
-     * O vencimento `monthsAhead` meses depois da compra.
+     * O vencimento da fatura que fecha no mês de `closingMonth`.
      *
-     * Sempre contado **a partir da data da compra**, nunca encadeado no vencimento anterior: o
-     * `setDayOfMonth` depois do `addMonthsToDate` desfaz o arrasto do grampeamento. Vencendo no
-     * dia 31, a parcela de fevereiro cai no 28 — e a de março tem que voltar ao 31, o que só
-     * acontece porque o 28 nunca vira a nova âncora.
+     * `monthShift` é a única inferência do modelo — e o `setDayOfMonth` depois do
+     * `addMonthsToDate` é o que desfaz o arrasto do grampeamento: vencendo no dia 31, a parcela
+     * de fevereiro cai no 28, e a de março tem que voltar ao 31.
      */
-    private dueOf(paymentMethod: Database.PaymentMethods, ExpenseDate: string, monthsAhead: number) {
-        return Utils.setDayOfMonth(Utils.addMonthsToDate(ExpenseDate, monthsAhead), paymentMethod.DueDay!)
+    private dueIn(card: CardCycleSource, closingMonth: string) {
+        return Utils.setDayOfMonth(Utils.addMonthsToDate(closingMonth, this.monthShift(card)), card.DueDay!)
     }
 
-    //  O fechamento é o vencimento menos a folga, e nada mais. Nunca grampeia, porque uma
-    //  contagem de dias corridos sempre cai num dia que existe.
-    private closingOf(paymentMethod: Database.PaymentMethods, ExpenseDate: string, monthsAhead: number) {
-        return this.closingFrom(paymentMethod, this.dueOf(paymentMethod, ExpenseDate, monthsAhead))
-    }
-
-    //  A subtração em si, isolada num lugar só: quem já tem o vencimento na mão — o extrato,
-    //  que lê a fatura gravada em vez de derivá-la da compra — chega ao fechamento por aqui,
-    //  sem uma segunda cópia da regra que este arquivo existe para concentrar.
+    //  O caminho de volta do `dueIn`, para quem já tem o vencimento na mão — o extrato, que lê a
+    //  fatura gravada em vez de derivá-la da compra. Uma cópia só da relação entre os dois dias.
     private closingFrom(card: CardCycleSource, DueDate: string) {
-        return Utils.addDaysToDate(DueDate, -card.ClosingOffsetDays!)
+        return Utils.setDayOfMonth(Utils.addMonthsToDate(DueDate, -this.monthShift(card)), card.ClosingDay!)
     }
 
-    //  Cartão sem vencimento ou sem folga de fechamento não existe (o PaymentMethodKind
-    //  garante), mas a checagem das duas colunas é o que deixa o `!` acima honesto.
+    //  **A relação entre os dois dias, derivada uma vez.** Fechando depois do dia de vencer, a
+    //  fatura só pode ser cobrada no mês seguinte ao que ela fechou.
+    private monthShift(card: CardCycleSource) {
+        return card.ClosingDay! > card.DueDay! ? 1 : 0
+    }
+
+    //  Cartão sem vencimento ou sem dia de fechamento não existe (o PaymentMethodKind garante),
+    //  mas a checagem das duas colunas é o que deixa o `!` acima honesto.
     private isCreditCard(paymentMethod: Database.PaymentMethods) {
-        return paymentMethod.Kind === "credit_card" && Boolean(paymentMethod.DueDay) && Boolean(paymentMethod.ClosingOffsetDays)
+        return paymentMethod.Kind === "credit_card" && Boolean(paymentMethod.DueDay) && Boolean(paymentMethod.ClosingDay)
     }
 }
 
 /**
- * O que basta para derivar o ciclo de uma fatura: **o cartão é o vencimento e a folga**, e não
- * há terceira coluna nessa conta. Um `Pick` porque o extrato chega aqui com as duas colunas
- * vindas de um `join`, não com a linha inteira de `PaymentMethods`.
+ * O que basta para derivar o ciclo de uma fatura: **o cartão é os dois dias do mês**, e não há
+ * terceira coluna nessa conta. Um `Pick` porque o extrato chega aqui com as duas colunas vindas
+ * de um `join`, não com a linha inteira de `PaymentMethods`.
  */
-type CardCycleSource = Pick<Database.PaymentMethods, "DueDay" | "ClosingOffsetDays">
+type CardCycleSource = Pick<Database.PaymentMethods, "DueDay" | "ClosingDay">
 
 export const InvoiceDates = new Controller()

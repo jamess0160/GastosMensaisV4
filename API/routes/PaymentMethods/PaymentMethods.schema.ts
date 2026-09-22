@@ -4,11 +4,11 @@ import { color, isoDate } from "root/Utils/joiSchemas"
 
 const day = Joi.number().integer().min(1).max(31)
 
-//  A folga do emissor: quantos dias antes do vencimento a fatura fecha. Não há padrão do setor
-//  — fica tipicamente entre 6 e 10 dias, e 7 é o mais comum, que é o default aqui. O teto de 28
-//  é o que impede uma folga de virar o mês inteiro e jogar o fechamento antes da fatura
-//  anterior.
-const closingOffset = Joi.number().integer().min(1).max(28)
+//  O dia do mês em que a fatura fecha. **Mesmo intervalo do vencimento (1 a 31), porque é a
+//  mesma coisa: um dia do mês.** Era uma folga em dias (`ClosingOffsetDays`), e a folga errava
+//  por construção — 04/09 menos 8 dias é 27/08, mas 04/10 menos 8 dias é 26/09, então o mesmo
+//  cartão fechava em dois dias diferentes. O emissor brasileiro fecha num dia fixo do mês.
+const closingDay = Joi.number().integer().min(1).max(31)
 
 //  **Em qual mês a compra do cartão pesa.** Enum e não booleano: `IsEveryday: true` é
 //  ilegível em seis meses.
@@ -30,7 +30,7 @@ export const paymentMethodResponse = Joi.object({
     Name: Joi.string().required(),
     Kind: Joi.string().valid("pix", "debit", "credit_card").required(),
     DueDay: Joi.number().allow(null).required(),
-    ClosingOffsetDays: Joi.number().allow(null).required(),
+    ClosingDay: Joi.number().allow(null).required(),
     //  Nulo fora do cartão: sem fatura não há defasagem entre consumo e pagamento a escolher.
     CompetenceMode: competenceMode.allow(null).required(),
     IconPath: Joi.string().allow(null).required(),
@@ -56,13 +56,16 @@ class Schema {
             //  acima já deixa o Kind fixo, mas a condição fica explícita porque ela é a regra —
             //  não uma consequência de quais Kind esta rota aceita hoje.
             //
-            //  Só o vencimento é obrigatório, e é de propósito: é o único dos dois que o
-            //  usuário sabe de cabeça. A folga tem default porque pedir um número que ele teria
-            //  que deduzir foi exatamente o que fez o modelo anterior aceitar dado inventado.
-            //  O dia 29, 30 ou 31 segue aceito — o vencimento é a âncora e é reaplicado a
-            //  partir da compra a cada mês, então o grampeamento de fevereiro não arrasta.
+            //  **Os dois são obrigatórios, e o fechamento não tem default.** A folga que ele
+            //  substituiu tinha um (7 dias), e o default era defensável porque uma folga se
+            //  deduz do que o setor pratica; um *dia do mês* não se deduz de nada — inventar
+            //  um seria gravar exatamente o dado errado que esta etapa existe para corrigir.
+            //  São dois números que a pessoa lê na fatura, e a tela pergunta os dois.
+            //
+            //  O dia 29, 30 ou 31 segue aceito nos dois — eles são reaplicados a cada mês a
+            //  partir da compra, então o grampeamento de fevereiro não arrasta.
             DueDay: day.when("Kind", { is: "credit_card", then: Joi.required(), otherwise: Joi.forbidden() }),
-            ClosingOffsetDays: closingOffset.when("Kind", { is: "credit_card", then: closingOffset.default(7), otherwise: Joi.forbidden() }),
+            ClosingDay: closingDay.when("Kind", { is: "credit_card", then: Joi.required(), otherwise: Joi.forbidden() }),
             //  **O padrão é 'purchase'**, e o padrão é o que serve a quem não vai configurar
             //  nada: quem usa o cartão para adiar sabe que está adiando e vai procurar a opção.
             //  O caminho contrário — nascer 'invoice' — deixaria o "posso gastar" mostrando o
@@ -91,7 +94,7 @@ class Schema {
             //  Opcionais, e o null é recusado pela section quando a linha é cartão: quem sabe
             //  o Kind gravado é ela, não o schema. Ver PaymentMethodKind.section.ts.
             DueDay: day.allow(null).optional(),
-            ClosingOffsetDays: closingOffset.allow(null).optional(),
+            ClosingDay: closingDay.allow(null).optional(),
             //  **Trocar o modo vale para o futuro.** A data é congelada na perna no lançamento,
             //  então virar a chave em novembro não reescreve agosto. Recalcular um cartão
             //  inteiro, se um dia fizer falta, é ação explícita — nunca efeito de um PUT.
