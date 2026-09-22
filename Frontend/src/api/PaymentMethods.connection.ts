@@ -1,10 +1,42 @@
 import { http } from "./client";
 import type { ApiTypes } from "@/types/api";
 
-/** `/PaymentMethods` — não há GET: a forma de pagamento sai
- *  embutida em `AccountsConnection.list()`. */
+/** `/PaymentMethods` — o único GET é o da FATURA. A forma de pagamento
+ *  em si continua saindo embutida em `AccountsConnection.list()`. */
 class Connection {
     private readonly route = "/PaymentMethods";
+
+    /** UMA fatura do cartão, inteira: o ciclo, o que há nela, em que
+     *  estado está, as faturas vizinhas e as próximas.
+     *
+     *  **O recorte é o VENCIMENTO, não o mês do chassi.** A fatura não é
+     *  um mês — ela vai de fechamento a fechamento —, e enquanto ela só
+     *  existia dentro do extrato, recortada pelo mês global, perguntar
+     *  "e a fatura passada?" obrigava a trocar o mês da aplicação
+     *  inteira, mexendo junto no Início, nos Gastos e no Relatório.
+     *
+     *  **Sem `dueDate`, a resposta é a fatura ABERTA** — a que uma
+     *  compra feita hoje pegaria. É deliberado que seja o servidor a
+     *  responder isso: ele é quem gravou o vencimento em cada perna, e
+     *  refazer a aritmética de ciclo aqui só para montar a primeira
+     *  requisição é a segunda implementação que acaba discordando no dia
+     *  do fechamento.
+     *
+     *  Vencimento sem lançamento nenhum **não é erro**: volta a fatura
+     *  vazia, que é uma resposta ("nada nesta"). Quem recusa o
+     *  vencimento inventado é o `payInvoice`, porque lá ele moveria
+     *  dinheiro. 406 se o cartão não existe no workspace ou não é
+     *  `credit_card`. */
+    async invoice(
+        idPaymentMethod: number,
+        dueDate?: ApiTypes.CalendarDate,
+    ): Promise<ApiTypes.Invoice> {
+        const { data } = await http.get<ApiTypes.Invoice>(
+            `${this.route}/IdPaymentMethod=${idPaymentMethod}/invoice`,
+            { params: dueDate ? { DueDate: dueDate } : undefined },
+        );
+        return data;
+    }
 
     /** Só cartão de crédito. Pix e débito nascem com a conta e não se
      *  criam pela mão. */

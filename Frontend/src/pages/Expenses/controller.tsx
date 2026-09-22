@@ -1,5 +1,6 @@
 import { cancelExpense } from "./sections/cancelExpense";
 import { cancelSeries } from "./sections/cancelSeries";
+import { openInvoice } from "./sections/openInvoice";
 import { toggleLegPayment } from "./sections/toggleLegPayment";
 import { updateSeries } from "./sections/updateSeries";
 import type { SplitLine } from "@/ui/SplitEditor";
@@ -25,10 +26,15 @@ export interface ExpensesContext {
     finishSubmit(message: string): void;
     closeDetail(): void;
     closeSeriesForm(): void;
+    /** Vai para a tela da fatura daquele cartão. */
+    openInvoiceFor(idPaymentMethod: number): void;
+    /** Abre a escolha de cartão — só quando há mais de um. */
+    openCardChoice(): void;
 }
 
 class Controller {
     readonly toggleLegPayment = toggleLegPayment;
+    readonly openInvoice = openInvoice;
     readonly cancelExpense = cancelExpense;
     readonly cancelSeries = cancelSeries;
     readonly updateSeries = updateSeries;

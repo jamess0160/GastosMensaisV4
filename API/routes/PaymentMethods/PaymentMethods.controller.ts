@@ -1,13 +1,22 @@
 import { Request, Response } from "express"
 import { Remove } from "./sections/DELETE/remove"
+import { GetInvoice } from "./sections/GET/getInvoice"
 import { Create } from "./sections/POST/create"
 import { PayInvoice } from "./sections/POST/payInvoice"
 import { Update } from "./sections/PUT/update"
 
 class Controller {
 
-    //  Não há GET: a forma de pagamento sai embutida na conta, no GET /Accounts. Ler as
-    //  duas coisas separadas obrigaria o cliente a remontar o vínculo que o modelo já tem.
+    //  **O único GET da feature, e ele não lê a forma de pagamento: lê a FATURA dela.** A forma
+    //  continua saindo embutida na conta, no GET /Accounts — ler as duas coisas separadas
+    //  obrigaria o cliente a remontar o vínculo que o modelo já tem. A fatura é outra coisa: ela
+    //  não é linha de tabela nenhuma, é a tupla (cartão, vencimento) consultada.
+    //
+    //  O DueDate é opcional, e a ausência dele é uma resposta — a fatura aberta hoje.
+    getInvoice = async (req: Request, res: Response) => {
+        res.json(await new GetInvoice().run(res.locals.IdWorkspace, Number(req.params.IdPaymentMethod), res.locals.IdUser, req.query.DueDate as string | undefined))
+    }
+
     create = async (req: Request, res: Response) => {
         res.json(await new Create().run(res.locals.IdWorkspace, res.locals.IdUser, req.body))
     }

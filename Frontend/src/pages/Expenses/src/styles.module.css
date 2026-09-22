@@ -355,3 +355,68 @@
     font-size: 12px;
     color: var(--ink-2);
 }
+
+/* ── A escolha de cartão do botão "Fatura" ────────────────── */
+
+/* Uma lista de alvos, não um formulário: escolher aqui não guarda nada,
+   navega. Por isso cada linha é um botão inteiro, e não um rádio com um
+   "Confirmar" no rodapé — um passo a mais para uma escolha que já é
+   reversível pelo voltar do navegador. */
+.cardChoice {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cardChoiceRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cardChoiceRow:hover {
+    border-color: var(--brand);
+    background: var(--surface-alt);
+}
+
+.cardChoiceMark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: var(--r-sm);
+    background: var(--surface-alt);
+    color: var(--ink-2);
+}
+
+.cardChoiceMark svg {
+    width: 16px;
+    height: 16px;
+}
+
+.cardChoiceBody {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.cardChoiceName {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.cardChoiceSub {
+    font-size: 12px;
+    color: var(--ink-2);
+}

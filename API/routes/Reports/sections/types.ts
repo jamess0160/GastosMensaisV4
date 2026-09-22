@@ -1,3 +1,5 @@
+import { PaymentMethodsNamespace } from "root/routes/PaymentMethods/sections/types"
+
 export namespace ReportsNamespace {
 
     /**
@@ -29,22 +31,11 @@ export namespace ReportsNamespace {
     }
 
     /**
-     * Uma compra dentro da fatura. Aqui o valor é positivo: é o que a fatura cobra.
-     *
-     * `Charged` diz **se ela está na fatura**, e é o que separa os dois grupos do `CardStatement`
-     * — ele nasce `true` na perna de cartão, então o `false` aqui é sempre um clique do usuário.
+     * Uma compra dentro da fatura, e ela é **a mesma linha** que a tela da fatura recebe: a
+     * definição mora em `routes/PaymentMethods/`, porque a fatura é do cartão e esta feature não
+     * é dona de tabela nenhuma. Aqui ela só ganha o nome que o extrato usa.
      */
-    export interface CardEntry {
-        Date: string
-        Description: string
-        Value: number
-        IdExpense: number
-        IdExpensePayment: number
-        InstallmentNumber: number | null
-        InstallmentTotal: number | null
-        Paid: boolean
-        Charged: boolean
-    }
+    export type CardEntry = PaymentMethodsNamespace.InvoiceEntry
 
     /**
      * Uma fatura: o par (cartão, vencimento), que é tudo que uma fatura é neste modelo.

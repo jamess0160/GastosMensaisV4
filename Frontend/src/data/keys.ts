@@ -58,6 +58,22 @@ export const queryKeys = {
      *  que garante que os dois sejam invalidados juntos. */
     statement: (month: ApiTypes.ReferenceMonth) => ["reports", "statement", month] as const,
 
+    /** UMA fatura: o par (cartão, vencimento), que é tudo que uma fatura
+     *  é neste modelo.
+     *
+     *  **A chave NÃO leva mês, e é o ponto da tela dela.** A fatura vai
+     *  de fechamento a fechamento e quase nunca cabe num mês civil —
+     *  chavear por mês obrigaria a fatura a se mover junto com o seletor
+     *  do chassi, que é exatamente o que fazia "e a fatura passada?"
+     *  custar trocar o mês do Início, dos Gastos e do Relatório junto.
+     *
+     *  `due` é `null` para a fatura ABERTA, que é a requisição sem
+     *  `DueDate`: ela é uma entrada de cache própria de propósito, já
+     *  que qual vencimento está aberto é resposta do servidor e muda com
+     *  o dia — não com nada que o cliente saiba. */
+    invoice: (idPaymentMethod: number, due: ApiTypes.CalendarDate | null) =>
+        ["invoice", idPaymentMethod, due] as const,
+
     /* Raízes, para invalidar tudo de um domínio depois de uma escrita
        que atravessa meses (parcelado, série de fixo, estorno). */
     allAccounts: ["accounts"] as const,
@@ -68,4 +84,8 @@ export const queryKeys = {
      *  movimento: quitar uma parcela muda seis dos nove números do mês,
      *  e em todos os meses em cache. */
     allReports: ["reports"] as const,
+    /** Toda fatura em cache. Quitar, lançar ou cancelar mexe na fatura
+     *  de outro ciclo que não o visível — um parcelado nasce com perna
+     *  em doze faturas —, então a invalidação é da raiz. */
+    allInvoices: ["invoice"] as const,
 };

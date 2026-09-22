@@ -221,12 +221,25 @@ export namespace Utils {
     /**
      * O mês corrente, "YYYY-MM", no formato que `monthStart` consome.
      *
-     * É o único lugar do projeto que olha o relógio para montar uma data de calendário, e por
-     * isso passa pelo mesmo `format` de todo o resto: um `new Date()` solto aqui traria o fuso
-     * de volta — em UTC-3, à meia-noite do dia 1 o mês corrente ainda seria o anterior.
+     * É um dos dois lugares do projeto que olham o relógio para montar uma data de calendário,
+     * e por isso passa pelo mesmo `format` de todo o resto: um `new Date()` solto aqui traria o
+     * fuso de volta — em UTC-3, à meia-noite do dia 1 o mês corrente ainda seria o anterior.
      */
     export function currentMonth() {
         return moment().format("YYYY-MM")
+    }
+
+    /**
+     * Hoje, "YYYY-MM-DD" — o outro lugar que olha o relógio, e pelo mesmo cuidado.
+     *
+     * Existe por causa de **uma** pergunta: qual fatura do cartão está aberta. Ela é a única do
+     * sistema cuja resposta depende do dia de hoje e não de um mês escolhido na tela — a fatura
+     * não é um mês, e é justamente por isso que a tela dela navega por ciclo. Comparar com
+     * `ClosingDate`, que é string, exige que o "hoje" também seja: em "YYYY-MM-DD" a ordem
+     * lexicográfica é a cronológica, e nenhum instante entra na conta.
+     */
+    export function today() {
+        return moment().format(calendarFormat)
     }
 
     export function buildTree<T>(items: T[], getId: (item: T) => number, getParentId: (item: T) => number | null): TreeNode<T>[] {

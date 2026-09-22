@@ -5,6 +5,7 @@ import { BudgetsConnection } from "@/api/Budgets.connection";
 import { ExpensePaymentsConnection } from "@/api/ExpensePayments.connection";
 import { ExpensesConnection } from "@/api/Expenses.connection";
 import { InflowsConnection } from "@/api/Inflows.connection";
+import { PaymentMethodsConnection } from "@/api/PaymentMethods.connection";
 import { ReportsConnection } from "@/api/Reports.connection";
 import { paymentLegs, type ExpenseLeg } from "@/lib/aggregate";
 import { monthRange, monthsBetween } from "@/lib/date";
@@ -93,6 +94,31 @@ export function useInflowDetail(idInflow: number | null): UseQueryResult<ApiType
         queryKey: queryKeys.inflow(idInflow ?? 0),
         queryFn: () => InflowsConnection.get(idInflow as number),
         enabled: idInflow !== null,
+    });
+}
+
+/** UMA fatura de um cartão — o ciclo, o que há nela, o estado, as
+ *  vizinhas e as próximas.
+ *
+ *  **Ela é a única leitura deste arquivo que não é de um MÊS**, e é o
+ *  motivo de a tela existir: a fatura vai de fechamento a fechamento e
+ *  quase nunca coincide com o mês civil. Enquanto ela só saía do extrato
+ *  — recortado pelo mês do chassi —, "e a fatura passada?" custava
+ *  trocar o mês da aplicação inteira, Início e Relatório junto.
+ *
+ *  `due` nulo é a fatura ABERTA, e quem responde qual é ela é o
+ *  servidor: a conta depende do dia de hoje e das datas que ele mesmo
+ *  gravou nas pernas. Refazê-la aqui seria a segunda implementação da
+ *  regra de ciclo — a que discorda no dia do fechamento. */
+export function useInvoice(
+    idPaymentMethod: number | null,
+    due: ApiTypes.CalendarDate | null,
+): UseQueryResult<ApiTypes.Invoice> {
+    return useQuery({
+        queryKey: queryKeys.invoice(idPaymentMethod ?? 0, due),
+        queryFn: () =>
+            PaymentMethodsConnection.invoice(idPaymentMethod as number, due ?? undefined),
+        enabled: idPaymentMethod !== null,
     });
 }
 
@@ -294,5 +320,9 @@ export function useInvalidateMovement() {
         // saldo, o vencido, a fatura em aberto — e muda em todos os meses
         // em cache, não só no visível.
         void queryClient.invalidateQueries({ queryKey: queryKeys.allReports });
+        // E a fatura, que é a mesma perna vista por vencimento: quitar,
+        // lançar ou cancelar muda o total de um ciclo que pode não ser o
+        // exibido — um parcelado nasce com perna em doze faturas.
+        void queryClient.invalidateQueries({ queryKey: queryKeys.allInvoices });
     };
 }

@@ -452,6 +452,21 @@ export function Statement() {
                                 {formatMoney(card.Total)}
                             </div>
                         </div>
+                        {/* O caminho para a tela da fatura, e ele leva ao
+                            CICLO QUE ESTE BLOCO ESTÁ MOSTRANDO — daí o
+                            `DueDate` no link. Sem ele o clique cairia na
+                            fatura aberta, e quem estava olhando agosto
+                            teria que voltar até lá pelas setas. */}
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                navigate(
+                                    `/contas/fatura/${card.IdPaymentMethod}?DueDate=${card.DueDate}`,
+                                )
+                            }
+                        >
+                            Abrir fatura
+                        </Button>
                     </div>
                 </div>
 
@@ -506,6 +521,18 @@ export function Statement() {
                     <div className={styles.mobileEnd}>
                         <Overline>Total da fatura</Overline>
                         <span className={styles.mobileEndValue}>{formatMoney(card.Total)}</span>
+                    </div>
+                    <div className={styles.cycle}>
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                navigate(
+                                    `/contas/fatura/${card.IdPaymentMethod}?DueDate=${card.DueDate}`,
+                                )
+                            }
+                        >
+                            Abrir fatura
+                        </Button>
                     </div>
                 </div>
 

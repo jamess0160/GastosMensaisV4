@@ -142,12 +142,23 @@ class Controller {
      * herdar o 28 que fevereiro grampeou.
      */
     public cycleOf(card: CardCycleSource, DueDate: string) {
-        let previousDue = Utils.setDayOfMonth(Utils.addMonthsToDate(DueDate, -1), card.DueDay!)
-
         return {
-            CycleStart: Utils.addDaysToDate(this.closingFrom(card, previousDue), 1),
+            CycleStart: Utils.addDaysToDate(this.closingFrom(card, this.dueShift(card, DueDate, -1)), 1),
             CycleEnd: this.closingFrom(card, DueDate),
         }
+    }
+
+    /**
+     * **O vencimento da fatura vizinha** — a anterior (`-1`) ou a seguinte (`+1`).
+     *
+     * Uma fatura é o par `(cartão, vencimento)`, então andar de um ciclo para o outro é andar
+     * de um vencimento para o outro, e a tela da fatura navega por aqui. O `setDayOfMonth`
+     * depois do `addMonthsToDate` é o mesmo cuidado do `dueIn`: vencendo dia 31, a fatura de
+     * fevereiro cai no 28 e a de março **tem que voltar ao 31** — sem isso a navegação de dois
+     * cliques deixaria de cair nos vencimentos que estão gravados nas pernas.
+     */
+    public dueShift(card: CardCycleSource, DueDate: string, months: number) {
+        return Utils.setDayOfMonth(Utils.addMonthsToDate(DueDate, months), card.DueDay!)
     }
 
     /**

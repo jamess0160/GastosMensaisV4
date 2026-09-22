@@ -10,7 +10,7 @@ import {
 import { useMonthScope } from "@/app/monthScope";
 import { useSession } from "@/app/session";
 import { useAccounts, useInvalidateCatalogs } from "@/data/catalogs";
-import { useInvalidateMovement, useMonthStatement } from "@/data/month";
+import { useInvalidateMovement, useInvoice, useMonthStatement } from "@/data/month";
 import { Badge, Button, Card, Overline, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
 import {
@@ -234,6 +234,61 @@ function CycleHint({ draft }: { draft: CardDraft }) {
                     todo mês — fechamento e vencimento caem no <b>mesmo mês</b>.
                 </>
             )}
+        </div>
+    );
+}
+
+/** **A fatura ABERTA do cartão** — quanto ela já tem, quando fecha e
+ *  quando vence —, com o caminho para a tela dela.
+ *
+ *  Ela responde outra pergunta que o bloco logo abaixo, e é por isso que
+ *  são dois: aquele é a fatura do MÊS EXIBIDO, a que se quita; esta é a
+ *  que está acumulando AGORA. Quem abre Contas em março para conferir um
+ *  saldo antigo não está perguntando quanto a fatura de março custou —
+ *  está perguntando quanto já tem na que vai chegar. E essa pergunta não
+ *  tem mês: a fatura vai de fechamento a fechamento.
+ *
+ *  Componente próprio porque cada cartão tem a sua, e um hook dentro de
+ *  um `map` não é hook. Quem diz qual fatura está aberta é o servidor —
+ *  a requisição sai sem `DueDate` —, pelo mesmo motivo de sempre: ele é
+ *  quem gravou o vencimento em cada perna, e uma segunda aritmética de
+ *  ciclo aqui discordaria no dia do fechamento. */
+function OpenInvoice({ method }: { method: ApiTypes.PaymentMethod }) {
+    const navigate = useNavigate();
+    const invoice = useInvoice(method.IdPaymentMethod, null);
+
+    return (
+        <div className={styles.openInvoice}>
+            <div className={styles.invoiceBody}>
+                <div className={styles.invoiceLabel}>Fatura aberta</div>
+
+                {invoice.isPending ? (
+                    <div className={styles.invoiceCaption}>Lendo a fatura aberta…</div>
+                ) : invoice.isError ? (
+                    <div className={styles.invoiceCaption}>
+                        Não foi possível ler a fatura aberta.
+                    </div>
+                ) : (
+                    <>
+                        {/* O número que a API AFIRMOU: só o que está na
+                            fatura, sem o previsto. */}
+                        <div className={styles.invoiceValue}>{formatMoney(invoice.data.Total)}</div>
+                        <div className={styles.invoiceCaption}>
+                            fecha em {formatShort(invoice.data.ClosingDate)} · vence em{" "}
+                            {formatShort(invoice.data.DueDate)}
+                        </div>
+                    </>
+                )}
+            </div>
+
+            <span className={styles.invoiceActions}>
+                <Button
+                    size="sm"
+                    onClick={() => navigate(`/contas/fatura/${method.IdPaymentMethod}`)}
+                >
+                    Ver fatura
+                </Button>
+            </span>
         </div>
     );
 }
@@ -743,6 +798,12 @@ export function Accounts() {
                                                         <IconArchive />
                                                     </IconButton>
                                                 </div>
+
+                                                {/* A fatura ABERTA, com o caminho para a tela
+                                                dela. Outra pergunta que o bloco de baixo: aquele
+                                                é a fatura do MÊS EXIBIDO, esta é a que está
+                                                acumulando agora — e essa não tem mês. */}
+                                                <OpenInvoice method={method} />
 
                                                 {/* A FATURA, e é ela que faz o saldo descer. No cartão,
                                                 marcar uma compra como paga não tira dinheiro de conta

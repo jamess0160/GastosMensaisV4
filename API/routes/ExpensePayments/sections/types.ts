@@ -10,4 +10,19 @@ export namespace ExpensePaymentsNamespace {
         /** Traz as pernas de gasto cancelado junto. Sem ele (ou false), elas ficam de fora. */
         IncludeCanceled?: boolean
     }
+
+    /**
+     * Uma fatura de um cartão, vista de fora: o vencimento que a identifica e o que há nela.
+     *
+     * É o que `getInvoiceDues` devolve — uma linha por vencimento, sem as pernas. A fatura não
+     * é cadastro nenhum, então esta é a lista de faturas que o cartão tem: o que existe é o
+     * conjunto de `DueDate` gravados nas pernas dele.
+     */
+    export interface InvoiceDue {
+        DueDate: string
+        /** Quantas pernas, contando o previsto: é ele que diz se a fatura existe. */
+        Legs: number
+        /** Só o que está na fatura (`Charged`) — o mesmo recorte do `Total` do extrato. */
+        Total: number
+    }
 }

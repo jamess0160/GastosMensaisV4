@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { ExpensesController, type ExpensesContext, type SeriesDraft } from "./controller";
 import { useMonthScope } from "@/app/monthScope";
@@ -117,6 +117,7 @@ const emptySeriesDraft = (): SeriesDraft => ({
 
 export function Expenses() {
     const openModal = useOpenModal();
+    const navigate = useNavigate();
     const { user } = useSession();
 
     const isMobile = useIsMobile();
@@ -140,6 +141,10 @@ export function Expenses() {
         () => Number(urlQuery.get("IdExpense")) || null,
     );
     const [seriesDraft, setSeriesDraft] = useState<SeriesDraft | null>(null);
+    /* A escolha de cartão do botão "Fatura". Só existe com MAIS DE UM
+       cartão: com um só o botão vai direto, porque uma escolha de um
+       item é um clique que só tem uma saída possível. */
+    const [choosingCard, setChoosingCard] = useState(false);
     const [confirming, setConfirming] = useState<"cancel" | "cancelSeries" | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -174,8 +179,26 @@ export function Expenses() {
             },
             closeDetail: () => setOpenExpense(null),
             closeSeriesForm: () => setSeriesDraft(null),
+            openInvoiceFor(idPaymentMethod) {
+                setChoosingCard(false);
+                navigate(`/contas/fatura/${idPaymentMethod}`);
+            },
+            openCardChoice: () => setChoosingCard(true),
         }),
-        [seriesDraft, invalidateMovement],
+        [seriesDraft, invalidateMovement, navigate],
+    );
+
+    /* Os cartões de crédito ativos do espaço — a lista que o botão
+       "Fatura" abre. Sai do cadastro que as telas de saldo já leram
+       (`GET /Accounts` traz as formas dentro da conta), então é a mesma
+       entrada de cache: nenhuma requisição a mais para desenhar o
+       botão. */
+    const cards = useMemo(
+        () =>
+            methods
+                .filter((option) => option.method.Kind === "credit_card")
+                .map((option) => option.method),
+        [methods],
     );
 
     /* ── O filtro ──────────────────────────────────────────────
@@ -320,14 +343,38 @@ export function Expenses() {
                 month={month}
                 onMonthChange={setMonth}
                 actions={
-                    /* No mobile quem lança gasto é o FAB da barra
-                       inferior — ver `HideOnMobile`. */
-                    <HideOnMobile>
-                        <Button variant="primary" onClick={() => openModal("/gastos/novo")}>
-                            <IconPlus />
-                            Novo gasto
-                        </Button>
-                    </HideOnMobile>
+                    <>
+                        {/* A FATURA, aqui — e o lugar é a pergunta:
+                            quem está olhando os gastos do mês é quem se
+                            pergunta quanto foi parar no cartão. Até a
+                            leva 9 a resposta só existia descendo por
+                            Contas → Extrato → rolar até o cartão, com o
+                            mês do chassi recortando a fatura no caminho.
+
+                            Sem cartão nenhum ele não aparece: um botão
+                            que abre uma escolha vazia é pior do que não
+                            ter botão. Com um só, vai direto — ver
+                            `sections/openInvoice.ts`.
+
+                            Ele NÃO é `HideOnMobile`: ao contrário do
+                            "Novo gasto", não há FAB nem outro caminho
+                            para ele na barra inferior. */}
+                        {cards.length > 0 && (
+                            <Button onClick={() => ExpensesController.openInvoice(context, cards)}>
+                                <IconCard />
+                                Fatura
+                            </Button>
+                        )}
+
+                        {/* No mobile quem lança gasto é o FAB da barra
+                            inferior — ver `HideOnMobile`. */}
+                        <HideOnMobile>
+                            <Button variant="primary" onClick={() => openModal("/gastos/novo")}>
+                                <IconPlus />
+                                Novo gasto
+                            </Button>
+                        </HideOnMobile>
+                    </>
                 }
             />
 
@@ -1122,6 +1169,57 @@ export function Expenses() {
                             </FormField>
                         </form>
                     )}
+                </Modal>
+
+                {/* ── Qual fatura? ─────────────────────────────────
+                    Só aparece com MAIS DE UM cartão: dois cartões são
+                    duas faturas diferentes, e abrir "a primeira"
+                    levaria a pessoa à fatura errada sem dizer que
+                    escolheu por ela. Com um só o botão nem passa por
+                    aqui — ver `sections/openInvoice.ts`. */}
+                <Modal
+                    open={choosingCard}
+                    onClose={() => setChoosingCard(false)}
+                    title="Qual fatura?"
+                    subtitle="A fatura é de um cartão, e cada um tem o seu ciclo."
+                    footer={
+                        <>
+                            <FooterSpacer />
+                            <Button onClick={() => setChoosingCard(false)}>Cancelar</Button>
+                        </>
+                    }
+                >
+                    <div className={styles.cardChoice}>
+                        {cards.map((card) => (
+                            <button
+                                key={card.IdPaymentMethod}
+                                type="button"
+                                className={styles.cardChoiceRow}
+                                onClick={() => context.openInvoiceFor(card.IdPaymentMethod)}
+                            >
+                                <span
+                                    className={styles.cardChoiceMark}
+                                    style={
+                                        card.Color
+                                            ? { background: `${card.Color}1f`, color: card.Color }
+                                            : undefined
+                                    }
+                                >
+                                    <IconCard />
+                                </span>
+                                <span className={styles.cardChoiceBody}>
+                                    <span className={styles.cardChoiceName}>{card.Name}</span>
+                                    {/* Os dois DIAS do mês, e eles valem
+                                        em todo mês: o cartão é descrito
+                                        por eles desde a etapa 2. */}
+                                    <span className={styles.cardChoiceSub}>
+                                        fecha dia {String(card.ClosingDay ?? 0).padStart(2, "0")} ·
+                                        vence dia {String(card.DueDay ?? 0).padStart(2, "0")}
+                                    </span>
+                                </span>
+                            </button>
+                        ))}
+                    </div>
                 </Modal>
 
                 {/* ── Confirmações ─────────────────────────────── */}

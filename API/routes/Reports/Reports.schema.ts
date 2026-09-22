@@ -2,22 +2,12 @@ import Joi from "joi"
 import { joiController } from "root/Utils/joiController"
 import { isoDate, periodQuery, referenceMonth } from "root/Utils/joiSchemas"
 
-//  A linha da fatura, descrita uma vez: ela sai em duas listas — o que está na fatura e o que
-//  ainda é previsto —, e duas cópias do mesmo objeto divergiriam na primeira coluna nova.
-const cardEntry = Joi.object({
-    /** A data da **compra**, não a do vencimento */
-    Date: isoDate.required(),
-    Description: Joi.string().required(),
-    /** Positivo: é o que a fatura cobra */
-    Value: Joi.number().required(),
-    IdExpense: Joi.number().required(),
-    IdExpensePayment: Joi.number().required(),
-    InstallmentNumber: Joi.number().allow(null).required(),
-    InstallmentTotal: Joi.number().allow(null).required(),
-    Paid: Joi.boolean().required(),
-    /** "Está na fatura" — nasce `true` na perna de cartão, e é o que separa as duas listas */
-    Charged: Joi.boolean().required(),
-})
+//  **A linha da fatura vem de PaymentMethods, não daqui.** Ela sai em duas listas (o que está
+//  na fatura e o que ainda é previsto) e em duas ROTAS — este extrato e
+//  `GET /PaymentMethods/.../invoice`, a tela da fatura —, e duas cópias divergiriam na primeira
+//  coluna nova. Mora lá porque a fatura é do cartão: esta feature não é dona de tabela nenhuma,
+//  e o mesmo critério já traz o `tagResponse` de Tags para dentro de Expenses.
+import { invoiceEntry as cardEntry } from "root/routes/PaymentMethods/PaymentMethods.schema"
 
 class Schema {
 

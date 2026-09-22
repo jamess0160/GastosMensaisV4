@@ -41,7 +41,86 @@ export const paymentMethodResponse = Joi.object({
     UpdatedAt: Joi.date().required(),
 })
 
+/**
+ * **Uma linha de fatura, descrita uma vez.** Ela sai em duas listas (o que está na fatura e o
+ * que ainda é previsto) e em **duas rotas** — aqui e no extrato do cartão —, e o extrato importa
+ * daqui: a fatura é do cartão, e `routes/Reports/` não é dono de tabela nenhuma. Duas cópias
+ * divergiriam na primeira coluna nova, e aí as duas telas diriam coisas diferentes sobre a
+ * mesma compra.
+ */
+export const invoiceEntry = Joi.object({
+    /** A data da **compra**, não a do vencimento */
+    Date: isoDate.required(),
+    Description: Joi.string().required(),
+    /** Positivo: é o que a fatura cobra */
+    Value: Joi.number().required(),
+    IdExpense: Joi.number().required(),
+    IdExpensePayment: Joi.number().required(),
+    InstallmentNumber: Joi.number().allow(null).required(),
+    InstallmentTotal: Joi.number().allow(null).required(),
+    Paid: Joi.boolean().required(),
+    /** "Está na fatura" — nasce `true` na perna de cartão, e é o que separa as duas listas */
+    Charged: Joi.boolean().required(),
+})
+
 class Schema {
+
+    /**
+     * **A fatura de um cartão, recortada por VENCIMENTO e não por mês.**
+     *
+     * O `DueDate` é opcional e a ausência dele é uma resposta, não um descuido: sem ele a rota
+     * devolve a fatura **aberta** — a que uma compra feita hoje pegaria. É a pergunta que traz o
+     * usuário à tela, e deixá-la a cargo do cliente seria pedir que ele refizesse a aritmética
+     * de ciclo do servidor para fazer a primeira requisição.
+     */
+    public readonly getInvoice = [
+        joiController.validateParams(Joi.object({
+            IdPaymentMethod: Joi.number().required(),
+        })),
+        joiController.validateQuery(Joi.object({
+            DueDate: isoDate.optional(),
+        })),
+        joiController.validateResponse(Joi.object({
+            IdPaymentMethod: Joi.number().required(),
+            /** De qual conta o cartão é: a fatura sai dela quando for quitada */
+            IdAccount: Joi.number().required(),
+            Name: Joi.string().required(),
+            /** Em qual mês estas compras pesam — o modo do cartão, sem reler o cadastro */
+            CompetenceMode: competenceMode.required(),
+            /** O que identifica esta fatura. Não há id: a fatura é (cartão, vencimento) */
+            DueDate: isoDate.required(),
+            /** O prazo: até este dia a compra ainda cai nesta fatura */
+            ClosingDate: isoDate.required(),
+            //  O ciclo que ela cobre — a primeira compra que ela pega e a última. `CycleEnd` é
+            //  a mesma data do `ClosingDate`, vista da outra ponta: uma é prazo, a outra é o
+            //  fim do intervalo que a tela imprime.
+            CycleStart: isoDate.required(),
+            CycleEnd: isoDate.required(),
+            /** Derivado, nunca guardado — ver PaymentMethodsNamespace.InvoiceStatus */
+            Status: Joi.string().valid("open", "closed", "paid").required(),
+            /** **Só o que está na fatura** — o previsto ainda não é cobrado */
+            Total: Joi.number().required(),
+            Entries: Joi.array().items(invoiceEntry).required(),
+            /** Previsto: lançado no cartão e desmarcado porque o emissor ainda não registrou */
+            Expected: Joi.array().items(invoiceEntry).required(),
+            //  A navegação por ciclo, que é o que substitui o seletor de mês nesta tela: a
+            //  fatura não é um mês, e forçá-la no seletor global trocaria junto o Início, os
+            //  Gastos e o Relatório. Nulo na ponta desabilita a seta.
+            PreviousDueDate: isoDate.allow(null).required(),
+            NextDueDate: isoDate.allow(null).required(),
+            /** O atalho "a aberta", e o que diz se já se está nela */
+            OpenDueDate: isoDate.required(),
+            /**
+             * **As próximas faturas**: os vencimentos depois deste que já têm parcela marcada.
+             * É o que responde quanto do mês que vem já está vendido — e sai de graça, porque
+             * as pernas futuras de um parcelamento existem desde o lançamento dele.
+             */
+            Upcoming: Joi.array().items(Joi.object({
+                DueDate: isoDate.required(),
+                Total: Joi.number().required(),
+            })).required(),
+        })),
+    ]
 
     //  Sem IdWorkspace em lugar nenhum: ele vem do token da sessão. O IdAccount continua no
     //  body porque é escolha do cliente dentro do workspace que ele já selecionou.

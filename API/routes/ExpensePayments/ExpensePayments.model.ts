@@ -79,6 +79,42 @@ export class class_ExpensePayments_model extends BaseModel {
             .orderBy("ExpensePayments.IdExpensePayment")
     }
 
+    /**
+     * **Os vencimentos que um cartão tem, com o total de cada um** — a lista de faturas dele.
+     *
+     * É o `getByInvoice` agregado: lá a fatura é escolhida e as pernas voltam uma a uma, aqui
+     * volta uma linha por fatura. Duas perguntas da tela da fatura saem desta consulta e de mais
+     * nada, e as duas seriam N requisições se ela não existisse:
+     *
+     * - **os vizinhos da navegação** (‹ anterior · próxima ›), que são os vencimentos ao lado do
+     *   exibido — a fatura não é um mês, então "o mês anterior" não é a resposta;
+     * - **as próximas faturas**, o rodapé que responde quanto do mês que vem já está vendido em
+     *   parcela. As pernas futuras já estão gravadas desde o lançamento do parcelamento, então
+     *   isso sai de graça.
+     *
+     * **O `Total` soma só o que está na fatura (`Charged`)**, exatamente como o `Total` que o
+     * extrato do cartão devolve: o previsto é o que o emissor ainda não registrou, e dois
+     * totais da mesma fatura com regras diferentes é como as duas telas passam a discordar.
+     * `Legs` conta as pernas **todas**, porque é ele que diz se a fatura existe.
+     *
+     * Mesmos dois filtros de sempre: o workspace (o id do cartão chega do cliente e é
+     * sequencial) e o gasto cancelado fora, que é o estorno dele.
+     */
+    getInvoiceDues(IdWorkspace: number, IdPaymentMethod: number) {
+        return this.KnexConnection
+            .select("ExpensePayments.DueDate")
+            .count({ Legs: "ExpensePayments.IdExpensePayment" })
+            .select(this.KnexConnection.raw(`coalesce(sum(case when "ExpensePayments"."Charged" then "ExpensePayments"."Value" else 0 end), 0) as "Total"`))
+            .from<Database.ExpensePayments>("ExpensePayments")
+            .innerJoin("Expenses", "Expenses.IdExpense", "ExpensePayments.IdExpense")
+            .where("ExpensePayments.IdWorkspace", IdWorkspace)
+            .where("ExpensePayments.IdPaymentMethod", IdPaymentMethod)
+            .whereNotNull("ExpensePayments.DueDate")
+            .whereNot("Expenses.Status", "canceled")
+            .groupBy("ExpensePayments.DueDate")
+            .orderBy("ExpensePayments.DueDate") as unknown as Promise<ExpensePaymentsNamespace.InvoiceDue[]>
+    }
+
     //  Quitar é por perna: a compra em 6x precisa saber qual parcela já foi paga. Esse detalhe
     //  nunca sobe para o gasto como status parcial — quem o resume é o ExpenseStatus.
     pay(IdExpensePayment: number, Paid: boolean) {

@@ -736,6 +736,73 @@ export namespace ApiTypes {
         DueDate: CalendarDate;
     }
 
+    /** O estado da fatura, derivado pela API e guardado em lugar nenhum.
+     *
+     *      open    -> ainda dá para comprar nela: hoje <= `ClosingDate`
+     *      closed  -> fechou; o emissor já cobrou o que tinha
+     *      paid    -> todas as pernas do ciclo estão quitadas
+     *
+     *  `paid` GANHA dos outros dois, e isso importa: uma fatura quitada
+     *  adiantada continua paga, e chamá-la de aberta porque o calendário
+     *  ainda não chegou no fechamento seria oferecer quitá-la de novo.
+     *
+     *  Ele NÃO se recalcula aqui — a comparação com "hoje" é do
+     *  servidor, que é quem também gravou as datas das pernas. */
+    export type InvoiceStatus = "open" | "closed" | "paid";
+
+    /** Uma fatura vizinha, no rodapé de "próximas faturas": o vencimento
+     *  e o total do que já está marcado nele.
+     *
+     *  Ela sai de graça — as pernas futuras de um parcelamento existem
+     *  desde o lançamento dele —, e é o que responde "quanto do meu mês
+     *  que vem já está comprometido". */
+    export interface InvoiceDue {
+        DueDate: CalendarDate;
+        Total: Money;
+    }
+
+    /** `GET /PaymentMethods/IdPaymentMethod=:Id/invoice?DueDate=` — UMA
+     *  fatura, inteira.
+     *
+     *  **O recorte é o VENCIMENTO, não o mês**, e é a rota inteira: a
+     *  fatura não é um mês, e enquanto ela só existia dentro do extrato
+     *  — recortada pelo mês do chassi — três perguntas não tinham onde
+     *  ser feitas ("quanto tem na aberta", "e a passada", "e a
+     *  próxima"). Sem `DueDate` a resposta é a fatura ABERTA.
+     *
+     *  Ela reaproveita a linha do extrato do cartão (`StatementCardEntry`)
+     *  porque é a MESMA linha: a API descreve as duas no mesmo lugar. */
+    export interface Invoice {
+        IdPaymentMethod: number;
+        /** De qual conta o cartão é — a fatura sai dela quando for quitada. */
+        IdAccount: number;
+        Name: string;
+        CompetenceMode: CompetenceMode;
+        /** O que identifica esta fatura: não há id, a fatura é (cartão, vencimento). */
+        DueDate: CalendarDate;
+        /** O prazo: até este dia a compra ainda cai nesta fatura. */
+        ClosingDate: CalendarDate;
+        /** O ciclo que ela cobre. `CycleEnd` é a mesma data do
+         *  `ClosingDate`, vista da outra ponta — uma é prazo, a outra é
+         *  o fim do intervalo que a tela imprime. */
+        CycleStart: CalendarDate;
+        CycleEnd: CalendarDate;
+        Status: InvoiceStatus;
+        /** **Só o que está na fatura** — o previsto ainda não é cobrado. */
+        Total: Money;
+        Entries: StatementCardEntry[];
+        /** Previsto: lançado no cartão e desmarcado porque o emissor
+         *  ainda não registrou. Fora do `Total`, e quitado junto. */
+        Expected: StatementCardEntry[];
+        /** As setas da navegação por ciclo. Nulo na ponta — é o que
+         *  desabilita a seta em vez de deixá-la levar a lugar nenhum. */
+        PreviousDueDate: CalendarDate | null;
+        NextDueDate: CalendarDate | null;
+        /** O atalho do meio ("a aberta"), e o que diz se já se está nela. */
+        OpenDueDate: CalendarDate;
+        Upcoming: InvoiceDue[];
+    }
+
     /** A perna como `GET /ExpensePayments` a devolve: com o gasto de
      *  origem e o rateio DELE.
      *

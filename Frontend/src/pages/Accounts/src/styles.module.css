@@ -220,6 +220,19 @@
     border-radius: 0;
 }
 
+/* A fatura ABERTA, acima da do mês exibido. Mesma caixa, e a diferença é
+   o que cada uma responde: esta é a que está acumulando AGORA e não tem
+   mês nenhum; a de baixo é a do mês que o seletor escolheu, que é a que
+   se quita. */
+.openInvoice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+}
+
 .invoice {
     display: flex;
     align-items: center;

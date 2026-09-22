@@ -1,4 +1,5 @@
 import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
+import { Utils } from "root/Utils/Utils"
 
 //  Testes integrados de PaymentMethods. Um describe por rota de PaymentMethods.route.ts.
 //
@@ -497,6 +498,212 @@ describe("PaymentMethods", () => {
         })
     })
 
+    //  **A fatura como leitura**, que é o que a etapa 5 abriu. Ela sempre existiu nos dados —
+    //  todas as pernas de um ciclo compartilham o mesmo DueDate —, mas só aparecia dentro do
+    //  extrato, recortada pelo mês da tela. A fatura NÃO é um mês, e é isso que estes testes
+    //  travam: o recorte é o vencimento, e a navegação anda de ciclo em ciclo.
+    describe("GET /PaymentMethods/IdPaymentMethod=:IdPaymentMethod/invoice", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().get(`/PaymentMethods/IdPaymentMethod=1/invoice`)
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/PaymentMethods/IdPaymentMethod=1/invoice`)
+
+            expect(response.status).toBe(406)
+        })
+
+        //  O id chega do cliente e é sequencial: sem o escopo, a fatura do vizinho — que é a
+        //  lista de compras dele — sairia inteira
+        it("recusa o cartão de outro workspace", async () => {
+            let invoice = await buildInvoice()
+
+            let response = await otherClient.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice?DueDate=2026-08-28`)
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Fora do cartão não há fatura: o débito e o pix saem no ato
+        it("recusa forma de pagamento que não é cartão", async () => {
+            let invoice = await buildInvoice()
+
+            let response = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdDebit}/invoice`)
+
+            expect(response.status).toBe(406)
+        })
+
+        //  **O ciclo é a regra que a etapa 2 gravou, lida ao contrário**: a fatura de 28/08 num
+        //  cartão que fecha dia 20 pega tudo que foi comprado DEPOIS do fechamento anterior
+        it("devolve o ciclo, o total e as linhas da fatura pedida", async () => {
+            let invoice = await buildInvoice()
+
+            let response = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice?DueDate=2026-08-28`)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toMatchObject({
+                IdPaymentMethod: invoice.IdCard,
+                IdAccount: invoice.IdAccount,
+                DueDate: "2026-08-28",
+                //  Fecha dia 20 e vence dia 28: ClosingDay <= DueDay, os dois no mesmo mês
+                ClosingDate: "2026-08-20",
+                CycleStart: "2026-07-21",
+                CycleEnd: "2026-08-20",
+                CompetenceMode: "purchase",
+                Total: 600,
+            })
+
+            expect(response.body.Entries).toHaveLength(3)
+            expect(response.body.Expected).toHaveLength(0)
+            //  A data da linha é a da COMPRA, não a do vencimento: é por ela que o usuário
+            //  reconhece o lançamento ao conferir com o app do cartão
+            expect(response.body.Entries.map((entry: { Date: string }) => entry.Date)).toEqual(["2026-08-10", "2026-08-10", "2026-08-10"])
+        })
+
+        //  Cancelar um gasto é o estorno dele: ele sai da fatura, e do total junto
+        it("ignora a perna de gasto cancelado", async () => {
+            let invoice = await buildInvoice()
+
+            await invoice.client.delete(`/Expenses/IdExpense=${invoice.IdExpenses[0]}`)
+
+            let response = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice?DueDate=2026-08-28`)
+
+            expect(response.body.Total).toBe(500)
+            expect(response.body.Entries).toHaveLength(2)
+        })
+
+        //  **O previsto fica FORA do total e DENTRO da resposta**, como no extrato: ele é quitado
+        //  junto quando a fatura for paga, e uma linha invisível que mesmo assim tira dinheiro da
+        //  conta é o defeito que a separação existe para não criar
+        it("separa o previsto do que está na fatura, sem somá-lo no total", async () => {
+            let invoice = await buildInvoice()
+
+            let leg = await firstLegOf(invoice.IdExpenses[0])
+
+            expect((await invoice.client.post(`/ExpensePayments/IdExpensePayment=${leg.IdExpensePayment}/uncharge`, {})).status).toBe(200)
+
+            let response = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice?DueDate=2026-08-28`)
+
+            expect(response.body.Total).toBe(500)
+            expect(response.body.Entries).toHaveLength(2)
+            expect(response.body.Expected).toHaveLength(1)
+            expect(response.body.Expected[0].Value).toBe(100)
+        })
+
+        //  **O estado é derivado e não há coluna onde guardá-lo.** Uma fatura de agosto lida hoje
+        //  já fechou; a `paga` ganha das outras duas porque é a única que fala de dinheiro
+        it("deriva o estado da fatura", async () => {
+            let invoice = await buildInvoice()
+
+            let closed = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice?DueDate=2026-08-28`)
+
+            expect(closed.body.Status).toBe("closed")
+
+            await invoice.client.post(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/payInvoice`, { DueDate: "2026-08-28" })
+
+            let paid = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice?DueDate=2026-08-28`)
+
+            expect(paid.body.Status).toBe("paid")
+        })
+
+        //  **Sem DueDate, a fatura é a ABERTA** — a que uma compra feita hoje pegaria. É a
+        //  pergunta que traz o usuário à tela, e deixá-la com o cliente seria pedir que ele
+        //  refizesse a aritmética de ciclo do servidor só para fazer a primeira requisição
+        it("devolve a fatura aberta quando o vencimento é omitido", async () => {
+            let invoice = await buildInvoice()
+
+            let response = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice`)
+
+            expect(response.status).toBe(200)
+            expect(response.body.DueDate).toBe(response.body.OpenDueDate)
+            //  Aberta por construção: o fechamento dela ainda não chegou. E sem perna nenhuma
+            //  ela não é "paga" — `every` sobre lista vazia é `true`, e essa guarda é deliberada
+            expect(response.body.Status).toBe("open")
+            expect(response.body.ClosingDate >= Utils.today()).toBe(true)
+        })
+
+        //  **As setas andam entre ciclos, não entre meses** — é isto que tira a fatura do seletor
+        //  de mês global, que trocaria junto o Início, os Gastos e o Relatório
+        it("navega para a fatura anterior e volta para a mesma", async () => {
+            let invoice = await buildInvoice()
+
+            let open = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice`)
+
+            //  As duas vizinhas da aberta entram sempre, mesmo sem compra nenhuma: um cartão
+            //  recém cadastrado não pode ter as duas setas mortas
+            expect(open.body.PreviousDueDate).not.toBeNull()
+            expect(open.body.NextDueDate).not.toBeNull()
+            expect(open.body.PreviousDueDate < open.body.DueDate).toBe(true)
+            expect(open.body.NextDueDate > open.body.DueDate).toBe(true)
+
+            let previous = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice?DueDate=${open.body.PreviousDueDate}`)
+
+            expect(previous.body.DueDate).toBe(open.body.PreviousDueDate)
+            //  A ida e a volta fecham: sem o grampeamento do mês curto voltando ao dia certo,
+            //  dois cliques cairiam num vencimento que perna nenhuma tem
+            expect(previous.body.NextDueDate).toBe(open.body.DueDate)
+            expect(previous.body.OpenDueDate).toBe(open.body.DueDate)
+        })
+
+        //  A fatura de agosto é alcançável pela seta porque TEM perna, mesmo estando meses atrás
+        //  da aberta: o conjunto navegável é o dos vencimentos gravados, mais os vizinhos da aberta
+        it("inclui na navegação todo vencimento que tem perna", async () => {
+            let invoice = await buildInvoice()
+
+            let august = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice?DueDate=2026-08-28`)
+
+            expect(august.body.NextDueDate).not.toBeNull()
+            expect(august.body.NextDueDate > "2026-08-28").toBe(true)
+        })
+
+        //  **O rodapé das próximas faturas, e ele sai de graça**: as pernas futuras de um
+        //  parcelamento estão gravadas desde o lançamento dele. É o que responde quanto do mês
+        //  que vem já está vendido
+        it("lista os vencimentos futuros que já têm parcela, com o total de cada um", async () => {
+            let invoice = await buildInvoice()
+
+            //  600 em 6x: seis pernas de 100, uma por mês a partir da fatura de 28/08
+            expect((await invoice.client.post(`/Expenses`, {
+                Description: "Geladeira em 6x",
+                TotalValue: 600,
+                IdCategory: invoice.IdCategory,
+                ExpenseDate: "2026-08-10",
+                Kind: "installment",
+                InstallmentTotal: 6,
+                Payments: [{ IdPaymentMethod: invoice.IdCard, Value: 600 }],
+            })).status).toBe(200)
+
+            let response = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice?DueDate=2026-08-28`)
+
+            //  600 das três compras à vista + a primeira parcela
+            expect(response.body.Total).toBe(700)
+
+            expect(response.body.Upcoming).toEqual([
+                { DueDate: "2026-09-28", Total: 100 },
+                { DueDate: "2026-10-28", Total: 100 },
+                { DueDate: "2026-11-28", Total: 100 },
+                { DueDate: "2026-12-28", Total: 100 },
+                { DueDate: "2027-01-28", Total: 100 },
+            ])
+        })
+
+        //  Um vencimento que perna nenhuma tem não é erro — é a fatura vazia, e ela é uma
+        //  resposta legítima: a tela precisa poder mostrar "nada nesta". Quem recusa o vencimento
+        //  inventado é o payInvoice, porque lá ele moveria dinheiro
+        it("devolve a fatura vazia de um vencimento sem lançamento", async () => {
+            let invoice = await buildInvoice()
+
+            let response = await invoice.client.get(`/PaymentMethods/IdPaymentMethod=${invoice.IdCard}/invoice?DueDate=2027-05-28`)
+
+            expect(response.status).toBe(200)
+            expect(response.body.Total).toBe(0)
+            expect(response.body.Entries).toEqual([])
+            expect(response.body.Status).toBe("open")
+        })
+    })
+
     describe("POST /PaymentMethods/IdPaymentMethod=:IdPaymentMethod/payInvoice", () => {
 
         it("recusa sem token", async () => {
@@ -811,6 +1018,12 @@ async function balanceOf(client: TestClient, IdAccount: number, ReferenceMonth: 
 
 function findExpense(IdExpense: number) {
     return TestDatabase.connection().select("*").from("Expenses").where("IdExpense", IdExpense).first()
+}
+
+//  A perna de um gasto à vista — a única dele. Vai direto ao banco porque o que se quer é o id
+//  para chamar o `uncharge`, e a rota que os lista é de outra feature.
+function firstLegOf(IdExpense: number) {
+    return TestDatabase.connection().select("*").from("ExpensePayments").where("IdExpense", IdExpense).orderBy("IdExpensePayment").first()
 }
 
 function paidLegs(IdPaymentMethod: number) {

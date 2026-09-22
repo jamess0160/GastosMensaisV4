@@ -20,6 +20,15 @@ PaymentMethods_route.put("/PaymentMethods/IdPaymentMethod=:IdPaymentMethod", Pay
 
 PaymentMethods_route.delete("/PaymentMethods/IdPaymentMethod=:IdPaymentMethod", PaymentMethods_schema.remove, AsyncHandler(PaymentMethods_controller.remove))
 
+//  **A fatura, como leitura.** Até a leva 9 ela só existia dentro do extrato, recortada pelo mês
+//  selecionado — e a fatura **não é um mês**: "quanto já tem na que está aberta" é uma pergunta
+//  sobre hoje, e "e a passada" obrigava a trocar o mês da aplicação inteira. Por isso o recorte
+//  aqui é um **vencimento**, que é o que identifica uma fatura, e sem ele a resposta é a aberta.
+//
+//  GET numa feature que não tinha nenhum: a forma de pagamento continua saindo embutida na
+//  conta, o que sai por aqui é a fatura — que não é linha de tabela nenhuma.
+PaymentMethods_route.get("/PaymentMethods/IdPaymentMethod=:IdPaymentMethod/invoice", PaymentMethods_schema.getInvoice, AsyncHandler(PaymentMethods_controller.getInvoice))
+
 //  **A fatura do cartão.** Ela já existe nos dados — todas as pernas de um ciclo compartilham o
 //  mesmo DueDate exato —, então é uma consulta por (IdPaymentMethod, DueDate) e não um cadastro:
 //  nenhuma tabela nova. É o `pay` em lote, e é o que faz o saldo do cartão finalmente descer.

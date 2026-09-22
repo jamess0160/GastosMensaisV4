@@ -29,6 +29,7 @@ const Accounts = lazy(() =>
 const Statement = lazy(() =>
     import("@/pages/Statement/Statement").then((m) => ({ default: m.Statement })),
 );
+const Invoice = lazy(() => import("@/pages/Invoice/Invoice").then((m) => ({ default: m.Invoice })));
 const Report = lazy(() => import("@/pages/Report/Report").then((m) => ({ default: m.Report })));
 const Settings = lazy(() =>
     import("@/pages/Settings/Settings").then((m) => ({ default: m.Settings })),
@@ -51,8 +52,9 @@ export interface ScreenRoute {
     element: ReactNode;
 }
 
-/** As 9 telas do chassi — as 8 do layout menos o login, mais o perfil,
- *  o espaço e o extrato, que a API pede e o layout não desenha. */
+/** As 10 telas do chassi — as 8 do layout menos o login, mais o perfil,
+ *  o espaço, o extrato e a fatura, que a API pede e o layout não
+ *  desenha. */
 export const SHELL_SCREENS: ScreenRoute[] = [
     { index: true, element: load(<Dashboard />) },
     { path: "gastos", element: load(<Expenses />) },
@@ -63,6 +65,14 @@ export const SHELL_SCREENS: ScreenRoute[] = [
        mês do chassi é o mesmo nas duas — o extrato de um mês e o saldo
        daquele mês têm que andar juntos. */
     { path: "contas/extrato", element: load(<Statement />) },
+    /* A FATURA de um cartão. Também filha de Contas na URL — o cartão
+       mora dentro da conta dele —, mas é a única tela do chassi que
+       NÃO acompanha o mês: a fatura vai de fechamento a fechamento e
+       quase nunca cabe num mês civil, e é ela mesma que navega por
+       ciclo. Enquanto a fatura só existia dentro do Extrato, recortada
+       pelo mês global, "e a fatura passada?" custava trocar o mês do
+       Início, dos Gastos e do Relatório junto. */
+    { path: "contas/fatura/:idPaymentMethod", element: load(<Invoice />) },
     { path: "relatorio", element: load(<Report />) },
     { path: "personalizacao", element: load(<Settings />) },
     { path: "perfil", element: load(<Profile />) },
