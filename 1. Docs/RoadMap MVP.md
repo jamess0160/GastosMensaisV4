@@ -131,6 +131,14 @@ item de fila não é o lugar de nenhum dos dois.
 
 ### 1. O fechamento do cartão guardado como dia do mês
 
+> **22/09/2026 — saiu da fila: virou as etapas 2 e 3 da [leva 9](Levas/9.%20O%20que%20voltou%20de%20quem%20usa.md).**
+> Não por decisão de planejamento, e sim porque o uso real caiu em cima dele: o primeiro retorno
+> depois do MVP no ar foi um cartão que fecha dia 30, com o gasto de 31/08 pesando em agosto.
+> A leva 9 troca `ClosingOffsetDays` por `ClosingDay` e, **em cima disso**, faz a compra pesar no
+> mês do ciclo que a pegou — que é o que o retorno pedia e o que a folga em dias corridos não
+> tinha como entregar certo. O texto abaixo é o diagnóstico original, e continua valendo como o
+> porquê.
+
 **Leva própria.** A etapa 2 da leva 6
 reproduziu "a compra no dia do fechamento" e o defeito não é a comparação, que está certa: quem
 erra é o modelo que descreve o cartão. Hoje o fechamento é o vencimento menos uma folga em
@@ -157,7 +165,7 @@ cliente enquanto não voltar como etapa de leva.**
 | **Conciliação de extrato** | Fora do MVP em 07/09 — virou o extrato manual, entregue na leva 5 (`contas/extrato`), que é o que a tela precisa | Três perguntas sem resposta: **de onde vem o extrato** (OFX/CSV ou Open Finance — um parser contra uma integração com credencial e homologação), **o que é um item "a resolver"**, e **se conciliar cria lançamento ou só marca os existentes** — se cria, é migration em `Inflows` e `Expenses` |
 | **`UserDevices`** | Só faz sentido junto com notificações | Tabela existe, rota não |
 | **`Plans` / `Subscriptions`** | Cobrança não faz parte do fluxo de um mês | Tabelas existem, rotas não. **Quando isto voltar, os termos de uso e a política de privacidade têm que ser revisados antes**: muda o controlador (o CNPJ assina no lugar da pessoa física), entram pagamento, reembolso e cancelamento, e o processador de pagamento vira mais um operador na política |
-| **Fatura de cartão como entidade** | As datas da fatura já vivem na perna (`ClosingDate`/`DueDate`), e o extrato mostra a fatura sem precisar de tabela. Só se pagaria com conciliação, que também saiu | — |
+| **Fatura de cartão como entidade** | As datas da fatura já vivem na perna (`ClosingDate`/`DueDate`), e o extrato mostra a fatura sem precisar de tabela. Só se pagaria com conciliação, que também saiu. **Reavaliada em 22/09** e mantida fora: a leva 9 dá à fatura tela própria, navegação entre ciclos e botão de quitar, tudo sobre a tupla `(cartão, vencimento)` que o `payInvoice` já usa. A tabela também foi levantada como alternativa ao `ClosingDay`, e recusada aí por um motivo mais forte — congelar a data não conserta a deriva, porque o que seria congelado é o resultado da mesma subtração errada | O gatilho para ela voltar é a fatura precisar de estado **não derivável**: o valor fechado pelo emissor divergindo da soma das compras, ou a conciliação |
 | **"Continuar com Google"** | Não há OAuth na API | Desenhado no layout; o botão fica desabilitado |
 | **Exportação de dados para portabilidade** | A exportação `.xlsx` da leva 3 já entrega o conteúdo financeiro, e é o que a política de privacidade cita | Um formato formal, com os dados cadastrais junto, só se paga quando alguém pedir |
 | **Backup fora da máquina** | Decidido em 11/09, junto com a leva 8: o `pg_dump` fica no mesmo disco do banco. Cobre migration ruim, comando errado e corrupção lógica — as causas prováveis; **não cobre a perda do servidor**, que é a total. Aceitável enquanto o dado é de teste | O script (`deploy/backup.sh`), o agendamento (`deploy/gastosmensais-backup.timer`) e o procedimento de restore ([Deploy.md](Deploy.md#5-restaurar-o-backup)) já existem, entregues pela etapa 9 da leva 8; falta só o destino externo. **O gatilho para isto voltar é o primeiro usuário que não seja conhecido**, e certamente o lançamento com cobrança |
@@ -207,6 +215,15 @@ compliance e o código que muda de comportamento em produção — se verifica c
 e-mail do domínio, arquivos
 externos, infra e backup — é o que está em volta dos dois, e só subindo se sabe. Juntá-las faria
 uma leva em que metade das etapas não tem critério de aceite até o dia do deploy.
+
+**A 9 foi escrita em 22/09, e é a primeira que não nasce de uma lista interna.** As oito
+anteriores saíram do que o projeto sabia que devia; esta sai de treze retornos de quem usou o
+produto no ar. Por isso ela mistura o que nenhuma outra misturou: quatro defeitos de uma linha
+(o mês em inglês, a data vermelha, o convite sem o e-mail, o ícone que estoura o botão de
+biometria) ao lado de **duas trocas de modelo**
+— o fechamento do cartão, que saiu da fila acima, e o orçamento, que deixa de ser um teto perene
+por alvo e vira uma repartição da renda do mês, com a pessoa e a categoria na mesma linha. As
+duas são migration sobre dado de produção, e é isso que define o tamanho da leva.
 
 Cada leva ganha um arquivo em [Levas/](Levas/), no formato descrito lá. O que muda em relação
 ao que existia antes:
