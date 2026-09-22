@@ -11,7 +11,7 @@ este.
 | --- | --- |
 | Plano | **Um só.** Segmentar depois dos primeiros 50 pagantes |
 | Mensal | **R\$29,90** |
-| Anual | **R\$299,00**, oferecido **no mês 3**, nunca na entrada |
+| Anual | **R\$299,00 + R\$129/ano por conexão acima da 3ª**, cotado com o uso real no **mês 3**. Não existe como plano na página |
 | Workspaces | **ilimitados, R\$0** |
 | Membros (editor/viewer) | **ilimitados, R\$0** |
 | Conexões bancárias | **3 inclusas**; da 4ª em diante **R\$12,90** |
@@ -36,6 +36,105 @@ sempre."*
 
 **R\$12,90 na conexão extra, não R\$9,90.** A regra dos 2,5× estava medindo a coisa errada — cobria o
 custo variável de R\$4 e ignorava os R\$160/mês fixos. R\$12,90 dá 3,2× e começa a amortizar o fixo.
+
+## O anual é oferta, não plano
+
+**Ele não aparece na página de preço.** A página mostra R\$29,90/mês e mais nada. O anual é extendido
+a um cliente específico, no mês 3, cotado com a contagem de conexões que ele realmente usa.
+
+Essa distinção não é cosmética: **um plano na página precisa ter preço genérico, e preço genérico é
+de onde vinha o buraco de margem.** Um cliente com 5 contas assinando R\$299 na entrada custaria
+R\$240/ano em consentimento — margem de R\$59. Cotado pelo uso real ele paga R\$557, e a conta fecha.
+
+Três razões independentes levam ao mesmo mês 3, e é isso que trava a decisão:
+
+- **confiança** — R\$299 à vista é o terceiro pedido empilhado num produto sem marca que já pediu
+  cartão e acesso bancário;
+- **margem** — sem a contagem de conexões você não tem o insumo do preço;
+- **mecânica** — pela régua do trial (1 conexão, 2ª e 3ª liberadas na primeira cobrança confirmada),
+  **a contagem só estabiliza no mês 2**. Antes disso o número não é um dado, é artefato da régua.
+
+**A cotação:** R\$299 (base, 3 conexões) + **R\$129/ano** por conexão acima da 3ª. Os R\$129 são
+12,90 × 10 — os **mesmos dois meses grátis** do anual principal, então a regra é uma só em todo o
+plano. Margem de 2,7× sobre os R\$48/ano de custo, acima do piso de 2,5×.
+
+Do lado do cliente a oferta se vende sozinha, e é mais atraente justamente para quem você mais quer
+travar:
+
+| Conexões | Mensal | Anual | Desconto |
+| --- | --- | --- | --- |
+| 3 | R\$358,80/ano | R\$299,00 | 17% |
+| 5 | R\$668,40/ano | R\$557,00 | 17% |
+
+**Não há motivo para o anual variar abaixo de 3 conexões.** O cliente com 1 conexão paga R\$299 e
+custa R\$48 — margem de R\$251. É o melhor cliente da base, e é ele que subsidia o de 6. A base fixa
+em 3 é o que faz a estrutura fechar.
+
+**Exceção única, e é manual:** a coorte dos 10 compromissos por escrito (ver *A Polp*). Você conhece
+cada um por nome e sabe quantos bancos tem — venda anual na mão, por link de pagamento, negociado.
+Preserva o caixa antecipado nos meses em que a exposição da Polp é maior, casa com a promessa de
+grandfathering, e não é funcionalidade de produto. Oferta pontual para 10 pessoas não vira tela.
+
+## Conexões no meio do termo
+
+A política inteira, e ela é curta de propósito:
+
+1. No meio do termo, conexão custa **R\$12,90 por mês restante**, em **cobrança única**.
+2. **Exceção:** a primeira conexão adicionada **depois do 2º mês** do termo é cortesia. Uma por
+   termo, e ela **conta na renovação** como qualquer outra.
+3. Na renovação, **conta-se o que está ativo**: R\$299 + R\$129/ano por conexão acima da 3ª.
+
+**Por que R\$12,90 por mês restante e não rateio proporcional.** `3 × 129 × 11/12 = R\$354,75` é um
+número que o cliente aceita ou desconfia — ele não tem como conferir. `3 conexões × 11 meses ×
+R\$12,90` ele confere de cabeça, na tarifa mensal que já conhece. E responde à pergunta óbvia — *"por
+que não ganho o desconto do anual nessa conexão?"* — com a verdade: porque não houve compromisso de
+um ano com ela. O incentivo fica na direção certa: adicionar no meio do termo é mais caro por
+conexão do que declarar na renovação.
+
+**A cortesia é limitada por desenho.** Pior caso: 1 conexão no mês 3, 10 meses restantes, R\$40 — e
+depois ela passa a render R\$129/ano. O gate de 2 meses existe porque quem assina o anual e adiciona
+conexões no mês seguinte estava escondendo a contagem real na cotação.
+
+**A renovação precisa de clique ativo quando o valor sobe.** R\$557 → R\$815 é 46% de aumento;
+renovar nesse valor porque o cliente não respondeu ao e-mail é como se gera chargeback, e é frágil
+do ponto de vista de defesa do consumidor — não tratar silêncio como aceite num salto desse tamanho.
+A mecânica de pagamento força o mesmo caminho: o valor novo provavelmente estoura o teto do
+consentimento de Pix Automático coletado para o valor antigo. Então: **cotação 30 dias antes,
+mostrando a contagem que a gerou, com clique ativo e a opção de remover conexões antes de renovar.**
+
+### Duas regras que foram testadas e caíram
+
+Registrado para não serem reinventadas.
+
+**Cortesia até a renovação, sem limite** — a primeira versão desta seção. Quebra no cenário
+`3 conexões inclusas → 6 no mês seguinte à assinatura do anual`: custo de R\$276 contra R\$299
+recebidos, margem de R\$23. A exposição é **(conexões adicionadas) × (meses restantes)**, e a versão
+original só tinha sido testada com os dois fatores pequenos (+1 na metade do termo, R\$24). Com o
+upgrade, o mesmo cenário fica assim:
+
+| | Cortesia irrestrita | Com upgrade |
+| --- | --- | --- |
+| Recebido no ano 1 | R\$299,00 | **R\$724,70** (299 + 3 × 11 × 12,90) |
+| Custo | R\$276,00 | R\$276,00 |
+| **Margem ano 1** | **R\$23,00** | **R\$448,70** |
+| Renovação (6 conexões) | R\$686,00 | R\$686,00 |
+
+E fecha por fora: o mesmo cliente no mensal com 6 conexões pagaria R\$823/ano, então os R\$724,70 são
+12% de desconto — menos que os 17% do anual limpo, porque metade foi comprada no meio do termo a
+tarifa mensal.
+
+**Carência mínima de `ceil(3 / nº de contas)` meses para a conexão contar na renovação.** Cai por
+três motivos. O custo do ano seguinte é determinado pelo que está **ativo**, não pela data em que
+chegou — uma conexão viva na renovação custa R\$48 nos próximos 12 meses tenha ela entrado no mês 2
+ou no mês 11. A regra faz o preço depender de *quando* em vez de *o quê*, e visto de fora é
+arbitrário ("por que meu plano subiu R\$129 e do meu amigo não?"). E ela abre a única brecha real de
+gaming do desenho: adição tardia escapando da reprecificação é você pagando R\$48/ano por uma
+conexão que nunca entrou no preço. A preocupação legítima por trás dela — não surpreender o cliente
+— é da cotação prévia, não do preço.
+
+**O cliente que salta para 6 conexões não é ameaça, é a melhor conta da base.** Seis bancos ligados é
+investimento profundo e churn baixíssimo. O problema nunca foi ele; era a cortesia irrestrita
+precificando ele errado.
 
 ## O compartilhamento
 
@@ -179,7 +278,7 @@ vai ser óbvia.
 
 | Recomendação do conselho | Por que caiu |
 | --- | --- |
-| Anual pré-pago **em destaque** na entrada | R\$299 na entrada é o terceiro pedido de confiança empilhado num produto sem marca que já pede cartão e acesso bancário. Recusar o anual em destaque contamina o mensal ao lado. Ele vai para o mês 3, onde cai na coorte que já provou retenção — e onde o consentimento está a ~9 meses de expirar, casando os ciclos. O preço plano já matou o problema do teto do Pix Automático que o anual resolveria |
+| Anual pré-pago **em destaque** na entrada | Três razões independentes, ver *O anual é oferta, não plano*: R\$299 à vista é o terceiro pedido de confiança empilhado; sem a contagem de conexões não há insumo para o preço (um cliente de 5 contas a R\$299 deixa R\$59 de margem); e a contagem só estabiliza no mês 2. No mês 3 ele ainda cai na coorte que já provou retenção, com o consentimento a ~9 meses de expirar, casando os ciclos. O preço plano já matou o problema do teto do Pix Automático que o anual resolveria |
 | Trial de **14 dias** | 30, pelo fechamento de mês e pela formação de hábito |
 | **Nenhuma conexão** no trial | Trial sem integração é trial de outro produto; ninguém autoriza pagamento para testar planilha com funções a mais. Vira **uma** conexão |
 | **Só ligar a Polp contra fila já paga** | Era conselho para quem não podia bancar R\$700. O ativo a proteger são as 3–6 semanas, e a trava correta é 10 compromissos por escrito + limiar de 9 pagantes no dia 60 |
