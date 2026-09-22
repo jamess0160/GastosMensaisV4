@@ -807,18 +807,10 @@ export namespace ApiTypes {
         Tags: Tag[];
     }
 
-    export interface ExpenseListQuery {
-        From?: CalendarDate;
-        To?: CalendarDate;
-        /** Sem `Status`, os cancelados ficam de fora. */
-        Status?: ExpenseStatus;
-        /** Traz os cancelados JUNTO com o resto, em vez de trocar um
-         *  recorte por outro — é o que permite o filtro de status ser
-         *  multi-seleção sobre uma lista só. */
-        IncludeCanceled?: boolean;
-        Kind?: ExpenseKind;
-        IdCategory?: number;
-    }
+    /* Não há `ExpenseListQuery`: o cliente não lista compras. `GET
+       /Expenses` recorta por `ExpenseDate` e não enxerga a parcela de
+       uma compra de outro mês — quem lista é `ExpensePaymentListQuery`,
+       que recorta por `CompetenceDate`. */
 
     export interface ExpensePaymentInput {
         IdPaymentMethod: number;

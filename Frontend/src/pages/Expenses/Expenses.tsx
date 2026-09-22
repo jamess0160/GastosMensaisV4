@@ -13,12 +13,8 @@ import {
     useCategories,
     usePaymentMethods,
 } from "@/data/catalogs";
-import {
-    useExpenseDetail,
-    useInvalidateMovement,
-    useMonthExpenses,
-    useMonthLegs,
-} from "@/data/month";
+import { useExpenseDetail, useInvalidateMovement, useMonthLegs } from "@/data/month";
+import { installmentLabel, isLegOverdue, legMatches, legStatus, type LegFilters } from "./src/rows";
 import { Avatar, Badge, Button, Card, Chip, PageHead, Workspace as Page } from "@/ui/primitives";
 import { HideOnMobile, Topbar } from "@/ui/topbar";
 import {
@@ -53,7 +49,6 @@ import { EmptyState, ErrorState, LoadingRows, StatusBadge } from "@/ui/states";
 import {
     isLive,
     legsOfKind,
-    sumMoney,
     totalPaid,
     totalPending,
     totalSpent,
@@ -84,10 +79,10 @@ const KIND_BADGE: Record<ApiTypes.ExpenseKind, string> = {
 
 /** O status em que a lista nasce: tudo menos cancelado.
  *
- *  A lista do mês agora VEM com os cancelados (ver `useMonthExpenses`),
- *  então "nenhum chip marcado" passou a significar mesmo "tudo,
- *  inclusive cancelado" — e não é isso que se quer ver ao abrir o mês.
- *  O padrão é explícito, e é para ele que "limpar filtros" volta. */
+ *  A lista do mês VEM com os cancelados (ver `useMonthLegs`), então
+ *  "nenhum chip marcado" significa mesmo "tudo, inclusive cancelado" —
+ *  e não é isso que se quer ver ao abrir o mês. O padrão é explícito, e
+ *  é para ele que "limpar filtros" volta. */
 const LIVE_STATUSES: ApiTypes.ExpenseStatus[] = ["pending", "paid"];
 
 /** O status que a URL pode pedir — é como o Início manda "me mostre o
@@ -139,9 +134,6 @@ export function Expenses() {
     const [idPersons, setIdPersons] = useState<number[]>([]);
     const [idMethods, setIdMethods] = useState<number[]>([]);
     const [search, setSearch] = useState("");
-    /* Os parcelados em que o usuário pediu para ver o total da compra no
-       lugar da parcela do mês. */
-    const [revealed, setRevealed] = useState<number[]>([]);
     /* O extrato manda para cá com `?IdExpense=`, e é a URL que decide o
        PRIMEIRO painel: depois disso quem manda é o clique na lista. */
     const [openExpense, setOpenExpense] = useState<number | null>(
@@ -153,7 +145,6 @@ export function Expenses() {
     const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
-    const expenses = useMonthExpenses(month);
     const monthLegs = useMonthLegs(month);
     const detail = useExpenseDetail(openExpense);
     const categories = useCategories();
@@ -187,73 +178,29 @@ export function Expenses() {
         [seriesDraft, invalidateMovement],
     );
 
-    /* As pernas do mês, indexadas pelo gasto de origem.
-       É daqui que a linha da tabela tira destino, forma de pagamento e
-       o botão de status — as três coisas que custavam um `get(id)` por
-       gasto do mês.
-
-       Uma linha pode não ter perna nenhuma aqui, e isso é correto: a
-       lista de compras filtra pela data da COMPRA e a de pernas pela
-       data em que ela PESA. Uma compra de 25/08 no cartão que vence em
-       27/09 aparece na lista de agosto e tem perna só em setembro. */
-    const legsByExpense = useMemo(() => {
-        const index = new Map<number, ExpenseLeg[]>();
-        for (const leg of monthLegs.legs) {
-            const found = index.get(leg.expense.IdExpense);
-            if (found) found.push(leg);
-            else index.set(leg.expense.IdExpense, [leg]);
-        }
-        return index;
-    }, [monthLegs.legs]);
-
     /* ── O filtro ──────────────────────────────────────────────
-       Um só, aplicado em DOIS conjuntos: a lista de compras (a
-       tabela) e as pernas do mês (a faixa de indicadores). São
-       universos diferentes de propósito — a parcela 8 de uma compra
-       de março pesa em agosto sem estar na lista de agosto —, e é por
-       isso que o predicado mora aqui, num lugar só.
+       Um só, e agora sobre UM conjunto: a linha da tabela e a faixa de
+       indicadores são a mesma perna. Eram dois universos — a tabela
+       listava compras e a faixa somava pernas —, e por isso setembro
+       dizia "Total: 1.340" com uma tabela que somava 1.240. O predicado
+       mora em `src/rows.ts`, sem React, e é testado lá. */
+    const filters = useMemo<LegFilters>(
+        () => ({ statuses, kinds, idCategories, idPersons, idMethods, search }),
+        [statuses, kinds, idCategories, idPersons, idMethods, search],
+    );
 
-       Destino e forma de pagamento vêm da PERNA, que já chegou junto
-       com o resto: filtrar por eles não espera mais por requisição
-       nenhuma. Uma compra cuja perna cai noutro mês não tem como
-       responder aos dois, e por isso não passa nesses filtros. */
-    const matches = useMemo(() => {
-        const term = search.trim().toLowerCase();
-
-        return (expense: ApiTypes.Expense): boolean => {
-            if (statuses.length > 0 && !statuses.includes(expense.Status)) return false;
-            if (kinds.length > 0 && !kinds.includes(expense.Kind)) return false;
-            if (idCategories.length > 0 && !idCategories.includes(expense.IdCategory)) return false;
-            if (term && !expense.Description.toLowerCase().includes(term)) return false;
-
-            if (idPersons.length > 0 || idMethods.length > 0) {
-                const found = legsByExpense.get(expense.IdExpense) ?? [];
-                if (found.length === 0) return false;
-                if (
-                    idPersons.length > 0 &&
-                    !found[0].persons.some((person) => idPersons.includes(person.IdPerson))
-                ) {
-                    return false;
-                }
-                if (
-                    idMethods.length > 0 &&
-                    !found.some((leg) => idMethods.includes(leg.payment.IdPaymentMethod))
-                ) {
-                    return false;
-                }
-            }
-
-            return true;
-        };
-    }, [search, statuses, kinds, idCategories, idPersons, idMethods, legsByExpense]);
-
-    const rows = useMemo(() => (expenses.data ?? []).filter(matches), [expenses.data, matches]);
+    /* A LINHA É A PERNA. `allLegs` traz os cancelados junto, porque o
+       chip "Cancelados" precisa deles; nenhum total soma sobre ela. */
+    const rows = useMemo(
+        () => monthLegs.allLegs.filter((leg) => legMatches(leg, filters)),
+        [monthLegs.allLegs, filters],
+    );
 
     const grouped = useMemo(
         () =>
             KIND_ORDER.map((groupKind) => ({
                 kind: groupKind,
-                items: rows.filter((expense) => expense.Kind === groupKind),
+                items: rows.filter((leg) => leg.expense.Kind === groupKind),
             })).filter((group) => group.items.length > 0),
         [rows],
     );
@@ -261,20 +208,17 @@ export function Expenses() {
     /* ── Os cinco indicadores ──────────────────────────────────
        Todos somam PERNA, não compra: 600 em 6x custa 100 a este mês, e
        "Parcelados" é a soma das parcelas que vencem nele — não o total
-       das compras parceladas em curso. */
-    const legs: ExpenseLeg[] = useMemo(
-        () => monthLegs.legs.filter((leg) => matches(leg.expense)),
-        [monthLegs.legs, matches],
-    );
+       das compras parceladas em curso.
+
+       É a MESMA lista da tabela, menos os cancelados: é isso que faz a
+       soma da coluna fechar com o "Total" do topo ao centavo. */
+    const legs: ExpenseLeg[] = useMemo(() => rows.filter((leg) => isLive(leg.expense)), [rows]);
 
     const total = totalSpent(legs);
     const paid = totalPaid(legs);
     const toPay = totalPending(legs);
     const fixed = totalSpent(legsOfKind(legs, "fixed"));
     const installments = totalSpent(legsOfKind(legs, "installment"));
-
-    const live = rows.filter(isLive);
-    const totalPurchases = sumMoney(live.map((expense) => expense.TotalValue));
 
     /* "Sem filtro" é o padrão de status, não o vazio: com nenhum chip
        marcado a lista mostraria os cancelados. */
@@ -306,80 +250,37 @@ export function Expenses() {
 
     /* ── O que cada linha precisa saber ────────────────────────
        A tabela e a lista de cards mostram os mesmos dados em formatos
-       diferentes. O cálculo mora aqui, uma vez: as duas leem daqui. */
-    const rowInfo = (row: ApiTypes.Expense) => {
-        const category = categoryIndex.get(row.IdCategory);
+       diferentes. O cálculo mora aqui, uma vez: as duas leem daqui.
 
-        /* As pernas deste gasto que PESAM no mês exibido — o único
-           universo em que a linha do mês tem o que dizer. Com mais de
-           uma candidata, adivinhar qual quitar seria pior do que não
-           oferecer: o botão apaga e diz por quê. */
-        const legs = legsByExpense.get(row.IdExpense) ?? [];
-        const payable = legs.length === 1 ? legs[0] : null;
-
+       Tudo sai da PERNA, que já chegou completa: a categoria e o rateio
+       são do gasto de origem, a forma de pagamento e as duas datas são
+       dela. Nenhuma linha espera por requisição nenhuma, e não existe
+       mais a linha "sem perna neste mês" — se ela está na lista, é
+       porque a perna pesa aqui. */
+    const rowInfo = (leg: ExpenseLeg) => {
+        const category = categoryIndex.get(leg.expense.IdCategory);
         // O rateio é o do GASTO, e vem igual em toda perna dele.
-        const persons = legs[0]?.persons ?? [];
-        const methods = legs.map((leg) => leg.payment);
+        const persons = leg.persons;
 
         return {
             category,
             color: category ? categoryColor(category) : "var(--ink-3)",
-            loaded: !monthLegs.isPending,
-            legs,
-            payable,
-            payReason: monthLegs.isPending
-                ? "Carregando as parcelas do mês…"
-                : legs.length === 0
-                  ? "Nenhuma parcela deste gasto pesa no mês exibido"
-                  : legs.length > 1
-                    ? "Este gasto tem mais de uma perna no mês — abra o detalhe para escolher"
-                    : undefined,
             persons,
             firstPerson: persons.length > 0 ? personIndex.get(persons[0].IdPerson) : undefined,
-            methods,
-            firstMethod:
-                methods.length > 0 ? methodIndex.get(methods[0].IdPaymentMethod) : undefined,
+            method: methodIndex.get(leg.payment.IdPaymentMethod),
+            status: legStatus(leg),
+            overdue: isLegOverdue(leg),
+            installment: installmentLabel(leg.payment),
         };
     };
 
-    type RowInfo = ReturnType<typeof rowInfo>;
-
-    /** O valor da linha. Em parcelado é a PARCELA do mês, com "8/12"
-     *  embaixo — o total da compra é outra pergunta, e um clique no
-     *  próprio valor a responde ali mesmo, sem abrir o painel. */
-    const amountOf = (row: ApiTypes.Expense, info: RowInfo) => {
-        const leg = info.legs[0];
-        const payment = leg?.payment;
-
-        if (row.Kind !== "installment" || !payment?.InstallmentTotal) {
-            return formatMoney(row.TotalValue);
-        }
-
-        const showTotal = revealed.includes(row.IdExpense);
-
-        return (
-            <button
-                type="button"
-                className={styles.amountReveal}
-                title={showTotal ? "Ver a parcela do mês" : "Ver o total da compra"}
-                onClick={(event) => {
-                    event.stopPropagation();
-                    setRevealed((current) =>
-                        current.includes(row.IdExpense)
-                            ? current.filter((id) => id !== row.IdExpense)
-                            : [...current, row.IdExpense],
-                    );
-                }}
-            >
-                <span>{formatMoney(showTotal ? row.TotalValue : leg.value)}</span>
-                <span className={styles.amountCaption}>
-                    {showTotal
-                        ? "total da compra"
-                        : `${payment.InstallmentNumber}/${payment.InstallmentTotal}`}
-                </span>
-            </button>
-        );
-    };
+    /** A linha diz de que COMPRA a parcela veio — a data da compra, que
+     *  deixou de ser a da coluna de vencimento. Num fixo não há compra a
+     *  datar: a ocorrência é o lançamento. */
+    const originOf = (leg: ExpenseLeg) =>
+        leg.expense.Kind === "fixed"
+            ? "Ocorrência de um gasto fixo"
+            : `Compra de ${formatDate(leg.expense.ExpenseDate)}`;
 
     /** O botão de status, em TODA linha não cancelada.
      *
@@ -387,26 +288,26 @@ export function Expenses() {
      *  isso troca de rótulo: fora do cartão diz "quitar" e o dinheiro sai
      *  da conta; no cartão diz "entrou na fatura" e não move saldo
      *  nenhum — quem faz o saldo descer é "Quitar fatura", na tela de
-     *  Contas. O botão não some: ele para de mentir. */
-    const payButtonOf = (row: ApiTypes.Expense, info: RowInfo) => {
-        if (row.Status === "canceled") return null;
+     *  Contas. O botão não some: ele para de mentir.
+     *
+     *  Ele age na perna DESTA linha, e é só isso: a ambiguidade de "este
+     *  gasto tem mais de uma perna no mês" morreu com a lista de
+     *  compras. Duas formas de pagamento são duas linhas, cada uma com o
+     *  seu botão. */
+    const payButtonOf = (leg: ExpenseLeg) => {
+        if (!isLive(leg.expense)) return null;
 
-        const payment = info.payable?.payment ?? null;
-        const card = payment !== null && isCardLeg(payment);
+        const payment = leg.payment;
+        const card = isCardLeg(payment);
 
         return (
             <span onClick={(event) => event.stopPropagation()}>
                 <PayButton
-                    paid={(card ? payment.Charged : payment?.Paid) ?? row.Status === "paid"}
-                    disabled={payment === null}
-                    reason={info.payReason}
+                    paid={card ? payment.Charged === true : payment.Paid}
                     pending={pending}
                     label={card ? "Entrou na fatura" : "Quitar"}
                     doneLabel={card ? "Desmarcar da fatura" : "Desfazer quitação"}
-                    onToggle={() => {
-                        if (!payment) return;
-                        void ExpensesController.toggleLegPayment(context, payment);
-                    }}
+                    onToggle={() => void ExpensesController.toggleLegPayment(context, payment)}
                 />
             </span>
         );
@@ -431,9 +332,14 @@ export function Expenses() {
             />
 
             <Page>
+                {/* Sem dinheiro no subtítulo: ele somava o `TotalValue`
+                    das COMPRAS do mês, que com a lista de parcelas não
+                    corresponde a nada visível na tela. O número do mês é
+                    o "Total" da faixa, logo abaixo, e ele soma a mesma
+                    coisa que a tabela. */}
                 <PageHead
                     title="Gastos"
-                    subtitle={`${formatMonthLabel(month)} · ${live.length} lançamento${live.length === 1 ? "" : "s"} · ${formatMoney(totalPurchases)}`}
+                    subtitle={`${formatMonthLabel(month)} · ${legs.length} lançamento${legs.length === 1 ? "" : "s"} no mês`}
                 />
 
                 {notice && <div className={styles.notice}>{notice}</div>}
@@ -480,11 +386,19 @@ export function Expenses() {
 
                     <FilterBar>
                         <FilterGroup label="Status">
-                            {/* Os cancelados agora VÊM na lista do mês
-                                (ver `useMonthExpenses`), então este
-                                grupo os esconde e os mostra sem nova
-                                consulta — e "em aberto + pago" deixou de
-                                obrigar a escolher um dos dois. */}
+                            {/* Os cancelados VÊM na lista do mês (ver
+                                `useMonthLegs`), então este grupo os
+                                esconde e os mostra sem nova consulta — e
+                                "em aberto + pago" não obriga a escolher
+                                um dos dois.
+
+                                Os três chips falam da PARCELA: "Pagos"
+                                em setembro é "a parcela de setembro está
+                                quitada", e não "a compra inteira foi
+                                paga" — que deixava um parcelado de seis
+                                com três quitadas em aberto nos seis
+                                meses. "Cancelados" é a exceção, e é do
+                                gasto: ver `legStatus`. */}
                             <FilterChips
                                 values={statuses}
                                 onChange={setStatuses}
@@ -558,12 +472,12 @@ export function Expenses() {
                     </FilterBar>
                 </div>
 
-                {expenses.isPending ? (
+                {monthLegs.isPending ? (
                     <Card padded={false}>
                         <LoadingRows rows={6} />
                     </Card>
-                ) : expenses.isError ? (
-                    <ErrorState error={expenses.error} onRetry={() => void expenses.refetch()} />
+                ) : monthLegs.isError ? (
+                    <ErrorState error={monthLegs.error} onRetry={monthLegs.refetch} />
                 ) : rows.length === 0 ? (
                     <EmptyState
                         title={hasFilters ? "Nada com esses filtros" : "Nenhum gasto neste mês"}
@@ -590,29 +504,43 @@ export function Expenses() {
                        separando os três. */
                     <div>
                         {grouped.map((group) => {
-                            const groupLive = group.items.filter(isLive);
+                            const groupLive = group.items.filter((leg) => isLive(leg.expense));
                             return (
                                 <div key={group.kind}>
                                     <CardGroup
                                         title={KIND_LABEL[group.kind]}
                                         meta={`${group.items.length} · ${formatMoney(
-                                            sumMoney(groupLive.map((e) => e.TotalValue)),
+                                            totalSpent(groupLive),
                                         )}`}
                                     />
                                     <CardList>
-                                        {group.items.map((row) => {
-                                            const info = rowInfo(row);
+                                        {group.items.map((leg) => {
+                                            const info = rowInfo(leg);
                                             return (
                                                 <ItemCard
-                                                    key={row.IdExpense}
-                                                    onClick={() => setOpenExpense(row.IdExpense)}
-                                                    faded={row.Status === "canceled"}
-                                                    label={`Abrir ${row.Description}`}
-                                                    title={row.Description}
-                                                    badges={<Badge>{KIND_BADGE[row.Kind]}</Badge>}
+                                                    key={leg.payment.IdExpensePayment}
+                                                    onClick={() =>
+                                                        setOpenExpense(leg.expense.IdExpense)
+                                                    }
+                                                    faded={info.status === "canceled"}
+                                                    label={`Abrir ${leg.expense.Description}`}
+                                                    title={leg.expense.Description}
+                                                    badges={
+                                                        <>
+                                                            <Badge>
+                                                                {KIND_BADGE[leg.expense.Kind]}
+                                                            </Badge>
+                                                            {info.installment && (
+                                                                <Badge>{info.installment}</Badge>
+                                                            )}
+                                                        </>
+                                                    }
                                                     meta={
                                                         <>
-                                                            <StatusBadge status={row.Status} />
+                                                            <StatusBadge
+                                                                status={info.status}
+                                                                overdue={info.overdue}
+                                                            />
                                                             {info.category && (
                                                                 <Chip>
                                                                     <span
@@ -638,13 +566,17 @@ export function Expenses() {
                                                                         ` +${info.persons.length - 1}`}
                                                                 </Chip>
                                                             )}
-                                                            <span className={styles.meta}>
-                                                                {formatDate(row.ExpenseDate)}
-                                                            </span>
+                                                            {/* O vencimento DA PERNA, que é a
+                                                                data em que o dinheiro sai da
+                                                                conta — num cartão, a da
+                                                                fatura. */}
+                                                            <DueDate warn={info.overdue}>
+                                                                {formatDate(leg.payment.CashDate)}
+                                                            </DueDate>
                                                         </>
                                                     }
-                                                    amount={amountOf(row, info)}
-                                                    trailing={payButtonOf(row, info)}
+                                                    amount={formatMoney(leg.value)}
+                                                    trailing={payButtonOf(leg)}
                                                 />
                                             );
                                         })}
@@ -655,62 +587,62 @@ export function Expenses() {
 
                         <div className={styles.cardFoot}>
                             <span>
-                                {live.length} lançamento{live.length === 1 ? "" : "s"} em{" "}
+                                {legs.length} lançamento{legs.length === 1 ? "" : "s"} em{" "}
                                 {formatMonthLabel(month)}
                             </span>
                             <span>
-                                Total lançado <b>{formatMoney(totalPurchases)}</b>
+                                Total do mês <b>{formatMoney(total)}</b>
                             </span>
                         </div>
                     </div>
                 ) : (
-                    <Table columns="minmax(0,1.5fr) minmax(0,1fr) minmax(0,0.9fr) minmax(0,1.2fr) 110px 130px 150px">
+                    /* Oito colunas, e a nova é a da PARCELA: sem ela a
+                       linha de setembro de uma compra de junho não teria
+                       como dizer que é a 3 de 6. */
+                    <Table columns="minmax(0,1.4fr) minmax(0,0.95fr) minmax(0,0.85fr) minmax(0,1.1fr) 62px 110px 130px 150px">
                         <TableHead>
                             <span>Descrição</span>
                             <span>Categoria</span>
                             <span>Pessoa</span>
                             <span>Forma de pagamento</span>
-                            <span>Data</span>
+                            <span>Parcela</span>
+                            <span>Vencimento</span>
                             <span style={{ textAlign: "right" }}>Valor</span>
                             <span>Status</span>
                         </TableHead>
 
                         {grouped.map((group) => {
-                            const groupLive = group.items.filter(isLive);
+                            const groupLive = group.items.filter((leg) => isLive(leg.expense));
                             return (
                                 <div key={group.kind}>
                                     <TableGroup
                                         title={KIND_LABEL[group.kind]}
                                         icon={KIND_ICON[group.kind]}
                                         count={group.items.length}
-                                        pending={
-                                            groupLive.filter((e) => e.Status === "pending").length
-                                        }
-                                        total={formatMoney(
-                                            sumMoney(groupLive.map((e) => e.TotalValue)),
-                                        )}
+                                        pending={groupLive.filter((leg) => !leg.paid).length}
+                                        total={formatMoney(totalSpent(groupLive))}
                                     />
-                                    {group.items.map((row) => {
-                                        const info = rowInfo(row);
+                                    {group.items.map((leg) => {
+                                        const info = rowInfo(leg);
 
                                         return (
                                             <TableRow
-                                                key={row.IdExpense}
-                                                onClick={() => setOpenExpense(row.IdExpense)}
-                                                selected={openExpense === row.IdExpense}
-                                                faded={row.Status === "canceled"}
+                                                key={leg.payment.IdExpensePayment}
+                                                onClick={() =>
+                                                    setOpenExpense(leg.expense.IdExpense)
+                                                }
+                                                selected={openExpense === leg.expense.IdExpense}
+                                                faded={info.status === "canceled"}
                                             >
-                                                <RowTrigger label={`Abrir ${row.Description}`}>
+                                                <RowTrigger
+                                                    label={`Abrir ${leg.expense.Description}`}
+                                                >
                                                     <div style={{ minWidth: 0 }}>
                                                         <div className={styles.description}>
-                                                            {row.Description}
+                                                            {leg.expense.Description}
                                                         </div>
                                                         <div className={styles.meta}>
-                                                            {row.Kind === "installment"
-                                                                ? "Parcelado"
-                                                                : row.Kind === "fixed"
-                                                                  ? "Ocorrência de um gasto fixo"
-                                                                  : "Compra à vista"}
+                                                            {originOf(leg)}
                                                         </div>
                                                     </div>
                                                 </RowTrigger>
@@ -735,9 +667,7 @@ export function Expenses() {
 
                                                 <Cell>
                                                     {info.persons.length === 0 ? (
-                                                        <span className={styles.meta}>
-                                                            {info.loaded ? "—" : ""}
-                                                        </span>
+                                                        <span className={styles.meta}>—</span>
                                                     ) : (
                                                         <span className={styles.who}>
                                                             <Avatar
@@ -754,56 +684,66 @@ export function Expenses() {
                                                     )}
                                                 </Cell>
 
+                                                {/* UMA forma de pagamento, porque a linha é uma
+                                                    PERNA: o gasto pago com duas formas são duas
+                                                    linhas, cada uma com a sua e com o seu valor —
+                                                    que é a razão de o eixo financeiro ser rateio,
+                                                    e não um campo. */}
                                                 <Cell>
-                                                    {info.methods.length === 0 ? (
-                                                        <span className={styles.meta}>
-                                                            {info.loaded ? "—" : ""}
+                                                    <span className={styles.who}>
+                                                        <TypeTile
+                                                            color={
+                                                                info.method?.method.Color ??
+                                                                info.method?.account.Color ??
+                                                                "var(--ink-2)"
+                                                            }
+                                                        >
+                                                            {
+                                                                METHOD_ICON[
+                                                                    info.method?.method.Kind ??
+                                                                        "debit"
+                                                                ]
+                                                            }
+                                                        </TypeTile>
+                                                        <span className={styles.whoName}>
+                                                            {info.method
+                                                                ? `${info.method.account.Name} · ${info.method.method.Name}`
+                                                                : "Forma arquivada"}
+                                                        </span>
+                                                    </span>
+                                                </Cell>
+
+                                                <Cell>
+                                                    {info.installment ? (
+                                                        <span className={styles.installment}>
+                                                            {info.installment}
                                                         </span>
                                                     ) : (
-                                                        <span className={styles.who}>
-                                                            <TypeTile
-                                                                color={
-                                                                    info.firstMethod?.method
-                                                                        .Color ??
-                                                                    info.firstMethod?.account
-                                                                        .Color ??
-                                                                    "var(--ink-2)"
-                                                                }
-                                                            >
-                                                                {
-                                                                    METHOD_ICON[
-                                                                        info.firstMethod?.method
-                                                                            .Kind ?? "debit"
-                                                                    ]
-                                                                }
-                                                            </TypeTile>
-                                                            <span className={styles.whoName}>
-                                                                {info.firstMethod
-                                                                    ? `${info.firstMethod.account.Name} · ${info.firstMethod.method.Name}`
-                                                                    : "Forma arquivada"}
-                                                                {info.methods.length > 1 &&
-                                                                    ` +${info.methods.length - 1}`}
-                                                            </span>
-                                                        </span>
+                                                        <span className={styles.meta}>—</span>
                                                     )}
                                                 </Cell>
 
+                                                {/* A data é a `CashDate` — quando o dinheiro sai
+                                                    da conta. Numa perna de cartão ela é o
+                                                    vencimento da FATURA: a compra de 10/09 num
+                                                    cartão que vence 04/10 só fica vermelha em
+                                                    05/10. Comparar com a data da COMPRA pintava a
+                                                    linha de vermelho no dia seguinte à compra,
+                                                    com a fatura em dia. */}
                                                 <Cell>
-                                                    <DueDate
-                                                        warn={
-                                                            row.Status === "pending" &&
-                                                            row.ExpenseDate < today()
-                                                        }
-                                                    >
-                                                        {formatDate(row.ExpenseDate)}
+                                                    <DueDate warn={info.overdue}>
+                                                        {formatDate(leg.payment.CashDate)}
                                                     </DueDate>
                                                 </Cell>
 
-                                                <CellAmount>{amountOf(row, info)}</CellAmount>
+                                                <CellAmount>{formatMoney(leg.value)}</CellAmount>
 
                                                 <Cell className={styles.statusCell}>
-                                                    <StatusBadge status={row.Status} />
-                                                    {payButtonOf(row, info)}
+                                                    <StatusBadge
+                                                        status={info.status}
+                                                        overdue={info.overdue}
+                                                    />
+                                                    {payButtonOf(leg)}
                                                 </Cell>
                                             </TableRow>
                                         );
@@ -812,13 +752,16 @@ export function Expenses() {
                             );
                         })}
 
+                        {/* A soma da coluna é o "Total" da faixa do topo,
+                            ao centavo: as duas somam a mesma lista de
+                            pernas. */}
                         <TableFoot>
                             <span>
-                                {live.length} lançamento{live.length === 1 ? "" : "s"} em{" "}
+                                {legs.length} lançamento{legs.length === 1 ? "" : "s"} em{" "}
                                 {formatMonthLabel(month)}
                             </span>
                             <span>
-                                Total lançado <b>{formatMoney(totalPurchases)}</b>
+                                Total do mês <b>{formatMoney(total)}</b>
                             </span>
                         </TableFoot>
                     </Table>

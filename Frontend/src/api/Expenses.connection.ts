@@ -11,15 +11,19 @@ import type { ApiTypes } from "@/types/api";
 class Connection {
     private readonly route = "/Expenses";
 
-    /** Filtra por `ExpenseDate`. Sem `Status` nem `IncludeCanceled`, os
-     *  cancelados ficam de fora. A lista não traz pernas, rateio nem
-     *  tags. */
-    async list(query: ApiTypes.ExpenseListQuery = {}): Promise<ApiTypes.Expense[]> {
-        const { data } = await http.get<ApiTypes.Expense[]>(this.route, { params: query });
-        return data;
-    }
+    /* Não há `list` aqui, e a ausência é a correção da leva 9: `GET
+       /Expenses` lista COMPRAS, recortadas por `ExpenseDate`. Uma
+       geladeira de 600 em 6× comprada em junho tem UMA linha nessa
+       lista, em junho — e a parcela que pesa em setembro não aparece em
+       lugar nenhum dela. A tela de Gastos lista pernas
+       (`ExpensePaymentsConnection.list`), que é o que faz a tabela e a
+       faixa de indicadores do mesmo mês somarem o mesmo número.
 
-    /** A mesma linha, mais `Payments`, `Persons` e `Tags`. */
+       A rota continua existindo na API; o que acabou foi o front listar
+       por ela. */
+
+    /** A linha da compra, com `Payments`, `Persons` e `Tags` — o que o
+     *  painel de detalhe abre a partir da perna clicada na lista. */
     async get(idExpense: number): Promise<ApiTypes.ExpenseDetail> {
         const { data } = await http.get<ApiTypes.ExpenseDetail>(
             `${this.route}/IdExpense=${idExpense}`,

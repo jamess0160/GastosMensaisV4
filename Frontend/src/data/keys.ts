@@ -33,11 +33,15 @@ export const queryKeys = {
     /* Movimento — a unidade do cache é o MÊS, que é a unidade de
        navegação das telas. Assim a lista de Gastos e o Dashboard do
        mesmo mês compartilham a resposta em vez de pedirem duas vezes. */
-    expenses: (month: ApiTypes.ReferenceMonth) => ["expenses", month] as const,
     expense: (idExpense: number) => ["expense", idExpense] as const,
     /** As PERNAS que pesam no mês — a unidade de todo total de gasto, e
-     *  a única lista que descreve o mês por inteiro: a 6ª parcela de uma
-     *  compra de março está aqui e não em `expenses`. */
+     *  a única lista de gasto que o cliente pede.
+     *
+     *  Não há mais chave `expenses(mês)`: `GET /Expenses` lista COMPRAS,
+     *  recortadas por `ExpenseDate`, e a 6ª parcela de uma compra de
+     *  março não está nela — a tela de Gastos listava por ali e perdia a
+     *  parcela do mês. A rota continua existindo na API; o que acabou
+     *  foi o front listar por ela. */
     legs: (month: ApiTypes.ReferenceMonth) => ["legs", month] as const,
     inflows: (month: ApiTypes.ReferenceMonth) => ["inflows", month] as const,
     inflow: (idInflow: number) => ["inflow", idInflow] as const,
@@ -57,7 +61,6 @@ export const queryKeys = {
     /* Raízes, para invalidar tudo de um domínio depois de uma escrita
        que atravessa meses (parcelado, série de fixo, estorno). */
     allAccounts: ["accounts"] as const,
-    allExpenses: ["expenses"] as const,
     allLegs: ["legs"] as const,
     allInflows: ["inflows"] as const,
     allBudgets: ["budgets"] as const,

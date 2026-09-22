@@ -82,13 +82,20 @@ export const isLive = (expense: ApiTypes.Expense): boolean => expense.Status !==
 /** As pernas que a lista do período devolveu, prontas para somar.
  *
  *  Uma requisição por mês, e nada aqui completa nada: a resposta já
- *  descreve o mês por inteiro, parcela de compra antiga inclusive. O
- *  filtro de cancelado fica como guarda — a consulta é feita sem
- *  `IncludeCanceled`, mas todo total do sistema passa por `isLive`, e
- *  não é aqui que essa regra vai deixar de valer. */
-export function paymentLegs(rows: readonly ApiTypes.ExpensePaymentRow[]): ExpenseLeg[] {
+ *  descreve o mês por inteiro, parcela de compra antiga inclusive.
+ *
+ *  O padrão DESCARTA o cancelado, e é isso que faz de `paymentLegs` a
+ *  entrada de todo total: cancelado não conta em lugar nenhum. A
+ *  consulta, essa, vem completa — a lista da tela de Gastos precisa
+ *  mostrar o cancelado para que o chip "Cancelados" tenha o que
+ *  mostrar —, e é só ela que pede `includeCanceled`. ⚠️ O que sai daqui
+ *  com ele ligado NÃO se soma: passe por `isLive` antes. */
+export function paymentLegs(
+    rows: readonly ApiTypes.ExpensePaymentRow[],
+    includeCanceled = false,
+): ExpenseLeg[] {
     return rows
-        .filter((row) => isLive(row.Expense))
+        .filter((row) => includeCanceled || isLive(row.Expense))
         .map((row) => ({
             expense: row.Expense,
             payment: row,

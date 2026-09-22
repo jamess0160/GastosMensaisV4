@@ -18,29 +18,6 @@ import type { ApiTypes } from "@/types/api";
    a resposta em vez de pedir de novo.
    ════════════════════════════════════════════════════════════ */
 
-/** Os gastos de um mês — TODOS eles, cancelados inclusive.
- *
- *  UMA chave por mês, e nenhum filtro na query. O status virou
- *  multi-seleção na tela de Gastos, e um filtro que conversa com a API
- *  quebraria isso duas vezes: "em aberto + cancelados" não é uma
- *  consulta que exista, e cada combinação viraria uma chave de cache
- *  diferente — o Início, Gastos e o Relatório deixariam de reaproveitar
- *  a mesma lista e o mês seria baixado de novo a cada clique num chip.
- *
- *  Por isso a lista vem completa — `IncludeCanceled: true` — e os cinco
- *  filtros são aplicados no cliente.
- *
- *  ATENÇÃO a quem somar sobre esta lista: ela CONTÉM cancelados. Todo
- *  total precisa passar por `isLive` — `paymentLegs` já passa. */
-export function useMonthExpenses(
-    month: ApiTypes.ReferenceMonth,
-): UseQueryResult<ApiTypes.Expense[]> {
-    return useQuery({
-        queryKey: queryKeys.expenses(month),
-        queryFn: () => ExpensesConnection.list({ ...monthRange(month), IncludeCanceled: true }),
-    });
-}
-
 /** `enabled` existe para o mês ANTERIOR: a clonagem de Renda precisa
  *  dele, e só quando o usuário abre o painel de escolha — buscá-lo a
  *  cada visita à tela seria uma requisição a mais em toda carga, por um
@@ -121,6 +98,19 @@ export function useInflowDetail(idInflow: number | null): UseQueryResult<ApiType
 
 /* ── Pernas do mês ────────────────────────────────────────── */
 
+/** A consulta das pernas de um mês, uma só e compartilhada.
+ *
+ *  A chave de cache é `["legs", mês]` e ela é lida por três telas: se
+ *  uma delas pedisse o mês com outro filtro, quem chegasse primeiro
+ *  decidiria o que as outras enxergam — a mesma chave não pode ter duas
+ *  respostas. Por isso o `IncludeCanceled` mora aqui, e não no ponto de
+ *  uso: a resposta é sempre a completa, e quem descarta o cancelado é o
+ *  `paymentLegs`. */
+const monthLegsQuery = (month: ApiTypes.ReferenceMonth): ApiTypes.ExpensePaymentListQuery => ({
+    ...monthRange(month),
+    IncludeCanceled: true,
+});
+
 /** As pernas que pesam no mês — a unidade de todo total de gasto.
  *
  *  600 em 6x é uma compra de 600 e seis pernas de 100: agosto custou
@@ -138,21 +128,38 @@ export function useInflowDetail(idInflow: number | null): UseQueryResult<ApiType
  *  Note que isto NÃO é o `Spent` do orçamento, e não precisa bater com
  *  ele: o orçamento conta pendente junto com pago e recorta por
  *  categoria ou por pessoa. São perguntas diferentes — o contrato é
- *  explícito em não tentar reconciliá-las. */
+ *  explícito em não tentar reconciliá-las.
+ *
+ *  A consulta pede `IncludeCanceled: true` e devolve DUAS listas da
+ *  mesma resposta. É a lista de Gastos que precisa do cancelado — é a
+ *  tela que o mostra, atrás de um chip —, e sem ele na resposta o chip
+ *  não teria o que mostrar. `legs` continua sendo a lista viva, e é ela
+ *  que todo total soma; `allLegs` é a da tela, e quem somar sobre ela
+ *  soma cancelado junto. */
 export function useMonthLegs(month: ApiTypes.ReferenceMonth): {
     legs: ExpenseLeg[];
+    allLegs: ExpenseLeg[];
     isPending: boolean;
     isError: boolean;
     error: unknown;
+    refetch: () => void;
 } {
     const query = useQuery({
         queryKey: queryKeys.legs(month),
-        queryFn: () => ExpensePaymentsConnection.list(monthRange(month)),
+        queryFn: () => ExpensePaymentsConnection.list(monthLegsQuery(month)),
     });
 
     const legs = useMemo(() => paymentLegs(query.data ?? []), [query.data]);
+    const allLegs = useMemo(() => paymentLegs(query.data ?? [], true), [query.data]);
 
-    return { legs, isPending: query.isPending, isError: query.isError, error: query.error };
+    return {
+        legs,
+        allLegs,
+        isPending: query.isPending,
+        isError: query.isError,
+        error: query.error,
+        refetch: () => void query.refetch(),
+    };
 }
 
 /* ── Pernas de um período ─────────────────────────────────── */
@@ -191,7 +198,7 @@ export function useRangeLegs(
     const queries = useQueries({
         queries: months.map((month) => ({
             queryKey: queryKeys.legs(month),
-            queryFn: () => ExpensePaymentsConnection.list(monthRange(month)),
+            queryFn: () => ExpensePaymentsConnection.list(monthLegsQuery(month)),
         })),
     });
 
@@ -272,7 +279,6 @@ export function useInvalidateMovement() {
     const queryClient = useQueryClient();
 
     return () => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.allExpenses });
         void queryClient.invalidateQueries({ queryKey: queryKeys.allInflows });
         void queryClient.invalidateQueries({ queryKey: queryKeys.allBudgets });
         void queryClient.invalidateQueries({ queryKey: queryKeys.allLegs });
