@@ -5,13 +5,16 @@ import {
     daysBetween,
     daysOfMonth,
     formatDate,
+    formatDayMonth,
     formatMonthLabel,
     formatMonthShort,
+    formatShort,
     monthRange,
     monthsBetween,
     parts,
     toLocalDate,
     toReferenceMonth,
+    weekdayShort,
 } from "../date";
 
 describe("o fuso dos testes", () => {
@@ -145,6 +148,10 @@ describe("toReferenceMonth", () => {
     });
 });
 
+// Os nomes de mês e de dia são constantes do `date.ts`, e não mais o
+// locale do moment. Estes testes valem justamente por isso: enquanto os
+// nomes vinham do locale, eles passavam em ambiente de teste (onde o
+// locale carrega) com o produto dizendo "September · 2026" no ar.
 describe("formatMonthLabel", () => {
     it("monta o rótulo do cabeçalho com a inicial maiúscula", () => {
         expect(formatMonthLabel("2026-05")).toBe("Maio · 2026");
@@ -152,6 +159,28 @@ describe("formatMonthLabel", () => {
 
     it("aceita o formato que a API devolve", () => {
         expect(formatMonthLabel("2026-05-01")).toBe("Maio · 2026");
+    });
+
+    it("escreve o mês em português — o defeito que isto trava", () => {
+        expect(formatMonthLabel("2026-09")).toBe("Setembro · 2026");
+    });
+
+    it("nomeia os doze meses", () => {
+        const labels = monthsBetween("2026-01", "2026-12").map(formatMonthLabel);
+        expect(labels).toEqual([
+            "Janeiro · 2026",
+            "Fevereiro · 2026",
+            "Março · 2026",
+            "Abril · 2026",
+            "Maio · 2026",
+            "Junho · 2026",
+            "Julho · 2026",
+            "Agosto · 2026",
+            "Setembro · 2026",
+            "Outubro · 2026",
+            "Novembro · 2026",
+            "Dezembro · 2026",
+        ]);
     });
 });
 
@@ -164,6 +193,64 @@ describe("formatMonthShort", () => {
         // A perna de um cartão `purchase`: ela vence em setembro e PESA
         // em agosto, e a linha do gasto mostra as duas coisas.
         expect(formatMonthShort("2026-08-21")).toBe("ago/2026");
+    });
+
+    it("abrevia os doze meses, em minúscula", () => {
+        const labels = monthsBetween("2026-01", "2026-12").map(formatMonthShort);
+        expect(labels).toEqual([
+            "jan/2026",
+            "fev/2026",
+            "mar/2026",
+            "abr/2026",
+            "mai/2026",
+            "jun/2026",
+            "jul/2026",
+            "ago/2026",
+            "set/2026",
+            "out/2026",
+            "nov/2026",
+            "dez/2026",
+        ]);
+    });
+});
+
+describe("formatDayMonth", () => {
+    it("escreve o dia sem zero à esquerda e o mês por extenso", () => {
+        expect(formatDayMonth("2026-05-05")).toBe("5 de maio");
+    });
+
+    it("não perde um dia em UTC-3", () => {
+        expect(formatDayMonth("2026-09-01")).toBe("1 de setembro");
+    });
+});
+
+describe("formatShort", () => {
+    it("mantém o zero à esquerda no dia e abrevia o mês", () => {
+        expect(formatShort("2026-05-05")).toBe("05 mai");
+    });
+
+    it("escreve o mês em português", () => {
+        expect(formatShort("2026-09-27")).toBe("27 set");
+    });
+});
+
+describe("weekdayShort", () => {
+    it("abrevia o dia da semana", () => {
+        // 05/05/2026 é uma terça-feira.
+        expect(weekdayShort("2026-05-05")).toBe("ter");
+    });
+
+    it("nomeia a semana inteira, de domingo a sábado", () => {
+        // 27/09/2026 é um domingo.
+        expect(daysBetween("2026-09-27", "2026-10-03").map(weekdayShort)).toEqual([
+            "dom",
+            "seg",
+            "ter",
+            "qua",
+            "qui",
+            "sex",
+            "sáb",
+        ]);
     });
 });
 

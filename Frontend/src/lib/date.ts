@@ -1,5 +1,4 @@
 import moment from "moment";
-import "moment/locale/pt-br";
 import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
@@ -21,12 +20,57 @@ import type { ApiTypes } from "@/types/api";
    - **nunca o parser ISO em UTC.** `new Date("2026-05-05")` é
      meia-noite UTC e volta como 04/05 em UTC-3. `moment(texto, formato)`
      constrói em horário LOCAL, que é o que a data de calendário quer;
-   - **locale `pt-br` importado e ligado explicitamente**, porque os
-     nomes de mês e de dia saem dele. Sem o import, `MMMM` sai em inglês
-     no bundle de produção.
+   - **o moment não traduz nada aqui.** Os nomes de mês e de dia são as
+     constantes abaixo, e `MMMM`/`MMM`/`ddd` não aparecem em nenhum
+     formato deste arquivo. O locale `pt-br` era importado para isso e
+     falhava em produção: o arquivo de locale é CommonJS e se registra
+     fazendo `require("../moment")`, enquanto este módulo é ESM e faz
+     `import moment from "moment"` — no build o interop pode dar dois
+     registros do módulo, e o idioma acaba instalado numa instância que
+     ninguém usa para formatar. O `moment.locale("pt-br")` seguinte não
+     denunciava nada: quando o idioma não existe, o moment DEVOLVE o
+     atual em vez de lançar, e o cabeçalho dizia "September · 2026" só
+     no ar. Só a tradução saiu — a aritmética de calendário continua
+     toda no moment, que é o que a API também usa.
    ════════════════════════════════════════════════════════════ */
 
-moment.locale("pt-br");
+/** Os doze nomes, em minúscula: em português mês é nome comum, e
+ *  "5 de maio" se escreve assim. Quem quer título sobe a inicial na
+ *  hora de escrever (ver `formatMonthLabel`). */
+const MONTH_NAMES = [
+    "janeiro",
+    "fevereiro",
+    "março",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro",
+];
+
+/** As abreviações de mês, indexadas por `month()` (0-11). */
+const MONTH_NAMES_SHORT = [
+    "jan",
+    "fev",
+    "mar",
+    "abr",
+    "mai",
+    "jun",
+    "jul",
+    "ago",
+    "set",
+    "out",
+    "nov",
+    "dez",
+];
+
+/** As abreviações de dia da semana, indexadas por `day()` — que é 0 no
+ *  domingo em qualquer idioma, porque é índice e não tradução. */
+const WEEKDAY_NAMES_SHORT = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
 /** O formato do `CalendarDate`, e o único que o parser estrito aceita. */
 const CALENDAR = "YYYY-MM-DD";
@@ -79,26 +123,29 @@ export function formatDate(date: ApiTypes.CalendarDate): string {
 
 /** "5 de maio" */
 export function formatDayMonth(date: ApiTypes.CalendarDate): string {
-    return calendar(date).format("D [de] MMMM");
+    const value = calendar(date);
+    return `${value.date()} de ${MONTH_NAMES[value.month()]}`;
 }
 
 /** "05 mai" */
 export function formatShort(date: ApiTypes.CalendarDate): string {
-    return calendar(date).format("DD MMM");
+    const value = calendar(date);
+    return `${value.format("DD")} ${MONTH_NAMES_SHORT[value.month()]}`;
 }
 
 /** "seg" */
 export function weekdayShort(date: ApiTypes.CalendarDate): string {
-    return calendar(date).format("ddd");
+    return WEEKDAY_NAMES_SHORT[calendar(date).day()];
 }
 
 /** "Maio · 2026" — o cabeçalho de mês do layout.
  *
  *  A inicial maiúscula é nossa: em português o nome do mês é minúsculo,
- *  e o locale devolve "maio". O cabeçalho quer o título. */
+ *  e a constante guarda "maio". O cabeçalho quer o título. */
 export function formatMonthLabel(value: ApiTypes.ReferenceMonth | ApiTypes.CalendarDate): string {
-    const [name, year] = month(value).format("MMMM|YYYY").split("|");
-    return `${name[0].toUpperCase()}${name.slice(1)} · ${year}`;
+    const target = month(value);
+    const name = MONTH_NAMES[target.month()];
+    return `${name[0].toUpperCase()}${name.slice(1)} · ${target.format("YYYY")}`;
 }
 
 /** "ago/2026" — o mês compacto, para a linha que já carrega uma data e
@@ -108,7 +155,8 @@ export function formatMonthLabel(value: ApiTypes.ReferenceMonth | ApiTypes.Calen
  *  datas verdadeiras — "vence 05 set" e "pesa em ago/2026" —, e a linha
  *  do gasto mostra as duas quando elas discordam. */
 export function formatMonthShort(value: ApiTypes.ReferenceMonth | ApiTypes.CalendarDate): string {
-    return month(value).format("MMM/YYYY");
+    const target = month(value);
+    return `${MONTH_NAMES_SHORT[target.month()]}/${target.format("YYYY")}`;
 }
 
 /** DateTime é instante de verdade, e é o único deste arquivo que não
