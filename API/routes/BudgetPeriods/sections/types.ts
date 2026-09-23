@@ -18,6 +18,26 @@ export namespace BudgetPeriodsNamespace {
         Spent: number
     }
 
+    /**
+     * O mes inteiro: as fatias e o que sobrou **fora** delas.
+     *
+     * E um envelope e nao uma lista porque o `Unbudgeted` e do MES, nao de linha nenhuma. Ele
+     * existe porque o casamento e estrito - uma porcao de gasto consome uma fatia ou NENHUMA
+     * (ver BudgetSpent.section.ts) -, e a porcao que nao consome nada precisa aparecer em algum
+     * lugar, ou a regra vira um sumico silencioso de dinheiro.
+     *
+     * Fecha a conta que o usuario confere sozinho: soma dos `Spent` + `Unbudgeted` = o gasto do
+     * mes inteiro.
+     */
+    export interface MonthPayload {
+        Periods: MonthRow[]
+        /**
+         * O gasto do mes que nao casou com fatia nenhuma. Num mes sem fatia alguma e o gasto
+         * inteiro - o que e a resposta certa, e nao zero.
+         */
+        Unbudgeted: number
+    }
+
     /** O alvo resolvido da fatia: PELO MENOS um dos dois. Ver BudgetTarget.section.ts. */
     export interface BudgetTargetPayload {
         IdCategory: number | null

@@ -27,6 +27,11 @@ export const BudgetPeriods_route = express()
 //  Orçamento é **só de gasto**: entrada não tem categoria.
 
 //  O mês inteiro, com quanto já foi comprometido em cada fatia: ?ReferenceMonth=YYYY-MM
+//
+//  **Responde um envelope `{ Periods, Unbudgeted }`, não uma lista**: cada porção de gasto
+//  consome uma fatia ou nenhuma (ver sections/BudgetSpent.section.ts), e o que não consumiu
+//  nada é do mês, não de linha nenhuma. Sem esse número a regra estrita seria um sumiço
+//  silencioso de dinheiro.
 BudgetPeriods_route.get("/BudgetPeriods", BudgetPeriods_schema.getByMonth, AsyncHandler(BudgetPeriods_controller.getByMonth))
 
 //  Uma fatia nova no mês. Uma escrita só — não há mais definição para resolver antes.

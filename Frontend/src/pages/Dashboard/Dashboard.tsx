@@ -179,7 +179,12 @@ export function Dashboard() {
     const fixed = totalSpent(legsOfKind(legs, "fixed"));
     const installments = totalSpent(legsOfKind(legs, "installment"));
 
-    const periods = budgets.data ?? [];
+    /* A rota passou a responder um ENVELOPE por causa do `Unbudgeted` —
+       o gasto do mês que não casou com fatia nenhuma. Aqui ele ainda não
+       é mostrado: a tela do orçamento é reescrita na etapa 12, e é lá que
+       ele ganha lugar. Ler só `Periods` é o mínimo para esta tela
+       continuar de pé. */
+    const periods = budgets.data?.Periods ?? [];
     const overBudget = periods.filter((period) => budgetState(period) === "over");
     const alerting = periods.filter((period) => budgetState(period) === "alert");
     const activeCategories = (categories.data ?? []).filter((category) => category.Active);

@@ -76,7 +76,7 @@ describe("BudgetPeriods", () => {
             let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
 
             expect(response.status).toBe(200)
-            expect(response.body).toEqual([])
+            expect(response.body.Periods).toEqual([])
         })
 
         it("devolve a fatia do mês com a categoria e o comprometido zerado", async () => {
@@ -87,8 +87,8 @@ describe("BudgetPeriods", () => {
             let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
 
             expect(response.status).toBe(200)
-            expect(response.body).toHaveLength(1)
-            expect(response.body[0]).toMatchObject({
+            expect(response.body.Periods).toHaveLength(1)
+            expect(response.body.Periods[0]).toMatchObject({
                 LimitValue: 800,
                 AlertPercent: 80,
                 //  Nasce aberto: fechar o mês é trabalho da rotina do dia 1º
@@ -100,7 +100,7 @@ describe("BudgetPeriods", () => {
                 Person: null,
                 Spent: 0,
             })
-            expect(response.body[0].Category.Description).toBe("Mercado")
+            expect(response.body.Periods[0].Category.Description).toBe("Mercado")
         })
 
         //  Cada mês é uma lista: o de agosto não aparece na consulta de setembro
@@ -110,8 +110,8 @@ describe("BudgetPeriods", () => {
             await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
             await createPeriod(workspace, { ReferenceMonth: "2026-09", LimitValue: 900 })
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([800])
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body.map(limit)).toEqual([900])
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods.map(limit)).toEqual([800])
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body.Periods.map(limit)).toEqual([900])
         })
 
         //  **Qualquer mês responde, e nada nasce sozinho.** Era o furo do modelo anterior:
@@ -122,7 +122,7 @@ describe("BudgetPeriods", () => {
 
             await createPeriod(workspace, { ReferenceMonth: "2027-03", LimitValue: 1200 })
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2027-03`)).body.map(limit)).toEqual([1200])
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2027-03`)).body.Periods.map(limit)).toEqual([1200])
         })
 
         it("não devolve o orçamento de outro workspace", async () => {
@@ -130,7 +130,7 @@ describe("BudgetPeriods", () => {
 
             await createPeriod(owner)
 
-            expect((await otherClient.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body).toEqual([])
+            expect((await otherClient.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods).toEqual([])
         })
 
         //  **O número que dá sentido à fatia.** Gasto lançado no mês, na categoria orçada.
@@ -147,7 +147,7 @@ describe("BudgetPeriods", () => {
 
             let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
 
-            expect(response.body[0].Spent).toBe(420.5)
+            expect(response.body.Periods[0].Spent).toBe(420.5)
         })
 
         //  Orçamento é **comprometido**, não realizado: o gasto lançado e ainda não quitado já
@@ -160,7 +160,7 @@ describe("BudgetPeriods", () => {
             await createExpense(workspace, { TotalValue: 100, ExpenseDate: "2026-08-10", Paid: true })
             await createExpense(workspace, { TotalValue: 200, ExpenseDate: "2026-08-11" })
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(300)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods[0].Spent).toBe(300)
         })
 
         it("não conta gasto cancelado", async () => {
@@ -172,7 +172,7 @@ describe("BudgetPeriods", () => {
 
             await workspace.client.delete(`/Expenses/IdExpense=${canceled.IdExpense}`)
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(0)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods[0].Spent).toBe(0)
         })
 
         //  **A parcela pesa no mês em que vence, não no mês da compra.** Somar os 600 em agosto
@@ -190,8 +190,8 @@ describe("BudgetPeriods", () => {
                 ExpenseDate: "2026-08-10",
             })
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(100)
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body[0].Spent).toBe(100)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods[0].Spent).toBe(100)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body.Periods[0].Spent).toBe(100)
         })
 
         //  **O teste que sustenta a decisão do rateio.** Sem ele, o mesmo gasto contaria 600
@@ -214,14 +214,19 @@ describe("BudgetPeriods", () => {
             let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
 
             expect(response.status).toBe(200)
-            expect(response.body).toHaveLength(1)
+            expect(response.body.Periods).toHaveLength(1)
             //  100, não 600: o rateio é do gasto e a parcela é da perna
-            expect(response.body[0].Spent).toBe(100)
+            expect(response.body.Periods[0].Spent).toBe(100)
         })
 
-        //  São duas perguntas diferentes sobre o mesmo dinheiro, e as duas respondem o mesmo
-        //  número quando o gasto é todo de uma pessoa só. Somar as duas é que seria errado.
-        it("conta a mesma compra na fatia da categoria e na da pessoa", async () => {
+        //  **O mesmo dinheiro conta UMA vez, e é a fatia da pessoa que o come.** Era o furo que
+        //  o alvo duplo abriu: até a etapa 9 esta compra comia 250 da fatia de Mercado **e**
+        //  250 da fatia da Maria — 500 consumidos de uma repartição por um gasto de 250.
+        //
+        //  A porção tem dono, e **porção com dono nunca sai do bolso dela**: procura (Maria,
+        //  Mercado), não acha, cai na mesada (Maria, sem categoria) e para aí. A fatia de
+        //  Mercado segue em zero, e é isso mesmo.
+        it("conta a mesma compra uma vez só, na fatia da pessoa", async () => {
             let workspace = await buildWorkspace()
             let IdPerson = await createPerson(workspace, "Maria")
 
@@ -236,8 +241,10 @@ describe("BudgetPeriods", () => {
 
             let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
 
-            expect(response.body).toHaveLength(2)
-            expect(response.body.map((item: { Spent: number }) => item.Spent)).toEqual([250, 250])
+            expect(response.body.Periods).toHaveLength(2)
+            //  A de categoria primeiro (foi criada antes): zero. A da pessoa: os 250 inteiros.
+            expect(response.body.Periods.map((item: { Spent: number }) => item.Spent)).toEqual([0, 250])
+            expect(response.body.Unbudgeted).toBe(0)
         })
 
         //  O rateio arredonda **uma vez, no fim**: a divisão em numeric do Postgres tem
@@ -260,7 +267,7 @@ describe("BudgetPeriods", () => {
 
             let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
 
-            let byPerson = new Map(response.body.map((item: { IdPerson: number }) => [item.IdPerson, item]))
+            let byPerson = new Map(response.body.Periods.map((item: { IdPerson: number }) => [item.IdPerson, item]))
 
             expect((byPerson.get(maria) as { Spent: number }).Spent).toBe(66.67)
             expect((byPerson.get(joao) as { Spent: number }).Spent).toBe(33.33)
@@ -279,7 +286,7 @@ describe("BudgetPeriods", () => {
 
             let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
 
-            let byTarget = new Map(response.body.map((item: { IdPerson: number | null }) => [item.IdPerson, item]))
+            let byTarget = new Map(response.body.Periods.map((item: { IdPerson: number | null }) => [item.IdPerson, item]))
 
             //  A categoria enxerga o gasto inteiro; a pessoa não enxerga nada
             expect((byTarget.get(null) as { Spent: number }).Spent).toBe(250)
@@ -301,9 +308,9 @@ describe("BudgetPeriods", () => {
             let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
 
             expect(response.status).toBe(200)
-            expect(response.body).toHaveLength(3)
+            expect(response.body.Periods).toHaveLength(3)
 
-            let [onlyPerson, both, onlyCategory] = response.body
+            let [onlyPerson, both, onlyCategory] = response.body.Periods
 
             expect(onlyPerson).toMatchObject({ IdPerson: luana, IdCategory: null, Category: null, LimitValue: 250 })
             expect(onlyPerson.Person.Name).toBe("Luana")
@@ -315,7 +322,7 @@ describe("BudgetPeriods", () => {
             expect(onlyCategory).toMatchObject({ IdPerson: null, Person: null, IdCategory: workspace.IdCategory, LimitValue: 500 })
 
             //  As fatias **somam lado a lado**: é a repartição dos 1.000 do mês
-            expect(response.body.reduce((total: number, item: { LimitValue: number }) => total + item.LimitValue, 0)).toBe(1000)
+            expect(response.body.Periods.reduce((total: number, item: { LimitValue: number }) => total + item.LimitValue, 0)).toBe(1000)
         })
 
         //  O alvo arquivado perde o que mostrar e sai da tela, mas a linha continua no banco —
@@ -328,7 +335,7 @@ describe("BudgetPeriods", () => {
 
             await workspace.client.delete(`/Persons/IdPerson=${IdPerson}`)
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body).toHaveLength(0)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods).toHaveLength(0)
             expect(await findPeriodById(created.IdBudgetPeriod)).toBeDefined()
         })
 
@@ -347,9 +354,9 @@ describe("BudgetPeriods", () => {
             //  Estorno de 21/08: já é a fatura de setembro
             await createExpense(workspace, { TotalValue: -150, ExpenseDate: "2026-08-21", IdPaymentMethod: card })
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(500)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods[0].Spent).toBe(500)
             //  **Spent negativo é resposta legítima:** o mês só teve o crédito
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body[0].Spent).toBe(-150)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body.Periods[0].Spent).toBe(-150)
         })
 
         //  O rateio por pessoa sobrevive ao sinal sem tocar na fórmula: (−150 × −150) ÷ −150
@@ -374,7 +381,7 @@ describe("BudgetPeriods", () => {
                 Persons: [{ IdPerson, Value: -150 }],
             })
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(250)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods[0].Spent).toBe(250)
         })
 
         //  Num cartão em modo 'invoice', o que pesa no mês é a fatura que vence nele — a compra
@@ -388,8 +395,124 @@ describe("BudgetPeriods", () => {
 
             await createExpense(workspace, { TotalValue: 150, ExpenseDate: "2026-08-21", IdPaymentMethod: card })
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(0)
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body[0].Spent).toBe(150)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods[0].Spent).toBe(0)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body.Periods[0].Spent).toBe(150)
+        })
+
+        //  **Cada porção de gasto consome UMA fatia, ou nenhuma** — nunca duas. A porção é o
+        //  cruzamento de uma perna com uma pessoa do rateio; o gasto sem rateio tem uma porção
+        //  só, da perna inteira, com pessoa nula.
+        //
+        //  | a porção                      | procura, nesta ordem            | e se não achar   |
+        //  |-------------------------------|---------------------------------|------------------|
+        //  | **tem pessoa P**, categoria C | `(P, C)` → `(P, sem categoria)` | não consome nada |
+        //  | **sem pessoa**, categoria C   | `(sem pessoa, C)`               | não consome nada |
+        //
+        //  Os testes daqui são o exemplo que definiu a regra: 1.000 de renda repartidos em
+        //  `#1 (Luana, —) 250`, `#2 (Tiago, Alimentação) 250` e `#3 (—, Mercado) 500`.
+        describe("O casamento da porção com a fatia", () => {
+
+            //  Os quatro gastos do exemplo, cada um achando (ou não) a sua fatia
+            it("casa cada um dos quatro gastos do exemplo com a fatia dele", async () => {
+                let workspace = await buildWorkspace()
+                let example = await buildAllocationExample(workspace)
+
+                //  bate pessoa E categoria -> #2
+                await createExpense(workspace, { TotalValue: 100, IdCategory: example.alimentacao, Persons: [{ IdPerson: example.tiago, Value: 100 }] })
+                //  não há (Luana, Mercado); há (Luana, —) -> #1
+                await createExpense(workspace, { TotalValue: 100, Persons: [{ IdPerson: example.luana, Value: 100 }] })
+                //  sem pessoa, em Mercado -> #3
+                await createExpense(workspace, { TotalValue: 300 })
+                //  sem pessoa, numa categoria que ninguém orçou -> nenhuma
+                await createExpense(workspace, { TotalValue: 1000, IdCategory: example.casa })
+
+                let month = await readMonth(workspace)
+
+                expect(month.spent.get(example.tiagoFood)).toBe(100)
+                expect(month.spent.get(example.luanaPeriod)).toBe(100)
+                expect(month.spent.get(example.mercado)).toBe(300)
+                //  **O preço da regra estrita, visível em vez de silencioso**
+                expect(month.Unbudgeted).toBe(1000)
+
+                //  A conta que o usuário confere sozinho: nada de dinheiro se perde no meio
+                expect(month.total + month.Unbudgeted).toBe(1500)
+            })
+
+            //  **O caso decidido junto com o exemplo, e o que mais dói:** não existe (Tiago,
+            //  Mercado), o #2 é do Tiago **só para Alimentação**, e a porção com dono não cai
+            //  no #3. Uma porção com dono nunca sai do bolso dela — se caísse, a fatia de
+            //  categoria voltaria a ser um segundo teto sobre o mesmo dinheiro.
+            it("não deixa a porção com dono cair na fatia de categoria", async () => {
+                let workspace = await buildWorkspace()
+                let example = await buildAllocationExample(workspace)
+
+                await createExpense(workspace, { TotalValue: 100, Persons: [{ IdPerson: example.tiago, Value: 100 }] })
+
+                let month = await readMonth(workspace)
+
+                expect(month.spent.get(example.luanaPeriod)).toBe(0)
+                expect(month.spent.get(example.tiagoFood)).toBe(0)
+                expect(month.spent.get(example.mercado)).toBe(0)
+                expect(month.Unbudgeted).toBe(100)
+            })
+
+            //  **Um gasto, duas porções, duas fatias diferentes.** É o rateio do eixo analítico
+            //  fazendo o que ele existe para fazer, e cada metade procura a fatia dela por
+            //  conta própria: a do Tiago acha o par exato, a da Luana cai na mesada.
+            it("reparte o gasto de duas pessoas entre as fatias que cada uma encontra", async () => {
+                let workspace = await buildWorkspace()
+                let example = await buildAllocationExample(workspace)
+
+                await createExpense(workspace, {
+                    TotalValue: 200,
+                    IdCategory: example.alimentacao,
+                    Persons: [{ IdPerson: example.luana, Value: 120 }, { IdPerson: example.tiago, Value: 80 }],
+                })
+
+                let month = await readMonth(workspace)
+
+                expect(month.spent.get(example.luanaPeriod)).toBe(120)
+                expect(month.spent.get(example.tiagoFood)).toBe(80)
+                expect(month.spent.get(example.mercado)).toBe(0)
+                expect(month.Unbudgeted).toBe(0)
+            })
+
+            //  **A porção é da PERNA, não da compra.** 600 em 6x rateados 400/200 não comem
+            //  400 e 200 de agosto: comem a parte de cada um **naquela parcela**, 66,67 e
+            //  33,33, e os dois juntos dão exatamente os 100 da perna.
+            it("a porção é da perna: o parcelado casa mês a mês", async () => {
+                let workspace = await buildWorkspace()
+                let example = await buildAllocationExample(workspace)
+
+                await createExpense(workspace, {
+                    TotalValue: 600,
+                    Kind: "installment",
+                    InstallmentTotal: 6,
+                    IdCategory: example.alimentacao,
+                    Persons: [{ IdPerson: example.tiago, Value: 400 }, { IdPerson: example.luana, Value: 200 }],
+                })
+
+                let month = await readMonth(workspace)
+
+                expect(month.spent.get(example.tiagoFood)).toBe(66.67)
+                expect(month.spent.get(example.luanaPeriod)).toBe(33.33)
+                expect(month.Unbudgeted).toBe(0)
+                //  A soma das porções do mês é a perna inteira, não a compra
+                expect(month.total).toBe(100)
+            })
+
+            //  Um mês que ninguém montou não tem o gasto "zerado": ele está **todo** fora do
+            //  orçamento, e é essa a resposta certa.
+            it("põe o gasto inteiro fora do orçamento num mês sem fatia nenhuma", async () => {
+                let workspace = await buildWorkspace()
+
+                await createExpense(workspace, { TotalValue: 420.5 })
+
+                let month = await readMonth(workspace)
+
+                expect(month.Periods).toHaveLength(0)
+                expect(month.Unbudgeted).toBe(420.5)
+            })
         })
     })
 
@@ -595,7 +718,7 @@ describe("BudgetPeriods", () => {
             await createPeriod(workspace)
             await createPeriod(workspace, { IdCategory: await createCategory(workspace, "Lazer") })
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body).toHaveLength(2)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods).toHaveLength(2)
         })
 
         //  A mesma categoria em dois meses é duas linhas, e uma não sabe da outra: não há mais
@@ -823,7 +946,7 @@ describe("BudgetPeriods", () => {
 
             expect(response.status).toBe(200)
             expect(await findPeriodById(created.IdBudgetPeriod)).toBeUndefined()
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body).toEqual([])
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods).toEqual([])
         })
 
         //  Apagar um mês não leva os outros junto: o delete é por id, e cada mês é uma linha
@@ -836,7 +959,7 @@ describe("BudgetPeriods", () => {
             expect((await workspace.client.delete(`/BudgetPeriods/IdBudgetPeriod=${august.IdBudgetPeriod}`)).status).toBe(200)
 
             expect(await findPeriodById(september.IdBudgetPeriod)).toBeDefined()
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body).toHaveLength(1)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body.Periods).toHaveLength(1)
         })
 
         //  Apagada a fatia, o alvo pode ser orçado de novo naquele mês
@@ -850,7 +973,7 @@ describe("BudgetPeriods", () => {
             let response = await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { LimitValue: 500 }))
 
             expect(response.status).toBe(200)
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([500])
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods.map(limit)).toEqual([500])
         })
 
         //  Delete é escrita, e mês fechado não aceita escrita — aqui com mais razão, já que o
@@ -916,9 +1039,10 @@ describe("BudgetPeriods", () => {
 
             let month = await flowClient.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
 
-            expect(month.body).toHaveLength(3)
-            expect(month.body.reduce((total: number, item: { LimitValue: number }) => total + item.LimitValue, 0)).toBe(1000)
-            expect(month.body.map((item: { Spent: number }) => item.Spent)).toEqual([0, 0, 0])
+            expect(month.body.Periods).toHaveLength(3)
+            expect(month.body.Periods.reduce((total: number, item: { LimitValue: number }) => total + item.LimitValue, 0)).toBe(1000)
+            expect(month.body.Periods.map((item: { Spent: number }) => item.Spent)).toEqual([0, 0, 0])
+            expect(month.body.Unbudgeted).toBe(0)
 
             //  Duas compras de mercado no mês, uma quitada e outra não: as duas comprometem
             for (let expense of [{ Value: 300, Paid: true }, { Value: 250, Paid: false }]) {
@@ -932,16 +1056,19 @@ describe("BudgetPeriods", () => {
             }
 
             let used = await flowClient.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
-            let mercadoRow = used.body.find((item: { IdCategory: number | null, IdPerson: number | null }) => item.IdCategory === mercado && item.IdPerson === null)
+            let mercadoRow = used.body.Periods.find((item: { IdCategory: number | null, IdPerson: number | null }) => item.IdCategory === mercado && item.IdPerson === null)
 
             expect(mercadoRow.Spent).toBe(550)
+            //  As duas compras são sem rateio, então as duas acharam a fatia de Mercado: nada
+            //  ficou de fora, e a soma fecha com o gasto do mês.
+            expect(used.body.Unbudgeted).toBe(0)
             //  O alerta é do cliente: a API entrega os três números que ele compara
             expect(mercadoRow.Spent / mercadoRow.LimitValue).toBeGreaterThan(0.68)
 
             //  O mês apertou: sobe a fatia de mercado
             expect((await flowClient.put(`/BudgetPeriods/IdBudgetPeriod=${mercadoRow.IdBudgetPeriod}`, { LimitValue: 600 })).status).toBe(200)
             expect((await flowClient.get(`/BudgetPeriods?ReferenceMonth=2026-08`))
-                .body.find((item: { IdBudgetPeriod: number }) => item.IdBudgetPeriod === mercadoRow.IdBudgetPeriod).LimitValue).toBe(600)
+                .body.Periods.find((item: { IdBudgetPeriod: number }) => item.IdBudgetPeriod === mercadoRow.IdBudgetPeriod).LimitValue).toBe(600)
 
             //  **Setembro é montado antes de setembro chegar** — o que o modelo anterior não
             //  tinha como oferecer, porque o mês só nascia na virada do dia 1º
@@ -953,8 +1080,8 @@ describe("BudgetPeriods", () => {
 
             let september = await flowClient.get(`/BudgetPeriods?ReferenceMonth=2026-09`)
 
-            expect(september.body).toHaveLength(1)
-            expect(september.body[0]).toMatchObject({ LimitValue: 450, Spent: 0 })
+            expect(september.body.Periods).toHaveLength(1)
+            expect(september.body.Periods[0]).toMatchObject({ LimitValue: 450, Spent: 0 })
 
             //  A virada fecha agosto, e agosto para de aceitar escrita
             await TestDatabase.connection()
@@ -967,7 +1094,7 @@ describe("BudgetPeriods", () => {
             expect((await flowClient.delete(`/BudgetPeriods/IdBudgetPeriod=${created[0]}`)).status).toBe(403)
 
             //  Setembro segue aberto e editável
-            expect((await flowClient.put(`/BudgetPeriods/IdBudgetPeriod=${september.body[0].IdBudgetPeriod}`, { LimitValue: 500 })).status).toBe(200)
+            expect((await flowClient.put(`/BudgetPeriods/IdBudgetPeriod=${september.body.Periods[0].IdBudgetPeriod}`, { LimitValue: 500 })).status).toBe(200)
         })
     })
 })
@@ -1045,6 +1172,30 @@ async function createPersonPeriod(workspace: TestWorkspace, IdPerson: number, ov
     return response.body as { IdBudgetPeriod: number }
 }
 
+/**
+ * **O exemplo que definiu a regra do casamento**, montado por HTTP: 1.000 de renda repartidos
+ * em três fatias, uma de cada formato de alvo —
+ *
+ *     #1 (Luana, —)              250
+ *     #2 (Tiago, Alimentação)    250
+ *     #3 (—, Mercado)            500
+ *
+ * `Casa` nasce junto e **de propósito sem fatia**: é a categoria que prova o "fora do
+ * orçamento". `Mercado` é a categoria que todo workspace do arranjo já tem.
+ */
+async function buildAllocationExample(workspace: TestWorkspace) {
+    let luana = await createPerson(workspace, "Luana")
+    let tiago = await createPerson(workspace, "Tiago")
+    let alimentacao = await createCategory(workspace, "Alimentação")
+    let casa = await createCategory(workspace, "Casa")
+
+    let luanaPeriod = (await createPersonPeriod(workspace, luana, { LimitValue: 250 })).IdBudgetPeriod
+    let tiagoFood = (await postPeriod(workspace, { IdPerson: tiago, IdCategory: alimentacao, LimitValue: 250 })).IdBudgetPeriod
+    let mercado = (await createPeriod(workspace, { LimitValue: 500 })).IdBudgetPeriod
+
+    return { luana, tiago, alimentacao, casa, luanaPeriod, tiagoFood, mercado }
+}
+
 //  O corpo livre, para o formato de alvo duplo e para o que não cabe nos dois helpers acima
 async function postPeriod(workspace: TestWorkspace, body: Record<string, unknown>) {
     let response = await workspace.client.post(`/BudgetPeriods`, { ReferenceMonth: "2026-08", ...body })
@@ -1118,6 +1269,28 @@ async function createExpense(workspace: TestWorkspace, overrides: Record<string,
 
 function limit(item: { LimitValue: number }) {
     return item.LimitValue
+}
+
+/**
+ * O mês lido pelo id da fatia, e não pela posição na lista: com cinco fatias possíveis e uma
+ * regra de precedência entre elas, `body.Periods[0]` vira adivinhação.
+ *
+ * `total` é a soma dos `Spent`, e ela existe por causa da conta que fecha a regra:
+ * **soma dos `Spent` + `Unbudgeted` = o gasto do mês inteiro**.
+ */
+async function readMonth(workspace: TestWorkspace, ReferenceMonth = "2026-08") {
+    let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=${ReferenceMonth}`)
+
+    expect(response.status).toBe(200)
+
+    let Periods = response.body.Periods as Array<{ IdBudgetPeriod: number, Spent: number }>
+
+    return {
+        Periods,
+        spent: new Map(Periods.map((item): [number, number] => [item.IdBudgetPeriod, item.Spent])),
+        total: Periods.reduce((sum, item) => sum + item.Spent, 0),
+        Unbudgeted: response.body.Unbudgeted as number,
+    }
 }
 
 function findPeriods(IdWorkspace: number) {

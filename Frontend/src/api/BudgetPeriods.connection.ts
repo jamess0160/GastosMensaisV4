@@ -32,11 +32,16 @@ class Connection {
      *  compras. O alerta é comparação do cliente: a resposta traz
      *  LimitValue, Spent e AlertPercent.
      *
+     *  **Responde um ENVELOPE, não uma lista**: cada porção de gasto
+     *  consome uma fatia ou nenhuma, e o `Unbudgeted` é o que não
+     *  consumiu nenhuma — um número do MÊS, não de linha alguma. Sem ele
+     *  a regra estrita seria um sumiço silencioso de dinheiro.
+     *
      *  Uma fatia cujo alvo foi ARQUIVADO some da lista do mês — ela não
      *  tem mais o que mostrar. A linha continua no banco: arquivar não é
      *  apagar, e o mês é histórico. */
-    async list(referenceMonth: ApiTypes.ReferenceMonth): Promise<ApiTypes.BudgetPeriod[]> {
-        const { data } = await http.get<ApiTypes.BudgetPeriod[]>(this.route, {
+    async list(referenceMonth: ApiTypes.ReferenceMonth): Promise<ApiTypes.BudgetMonth> {
+        const { data } = await http.get<ApiTypes.BudgetMonth>(this.route, {
             params: { ReferenceMonth: referenceMonth },
         });
         return data;

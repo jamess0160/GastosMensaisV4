@@ -26,8 +26,19 @@ export const budgetPeriodResponse = Joi.object({
     //  A pessoa inteira, pelo mesmo motivo.
     Person: personResponse.allow(null).required(),
     //  Quanto já foi comprometido no mês — ver sections/BudgetSpent.section.ts. Não é coluna:
-    //  é calculado a cada leitura, como o saldo da conta.
+    //  é calculado a cada leitura, como o saldo da conta. **Cada porção de gasto consome uma
+    //  fatia ou nenhuma**, nunca duas: o que não casou com nenhuma está no `Unbudgeted` do mês.
     Spent: Joi.number().required(),
+})
+
+//  **O mês inteiro é um envelope, não uma lista**, e quem obriga é o `Unbudgeted`: ele é do
+//  mês, não de linha nenhuma. Ele é o preço da regra estrita ficar visível — se todo gasto for
+//  carimbado com pessoa, as fatias só de categoria nunca consomem nada, e é aqui que isso
+//  aparece em vez de sumir calado.
+export const budgetMonthResponse = Joi.object({
+    Periods: Joi.array().items(budgetPeriodResponse).required(),
+    //  Pode vir negativo, como o `Spent`: um mês só de estornos fora das fatias.
+    Unbudgeted: Joi.number().required(),
 })
 
 class Schema {
@@ -38,7 +49,7 @@ class Schema {
         joiController.validateQuery(Joi.object({
             ReferenceMonth: referenceMonth.required(),
         })),
-        joiController.validateResponse(Joi.array().items(budgetPeriodResponse)),
+        joiController.validateResponse(budgetMonthResponse),
     ]
 
     public readonly create = [

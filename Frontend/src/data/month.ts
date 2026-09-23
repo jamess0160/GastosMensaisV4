@@ -72,9 +72,16 @@ export function useMonthStatement(
     });
 }
 
+/** O mês do orçamento: as fatias e o `Unbudgeted`.
+ *
+ *  **Um ENVELOPE, não uma lista** — o `Unbudgeted` é do mês, não de
+ *  linha nenhuma, e ele existe porque o casamento do gasto com a fatia é
+ *  estrito: cada porção consome uma fatia ou NENHUMA. Como todo número
+ *  daqui, ele é da API: somar `Spent` no cliente para "conferir" é a
+ *  segunda implementação da mesma pergunta. */
 export function useMonthBudgets(
     month: ApiTypes.ReferenceMonth,
-): UseQueryResult<ApiTypes.BudgetPeriod[]> {
+): UseQueryResult<ApiTypes.BudgetMonth> {
     return useQuery({
         queryKey: queryKeys.budgets(month),
         queryFn: () => BudgetPeriodsConnection.list(month),

@@ -1014,9 +1014,42 @@ export namespace ApiTypes {
          *  RATEADO pelas parcelas —
          *  `ExpensePersons.Value × ExpensePayments.Value ÷ Expenses.TotalValue`.
          *
+         *  **Cada porção de gasto consome UMA fatia, ou nenhuma** — nunca
+         *  duas. A porção é o cruzamento de uma perna com uma pessoa do
+         *  rateio, e ela procura assim:
+         *
+         *  | a porção                  | procura, nesta ordem            |
+         *  |---------------------------|---------------------------------|
+         *  | tem pessoa P, categoria C | `(P, C)` → `(P, sem categoria)` |
+         *  | sem pessoa, categoria C   | `(sem pessoa, C)`               |
+         *
+         *  Não achou, não consome nada — e uma porção COM DONO nunca cai
+         *  numa fatia só de categoria: um gasto do Tiago em Mercado não
+         *  move a fatia "Mercado". O que não consumiu nada está no
+         *  `Unbudgeted` do mês.
+         *
          *  PODE VIR NEGATIVO num mês em que os estornos superam as
          *  compras. Não é bug, e a barra de progresso trata o caso. */
         Spent: Money;
+    }
+
+    /** O MÊS INTEIRO do orçamento: as fatias e o que ficou fora delas.
+     *
+     *  É um envelope e não uma lista porque o `Unbudgeted` é do MÊS, não
+     *  de linha nenhuma. */
+    export interface BudgetMonth {
+        Periods: BudgetPeriod[];
+        /** **O gasto do mês que não casou com fatia nenhuma**, e ele é o
+         *  preço da regra estrita ficando visível: se todo gasto for
+         *  carimbado com pessoa, as fatias só de categoria nunca consomem
+         *  nada. Cobrir uma pessoa por inteiro exige dar a ela uma fatia
+         *  SEM categoria — uma mesada.
+         *
+         *  Fecha a conta que o usuário confere sozinho: soma dos `Spent`
+         *  + `Unbudgeted` = o gasto do mês inteiro. Num mês que ninguém
+         *  montou é o gasto inteiro, e não zero. Pode vir negativo, pelo
+         *  mesmo motivo que o `Spent`. */
+        Unbudgeted: Money;
     }
 
     interface BudgetPeriodCreateCommon {
