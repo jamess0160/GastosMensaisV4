@@ -215,7 +215,7 @@ o usuário veria o texto genérico no lugar da frase do servidor. Quem desempaco
 | Fatura | `/contas/fatura/:idPaymentMethod` | um ciclo por vez, com navegação própria — a fatura **não é um mês** e não segue o seletor do chassi —, o que já está nela, o previsto, os próximos vencimentos e a quitação |
 | Extrato | `/contas/extrato` | abertura → linhas assinadas → fechamento, por conta e por fatura, com a quitação no bloco do cartão |
 | Relatório | `/relatorio` | linha, barras e donut em ECharts, com filtros próprios de período |
-| Personalização | `/personalizacao` | categorias e pessoas |
+| Personalização | `/personalizacao` | categorias — com ordenação por ↑ ↓ e o grupo recolhido das arquivadas — e pessoas |
 | Perfil | `/perfil` | dados, senha, passkeys |
 | Espaço | `/espaco` | criar e editar o espaço, convidar e revogar convite, quem tem acesso — trocar papel, remover, sair e transferir a propriedade |
 
