@@ -1,12 +1,16 @@
+import { CategoriesSeed } from "root/routes/Categories/Categories.seed"
 import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
 
 //  Testes integrados de Categories. Um describe por rota de Categories.route.ts, mais o fluxo
 //  end to end no fim.
 //
-//  O que é próprio desta feature, e o que mais aparece aqui: metade das linhas da tabela não é
-//  de ninguém. A categoria global (IdWorkspace nulo) é a mesma linha para todos os workspaces,
-//  então todo describe de escrita tem o caso dela — editar ou arquivar uma global mexeria no
-//  cadastro de toda a base, e é a falha que o caminho feliz nunca encontra.
+//  **O que era próprio desta feature acabou:** metade das linhas da tabela não era de ninguém.
+//  A categoria global (IdWorkspace nulo) era a mesma linha para todos os workspaces, e todo
+//  describe de escrita carregava o caso dela. A migration 20260922140000 deu a cada espaço a
+//  sua cópia das treze, e com isso os dois retornos que não tinham como ser atendidos —
+//  arquivar e reordenar uma pré-definida — viraram o caminho normal. O que sobrou no lugar
+//  daqueles casos é o contrário deles: editar uma das treze **não** pode encostar na cópia do
+//  vizinho.
 //
 //  A lista é plana: não há categoria filha de outra.
 
@@ -16,16 +20,12 @@ describe("Categories", () => {
     let client: TestClient
     let other: TestUser
     let otherClient: TestClient
-    let globalCategory: { IdCategory: number, Description: string }
 
     beforeAll(async () => {
-        //  CASCADE: truncar Users leva Workspaces e, por tabela, as Categories junto — inclusive
-        //  as globais que a migration de seed inseriu, que não têm workspace mas moram na mesma
-        //  tabela. Por isso a suíte semeia a sua própria global em vez de contar com o seed:
-        //  qualquer outra suíte que trunque antes desta levaria as 13 embora.
+        //  CASCADE: truncar Users leva Workspaces e, por tabela, as Categories junto. Não há
+        //  mais linha sem workspace para sobreviver a isso — o seed deixou de ser uma
+        //  migration que roda uma vez na vida do banco e virou parte da criação do espaço.
         await TestDatabase.truncate(["Users"])
-
-        globalCategory = await seedGlobalCategory({ Description: "Transporte", Position: 1 })
 
         root = await UsersFactory.create({ Name: "Dono das categorias" })
         client = new TestClient(root.token)
@@ -58,22 +58,37 @@ describe("Categories", () => {
             expect(response.status).toBe(406)
         })
 
-        //  Workspace recém-criado não tem categoria nenhuma: as globais são as únicas que
-        //  existem, e é com elas que o usuário lança o primeiro gasto.
-        it("devolve as globais mesmo com o workspace vazio", async () => {
-            let user = await UsersFactory.create()
+        //  **O critério da etapa.** Dois espaços, treze categorias cada, com os mesmos nomes e
+        //  **ids diferentes**: é isso que torna possível arquivar e reordenar sem mexer no
+        //  cadastro de ninguém. Enquanto as treze eram globais, os dois lados liam a MESMA
+        //  linha, e os dois ids seriam iguais.
+        it("dá treze categorias próprias a cada espaço, com ids diferentes", async () => {
+            let first = await createSeededWorkspace("Espaço de um")
+            let second = await createSeededWorkspace("Espaço de outro")
 
-            let response = await new TestClient(user.token).get(`/Categories`)
+            let one = await first.client.get(`/Categories`)
+            let two = await second.client.get(`/Categories`)
 
-            expect(response.status).toBe(200)
-            expect(response.body.map(description)).toEqual(["Transporte"])
-            //  IdWorkspace nulo é como o cliente sabe que aquela linha não abre para edição
-            expect(response.body[0].IdWorkspace).toBeNull()
+            expect(one.status).toBe(200)
+            expect(one.body).toHaveLength(CategoriesSeed.length)
+            expect(two.body).toHaveLength(CategoriesSeed.length)
+
+            //  A lista sai ordenada por Position, que é a do seed — então a comparação é
+            //  direta, e ela é o que amarra a semeadura ao arquivo do seed.
+            expect(one.body.map(description)).toEqual(CategoriesSeed.map(description))
+            expect(two.body.map(description)).toEqual(CategoriesSeed.map(description))
+
+            //  Nenhum id em comum: não há uma linha só servindo os dois
+            expect(ids(one.body).filter((id) => ids(two.body).includes(id))).toEqual([])
+
+            //  E cada linha é do espaço que a leu — não há mais IdWorkspace nulo
+            expect(one.body.every((item: { IdWorkspace: number }) => item.IdWorkspace === first.IdWorkspace)).toBe(true)
         })
 
-        //  Juntas numa lista só: separá-las obrigaria o cliente a concatenar duas chamadas
-        //  para montar um seletor
-        it("devolve as próprias junto com as globais", async () => {
+        //  A fábrica insere o workspace direto no banco, sem passar pela criação — então o
+        //  espaço dela nasce sem as treze, e a lista aqui é só o que o teste cadastrar. Quem
+        //  prova a semeadura é o caso acima, que cria o espaço pela rota.
+        it("devolve as categorias do próprio workspace", async () => {
             let user = await UsersFactory.create()
             let workspaceClient = new TestClient(user.token)
 
@@ -82,7 +97,7 @@ describe("Categories", () => {
             let response = await workspaceClient.get(`/Categories`)
 
             expect(response.status).toBe(200)
-            expect(response.body.map(description).sort()).toEqual(["Faculdade", "Transporte"])
+            expect(response.body.map(description)).toEqual(["Faculdade"])
         })
 
         it("não devolve a categoria de outro workspace", async () => {
@@ -104,7 +119,7 @@ describe("Categories", () => {
 
             let response = await workspaceClient.get(`/Categories`)
 
-            expect(response.body.map(description)).toEqual(["Transporte"])
+            expect(response.body.map(description)).toEqual([])
         })
     })
 
@@ -158,7 +173,7 @@ describe("Categories", () => {
                 IconKey: "dumbbell",
                 Color: "#2E7D32",
                 Position: 4,
-                //  Do workspace, nunca global: a rota não tem como criar uma linha sem dono
+                //  A coluna é NOT NULL: a rota não tem como criar uma linha sem dono
                 IdWorkspace: user.workspace.IdWorkspace,
                 Active: true,
             })
@@ -189,14 +204,36 @@ describe("Categories", () => {
             expect((await findCategoryById(created.body.IdCategory)).Description).toBe("Categoria do dono")
         })
 
-        //  **O teste que sustenta o CategoryOwnership.** A global é visível a todos os
-        //  workspaces, então ela chega no getUnique de qualquer sessão. Sem esta trava, um PUT
-        //  renomeia a categoria de toda a base de uma vez.
-        it("recusa editar categoria global", async () => {
-            let response = await client.put(`/Categories/IdCategory=${globalCategory.IdCategory}`, { Description: "Sequestrada" })
+        //  **O caso que substituiu o "recusa editar categoria global".** Não há mais o que
+        //  recusar: renomear uma das treze é o retorno que a etapa veio atender. O que ainda
+        //  precisa de prova é o que a linha compartilhada tornava impossível — a edição ficar
+        //  dentro do espaço de quem a fez.
+        it("edita uma das treze semeadas sem encostar na cópia do outro espaço", async () => {
+            let mine = await createSeededWorkspace("Espaço que renomeia")
+            let neighbour = await createSeededWorkspace("Espaço do vizinho")
 
-            expect(response.status).toBe(406)
-            expect((await findCategoryById(globalCategory.IdCategory)).Description).toBe("Transporte")
+            let target = (await mine.client.get(`/Categories`)).body.find(named("Mercado"))
+            let untouched = (await neighbour.client.get(`/Categories`)).body.find(named("Mercado"))
+
+            let response = await mine.client.put(`/Categories/IdCategory=${target.IdCategory}`, { Description: "Supermercado" })
+
+            expect(response.status).toBe(200)
+            expect((await findCategoryById(target.IdCategory)).Description).toBe("Supermercado")
+            expect((await findCategoryById(untouched.IdCategory)).Description).toBe("Mercado")
+        })
+
+        //  Reordenar é escrever Position, e era o outro retorno que a linha compartilhada
+        //  travava: arrastar "Pets" para o topo mudaria a ordem na tela do vizinho.
+        it("reordena as semeadas só no próprio espaço", async () => {
+            let mine = await createSeededWorkspace("Espaço que reordena")
+            let neighbour = await createSeededWorkspace("Espaço que não pediu nada")
+
+            let pets = (await mine.client.get(`/Categories`)).body.find(named("Pets"))
+
+            await mine.client.put(`/Categories/IdCategory=${pets.IdCategory}`, { Description: "Pets", Position: 0 })
+
+            expect((await mine.client.get(`/Categories`)).body.map(description)[0]).toBe("Pets")
+            expect((await neighbour.client.get(`/Categories`)).body.map(description)[0]).toBe(CategoriesSeed[0].Description)
         })
 
         it("edita descrição, cor, ícone e posição", async () => {
@@ -262,12 +299,27 @@ describe("Categories", () => {
             expect((await findCategoryById(created.body.IdCategory)).Active).toBe(true)
         })
 
-        //  Arquivar a global a tiraria da lista de todos os workspaces de uma vez
-        it("recusa arquivar categoria global", async () => {
-            let response = await client.delete(`/Categories/IdCategory=${globalCategory.IdCategory}`)
+        //  **O caso que substituiu o "recusa arquivar categoria global".** Antes o
+        //  `Active = false` caía num `where("IdWorkspace", X)` que nunca casava com nulo: a
+        //  operação não tinha efeito nenhum, e era o retorno número um de quem usa o app.
+        it("arquiva uma das treze semeadas, e só no espaço de quem arquivou", async () => {
+            let mine = await createSeededWorkspace("Espaço que arquiva")
+            let neighbour = await createSeededWorkspace("Espaço que mantém")
 
-            expect(response.status).toBe(406)
-            expect((await findCategoryById(globalCategory.IdCategory)).Active).toBe(true)
+            let target = (await mine.client.get(`/Categories`)).body.find(named("Pets"))
+            let untouched = (await neighbour.client.get(`/Categories`)).body.find(named("Pets"))
+
+            let response = await mine.client.delete(`/Categories/IdCategory=${target.IdCategory}`)
+
+            expect(response.status).toBe(200)
+
+            //  Some da lista de quem arquivou, e só dela
+            expect((await mine.client.get(`/Categories`)).body.map(description)).not.toContain("Pets")
+            expect((await neighbour.client.get(`/Categories`)).body.map(description)).toContain("Pets")
+
+            //  Soft delete: a linha continua lá, porque o gasto antigo aponta para ela
+            expect((await findCategoryById(target.IdCategory)).Active).toBe(false)
+            expect((await findCategoryById(untouched.IdCategory)).Active).toBe(true)
         })
 
         //  Soft delete e não delete físico: Expenses aponta para cá, e o gasto de março tem
@@ -286,15 +338,14 @@ describe("Categories", () => {
             //  A linha continua no banco: só saiu das listas
             expect((await findCategoryById(created.body.IdCategory)).Active).toBe(false)
             expect((await findCategoryById(untouched.body.IdCategory)).Active).toBe(true)
-            expect((await findCategoryById(globalCategory.IdCategory)).Active).toBe(true)
         })
     })
 
     describe("Fluxo end to end", () => {
 
-        //  Passo 4 do "como saber que a leva acabou" do ROADMAP, só por HTTP: cria a categoria
-        //  própria e a lê junto com as globais
-        it("cadastra o usuário, cria a categoria própria e lista junto com as globais", async () => {
+        //  Passo 4 do "como saber que a leva acabou" do ROADMAP, só por HTTP: o cadastro já
+        //  nasce com as treze, e elas são dele para mexer.
+        it("cadastra o usuário, encontra as treze e faz com elas o que antes não dava", async () => {
             let payload = {
                 Name: "Usuário do fluxo de categorias",
                 Email: UsersFactory.buildEmail(),
@@ -309,11 +360,22 @@ describe("Categories", () => {
 
             expect((await flowClient.login(payload.Email, payload.Password)).status).toBe(200)
 
-            //  Antes de cadastrar nada, o usuário já tem com o que lançar um gasto
-            let predefined = await flowClient.get(`/Categories`)
+            //  Antes de cadastrar nada, o usuário já tem com o que lançar um gasto — e agora
+            //  as linhas são dele, não de um cadastro compartilhado com a base inteira
+            let seeded = await flowClient.get(`/Categories`)
 
-            expect(predefined.status).toBe(200)
-            expect(predefined.body.map(description)).toEqual(["Transporte"])
+            expect(seeded.status).toBe(200)
+            expect(seeded.body.map(description)).toEqual(CategoriesSeed.map(description))
+
+            //  Renomear uma das treze: era 406 até esta etapa
+            let mercado = seeded.body.find(named("Mercado"))
+
+            expect((await flowClient.put(`/Categories/IdCategory=${mercado.IdCategory}`, { Description: "Supermercado" })).status).toBe(200)
+
+            //  Arquivar uma das treze: antes respondia sem erro e não tinha efeito
+            let pets = seeded.body.find(named("Pets"))
+
+            expect((await flowClient.delete(`/Categories/IdCategory=${pets.IdCategory}`)).status).toBe(200)
 
             let own = await flowClient.post(`/Categories`, { Description: "Faculdade", Color: "#283593" })
 
@@ -321,18 +383,11 @@ describe("Categories", () => {
 
             let list = await flowClient.get(`/Categories`)
 
-            expect(list.body.map(description).sort()).toEqual(["Faculdade", "Transporte"])
-            expect(list.body.find((item: { Description: string }) => item.Description === "Faculdade")).toMatchObject({ Color: "#283593" })
-
-            //  A global não é dele para editar, mesmo aparecendo na mesma lista
-            expect((await flowClient.put(`/Categories/IdCategory=${globalCategory.IdCategory}`, { Description: "Minha" })).status).toBe(406)
-
-            //  Arquivar a própria não encosta na global
-            expect((await flowClient.delete(`/Categories/IdCategory=${own.body.IdCategory}`)).status).toBe(200)
-
-            let final = await flowClient.get(`/Categories`)
-
-            expect(final.body.map(description)).toEqual(["Transporte"])
+            expect(list.body.map(description)).toContain("Supermercado")
+            expect(list.body.map(description)).not.toContain("Mercado")
+            expect(list.body.map(description)).not.toContain("Pets")
+            expect(list.body.find(named("Faculdade"))).toMatchObject({ Color: "#283593" })
+            expect(list.body).toHaveLength(CategoriesSeed.length)
         })
     })
 })
@@ -341,21 +396,35 @@ function description(item: { Description: string }) {
     return item.Description
 }
 
+function named(Description: string) {
+    return (item: { Description: string }) => item.Description === Description
+}
+
+function ids(list: { IdCategory: number }[]) {
+    return list.map((item) => item.IdCategory)
+}
+
+//  Um espaço criado **pela rota**, que é o que semeia as treze. O workspace da UsersFactory é
+//  inserido direto no banco e por isso nasce vazio — o que aqui é uma vantagem: os describes
+//  que não falam das semeadas leem uma lista com só o que eles mesmos cadastraram.
+//
+//  O switch é obrigatório: criar dá matrícula, não move a sessão, e o token é quem carrega o
+//  workspace selecionado.
+async function createSeededWorkspace(Name: string) {
+    let user = await UsersFactory.createClient()
+
+    let created = await user.client.post(`/Workspaces`, { Name })
+    let switched = await user.client.post(`/Workspaces/switch`, { IdWorkspace: created.body.IdWorkspace })
+
+    user.client.setToken(TestClient.extractCookieToken(switched)!)
+
+    return { client: user.client, IdWorkspace: created.body.IdWorkspace as number }
+}
+
 function findCategories(IdWorkspace: number) {
     return TestDatabase.connection().select("*").from("Categories").where("IdWorkspace", IdWorkspace).where("Active", true).orderBy("IdCategory")
 }
 
 function findCategoryById(IdCategory: number) {
     return TestDatabase.connection().select("*").from("Categories").where("IdCategory", IdCategory).first()
-}
-
-//  A global não nasce por rota nenhuma — é a migration de seed que a insere, e o truncate do
-//  beforeAll a leva junto. Semear aqui deixa a suíte independente da ordem de execução.
-async function seedGlobalCategory(overrides: { Description: string, Position?: number }) {
-    let [category] = await TestDatabase.connection()
-        .insert({ IdWorkspace: null, IconKey: "car", Color: "#1565C0", ...overrides })
-        .into("Categories")
-        .returning("*") as Array<{ IdCategory: number, Description: string }>
-
-    return category
 }

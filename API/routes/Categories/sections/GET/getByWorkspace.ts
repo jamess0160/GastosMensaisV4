@@ -1,11 +1,13 @@
 import { WorkspacesAcessControl } from "root/routes/Workspaces/sections/AcessControl.section"
 import { Categories_model } from "../../Categories.model"
 
-//  As categorias do workspace e as pré-definidas do sistema (IdWorkspace nulo), numa lista só.
+//  As categorias do workspace, e só elas.
 //
-//  Vêm juntas porque é junto que a tela de lançar gasto usa: para quem acabou de se cadastrar,
-//  as globais são as únicas que existem, e separá-las em duas listas obrigaria o cliente a
-//  concatenar duas chamadas para montar um único seletor.
+//  **A lista já não tem dois donos.** As treze pré-definidas eram linhas globais (IdWorkspace
+//  nulo) que apareciam aqui ao lado das próprias; a migration 20260922140000 deu a cada espaço
+//  a sua cópia, e um workspace novo nasce com as treze pela criação, não pela leitura. Quem se
+//  acabou de cadastrar continua tendo com o que lançar o primeiro gasto — o que mudou é que
+//  agora ele pode arquivar e reordenar essas treze, que é o que elas nunca deixaram fazer.
 //
 //  Lista plana: não há categoria filha de outra. A hierarquia existiu e foi derrubada — ela
 //  cobrava conferência de pai, recusa de ciclo e arrasto de subárvore no arquivamento, e nada

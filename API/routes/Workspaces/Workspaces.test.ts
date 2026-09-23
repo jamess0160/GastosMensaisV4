@@ -1,3 +1,4 @@
+import { CategoriesSeed } from "root/routes/Categories/Categories.seed"
 import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
 
 //  Testes integrados da feature Workspaces. Um describe por rota de Workspaces.route.ts.
@@ -62,6 +63,24 @@ describe("Workspaces", () => {
             let person = (await findPersonsByUser(creator.user.IdUser)).find((item) => item.IdWorkspace === response.body.IdWorkspace)
 
             expect(person).toMatchObject({ Name: "Pessoa do criador", IdUser: creator.user.IdUser })
+        })
+
+        //  **O espaço nasce com as treze categorias**, na mesma transaction. Elas eram linhas
+        //  globais (IdWorkspace nulo) inseridas uma vez na vida do banco por uma migration, e
+        //  todo workspace enxergava as mesmas — o que tornava arquivar e reordenar impossíveis
+        //  de atender. Agora são cópias próprias, semeadas aqui a partir do Categories.seed.ts.
+        it("semeia as treze categorias do espaço novo", async () => {
+            let creator = await UsersFactory.createClient({ Name: "Dono que precisa lançar gasto" })
+
+            let response = await creator.client.post("/Workspaces", { Name: "Empresa" })
+
+            let categories = await findCategories(response.body.IdWorkspace)
+
+            expect(categories).toHaveLength(CategoriesSeed.length)
+            //  Ordenadas por Position, que é a do seed
+            expect(categories.map((item: { Description: string }) => item.Description)).toEqual(
+                CategoriesSeed.map((item) => item.Description)
+            )
         })
 
         it("passa a listar os dois workspaces no getSelf", async () => {
@@ -1218,6 +1237,22 @@ describe("Workspaces", () => {
             })
         })
 
+        //  O aceite matricula num espaço que JÁ existe, então ele não semeia categoria
+        //  nenhuma: a semeadura mora dentro do ramo que cria o workspace. Fora dele, cada
+        //  pessoa que entrasse despejaria mais treze cópias no cadastro de quem já estava lá.
+        it("não semeia categorias: o espaço do convite já existe", async () => {
+            let owner = await UsersFactory.createClient()
+            let invited = await UsersFactory.createClient()
+
+            let before = await findCategories(owner.workspace.IdWorkspace)
+
+            let created = await owner.client.post("/Workspaces/invite", { Email: invited.user.Email, Role: "editor" })
+
+            expect((await invited.client.post("/Workspaces/join", { Hash: created.body.Hash })).status).toBe(200)
+
+            expect(await findCategories(owner.workspace.IdWorkspace)).toHaveLength(before.length)
+        })
+
         //  ESTE expect é o que prova a migration do índice: Persons tinha unique(IdUser)
         //  GLOBAL, então o convidado ficaria sem pessoa no workspace novo — um membro que não
         //  pode receber um centavo de rateio, já que todo rateio é entre Persons.
@@ -1514,6 +1549,10 @@ async function countInvites(IdWorkspace: number) {
     let rows = await TestDatabase.connection().select("*").from("WorkspaceInvites").where("IdWorkspace", IdWorkspace)
 
     return rows.length
+}
+
+function findCategories(IdWorkspace: number) {
+    return TestDatabase.connection().select("*").from("Categories").where("IdWorkspace", IdWorkspace).orderBy("Position")
 }
 
 function findWorkspace(IdWorkspace: number) {

@@ -1,7 +1,6 @@
 import { WorkspacesAcessControl } from "root/routes/Workspaces/sections/AcessControl.section"
 import { APIError } from "root/Utils/Logs"
 import { Categories_model } from "../../Categories.model"
-import { CategoryOwnership } from "../CategoryOwnership.section"
 import { CategoriesNamespace } from "../types"
 
 export class Update {
@@ -12,6 +11,11 @@ export class Update {
 
         //  Mesma resposta de "não é do seu workspace": um 404 diferenciado diria ao cliente
         //  quais IdCategory existem nos outros tenants.
+        //
+        //  E é a única resposta que sobrou. Enquanto existia a global (IdWorkspace nulo), o
+        //  getUnique a encontrava e a escrita era recusada com um 406 próprio de "pré-definida
+        //  do sistema". Acabaram as duas coisas: sem linha de ninguém, um id que não é deste
+        //  espaço simplesmente não existe aqui — o mesmo tratamento de qualquer id alheio.
         if (!category) {
             throw new APIError({
                 msg: "Categoria não encontrada!",
@@ -19,10 +23,6 @@ export class Update {
                 data: { IdWorkspace, IdCategory },
             })
         }
-
-        //  A linha global entra no getUnique porque é visível a todo mundo; o que ela não
-        //  aceita é escrita. Editá-la renomearia a categoria de todos os workspaces da base.
-        CategoryOwnership.assertEditable(category)
 
         await Categories_model.update(IdCategory, body)
 

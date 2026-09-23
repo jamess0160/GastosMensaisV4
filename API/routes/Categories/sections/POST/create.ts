@@ -2,9 +2,11 @@ import { WorkspacesAcessControl } from "root/routes/Workspaces/sections/AcessCon
 import { Categories_model } from "../../Categories.model"
 import { CategoriesNamespace } from "../types"
 
-//  Cria uma categoria do workspace. A global não nasce por aqui: ela vem da migration de seed
-//  e é a mesma linha para todos os workspaces — criar uma pela rota seria escrever no cadastro
-//  de todo mundo. Por isso o IdWorkspace gravado é sempre o da matrícula, nunca nulo.
+//  Cria uma categoria do workspace. O IdWorkspace gravado é sempre o da matrícula — não há
+//  mais categoria sem dono, e a coluna é NOT NULL desde a migration 20260922140000.
+//
+//  As treze pré-definidas não nascem por aqui: elas são semeadas na criação do workspace, com
+//  a lista do Categories.seed.ts.
 export class Create {
     public async run(SelectedIdWorkspace: number, IdUser: number, body: CategoriesNamespace.CreateCategoryPayload) {
         //  Viewer lê o workspace, não cadastra dentro dele.

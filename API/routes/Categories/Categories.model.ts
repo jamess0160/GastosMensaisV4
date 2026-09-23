@@ -4,8 +4,12 @@ import { Database } from "root/Utils/database"
 //  Categoria de gasto. Entrada não tem categoria (ver o ROADMAP), então esta tabela é lida
 //  só pelo lado de Expenses.
 //
-//  A tabela tem dois donos possíveis: o workspace, ou ninguém — IdWorkspace nulo marca a
-//  categoria pré-definida do sistema, que todo workspace enxerga e nenhum edita.
+//  **Toda categoria é de um workspace.** O `IdWorkspace` nulo — a pré-definida do sistema,
+//  que todo espaço enxergava e nenhum editava — deixou de existir na migration
+//  20260922140000: cada espaço ganhou a sua cópia das treze. Era o que travava os dois pedidos
+//  de quem usa o app, porque arquivar e reordenar uma linha compartilhada mexeria no cadastro
+//  do vizinho. Quem semeia as treze agora é a criação de workspace, com a lista do
+//  `Categories.seed.ts`.
 //
 //  **Lista plana:** não há categoria filha de outra. A coluna IdParentCategory existiu e foi
 //  derrubada (migration 20260829010000).
@@ -13,19 +17,16 @@ export class class_Categories_model extends BaseModel {
 
     private readonly baseQuery = this.KnexConnection.select("*").from<Database.Categories>("Categories").where("Active", true).orderBy("Position").orderBy("IdCategory")
 
-    //  As do workspace mais as globais. O OR vai dentro do callback de propósito: solto, ele
-    //  se ligaria ao where("Active") do baseQuery e a consulta viraria "(ativa e do workspace)
-    //  ou global", trazendo de volta a global arquivada.
+    //  Só as do workspace. O `orWhereNull` que trazia as globais junto saiu com elas.
     getByWorkspace(IdWorkspace: number) {
-        return this.baseQuery.clone().where((query) => query.where("IdWorkspace", IdWorkspace).orWhereNull("IdWorkspace"))
+        return this.baseQuery.clone().where("IdWorkspace", IdWorkspace)
     }
 
     //  Mesmo motivo do Accounts.getUnique: o IdCategory chega do cliente e é sequencial, então
     //  buscar só por ele leria a categoria de outro tenant mesmo com a matrícula conferida.
     //
-    //  A diferença é que aqui a global entra junto — ela é visível a todo mundo, e achá-la é o
-    //  que permite responder "é somente leitura" em vez de "não existe". Quem barra a escrita
-    //  é o CategoryOwnership, não a ausência da linha.
+    //  E agora a ausência da linha é a única resposta possível para um id que não é do espaço:
+    //  sem linha de ninguém, "de outro tenant" e "não existe" viraram o mesmo 406.
     getUnique(IdWorkspace: number, IdCategory: number) {
         return this.getByWorkspace(IdWorkspace).where("IdCategory", IdCategory).first()
     }
@@ -42,7 +43,7 @@ export class class_Categories_model extends BaseModel {
     //  passado tem que continuar apontando para a categoria em que ele foi de fato lançado.
     //
     //  O IdWorkspace na cláusula não é redundância: é a segunda barreira que impede um
-    //  UPDATE de alcançar a linha de outro tenant — ou uma global, que não é de ninguém.
+    //  UPDATE de alcançar a linha de outro tenant.
     delete(IdWorkspace: number, IdCategory: number) {
         return this.KnexConnection
             .update({ Active: false, UpdatedAt: this.KnexConnection.fn.now() })

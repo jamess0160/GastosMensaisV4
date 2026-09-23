@@ -5,11 +5,12 @@ import { color } from "root/Utils/joiSchemas"
 //  A linha de Categories. Lista plana: a hierarquia existiu e foi derrubada, então não há
 //  recursão nenhuma para descrever aqui.
 //
-//  IdWorkspace nulo é a pré-definida do sistema — é por ele que o cliente sabe que aquela
-//  linha não abre para edição, então ele é parte da resposta, não detalhe interno.
+//  IdWorkspace não aceita mais nulo: a categoria sem dono acabou na migration 20260922140000,
+//  e toda linha que sai daqui é do espaço da sessão. Ele continua na resposta porque a coluna
+//  é NOT NULL no banco, e um `allow(null)` aqui descreveria um estado que não existe mais.
 export const categoryResponse = Joi.object({
     IdCategory: Joi.number().required(),
-    IdWorkspace: Joi.number().allow(null).required(),
+    IdWorkspace: Joi.number().required(),
     Description: Joi.string().required(),
     IconKey: Joi.string().allow(null).required(),
     Color: Joi.string().allow(null).required(),

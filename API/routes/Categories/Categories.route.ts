@@ -9,11 +9,12 @@ export const Categories_route = express()
 //  Accounts: o IdWorkspace não aparece no caminho, vem do token da sessão, e toda section
 //  começa por assertMember/assertRole usando o IdWorkspace que volta da matrícula.
 //
-//  O que é próprio desta feature: metade das linhas da tabela não é de ninguém. IdWorkspace
-//  nulo é a pré-definida do sistema, visível a todos os workspaces e editável por nenhum —
-//  ver sections/CategoryOwnership.section.ts.
+//  **Toda linha da tabela é de um workspace.** Até a migration 20260922140000 as treze
+//  pré-definidas eram globais (IdWorkspace nulo), visíveis a todos e editáveis por nenhum;
+//  cada espaço ganhou a sua cópia, e com ela o direito de arquivar e reordenar. Quem semeia as
+//  treze é a criação do workspace, com a lista do Categories.seed.ts.
 
-//  As do workspace mais as globais, numa lista plana — não há categoria filha de outra.
+//  As do workspace, numa lista plana — não há categoria filha de outra.
 Categories_route.get("/Categories", Categories_schema.getByWorkspace, AsyncHandler(Categories_controller.getByWorkspace))
 
 Categories_route.post("/Categories", Categories_schema.create, AsyncHandler(Categories_controller.create))

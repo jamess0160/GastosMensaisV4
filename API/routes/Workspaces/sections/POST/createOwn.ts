@@ -39,6 +39,10 @@ export class CreateOwn {
         return await KnexTransaction(async (tx) => {
             //  Quem cria entra como 'owner': é o default da peça de baixo, e é o papel de quem
             //  não foi convidado por ninguém.
+            //
+            //  As treze categorias do espaço novo vêm junto, de dentro da peça de baixo — é lá
+            //  que o workspace de fato nasce, e semear aqui deixaria o cadastro (que chama a
+            //  mesma peça) sem elas.
             let IdWorkspace = await new CreateWorkspace(tx).run(IdUser, body.Name)
 
             //  A Person do dono no workspace novo, na mesma transaction — todo rateio é entre
