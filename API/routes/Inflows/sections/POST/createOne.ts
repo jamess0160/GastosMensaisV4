@@ -6,9 +6,8 @@ import { InflowsNamespace } from "../types"
 //  O miolo da criação: uma entrada (ou transferência) e o rateio dela, dentro de uma
 //  transaction que **vem de fora**.
 //
-//  Existe separado do POST/create.ts pelo mesmo motivo de Workspaces/sections/POST/create.ts e
-//  BudgetPeriods/sections/POST/createForMonth.ts: para o lote poder chamá-lo N vezes dentro de
-//  uma transaction só. O avulso é "abre transaction e chama uma vez"; o lote, "abre transaction
+//  Existe separado do POST/create.ts pelo mesmo motivo de Workspaces/sections/POST/create.ts:
+//  para o lote poder chamá-lo N vezes dentro de uma transaction só. O avulso é "abre transaction e chama uma vez"; o lote, "abre transaction
 //  e chama N vezes" — e é isso que faz os N itens caírem ou passarem juntos.
 //
 //  **Não confere nada.** InflowKind.assertAccounts e InflowSplit.assertSplit rodam antes, fora

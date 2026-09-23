@@ -42,8 +42,10 @@ export class ApiUnauthorizedError extends Error {
 
 /** 403 — a rota existe, a sessão é válida, e mesmo assim não é sua.
  *
- *  Só as rotas de gestão do workspace respondem assim, e sempre pela
- *  mesma razão: quem chamou não é `owner`. Ele NÃO é um 406 disfarçado —
+ *  Duas famílias de rota respondem assim, e a `msg` do servidor é quem
+ *  diz qual: a gestão do workspace, quando quem chamou não é `owner`, e a
+ *  escrita de orçamento num mês já fechado — ali o papel está certo e o
+ *  que falta é o mês estar aberto. Ele NÃO é um 406 disfarçado —
  *  não há dado a corrigir, e repetir a chamada nunca vai passar —, nem
  *  um 500, cuja mensagem ("tente de novo em instantes") convida a um
  *  retry que não leva a lugar nenhum. */
