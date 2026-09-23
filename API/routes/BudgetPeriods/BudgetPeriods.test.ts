@@ -769,6 +769,235 @@ describe("BudgetPeriods", () => {
         })
     })
 
+    //  **Repetir a repartição de um mês no outro.** É o desconto do preço que a leva 9 cobrou
+    //  ao matar a rotina do dia 1º: nada nasce sozinho, então remontar em outubro as mesmas
+    //  linhas de setembro é trabalho repetido todo mês.
+    //
+    //  O que a suíte trava são as três exclusões e a recusa — pular o alvo que já existe, pular
+    //  o arquivado, recusar o destino fechado — e a **idempotência**, que é o que faz o botão
+    //  clicado duas vezes não ser um estrago.
+    describe("POST /BudgetPeriods/clone", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Copiar é escrever, e viewer não escreve
+        it("recusa o viewer", async () => {
+            let workspace = await buildWorkspace()
+            let viewerClient = await buildViewerClient(workspace)
+
+            await createPeriod(workspace, { LimitValue: 800 })
+
+            let response = await viewerClient.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect(response.status).toBe(403)
+        })
+
+        it("recusa mês fora do formato YYYY-MM", async () => {
+            let workspace = await buildWorkspace()
+
+            expect((await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08-01", To: "2026-09" })).status).toBe(406)
+            expect((await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08" })).status).toBe(406)
+        })
+
+        //  Todo alvo já existe no destino, então a rota responderia 200 com lista vazia e
+        //  esconderia do cliente uma chamada montada errada
+        it("recusa clonar o mês nele mesmo", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { LimitValue: 800 })
+
+            expect((await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-08" })).status).toBe(406)
+        })
+
+        it("recusa quando a origem não tem orçamento nenhum", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  O caso de aceite: em setembro, navegar para outubro e trazer as linhas de setembro
+        it("copia as fatias do mês de origem com o mesmo alvo e o mesmo valor", async () => {
+            let workspace = await buildWorkspace()
+            let example = await buildAllocationExample(workspace)
+
+            let response = await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect(response.status).toBe(200)
+            expect(response.body.IdBudgetPeriods).toHaveLength(3)
+
+            let september = await readMonth(workspace, "2026-09")
+
+            //  Os três formatos de alvo atravessam a cópia: só pessoa, pessoa + categoria, e
+            //  só categoria
+            expect(september.Periods.map((period: any) => ({
+                IdCategory: period.IdCategory,
+                IdPerson: period.IdPerson,
+                LimitValue: period.LimitValue,
+                ReferenceMonth: period.ReferenceMonth,
+                Status: period.Status,
+            }))).toEqual([
+                { IdCategory: null, IdPerson: example.luana, LimitValue: 250, ReferenceMonth: "2026-09-01", Status: "open" },
+                { IdCategory: example.alimentacao, IdPerson: example.tiago, LimitValue: 250, ReferenceMonth: "2026-09-01", Status: "open" },
+                { IdCategory: workspace.IdCategory, IdPerson: null, LimitValue: 500, ReferenceMonth: "2026-09-01", Status: "open" },
+            ])
+
+            //  A origem fica intacta: copiar não move nada de lugar
+            expect((await readMonth(workspace, "2026-08")).Periods).toHaveLength(3)
+        })
+
+        //  O AlertPercent é parte da fatia, não um padrão do formulário
+        it("copia o AlertPercent junto", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { LimitValue: 800, AlertPercent: 60 })
+
+            await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect((await readMonth(workspace, "2026-09")).Periods[0]).toMatchObject({ AlertPercent: 60 })
+        })
+
+        //  **Clonar duas vezes não duplica nem sobrescreve.** O valor que já está no mês é uma
+        //  decisão que alguém tomou, e uma cópia não tem autoridade para desfazê-la — é a mesma
+        //  escolha que a materialização velha fazia ao só inserir o que faltava.
+        it("não duplica nem sobrescreve ao clonar de novo", async () => {
+            let workspace = await buildWorkspace()
+
+            let source = await createPeriod(workspace, { LimitValue: 800 })
+
+            await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            //  A fatia de setembro é corrigida à mão: é ela que a segunda cópia não pode tocar
+            let copied = (await readMonth(workspace, "2026-09")).Periods[0]
+            await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${copied.IdBudgetPeriod}`, { LimitValue: 300 })
+
+            let second = await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect(second.status).toBe(200)
+            expect(second.body.IdBudgetPeriods).toEqual([])
+
+            let september = await readMonth(workspace, "2026-09")
+
+            expect(september.Periods).toHaveLength(1)
+            expect(september.Periods[0]).toMatchObject({ IdBudgetPeriod: copied.IdBudgetPeriod, LimitValue: 300 })
+            expect((await findPeriodById(source.IdBudgetPeriod)).LimitValue).toBe(800)
+        })
+
+        //  **O alvo INTEIRO é a chave, não uma das duas colunas:** "Mercado" e "Maria em
+        //  Mercado" são fatias diferentes do mesmo mês, então a segunda não pode ser pulada
+        //  por causa da primeira já estar no destino.
+        it("traz o alvo duplo mesmo com a categoria dele já orçada no destino", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await postPeriod(workspace, { ReferenceMonth: "2026-08", IdPerson, IdCategory: workspace.IdCategory, LimitValue: 200 })
+
+            //  Setembro já tem a fatia só de categoria
+            await createPeriod(workspace, { ReferenceMonth: "2026-09", LimitValue: 900 })
+
+            let response = await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect(response.body.IdBudgetPeriods).toHaveLength(1)
+
+            let september = (await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body.Periods
+
+            expect(september).toHaveLength(2)
+            //  A de categoria pura ficou com o valor que já tinha em setembro
+            expect(september.map(limit)).toEqual([900, 200])
+        })
+
+        //  Categoria ou pessoa que saiu das listas não volta pela porta dos fundos
+        it("pula o alvo arquivado entre um mês e outro", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+            let IdCategory = await createCategory(workspace, "Lazer")
+
+            await createPeriod(workspace, { LimitValue: 800 })
+            await createPersonPeriod(workspace, IdPerson, { LimitValue: 500 })
+            await createPeriod(workspace, { IdCategory, LimitValue: 100 })
+
+            await workspace.client.delete(`/Persons/IdPerson=${IdPerson}`)
+            await workspace.client.delete(`/Categories/IdCategory=${IdCategory}`)
+
+            let response = await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect(response.status).toBe(200)
+            expect(response.body.IdBudgetPeriods).toHaveLength(1)
+
+            let september = await readMonth(workspace, "2026-09")
+
+            expect(september.Periods).toHaveLength(1)
+            expect(september.Periods[0]).toMatchObject({ IdCategory: workspace.IdCategory, IdPerson: null, LimitValue: 800 })
+        })
+
+        //  **403 e não 406**, como as outras três escritas da feature: o workspace e o papel
+        //  estão certos, o que falta é o mês estar aberto
+        it("recusa o destino fechado, sem escrever linha nenhuma", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPeriod(workspace, { ReferenceMonth: "2026-09", IdCategory: await createCategory(workspace, "Lazer"), LimitValue: 100 })
+            await closeMonth(workspace, "2026-09-01")
+
+            let response = await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect(response.status).toBe(403)
+            expect((await readMonth(workspace, "2026-09")).Periods).toHaveLength(1)
+        })
+
+        //  **Origem fechada serve de modelo.** Fechado quer dizer "não se escreve mais nele", e
+        //  ler agosto para montar dezembro não escreve em agosto — recusar aqui tiraria
+        //  justamente o mês mais provável de servir de modelo.
+        it("aceita a origem fechada", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await closeMonth(workspace, "2026-08-01")
+
+            let response = await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })
+
+            expect(response.status).toBe(200)
+            //  A cópia nasce ABERTA: o carimbo do mês de origem não vem junto, ou o destino
+            //  já nasceria travado contra a edição que a cópia existe para poupar
+            expect((await readMonth(workspace, "2026-09")).Periods[0]).toMatchObject({ Status: "open", ClosedAt: null })
+        })
+
+        //  O mês de destino não precisa ser o seguinte: montar dezembro a partir de agosto é a
+        //  mesma operação, e é o que "qualquer mês é editável" quer dizer
+        it("copia para um mês qualquer, não só o seguinte", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+
+            expect((await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-12" })).status).toBe(200)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-12`)).body.Periods.map(limit)).toEqual([800])
+        })
+
+        //  O id chega do cliente em nenhum lugar aqui, mas o mês chega — e o workspace do
+        //  token é o único filtro que separa o orçamento de um tenant do do vizinho
+        it("não enxerga o orçamento de outro workspace", async () => {
+            let workspace = await buildWorkspace()
+            let neighbour = await buildWorkspace()
+
+            await createPeriod(neighbour, { LimitValue: 800 })
+
+            expect((await workspace.client.post(`/BudgetPeriods/clone`, { From: "2026-08", To: "2026-09" })).status).toBe(406)
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(0)
+        })
+    })
+
     describe("PUT /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", () => {
 
         it("recusa sem token", async () => {

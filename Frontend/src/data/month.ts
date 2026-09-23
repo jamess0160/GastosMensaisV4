@@ -78,13 +78,22 @@ export function useMonthStatement(
  *  linha nenhuma, e ele existe porque o casamento do gasto com a fatia é
  *  estrito: cada porção consome uma fatia ou NENHUMA. Como todo número
  *  daqui, ele é da API: somar `Spent` no cliente para "conferir" é a
- *  segunda implementação da mesma pergunta. */
+ *  segunda implementação da mesma pergunta.
+ *
+ *  `enabled` existe por causa de UM chamador: o estado vazio do Início
+ *  lê também o mês ANTERIOR, para saber quantas fatias o botão de
+ *  clonar vai trazer. Essa leitura só interessa quando o mês da tela
+ *  está vazio, e sem o gate ela seria uma requisição a mais em toda
+ *  visita ao Início. A CHAVE é a mesma de sempre — navegar para o mês
+ *  anterior reaproveita a resposta em vez de pedir de novo. */
 export function useMonthBudgets(
     month: ApiTypes.ReferenceMonth,
+    enabled = true,
 ): UseQueryResult<ApiTypes.BudgetMonth> {
     return useQuery({
         queryKey: queryKeys.budgets(month),
         queryFn: () => BudgetPeriodsConnection.list(month),
+        enabled,
     });
 }
 

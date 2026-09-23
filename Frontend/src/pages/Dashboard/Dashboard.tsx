@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { DashboardController, type BudgetDraft, type DashboardContext } from "./controller";
+import { previousMonth } from "./sections/cloneBudgetMonth";
 import { useMonthScope } from "@/app/monthScope";
 import { useOpenModal } from "@/app/modalRoute";
 import { useSession } from "@/app/session";
@@ -34,7 +35,7 @@ import {
 } from "@/lib/aggregate";
 import { accentColor, categoryColor, paletteColor } from "@/lib/categoryColor";
 import { formatMoney, fromCents, toCents } from "@/lib/money";
-import { formatMonthLabel } from "@/lib/date";
+import { formatMonthLabel, formatMonthShort } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
 const newBudgetDraft = (month: string): BudgetDraft => ({
@@ -113,6 +114,19 @@ export function Dashboard() {
        para somar dois números que agora vêm prontos. */
     const report = useMonthReport(month);
     const budgets = useMonthBudgets(month);
+    /* O mês ANTERIOR, lido só para o estado vazio: é ele que diz quantas
+       fatias o botão de clonar vai trazer, e um botão que não diz o
+       tamanho do que faz é um botão que ninguém clica.
+
+       `enabled` gateado pelo mês da tela estar vazio — a leitura não
+       interessa em mês nenhum montado, e sem o gate seria uma requisição
+       a mais em toda visita ao Início. A chave de cache é a mesma de
+       sempre, então navegar para o mês anterior reaproveita a resposta. */
+    const previous = previousMonth(month);
+    const previousBudgets = useMonthBudgets(
+        previous,
+        !budgets.isPending && (budgets.data?.Periods.length ?? 0) === 0,
+    );
     /* `useAccounts` continua sendo lido nesta tela — por dentro de
        `usePaymentMethodIndex`, que é quem dá nome à fatia "Por forma de
        pagamento". O que saiu foi a leitura DIRETA, que existia só para
@@ -185,6 +199,12 @@ export function Dashboard() {
        ele ganha lugar. Ler só `Periods` é o mínimo para esta tela
        continuar de pé. */
     const periods = budgets.data?.Periods ?? [];
+    /* Quantas fatias o botão de clonar vai trazer. É o mês anterior
+       INTEIRO: o que o servidor vai descartar por alvo arquivado ele não
+       conta aqui, e é a `msg` da resposta que dá o número final. Zero (ou
+       ainda carregando) esconde o botão — oferecer "clonar 0" é oferecer
+       um clique que não faz nada. */
+    const previousCount = previousBudgets.data?.Periods.length ?? 0;
     const overBudget = periods.filter((period) => budgetState(period) === "over");
     const alerting = periods.filter((period) => budgetState(period) === "alert");
     const activeCategories = (categories.data ?? []).filter((category) => category.Active);
@@ -466,17 +486,59 @@ export function Dashboard() {
                             onRetry={() => void budgets.refetch()}
                         />
                     ) : periods.length === 0 ? (
+                        /* ── O mês vazio e as suas DUAS saídas ──────────
+                           Desde a leva 9 nada se materializa sozinho, e é
+                           isso que faz outubro ser montável em setembro. O
+                           preço é que o mês novo nasce vazio, e é AQUI que
+                           ele se paga ou não: clonar o mês anterior, ou
+                           montar do zero.
+
+                           O botão de clonar DIZ QUANTAS LINHAS VAI TRAZER,
+                           porque "clonar setembro" sem número é um pulo no
+                           escuro — e o número é o do mês anterior inteiro,
+                           não o do que vai sobrar depois das exclusões do
+                           servidor (alvo já existente, alvo arquivado). Num
+                           mês vazio as duas contas coincidem, tirando o
+                           alvo arquivado entre um mês e outro; a `msg` da
+                           resposta é que dá o número final.
+
+                           Este estado vazio é o mínimo: a tela do orçamento
+                           é reescrita na etapa 12 e vai absorvê-lo. */
                         <EmptyState
                             inline
                             title="Nenhum orçamento neste mês"
+                            description={
+                                previousCount > 0
+                                    ? `${formatMonthLabel(previous)} tem ${previousCount} fatia${
+                                          previousCount === 1 ? "" : "s"
+                                      } — traga-as para cá e ajuste o que mudou, ou comece do zero.`
+                                    : "Reparta o que entra no mês em fatias por categoria, por pessoa, ou pelas duas."
+                            }
                             action={
-                                <Button
-                                    variant="primary"
-                                    onClick={() => setBudgetDraft(newBudgetDraft(month))}
-                                >
-                                    <IconPlus />
-                                    Adicionar orçamento
-                                </Button>
+                                <div className={styles.emptyActions}>
+                                    {previousCount > 0 && (
+                                        <Button
+                                            variant="primary"
+                                            disabled={pending}
+                                            onClick={() =>
+                                                void DashboardController.cloneBudgetMonth(
+                                                    context,
+                                                    month,
+                                                )
+                                            }
+                                        >
+                                            Clonar {formatMonthShort(previous)} ({previousCount}{" "}
+                                            {previousCount === 1 ? "fatia" : "fatias"})
+                                        </Button>
+                                    )}
+                                    <Button
+                                        variant={previousCount > 0 ? "default" : "primary"}
+                                        onClick={() => setBudgetDraft(newBudgetDraft(month))}
+                                    >
+                                        <IconPlus />
+                                        Montar do zero
+                                    </Button>
+                                </div>
                             }
                         />
                     ) : (

@@ -74,6 +74,26 @@ class Schema {
         })),
     ]
 
+    //  **Repetir a repartição de um mês no outro.** Dois meses e nada mais: não há lista de
+    //  itens no corpo, ao contrário do `POST /Inflows/batch` que a Renda usa para o mesmo
+    //  gesto — ver sections/POST/clone.ts para o porquê da diferença.
+    public readonly clone = [
+        joiController.validateBody(Joi.object({
+            From: referenceMonth.required(),
+            //  **Clonar um mês nele mesmo é chamada montada errada**, e não um jeito
+            //  complicado de não fazer nada: todo alvo já existe no destino, então a rota
+            //  responderia 200 com lista vazia e esconderia o erro do cliente. É o mesmo
+            //  cuidado do `min(1)` no lote da Renda.
+            To: referenceMonth.required().invalid(Joi.ref("From")),
+        })),
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+            //  A mesma forma do lote da Renda: os ids voltam para o cliente invalidar o cache
+            //  do mês certo, e o tamanho da lista é quantas linhas vieram.
+            IdBudgetPeriods: Joi.array().items(Joi.number()).required(),
+        })),
+    ]
+
     public readonly update = [
         joiController.validateParams(Joi.object({
             IdBudgetPeriod: Joi.number().required(),

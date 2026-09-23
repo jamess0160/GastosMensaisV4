@@ -67,4 +67,19 @@ export namespace BudgetPeriodsNamespace {
         LimitValue: number
         AlertPercent?: number
     }
+
+    /**
+     * Repetir a reparticao de um mes no outro: dois meses, "YYYY-MM", e nada mais.
+     *
+     * Nao ha lista de itens no corpo, ao contrario do lote da Renda, porque nao ha o que
+     * escolher: uma fatia nao tem data a avancar nem rateio a rebuscar, e as tres regras que
+     * separam o que vem do que nao vem - alvo ja existente, alvo arquivado, mes fechado - sao
+     * conhecimento que so o servidor tem. Ver sections/POST/clone.ts.
+     */
+    export interface CloneBudgetMonthPayload {
+        /** O mes que serve de modelo. Fechado serve igual: ler agosto nao escreve em agosto. */
+        From: string
+        /** O mes que recebe as copias. FECHADO RECUSA, com 403, antes de escrever uma linha. */
+        To: string
+    }
 }

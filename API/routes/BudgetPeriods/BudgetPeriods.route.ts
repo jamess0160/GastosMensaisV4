@@ -37,6 +37,18 @@ BudgetPeriods_route.get("/BudgetPeriods", BudgetPeriods_schema.getByMonth, Async
 //  Uma fatia nova no mês. Uma escrita só — não há mais definição para resolver antes.
 BudgetPeriods_route.post("/BudgetPeriods", BudgetPeriods_schema.create, AsyncHandler(BudgetPeriods_controller.create))
 
+//  **Repete a repartição de um mês no outro**: `{ From, To }`, os dois "YYYY-MM".
+//
+//  É o desconto do preço que a leva 9 cobrou ao matar a rotina do dia 1º: nada nasce sozinho,
+//  então um mês novo nasce vazio, e remontar as mesmas oito linhas à mão todo mês é o trabalho
+//  repetido que faz a funcionalidade parar de ser usada no terceiro mês.
+//
+//  Pula o alvo que já existe no destino (clonar duas vezes não duplica nem sobrescreve) e o
+//  alvo arquivado; recusa o destino **fechado** com 403, como as outras três escritas. Ver
+//  sections/POST/clone.ts, inclusive para por que o corpo aqui NÃO é o lote que a Renda usa
+//  para o mesmo gesto.
+BudgetPeriods_route.post("/BudgetPeriods/clone", BudgetPeriods_schema.clone, AsyncHandler(BudgetPeriods_controller.clone))
+
 BudgetPeriods_route.put("/BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", BudgetPeriods_schema.update, AsyncHandler(BudgetPeriods_controller.update))
 
 //  Delete físico: a fatia é plano, não lançamento. Ver sections/DELETE/remove.ts.

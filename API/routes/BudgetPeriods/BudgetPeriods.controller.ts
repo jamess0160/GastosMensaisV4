@@ -1,5 +1,6 @@
 import { Request, Response } from "express"
 import { GetByMonth } from "./sections/GET/getByMonth"
+import { Clone } from "./sections/POST/clone"
 import { Create } from "./sections/POST/create"
 import { Remove } from "./sections/DELETE/remove"
 import { Update } from "./sections/PUT/update"
@@ -12,6 +13,10 @@ class Controller {
 
     create = async (req: Request, res: Response) => {
         res.json(await new Create().run(res.locals.IdWorkspace, res.locals.IdUser, req.body))
+    }
+
+    clone = async (req: Request, res: Response) => {
+        res.json(await new Clone().run(res.locals.IdWorkspace, res.locals.IdUser, req.body))
     }
 
     update = async (req: Request, res: Response) => {

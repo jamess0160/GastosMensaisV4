@@ -1072,6 +1072,26 @@ export namespace ApiTypes {
         AlertPercent?: number;
     }
 
+    /** Repetir a repartição de um mês no outro: dois meses "YYYY-MM", e
+     *  nada mais.
+     *
+     *  **Não é o lote da Renda.** Lá o cliente lista o mês passado, o
+     *  usuário marca item a item e o corpo leva as cópias prontas; aqui
+     *  não há o que marcar — uma fatia não tem data a avançar nem rateio
+     *  a rebuscar —, e as três regras que separam o que vem do que não
+     *  vem (alvo já existente no destino, alvo arquivado, mês fechado)
+     *  são conhecimento que só o servidor tem. */
+    export interface BudgetMonthCloneBody {
+        /** O mês que serve de modelo. Fechado serve igual: ler agosto não
+         *  escreve em agosto. */
+        From: ReferenceMonth;
+        /** O mês que recebe as cópias. FECHADO recusa, com 403, antes de
+         *  escrever uma linha. E igual ao `From` é 406: todo alvo já
+         *  existiria no destino, e um 200 de lista vazia esconderia a
+         *  chamada montada errada. */
+        To: ReferenceMonth;
+    }
+
     /* ── 15. Reports ──────────────────────────────────────────── */
 
     /** Os dois indicadores do Início, somados no SERVIDOR.

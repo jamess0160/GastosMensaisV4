@@ -1,3 +1,4 @@
+import { cloneBudgetMonth } from "./sections/cloneBudgetMonth";
 import { removeBudgetPeriod } from "./sections/removeBudgetPeriod";
 import { saveBudget } from "./sections/saveBudget";
 import type { ApiTypes } from "@/types/api";
@@ -39,6 +40,7 @@ export interface DashboardContext {
 
 class Controller {
     readonly saveBudget = saveBudget;
+    readonly cloneBudgetMonth = cloneBudgetMonth;
     readonly removeBudgetPeriod = removeBudgetPeriod;
 }
 

@@ -59,6 +59,41 @@ class Connection {
         return data;
     }
 
+    /** **Repete a repartição de um mês no outro** — `{ From, To }`, os
+     *  dois "YYYY-MM".
+     *
+     *  É o desconto do preço que a leva 9 cobrou ao matar a rotina do dia
+     *  1º: nada nasce sozinho, então um mês novo nasce vazio, e remontar
+     *  em outubro as mesmas oito linhas de setembro, à mão, todo mês, é o
+     *  trabalho repetido que faz a funcionalidade parar de ser usada no
+     *  terceiro mês.
+     *
+     *  Três coisas ficam de fora da cópia, e o cliente não decide nenhuma
+     *  delas:
+     *
+     *  - **o alvo que já existe no destino** — clonar duas vezes não
+     *    duplica nem sobrescreve. O valor que já está no mês é uma decisão
+     *    que alguém tomou;
+     *  - **o alvo arquivado** — categoria ou pessoa que saiu das listas
+     *    não volta pela porta dos fundos;
+     *  - **nada**: o destino FECHADO recusa a rota inteira, com 403, antes
+     *    de escrever uma linha.
+     *
+     *  A resposta tem a forma do lote da Renda, e a simetria é de
+     *  propósito: `IdBudgetPeriods` é o que diz quantas linhas vieram e o
+     *  que invalida o cache do mês certo. Vazio é resposta legítima — é o
+     *  segundo clique num mês já clonado. */
+    async clone(body: ApiTypes.BudgetMonthCloneBody): Promise<{
+        msg: string;
+        IdBudgetPeriods: number[];
+    }> {
+        const { data } = await http.post<{ msg: string; IdBudgetPeriods: number[] }>(
+            `${this.route}/clone`,
+            body,
+        );
+        return data;
+    }
+
     /** `ReferenceMonth` e o alvo não são aceitos: mover a fatia de lugar
      *  é apagar esta e cadastrar outra. */
     async update(

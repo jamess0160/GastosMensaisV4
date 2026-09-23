@@ -423,3 +423,13 @@
     border-radius: 10px;
     padding: 10px 12px;
 }
+
+/* As DUAS saídas do mês vazio — clonar o anterior e montar do zero.
+   `wrap` porque o rótulo do clonar carrega o mês e a contagem, e em
+   390px os dois botões não cabem na mesma linha. */
+.emptyActions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+}
