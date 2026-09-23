@@ -140,9 +140,10 @@ const onSubmit = (event: FormEvent) => {
 };
 ```
 
-Páginas sem evento de verdade ficam só com `[Pagina].tsx` e `controller.tsx` — hoje só o
-Extrato, que é leitura pura: ele não quita, não concilia e não marca nada, e navegar até o
-lançamento é do roteador, não um evento de negócio.
+Páginas sem evento de verdade ficam só com `[Pagina].tsx` e `controller.tsx`. O Extrato era o
+exemplo disso — leitura pura, em que navegar até o lançamento é do roteador e não um evento de
+negócio — até a leva 9 pôr a quitação da fatura onde a fatura aparece; hoje ele tem `sections/`
+como as outras.
 
 **Testes ficam em `tests/` ao lado do que testam.** Vitest, porque reaproveita este mesmo
 `vite.config.ts` — o atalho `@/`, os CSS Modules e o TypeScript funcionam no teste sem
@@ -207,11 +208,12 @@ o usuário veria o texto genérico no lugar da frase do servidor. Quem desempaco
 | Criar senha nova | `/recuperar-senha` | pública, lê o `?Token=` do link do e-mail |
 | Confirmar e-mail | `/confirmar-email` | pública, confirma na montagem e oferece o reenvio |
 | Início | `/` | indicadores vindos de `GET /Reports/Month`, com o bloco de orçamentos |
-| Gastos | `/gastos` | lista, detalhe, quitação da perna, série, cancelamento |
+| Gastos | `/gastos` | lista **por perna** (a parcela, não a compra), detalhe, quitação da perna, série, cancelamento |
 | Adicionar / editar gasto | `/gastos/novo`, `/gastos/:id/editar` | mesma página, em modal |
 | Renda | `/renda` | entrada, transferência, e clonar o mês anterior |
-| Contas | `/contas` | contas e cartões, quitação da fatura, com seletor de mês |
-| Extrato | `/contas/extrato` | abertura → linhas assinadas → fechamento, por conta e por fatura |
+| Contas | `/contas` | contas e cartões, com seletor de mês; o card do cartão mostra a fatura aberta e linka para ela |
+| Fatura | `/contas/fatura/:idPaymentMethod` | um ciclo por vez, com navegação própria — a fatura **não é um mês** e não segue o seletor do chassi —, o que já está nela, o previsto, os próximos vencimentos e a quitação |
+| Extrato | `/contas/extrato` | abertura → linhas assinadas → fechamento, por conta e por fatura, com a quitação no bloco do cartão |
 | Relatório | `/relatorio` | linha, barras e donut em ECharts, com filtros próprios de período |
 | Personalização | `/personalizacao` | categorias e pessoas |
 | Perfil | `/perfil` | dados, senha, passkeys |
