@@ -203,8 +203,8 @@
     content: "";
     width: 9px;
     height: 5px;
-    border-left: 2px solid #fff;
-    border-bottom: 2px solid #fff;
+    border-left: 2px solid var(--on-accent);
+    border-bottom: 2px solid var(--on-accent);
     transform: rotate(-45deg) translate(1px, -1px);
     opacity: 0;
 }
@@ -258,7 +258,7 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--on-accent);
     box-shadow: var(--sh-raised);
     transition: left 0.15s;
 }
@@ -337,8 +337,8 @@
 
 .segBrand button.segOn {
     background: var(--brand);
-    color: #fff;
-    box-shadow: 0 4px 10px -3px rgba(255, 106, 0, 0.5);
+    color: var(--on-accent);
+    box-shadow: 0 4px 10px -3px var(--glow-brand);
 }
 
 /* ── Stepper ──────────────────────────────────────────────── */

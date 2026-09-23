@@ -168,12 +168,12 @@
 .dangerButton {
     background: var(--neg);
     border-color: var(--neg);
-    color: #fff;
+    color: var(--on-accent);
 }
 
 .dangerButton:hover:not(:disabled) {
-    background: #e00017;
-    border-color: #e00017;
+    background: var(--neg-press);
+    border-color: var(--neg-press);
 }
 
 /* ── Sessão ───────────────────────────────────────────────── */

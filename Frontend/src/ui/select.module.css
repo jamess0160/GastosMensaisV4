@@ -202,7 +202,7 @@
     border-radius: 12px;
     border: 1px solid var(--border);
     background: var(--surface);
-    box-shadow: 0 18px 40px -12px rgba(20, 18, 15, 0.28);
+    box-shadow: 0 18px 40px -12px var(--shadow-medium);
 }
 
 .option {
@@ -288,7 +288,7 @@
     border-radius: 5px;
     border: 1.5px solid var(--border-strong);
     background: var(--surface);
-    color: #fff;
+    color: var(--on-accent);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -314,7 +314,7 @@
     position: fixed;
     inset: 0;
     z-index: 59;
-    background: rgba(20, 18, 15, 0.34);
+    background: var(--scrim);
 }
 
 .sheet {
@@ -327,7 +327,7 @@
     padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
     border: 1px solid var(--border-strong);
     border-radius: 20px 20px 0 0;
-    box-shadow: 0 -12px 40px rgba(20, 18, 15, 0.18);
+    box-shadow: 0 -12px 40px var(--shadow-soft);
     animation: sheetup 0.16s ease-out;
 }
 

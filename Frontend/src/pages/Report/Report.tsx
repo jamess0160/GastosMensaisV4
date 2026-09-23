@@ -19,6 +19,7 @@ import { IconCard, IconRepeat, IconTag, METHOD_ICON } from "@/ui/icons";
 import { Cell, CellAmount, Table, TableFoot, TableHead, TableRow, TypeTile } from "@/ui/table";
 import { CardList, ItemCard } from "@/ui/cardList";
 import { IconExport } from "@/app/icons";
+import { useTheme } from "@/app/theme";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import {
     legCompetence,
@@ -266,8 +267,18 @@ export function Report() {
     /* ── As três opções do ECharts ─────────────────────────────
        Elas leem os tokens do sistema em vez de trazer paleta própria:
        o canvas não enxerga `var(--ink-2)`, mas duplicar hexadecimal
-       criaria uma segunda paleta para envelhecer sozinha. */
-    const axis = { ink: token("--ink-2"), faint: token("--ink-3"), line: token("--border") };
+       criaria uma segunda paleta para envelhecer sozinha.
+
+       E é por isso que esta tela assina o tema: o `getComputedStyle`
+       acontece no RENDER, então trocar de tema só repinta eixo e
+       rótulo se o componente rerenderizar. A cor de CATEGORIA fica de
+       fora disso de propósito — ela identifica, e é a mesma nos dois
+       temas. */
+    const theme = useTheme().resolved;
+    const axis = useMemo(
+        () => ({ ink: token("--ink-2"), faint: token("--ink-3"), line: token("--border") }),
+        [theme],
+    );
 
     const lineOption = useMemo(
         () => ({

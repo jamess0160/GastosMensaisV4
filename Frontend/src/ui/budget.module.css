@@ -21,7 +21,7 @@
    trata como digno de virar bloco cheio, e não só uma barra vermelha. */
 .over {
     background: var(--brand);
-    color: #fff;
+    color: var(--on-accent);
     border-color: var(--brand);
 }
 
@@ -76,8 +76,8 @@
 }
 
 .chipOver {
-    background: rgba(255, 255, 255, 0.22);
-    color: #fff;
+    background: var(--on-accent-veil);
+    color: var(--on-accent);
 }
 
 .value {
@@ -130,7 +130,7 @@
 }
 
 .over .meter {
-    background: rgba(255, 255, 255, 0.28);
+    background: var(--on-accent-veil);
 }
 
 .fill {
@@ -146,7 +146,7 @@
 }
 
 .over .fill {
-    background: #fff;
+    background: var(--on-accent);
 }
 
 /* A marca do alerta é uma linha na régua: sem ela, "80%" é um número
@@ -161,7 +161,7 @@
 }
 
 .over .alertMark {
-    background: #fff;
+    background: var(--on-accent);
     opacity: 0.7;
 }
 

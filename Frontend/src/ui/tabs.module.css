@@ -47,7 +47,7 @@
 
 .active .count {
     background: var(--brand);
-    color: #fff;
+    color: var(--on-accent);
 }
 
 .active::after {

@@ -19,7 +19,7 @@
     height: calc(64px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     border-top: 1px solid var(--border);
-    background: rgba(246, 245, 242, 0.92);
+    background: var(--screen-translucent);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     display: none;
@@ -70,12 +70,12 @@
     border-radius: 26px;
     margin-top: -18px;
     background: var(--brand);
-    color: #fff;
+    color: var(--on-accent);
     border: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 10px 22px -4px rgba(255, 106, 0, 0.5);
+    box-shadow: 0 10px 22px -4px var(--glow-brand);
     flex-shrink: 0;
 }
 
@@ -105,7 +105,7 @@
     line-height: 1.4;
     box-shadow: var(--sh-raised);
     background: var(--fill);
-    color: #fff;
+    color: var(--on-fill);
 }
 
 .noteError {

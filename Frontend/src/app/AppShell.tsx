@@ -4,6 +4,7 @@ import styles from "./AppShell.module.css";
 import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { MonthProvider } from "./monthScope";
+import { ThemeProvider } from "./theme";
 import { TermsGate } from "./TermsGate";
 import { ScreenRoutes, useScreenLocation } from "./modalRoute";
 import { SessionProvider, useSessionQuery, useUnauthorizedRedirect } from "./session";
@@ -41,65 +42,73 @@ export function AppShell() {
 
     return (
         <SessionProvider user={session.data}>
-            <div className={styles.shell}>
-                <Sidebar />
-                <main className={styles.main}>
-                    {/* A faixa mora NO CHASSI e não numa tela: o estado do
-                        e-mail é informação da conta, e vale em qualquer
-                        lugar do app.
+            {/* O tema é do APARELHO, não da conta: ele já foi aplicado
+                no `<head>` por `public/theme.js`, antes do primeiro
+                pixel. O provedor aqui é quem o TROCA depois — e é
+                também o que faz o Relatório rerenderizar na troca, sem
+                o que os gráficos ficariam com os eixos do tema
+                anterior até a próxima navegação. */}
+            <ThemeProvider>
+                <div className={styles.shell}>
+                    <Sidebar />
+                    <main className={styles.main}>
+                        {/* A faixa mora NO CHASSI e não numa tela: o estado do
+                            e-mail é informação da conta, e vale em qualquer
+                            lugar do app.
 
-                        Ela não trava nada — nenhuma tela ganha bloqueio
-                        por e-mail não confirmado. Bloquear o login é o
-                        que custa cadastro, porque quem não recebe o
-                        e-mail fica do lado de fora dependendo de o
-                        reenvio funcionar. */}
-                    {session.data.EmailConfirmedAt === null && !dismissed && (
-                        <div className={styles.confirmBanner}>
-                            <span>
-                                Confirme o e-mail <b>{session.data.Email}</b> para garantir a
-                                recuperação de senha.
-                            </span>
-                            <span className={styles.confirmActions}>
-                                <Link to="/perfil" className={styles.confirmLink}>
-                                    Resolver no perfil
-                                </Link>
-                                <button
-                                    type="button"
-                                    className={styles.confirmDismiss}
-                                    onClick={() => setDismissed(true)}
-                                    aria-label="Dispensar aviso"
-                                >
-                                    Agora não
-                                </button>
-                            </span>
-                        </div>
-                    )}
+                            Ela não trava nada — nenhuma tela ganha bloqueio
+                            por e-mail não confirmado. Bloquear o login é o
+                            que custa cadastro, porque quem não recebe o
+                            e-mail fica do lado de fora dependendo de o
+                            reenvio funcionar. */}
+                        {session.data.EmailConfirmedAt === null && !dismissed && (
+                            <div className={styles.confirmBanner}>
+                                <span>
+                                    Confirme o e-mail <b>{session.data.Email}</b> para garantir a
+                                    recuperação de senha.
+                                </span>
+                                <span className={styles.confirmActions}>
+                                    <Link to="/perfil" className={styles.confirmLink}>
+                                        Resolver no perfil
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        className={styles.confirmDismiss}
+                                        onClick={() => setDismissed(true)}
+                                        aria-label="Dispensar aviso"
+                                    >
+                                        Agora não
+                                    </button>
+                                </span>
+                            </div>
+                        )}
 
-                    {/* O re-aceite dos termos, e ele é o OPOSTO da
-                        faixa acima: cobre o app inteiro e as saídas
-                        são duas — aceitar, ou sair da conta.
+                        {/* O re-aceite dos termos, e ele é o OPOSTO da
+                            faixa acima: cobre o app inteiro e as saídas
+                            são duas — aceitar, ou sair da conta.
 
-                        Ele vem ANTES do `MonthProvider` porque não é
-                        de uma tela nem de um mês: é a permissão de
-                        continuar prestando o serviço sob o texto novo.
-                        Em dia, não desenha nada. */}
-                    <TermsGate user={session.data} />
+                            Ele vem ANTES do `MonthProvider` porque não é
+                            de uma tela nem de um mês: é a permissão de
+                            continuar prestando o serviço sob o texto novo.
+                            Em dia, não desenha nada. */}
+                        <TermsGate user={session.data} />
 
-                    {/* O mês vive aqui e não dentro de cada tela: trocar
-                        de página não pode zerar o mês que se está
-                        olhando. */}
-                    <MonthProvider>
-                        {/* A tela, e depois o que estiver por cima
-                            dela: o `<Outlet />` aqui só desenha rota
-                            modal. Ver `modalRoute.tsx`. */}
-                        <ScreenRoutes at={screenAt} />
-                        <Outlet />
-                    </MonthProvider>
-                </main>
-                {/* Abaixo de 900px a sidebar sai e a barra inferior
-                    entra — as duas nunca aparecem juntas. */}
-                <TabBar />
-            </div>
+                        {/* O mês vive aqui e não dentro de cada tela: trocar
+                            de página não pode zerar o mês que se está
+                            olhando. */}
+                        <MonthProvider>
+                            {/* A tela, e depois o que estiver por cima
+                                dela: o `<Outlet />` aqui só desenha rota
+                                modal. Ver `modalRoute.tsx`. */}
+                            <ScreenRoutes at={screenAt} />
+                            <Outlet />
+                        </MonthProvider>
+                    </main>
+                    {/* Abaixo de 900px a sidebar sai e a barra inferior
+                        entra — as duas nunca aparecem juntas. */}
+                    <TabBar />
+                </div>
+            </ThemeProvider>
         </SessionProvider>
     );
 }

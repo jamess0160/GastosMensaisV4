@@ -307,7 +307,7 @@
 .alertSolid {
     background: var(--brand);
     border-color: transparent;
-    color: #fff;
+    color: var(--on-accent);
 }
 
 .alertIcon {
@@ -323,8 +323,8 @@
 }
 
 .alertSolid .alertIcon {
-    background: rgba(255, 255, 255, 0.2);
-    color: #fff;
+    background: var(--on-accent-veil);
+    color: var(--on-accent);
 }
 
 .alertIcon svg {
@@ -345,7 +345,7 @@
 }
 
 .alertSolid .alertText {
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--on-accent-2);
 }
 
 @media (max-width: 1240px) {

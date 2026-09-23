@@ -23,7 +23,7 @@
     height: 34px;
     border-radius: var(--r-sm);
     background: var(--brand);
-    color: #fff;
+    color: var(--on-accent);
     display: inline-flex;
     align-items: center;
     justify-content: center;

@@ -43,11 +43,11 @@
     border-radius: 10px;
     border: none;
     background: var(--brand);
-    color: #fff;
+    color: var(--on-accent);
     font-family: var(--font);
     font-size: 13px;
     font-weight: 700;
-    box-shadow: 0 7px 16px -5px rgba(255, 106, 0, 0.5);
+    box-shadow: 0 7px 16px -5px var(--glow-brand);
 }
 
 .panelCta:hover:not(:disabled) {

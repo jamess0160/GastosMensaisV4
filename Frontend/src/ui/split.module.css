@@ -170,7 +170,7 @@
     height: 16px;
     border-radius: 8px;
     background: var(--pos);
-    color: #fff;
+    color: var(--on-accent);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -318,7 +318,7 @@
 
 .tagRemove:hover {
     opacity: 1;
-    background: rgba(255, 106, 0, 0.15);
+    background: var(--brand-tint);
 }
 
 .tagRemove svg {
@@ -350,7 +350,7 @@
     background: var(--surface);
     border: 1px solid var(--border-strong);
     border-radius: 10px;
-    box-shadow: 0 12px 28px -10px rgba(20, 18, 15, 0.28);
+    box-shadow: 0 12px 28px -10px var(--shadow-medium);
     padding: 4px;
     max-height: 200px;
     overflow-y: auto;

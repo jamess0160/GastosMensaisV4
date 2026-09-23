@@ -16,7 +16,7 @@
     width: 600px;
     flex-shrink: 0;
     background: var(--brand);
-    color: #fff;
+    color: var(--on-accent);
     padding: 48px 56px;
     display: flex;
     flex-direction: column;
@@ -28,8 +28,8 @@
     position: absolute;
     inset: 0;
     background-image:
-        linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+        linear-gradient(var(--on-accent-hairline) 1px, transparent 1px),
+        linear-gradient(90deg, var(--on-accent-hairline) 1px, transparent 1px);
     background-size: 34px 34px;
 }
 
@@ -40,7 +40,7 @@
     width: 420px;
     height: 420px;
     border-radius: 50%;
-    background: radial-gradient(closest-side, rgba(255, 255, 255, 0.18), transparent 70%);
+    background: radial-gradient(closest-side, var(--on-accent-veil), transparent 70%);
 }
 
 .brandpane > *:not(.grid):not(.glow) {
@@ -57,7 +57,7 @@
     width: 46px;
     height: 46px;
     border-radius: 11px;
-    background: #fff;
+    background: var(--on-accent);
     object-fit: cover;
 }
 
@@ -79,7 +79,7 @@
 .bpDesc {
     margin-top: 20px;
     font-size: 14.5px;
-    color: rgba(255, 255, 255, 0.82);
+    color: var(--on-accent-2);
     line-height: 1.6;
     max-width: 450px;
 }
@@ -90,7 +90,7 @@
     align-items: center;
     gap: 12px;
     font-size: 12.5px;
-    color: rgba(255, 255, 255, 0.78);
+    color: var(--on-accent-2);
 }
 
 /* ── Painel do formulário ─────────────────────────────────── */
@@ -193,7 +193,7 @@
     height: 48px;
     border-radius: 12px;
     background: var(--brand);
-    color: #fff;
+    color: var(--on-accent);
     border: none;
     font-family: var(--font);
     font-size: 15px;
@@ -202,7 +202,7 @@
     align-items: center;
     justify-content: center;
     gap: 9px;
-    box-shadow: 0 10px 24px -6px rgba(255, 106, 0, 0.5);
+    box-shadow: 0 10px 24px -6px var(--glow-brand);
 }
 
 .cta:disabled {

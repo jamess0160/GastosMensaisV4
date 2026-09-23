@@ -5,6 +5,11 @@
    layout de origem — este arquivo e a transcricao dele.
    ════════════════════════════════════════════════════════════ */
 :root {
+    /* O navegador precisa saber em que tema esta para pintar o que NAO
+       e nosso: barra de rolagem, `input[type=date]`, autocomplete. Sem
+       isto, um calendario nativo branco abre sobre o app escuro. */
+    color-scheme: light;
+
     /* ── Marca ─────────────────────────────────────────────── */
     --brand: #ff6a00;
     --brand-press: #e85f00;
@@ -14,11 +19,19 @@
     /* ── Semanticas ────────────────────────────────────────── */
     --neg: #ff001a;
     --neg-soft: #ffe9eb;
+    /* O irmao de `--brand-press`: o vermelho pressionado. Estava
+       literal em quatro lugares (`overlay` e `Profile`), inclusive num
+       comentario que prometia que ele morava aqui. */
+    --neg-press: #e00017;
     --pos: #00dc8c;
     --pos-soft: #ddf8ee;
     --pos-ink: #009c63;
 
     /* ── Categorias ────────────────────────────────────────── */
+    /* NAO invertem no tema escuro. Elas IDENTIFICAM, nao decoram: o
+       verde de "Casa" precisa ser o mesmo verde nos dois temas, ou a
+       leitura do grafico muda quando o tema muda. O que muda em volta
+       delas e o fundo e o texto. */
     --cat-azul: #0084ff;
     --cat-roxo: #7238d7;
     --cat-amarelo: #f4d800;
@@ -42,6 +55,24 @@
     --fill: #2a2826;
     --fill-soft: #eae8e2;
 
+    /* ── Sobre preenchimento ───────────────────────────────── */
+    /* O texto e os desenhos que ficam EM CIMA de um preenchimento
+       cheio. Sao dois casos opostos, e e por isso que sao dois tokens:
+
+       `--on-accent` vai sobre marca, positivo e negativo — cores de
+       identidade, que nao invertem. Ele tambem nao inverte: branco
+       sobre laranja nos dois temas. As tres variantes com alfa sao o
+       mesmo branco rebaixado (texto secundario, veu de preenchimento e
+       fio de grade) dentro de um bloco de acento;
+
+       `--on-fill` vai sobre `--fill`, que e o neutro forte — quase
+       preto no claro, quase branco no escuro. Esse INVERTE junto. */
+    --on-accent: #ffffff;
+    --on-accent-2: rgba(255, 255, 255, 0.82);
+    --on-accent-veil: rgba(255, 255, 255, 0.22);
+    --on-accent-hairline: rgba(255, 255, 255, 0.06);
+    --on-fill: #ffffff;
+
     /* ── Tipografia ────────────────────────────────────────── */
     --font: "Inter", -apple-system, system-ui, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, monospace;
@@ -59,10 +90,32 @@
     --r-lg: 14px;
     --r-pill: 999px;
 
+    /* Cores de sombra, veu e brilho.
+     *
+     * Sao COR, e nao sombra inteira: a geometria (o deslocamento, o
+     * borrao, o espalhamento) e o que muda de um botao para outro e
+     * continua literal em cada folha. A cor e o que precisa trocar de
+     * tema — no escuro, uma sombra de 18% de preto sobre um fundo
+     * quase preto simplesmente nao existe. */
+    --scrim: rgba(20, 18, 15, 0.34);
+    --scrim-strong: rgba(20, 18, 15, 0.5);
+    --shadow-soft: rgba(20, 18, 15, 0.18);
+    --shadow-medium: rgba(20, 18, 15, 0.28);
+    --glow-brand: rgba(255, 106, 0, 0.5);
+    --glow-neg: rgba(255, 0, 26, 0.45);
+    /* O fio por dentro da amostra de cor do seletor de categoria: ele
+       existe para separar uma amostra clara de um fundo claro, entao
+       no escuro tem que virar claro, e nao sumir. */
+    --swatch-ring: rgba(0, 0, 0, 0.08);
+    /* `--screen` com alfa: a barra inferior deixa o conteudo passar
+       por baixo. Um literal aqui seria uma faixa clara boiando no app
+       escuro. */
+    --screen-translucent: rgba(246, 245, 242, 0.92);
+
     /* Sombras */
     --sh-hairline: 0 1px 2px rgba(0, 0, 0, 0.06);
     --sh-raised: 0 1px 3px rgba(0, 0, 0, 0.25);
-    --sh-brand: 0 5px 13px -3px rgba(255, 106, 0, 0.5);
+    --sh-brand: 0 5px 13px -3px var(--glow-brand);
     --sh-slideover: -16px 0 40px -8px rgba(20, 18, 15, 0.22);
     --sh-modal: 0 30px 80px rgba(20, 18, 15, 0.34);
     --ring-brand: 0 0 0 4px var(--brand-soft);
@@ -83,4 +136,105 @@
     --cat-palette-5: var(--cat-amarelo);
     --cat-palette-6: var(--cat-coral);
     --cat-palette-7: var(--cat-grafite);
+}
+
+/* ════════════════════════════════════════════════════════════
+   O TEMA ESCURO
+
+   Tres estados, e "sistema" e o padrao. A escolha e do APARELHO e mora
+   no `localStorage` (`gm.theme`, ver `src/app/theme.tsx`) — o celular
+   escuro a noite e o desktop claro no escritorio sao a mesma pessoa.
+
+   Os dois blocos abaixo dizem a MESMA coisa por dois caminhos, e os
+   dois precisam existir:
+
+     1. a media query, para quem nunca escolheu nada. O
+        `:not([data-theme="light"])` e o que deixa escolher CLARO num
+        sistema escuro: sem ele, a media query venceria a escolha;
+     2. o `[data-theme="dark"]`, para quem escolheu escuro num sistema
+        claro.
+
+   A escolha "sistema" nao carimba atributo nenhum — ela APAGA o
+   `data-theme`, e o caminho 1 volta a mandar.
+
+   MANTENHA AS DUAS LISTAS IGUAIS. So entram aqui os tokens que
+   MUDAM: marca e categorias nao estao, de proposito.
+   ════════════════════════════════════════════════════════════ */
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+
+        --brand-press: #ff8124;
+        --brand-soft: #3a2812;
+        --brand-tint: #4d3419;
+
+        --neg-soft: #3b1a1e;
+        --neg-press: #ff2d43;
+        --pos-soft: #11362b;
+        --pos-ink: #4ae0a4;
+
+        --page: #141312;
+        --screen: #1a1917;
+        --surface: #232120;
+        --surface-alt: #2a2826;
+        --border: #343231;
+        --border-strong: #47443f;
+        --border-dashed: #57534e;
+        --ink: #f2f0ed;
+        --ink-2: #a8a39d;
+        --ink-3: #8f8a84;
+        --fill: #e9e6e1;
+        --fill-soft: #302e2c;
+        --on-fill: #1b1b1b;
+
+        --screen-translucent: rgba(26, 25, 23, 0.92);
+        --swatch-ring: rgba(255, 255, 255, 0.16);
+        --scrim: rgba(0, 0, 0, 0.62);
+        --scrim-strong: rgba(0, 0, 0, 0.74);
+        --shadow-soft: rgba(0, 0, 0, 0.5);
+        --shadow-medium: rgba(0, 0, 0, 0.6);
+        --sh-hairline: 0 1px 2px rgba(0, 0, 0, 0.4);
+        --sh-raised: 0 1px 3px rgba(0, 0, 0, 0.6);
+        --sh-slideover: -16px 0 40px -8px rgba(0, 0, 0, 0.6);
+        --sh-modal: 0 30px 80px rgba(0, 0, 0, 0.7);
+    }
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --brand-press: #ff8124;
+    --brand-soft: #3a2812;
+    --brand-tint: #4d3419;
+
+    --neg-soft: #3b1a1e;
+    --neg-press: #ff2d43;
+    --pos-soft: #11362b;
+    --pos-ink: #4ae0a4;
+
+    --page: #141312;
+    --screen: #1a1917;
+    --surface: #232120;
+    --surface-alt: #2a2826;
+    --border: #343231;
+    --border-strong: #47443f;
+    --border-dashed: #57534e;
+    --ink: #f2f0ed;
+    --ink-2: #a8a39d;
+    --ink-3: #8f8a84;
+    --fill: #e9e6e1;
+    --fill-soft: #302e2c;
+    --on-fill: #1b1b1b;
+
+    --screen-translucent: rgba(26, 25, 23, 0.92);
+    --swatch-ring: rgba(255, 255, 255, 0.16);
+    --scrim: rgba(0, 0, 0, 0.62);
+    --scrim-strong: rgba(0, 0, 0, 0.74);
+    --shadow-soft: rgba(0, 0, 0, 0.5);
+    --shadow-medium: rgba(0, 0, 0, 0.6);
+    --sh-hairline: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --sh-raised: 0 1px 3px rgba(0, 0, 0, 0.6);
+    --sh-slideover: -16px 0 40px -8px rgba(0, 0, 0, 0.6);
+    --sh-modal: 0 30px 80px rgba(0, 0, 0, 0.7);
 }

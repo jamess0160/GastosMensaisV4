@@ -6,13 +6,31 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSession, sessionKeys } from "@/app/session";
 import { UsersAuthConnection } from "@/api/UsersAuth.connection";
 import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
-import { cx, FormError, FormField, FormGrid, Input, PasswordInput } from "@/ui/form";
+import {
+    cx,
+    FormError,
+    FormField,
+    FormGrid,
+    Input,
+    PasswordInput,
+    SegmentedControl,
+} from "@/ui/form";
+import { useTheme, type ThemeChoice } from "@/app/theme";
 import { IconFingerprint } from "@/ui/icons";
 import { ConfirmDialog, FooterSpacer, Modal } from "@/ui/overlay";
 import { EmptyState } from "@/ui/states";
 import { useCooldown } from "@/lib/cooldown";
 import { formatDateTime } from "@/lib/date";
 import { readDeviceKey } from "@/lib/deviceKey";
+
+/** Os três estados do tema, nesta ordem: o padrão no meio não teria
+ *  onde encaixar — "sistema" é o padrão E o que abre mão da escolha,
+ *  então ele abre a fila. */
+const THEME_OPTIONS: readonly { value: ThemeChoice; label: string }[] = [
+    { value: "system", label: "Sistema" },
+    { value: "light", label: "Claro" },
+    { value: "dark", label: "Escuro" },
+];
 
 const maskPhone = (digits: string): string => {
     const d = digits.slice(0, 11);
@@ -27,6 +45,7 @@ export function Profile() {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const deviceKey = readDeviceKey();
+    const theme = useTheme();
 
     const [form, setForm] = useState({
         name: user.Name,
@@ -387,6 +406,39 @@ export function Profile() {
                             )}
 
                             {done.passkey && <span className={styles.ok}>{done.passkey}</span>}
+                        </div>
+                    </Card>
+
+                    {/* ── Aparência ─────────────────────────────── */}
+                    {/* Fica ao lado da biometria porque as duas são do
+                        APARELHO, e não da conta: nenhuma das duas viaja
+                        para o outro aparelho de quem entra na mesma
+                        conta. O tema não custa coluna no banco nem rota
+                        — mora no `localStorage`, e é o certo: o celular
+                        escuro à noite e o desktop claro no escritório
+                        são a mesma pessoa. */}
+                    <Card>
+                        <div className={styles.section}>
+                            <div className={styles.sectionHead}>
+                                <div>
+                                    <div className={styles.sectionTitle}>Aparência</div>
+                                    <div className={styles.sectionSub}>
+                                        Vale neste aparelho. Em <strong>Sistema</strong>, o app
+                                        acompanha o que o aparelho estiver usando.
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Radiogroup, e não interruptor: "sistema"
+                                não é um meio-termo entre claro e escuro,
+                                é abrir mão da escolha. Um checkbox de
+                                dois estados não tem onde colocá-lo. */}
+                            <SegmentedControl
+                                ariaLabel="Tema"
+                                value={theme.choice}
+                                onChange={theme.setChoice}
+                                options={THEME_OPTIONS}
+                            />
                         </div>
                     </Card>
 

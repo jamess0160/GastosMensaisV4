@@ -94,7 +94,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-sm);
-    box-shadow: var(--sh-lg, 0 12px 32px rgb(0 0 0 / 14%));
+    box-shadow: 0 12px 32px -10px var(--shadow-medium);
     padding: 6px;
     display: flex;
     flex-direction: column;
@@ -247,7 +247,7 @@
     position: fixed;
     inset: 0;
     z-index: 40;
-    background: rgb(20 18 15 / 34%);
+    background: var(--scrim);
 }
 
 /* Mesma métrica do `.sheet` de `ui/overlay.module.css`: no telefone o

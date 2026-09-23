@@ -51,7 +51,7 @@
     composes: preset;
     background: var(--brand);
     border-color: var(--brand);
-    color: #fff;
+    color: var(--on-accent);
     font-weight: 700;
 }
 
@@ -110,7 +110,7 @@
 .switchOn {
     background: var(--surface);
     color: var(--ink);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--sh-hairline);
 }
 
 /* O painel do donut.

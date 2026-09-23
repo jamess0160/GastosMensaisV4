@@ -22,6 +22,21 @@
              estava nesta linha entregava o IP de todo visitante antes da tela de login,
              e a CSP de `deploy/nginx.conf` diz `font-src 'self'`. -->
         <title>Gastos mensais</title>
+
+        <!-- O TEMA, e ele vem antes do primeiro pixel.
+
+             Clássico e sem `defer` de propósito: o parser para aqui, o script carimba o
+             `data-theme` no `<html>` lendo o `localStorage`, e só então o corpo é
+             desenhado. Feito no React, isso aconteceria depois do primeiro quadro — e
+             quem escolheu escuro veria o app piscar branco em toda carga.
+
+             Por que é um arquivo e não um `<script>` escrito aqui dentro: a CSP diz
+             `script-src 'self'` sem `'unsafe-inline'`. Inline, ele funcionaria em
+             desenvolvimento e seria bloqueado em produção. O porquê inteiro está em
+             `public/theme.js`.
+
+             Depois daqui, quem manda no tema é `src/app/theme.tsx`. -->
+        <script src="/theme.js"></script>
     </head>
     <body>
         <div id="root"></div>
