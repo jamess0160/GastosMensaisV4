@@ -64,6 +64,36 @@ export function splitEvenly(total: ApiTypes.Money, parts: number): ApiTypes.Mone
     );
 }
 
+/** Reparte o que SOBRA entre as linhas, somando ao que cada uma já tem.
+ *
+ *  É a outra metade do `splitEvenly`, e a diferença é o que o gesto quer
+ *  dizer: "dividir igualmente" joga fora o que já estava escrito e reparte o
+ *  total; "distribuir o que sobra" preserva as fatias que o usuário já
+ *  decidiu e fecha a diferença. A primeira é o rateio do gasto, que nasce
+ *  vazio; a segunda é o do orçamento, em que sobrar é o estado normal.
+ *
+ *  O centavo da sobra cai na PRIMEIRA linha, porque é o `splitEvenly` que
+ *  reparte — a mesma regra da parcela na API. Depois disto a soma bate com o
+ *  total ao centavo, que é o que o botão promete.
+ *
+ *  Com sobra ZERO ou negativa devolve as linhas como estão: distribuir um
+ *  número negativo reduziria fatias que ninguém mandou reduzir, e podia
+ *  deixá-las abaixo de zero — o que a API recusa. Quem estourou o total
+ *  conserta tirando de onde quer. */
+export function distributeRemainder(
+    values: readonly (ApiTypes.Money | null)[],
+    total: ApiTypes.Money,
+): ApiTypes.Money[] {
+    const current = values.map((value) => value ?? 0);
+    const remainder = splitRemainder(current, total);
+
+    if (values.length === 0 || remainder <= 0) return current;
+
+    const parts = splitEvenly(remainder, values.length);
+
+    return current.map((value, index) => fromCents(toCents(value) + toCents(parts[index])));
+}
+
 /** Converte o texto de um input de moeda em número. Aceita "1.234,56". */
 export function parseMoneyInput(input: string): ApiTypes.Money | null {
     const normalized = input.trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");

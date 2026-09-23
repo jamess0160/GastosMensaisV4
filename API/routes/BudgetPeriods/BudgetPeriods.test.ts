@@ -998,6 +998,293 @@ describe("BudgetPeriods", () => {
         })
     })
 
+    //  **O rateio do mês inteiro numa escrita só** — o gesto da tela do orçamento.
+    //
+    //  O que este describe trava é a diferença entre esta rota e as outras três: o corpo é o mês
+    //  DEPOIS da escrita, e não um lote de criações. A linha que sumiu da lista é apagada
+    //  (fisicamente, como o DELETE de uma linha só), a que ficou é atualizada NO LUGAR — mesmo
+    //  IdBudgetPeriod —, e a que mudou de alvo não é caso à parte: ela é uma remoção mais uma
+    //  inserção, porque a identidade de uma fatia é o alvo e não o id.
+    describe("POST /BudgetPeriods/allocate", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().post(`/BudgetPeriods/allocate`, { ReferenceMonth: "2026-08", Lines: [] })
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).post(`/BudgetPeriods/allocate`, { ReferenceMonth: "2026-08", Lines: [] })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Ratear é escrever, e viewer não escreve
+        it("recusa o viewer", async () => {
+            let workspace = await buildWorkspace()
+            let viewerClient = await buildViewerClient(workspace)
+
+            let response = await viewerClient.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [{ IdCategory: workspace.IdCategory, LimitValue: 800 }],
+            })
+
+            expect(response.status).toBe(403)
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(0)
+        })
+
+        it("recusa mês fora do formato YYYY-MM", async () => {
+            let workspace = await buildWorkspace()
+
+            expect((await workspace.client.post(`/BudgetPeriods/allocate`, { ReferenceMonth: "2026-08-01", Lines: [] })).status).toBe(406)
+            expect((await workspace.client.post(`/BudgetPeriods/allocate`, { Lines: [] })).status).toBe(406)
+        })
+
+        //  **A linha sem alvo nenhum é 406, e o mês não é tocado.** Um valor que não diz do que é
+        //  não soma contra coisa nenhuma — e o CHECK do banco garantiria o mesmo, mas como 500.
+        it("recusa a linha sem alvo nenhum, sem escrever o resto da lista", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [
+                    { IdCategory: workspace.IdCategory, LimitValue: 800 },
+                    { LimitValue: 200 },
+                ],
+            })
+
+            expect(response.status).toBe(406)
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(0)
+        })
+
+        //  O Joi valida item a item e não enxerga o conjunto: sem a conferência da section, a
+        //  segunda linha do mesmo alvo estouraria o índice parcial como 500 — ou sobrescreveria
+        //  a primeira calada, gravando um rateio diferente do que a tela mostrava.
+        it("recusa duas linhas para o mesmo alvo", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [
+                    { IdCategory: workspace.IdCategory, LimitValue: 800 },
+                    { IdCategory: workspace.IdCategory, LimitValue: 200 },
+                ],
+            })
+
+            expect(response.status).toBe(406)
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(0)
+        })
+
+        //  **"Mercado" e "Maria em Mercado" NÃO são o mesmo alvo**, e as duas convivem no mesmo
+        //  mês: a segunda não é um teto dentro da primeira — elas somam lado a lado.
+        it("aceita a categoria pura e o alvo duplo da mesma categoria na mesma lista", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            let response = await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [
+                    { IdCategory: workspace.IdCategory, LimitValue: 800 },
+                    { IdCategory: workspace.IdCategory, IdPerson, LimitValue: 200 },
+                ],
+            })
+
+            expect(response.status).toBe(200)
+            expect(response.body.IdBudgetPeriods).toHaveLength(2)
+        })
+
+        //  Os dois ids chegam do cliente e são sequenciais: o de outro tenant é 406, e o
+        //  arquivado cai no mesmo lugar — orçar quem sumiu do rateio é orçar o que nada alimenta
+        it("recusa o alvo de outro workspace e o alvo arquivado", async () => {
+            let workspace = await buildWorkspace()
+            let neighbour = await buildWorkspace()
+            let archived = await createCategory(workspace, "Lazer")
+
+            await workspace.client.delete(`/Categories/IdCategory=${archived}`)
+
+            expect((await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [{ IdCategory: neighbour.IdCategory, LimitValue: 800 }],
+            })).status).toBe(406)
+
+            expect((await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [{ IdCategory: archived, LimitValue: 800 }],
+            })).status).toBe(406)
+
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(0)
+        })
+
+        //  O caso de aceite: o mês vazio recebe o rateio inteiro, com os três formatos de alvo
+        it("grava o rateio de um mês vazio, na ordem do corpo", async () => {
+            let workspace = await buildWorkspace()
+            let luana = await createPerson(workspace, "Luana")
+            let tiago = await createPerson(workspace, "Tiago")
+            let alimentacao = await createCategory(workspace, "Alimentação")
+
+            let response = await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [
+                    { IdPerson: luana, LimitValue: 250 },
+                    { IdPerson: tiago, IdCategory: alimentacao, LimitValue: 250, AlertPercent: 60 },
+                    { IdCategory: workspace.IdCategory, LimitValue: 500 },
+                ],
+            })
+
+            expect(response.status).toBe(200)
+            expect(response.body.IdBudgetPeriods).toHaveLength(3)
+
+            let august = await readMonth(workspace, "2026-08")
+
+            expect(august.Periods.map((period: any) => ({
+                IdCategory: period.IdCategory,
+                IdPerson: period.IdPerson,
+                LimitValue: period.LimitValue,
+                AlertPercent: period.AlertPercent,
+                ReferenceMonth: period.ReferenceMonth,
+                Status: period.Status,
+            }))).toEqual([
+                { IdCategory: null, IdPerson: luana, LimitValue: 250, AlertPercent: 80, ReferenceMonth: "2026-08-01", Status: "open" },
+                { IdCategory: alimentacao, IdPerson: tiago, LimitValue: 250, AlertPercent: 60, ReferenceMonth: "2026-08-01", Status: "open" },
+                { IdCategory: workspace.IdCategory, IdPerson: null, LimitValue: 500, AlertPercent: 80, ReferenceMonth: "2026-08-01", Status: "open" },
+            ])
+        })
+
+        //  **Realocar SUBSTITUI o mês**, e cada linha sabe o que lhe cabe: a que ficou é
+        //  atualizada no lugar — mesmo IdBudgetPeriod, mesmo CreatedAt —, a que sumiu da lista é
+        //  apagada fisicamente, e a nova é inserida.
+        it("substitui o mês: atualiza a que ficou, apaga a que sumiu e insere a nova", async () => {
+            let workspace = await buildWorkspace()
+            let lazer = await createCategory(workspace, "Lazer")
+            let casa = await createCategory(workspace, "Casa")
+
+            let mercado = await createPeriod(workspace, { LimitValue: 800 })
+            let removido = await createPeriod(workspace, { IdCategory: lazer, LimitValue: 100 })
+
+            let response = await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [
+                    { IdCategory: workspace.IdCategory, LimitValue: 600 },
+                    { IdCategory: casa, LimitValue: 300 },
+                ],
+            })
+
+            expect(response.status).toBe(200)
+
+            let august = await readMonth(workspace, "2026-08")
+
+            //  A linha que ficou conservou o id: trocar 800 por 600 em "Mercado" não é uma fatia
+            //  nova, e a identidade dela é o alvo
+            expect(response.body.IdBudgetPeriods[0]).toBe(mercado.IdBudgetPeriod)
+            expect(august.Periods.map((period: any) => period.LimitValue)).toEqual([600, 300])
+
+            //  Delete FÍSICO, como o DELETE de uma linha só: a fatia é plano, não lançamento
+            expect(await findPeriodById(removido.IdBudgetPeriod)).toBeUndefined()
+        })
+
+        //  **Mudar de alvo não é um caso à parte**: é a remoção do alvo antigo mais a inserção
+        //  do novo, que é exatamente o que o PUT já obriga ao recusar alvo no corpo.
+        it("trata a linha que mudou de alvo como remoção mais inserção", async () => {
+            let workspace = await buildWorkspace()
+            let lazer = await createCategory(workspace, "Lazer")
+
+            let antigo = await createPeriod(workspace, { LimitValue: 800 })
+
+            let response = await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [{ IdCategory: lazer, LimitValue: 800 }],
+            })
+
+            expect(response.status).toBe(200)
+            expect(response.body.IdBudgetPeriods[0]).not.toBe(antigo.IdBudgetPeriod)
+            expect(await findPeriodById(antigo.IdBudgetPeriod)).toBeUndefined()
+            expect((await readMonth(workspace, "2026-08")).Periods.map((period: any) => period.IdCategory)).toEqual([lazer])
+        })
+
+        //  **A lista vazia é legítima**, ao contrário do lote da Renda: é o usuário apagando
+        //  todas as linhas e salvando — "este mês não tem orçamento" é uma resposta.
+        it("aceita a lista vazia e limpa o mês", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { LimitValue: 800 })
+
+            let response = await workspace.client.post(`/BudgetPeriods/allocate`, { ReferenceMonth: "2026-08", Lines: [] })
+
+            expect(response.status).toBe(200)
+            expect(response.body.IdBudgetPeriods).toEqual([])
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(0)
+        })
+
+        //  **A fatia de alvo arquivado sobrevive ao rateio**, e tem que sobreviver: o GET não a
+        //  devolve — sem nome e sem cor não há o que mostrar —, então ela nunca esteve na tela e
+        //  o cliente não tem como reenviá-la. Apagá-la aqui seria perder, calada, uma linha que
+        //  ninguém viu.
+        it("não apaga a fatia cujo alvo foi arquivado", async () => {
+            let workspace = await buildWorkspace()
+            let lazer = await createCategory(workspace, "Lazer")
+
+            let escondida = await createPeriod(workspace, { IdCategory: lazer, LimitValue: 100 })
+            await workspace.client.delete(`/Categories/IdCategory=${lazer}`)
+
+            let response = await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [{ IdCategory: workspace.IdCategory, LimitValue: 800 }],
+            })
+
+            expect(response.status).toBe(200)
+            expect(await findPeriodById(escondida.IdBudgetPeriod)).toMatchObject({ LimitValue: 100 })
+            //  E ela continua invisível: o mês da tela é só a linha que o rateio escreveu
+            expect((await readMonth(workspace, "2026-08")).Periods.map((period: any) => period.LimitValue)).toEqual([800])
+        })
+
+        //  **403 e não 406**, como as outras escritas da feature: o workspace e o papel estão
+        //  certos, o que falta é o mês estar aberto — e nada é escrito
+        it("recusa o mês fechado, sem escrever linha nenhuma", async () => {
+            let workspace = await buildWorkspace()
+
+            let period = await createPeriod(workspace, { LimitValue: 800 })
+            await closeMonth(workspace, "2026-08-01")
+
+            let response = await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [{ IdCategory: workspace.IdCategory, LimitValue: 600 }],
+            })
+
+            expect(response.status).toBe(403)
+            expect((await findPeriodById(period.IdBudgetPeriod)).LimitValue).toBe(800)
+        })
+
+        //  **O rateio do orçamento NÃO precisa fechar**, ao contrário dos dois eixos do gasto:
+        //  esta rota não lê a renda do mês para responder, então nem sobrar nem estourar é
+        //  recusa. Quem avisa do estouro é a tela.
+        it("não confere a soma contra coisa nenhuma", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-08",
+                Lines: [{ IdCategory: workspace.IdCategory, LimitValue: 999999.99 }],
+            })
+
+            expect(response.status).toBe(200)
+        })
+
+        //  Qualquer mês é rateável: nada nasce de rotina, então outubro em setembro é só esta
+        //  chamada
+        it("rateia um mês futuro sem tocar no corrente", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+
+            expect((await workspace.client.post(`/BudgetPeriods/allocate`, {
+                ReferenceMonth: "2026-12",
+                Lines: [{ IdCategory: workspace.IdCategory, LimitValue: 300 }],
+            })).status).toBe(200)
+
+            expect((await readMonth(workspace, "2026-08")).Periods.map((period: any) => period.LimitValue)).toEqual([800])
+            expect((await readMonth(workspace, "2026-12")).Periods.map((period: any) => period.LimitValue)).toEqual([300])
+        })
+    })
+
     describe("PUT /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", () => {
 
         it("recusa sem token", async () => {

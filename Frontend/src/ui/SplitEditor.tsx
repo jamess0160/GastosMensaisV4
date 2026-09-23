@@ -5,6 +5,7 @@ import { Button } from "./primitives";
 import { IconCheck, IconClose, IconPlus } from "./icons";
 import { Select } from "./select";
 import {
+    distributeRemainder,
     formatAmount,
     formatMoney,
     parseMoneyInput,
@@ -27,11 +28,42 @@ import type { ApiTypes } from "@/types/api";
    Todo rateio é por VALOR ABSOLUTO, nunca porcentagem, e a soma tem
    que bater em centavos: quem não fecha aqui leva 406 na certa. Por
    isso `closes` sai daqui para o botão de salvar.
+
+   ⚠️ SÓ QUE ISSO VALE PARA O GASTO, E NÃO PARA TODO RATEIO. O terceiro
+   consumidor deste componente é o ORÇAMENTO, em que o rateio reparte a
+   RENDA do mês — e lá sobrar é legítimo e comum: o que não foi alocado
+   é, literalmente, o que ainda não foi orçado. A API do orçamento nem
+   lê a renda para responder, e o que a tela sinaliza é o ESTOURO,
+   quando a soma passa do que entrou.
+
+   As duas regras não podem ser a mesma, então o que as separa é o
+   parâmetro `closure`, explícito e com o padrão no lado do gasto:
+
+       "strict" (padrão)  falta é erro, e o botão de salvar espera o
+                          rateio fechar — 406 na certa se não fechar
+       "loose"            falta é informação ("sobra R$ X a
+                          distribuir"), e só o estouro vira alerta
+
+   Ele muda mais uma coisa, e pelo mesmo motivo: o botão de repartir.
+   No gasto é "dividir igualmente", que joga fora o que estava escrito
+   e reparte o total, porque o rateio nasce vazio; no orçamento é
+   "distribuir o que sobra igualmente", que PRESERVA as fatias já
+   decididas e fecha a diferença. Um parâmetro só para as duas
+   diferenças porque elas são a mesma diferença.
    ════════════════════════════════════════════════════════════ */
+
+/** Quem tem que fechar com o total e quem não tem. Ver o cabeçalho. */
+export type SplitClosure = "strict" | "loose";
 
 export interface SplitLine {
     /** `IdPaymentMethod` ou `IdPerson`, conforme o eixo. */
     id: number | null;
+    /** **O SEGUNDO alvo da linha, e só o orçamento tem um.** Lá a fatia é
+     *  "Luana", "Mercado" ou "Luana em Mercado": um PAR de alvos, com pelo
+     *  menos um preenchido. Nos dois eixos do gasto ele não existe — a linha
+     *  aponta para uma forma de pagamento OU para uma pessoa, nunca para as
+     *  duas —, e é por isso que ele é opcional e ninguém mais o escreve. */
+    secondaryId?: number | null;
     value: ApiTypes.Money | null;
     /** Só no eixo financeiro: o débito já sai pago no ato. */
     paid?: boolean;
@@ -81,6 +113,8 @@ export function SplitEditor({
     label,
     hint,
     options,
+    secondaryOptions,
+    secondaryLabel = "Categoria",
     lines,
     onChange,
     total,
@@ -89,10 +123,18 @@ export function SplitEditor({
     withPaid = false,
     required = false,
     disabled = false,
+    closure = "strict",
+    rowExtra,
 }: {
     label: string;
     hint?: string;
     options: readonly SplitOption[];
+    /** **O segundo seletor da linha — só o orçamento passa um.** Com ele a
+     *  linha vira um PAR de alvos, dos quais basta UM estar preenchido para
+     *  a linha existir; sem ele nada muda, e o alvo continua sendo o único
+     *  `id`. Ver `SplitLine.secondaryId`. */
+    secondaryOptions?: readonly SplitOption[];
+    secondaryLabel?: string;
     lines: SplitLine[];
     onChange: (lines: SplitLine[]) => void;
     total: ApiTypes.Money | null;
@@ -103,14 +145,33 @@ export function SplitEditor({
     /** `Payments` é obrigatório (mín. 1); `Persons` é opcional. */
     required?: boolean;
     disabled?: boolean;
+    /** **A soma precisa bater com o total?** Ver o cabeçalho: nos dois
+     *  eixos do gasto sim, e não bater é 406; no orçamento não, porque
+     *  o que sobra é o que ainda não foi orçado. Padrão `"strict"` —
+     *  quem chama para o gasto não passa nada e nada muda. */
+    closure?: SplitClosure;
+    /** O que desenhar DEPOIS do valor, na mesma linha: no orçamento é o
+     *  comprometido da fatia com a régua. Uma função do índice porque só
+     *  quem chama sabe o que aquela linha é. */
+    rowExtra?: (index: number, line: SplitLine) => ReactNode;
 }) {
     // O texto digitado fica cru enquanto o campo está em foco: formatar
     // a cada tecla faria o cursor pular no meio do número.
     const [drafts, setDrafts] = useState<Record<number, string>>({});
 
-    const usable = usableLines(lines);
-    const values = usable.map((line) => line.value);
-    const closes = splitIsClosed(lines, total);
+    /* **A linha existe quando tem ALVO e valor** — e com o segundo eixo
+       ligado, "ter alvo" é ter QUALQUER um dos dois. É a única conta que
+       não passa pelo `usableLines` exportado, e de propósito: aquele é
+       lido pelas sections do gasto, que tipam `line.id` como número
+       depois de filtrar. Sem o segundo eixo as duas respostas são
+       idênticas — nenhuma linha de gasto escreve `secondaryId`. */
+    const hasTarget = (line: SplitLine) =>
+        line.id !== null || (secondaryOptions !== undefined && (line.secondaryId ?? null) !== null);
+
+    const usable = lines.filter((line) => hasTarget(line) && line.value !== null);
+    const values = usable.map((line) => line.value as ApiTypes.Money);
+    const closes =
+        total !== null && total !== 0 && usable.length > 0 && splitClosesTotal(values, total);
     const remainder = total === null ? 0 : splitRemainder(values, total);
     /* "Falta" e "passou" trocam de lado quando o total é negativo: num
        estorno de −150, faltar é o que sobra do lado de baixo de zero. É
@@ -126,8 +187,19 @@ export function SplitEditor({
     const distribute = () => {
         if (total === null || lines.length === 0) return;
         // O centavo que sobra vai na PRIMEIRA linha — a mesma regra que
-        // a API usa no parcelamento.
-        const parts = splitEvenly(total, lines.length);
+        // a API usa no parcelamento, nos dois casos.
+        //
+        // O que muda entre eles é o que acontece com o que já estava
+        // escrito: no gasto o rateio nasce vazio e repartir o total é o
+        // gesto certo; no orçamento as fatias são decisões que alguém
+        // tomou, e o botão só fecha a diferença. Ver o cabeçalho.
+        const parts =
+            closure === "loose"
+                ? distributeRemainder(
+                      lines.map((line) => line.value),
+                      total,
+                  )
+                : splitEvenly(total, lines.length);
         setDrafts({});
         onChange(lines.map((line, index) => ({ ...line, value: parts[index] })));
     };
@@ -172,6 +244,33 @@ export function SplitEditor({
                             />
                         </span>
 
+                        {/* O segundo alvo, quando existe: a fatia do
+                            orçamento é "Luana", "Mercado" ou "Luana em
+                            Mercado", e os dois seletores aceitam ficar
+                            vazios — o que não pode é os dois. Quem barra a
+                            linha sem alvo nenhum é a section antes de
+                            salvar, e a API depois dela. */}
+                        {secondaryOptions && (
+                            <span className={styles.selectWrap}>
+                                <Select
+                                    variant="compact"
+                                    value={line.secondaryId ?? null}
+                                    disabled={disabled}
+                                    ariaLabel={secondaryLabel}
+                                    placeholder={`${secondaryLabel}…`}
+                                    options={secondaryOptions.map((option) => ({
+                                        value: option.id,
+                                        label: option.group
+                                            ? `${option.group} · ${option.label}`
+                                            : option.label,
+                                        icon: option.icon,
+                                        color: option.color,
+                                    }))}
+                                    onChange={(secondaryId) => patch(index, { secondaryId })}
+                                />
+                            </span>
+                        )}
+
                         <span className={styles.amount}>
                             <span className={styles.amountPrefix}>R$</span>
                             <input
@@ -200,6 +299,8 @@ export function SplitEditor({
                                 }
                             />
                         </span>
+
+                        {rowExtra?.(index, line)}
 
                         {withPaid && optionOf(line.id)?.acceptsPaid !== false && (
                             <label className={styles.paidToggle}>
@@ -242,10 +343,20 @@ export function SplitEditor({
                 </Button>
                 <Button
                     size="sm"
-                    disabled={disabled || total === null || lines.length === 0}
+                    disabled={
+                        disabled ||
+                        total === null ||
+                        lines.length === 0 ||
+                        // No orçamento o botão fecha a diferença: sem
+                        // diferença ele não tem o que fazer, e um botão
+                        // que não muda nada é pior do que um desligado.
+                        (closure === "loose" && remainder <= 0)
+                    }
                     onClick={distribute}
                 >
-                    Dividir igualmente
+                    {closure === "loose"
+                        ? "Distribuir o que sobra igualmente"
+                        : "Dividir igualmente"}
                 </Button>
             </div>
 
@@ -253,19 +364,35 @@ export function SplitEditor({
                 mostrar "faltam R$ x" ali seria cobrar um rateio que a API
                 não exige. */}
             {!(empty && !required) && (
-                <div className={cx(styles.status, closes ? styles.closed : styles.open)}>
+                <div
+                    className={cx(
+                        styles.status,
+                        /* No rateio frouxo o que pinta de alerta é SÓ o
+                           estouro: sobrar não é um erro a consertar, é o
+                           que ainda não foi orçado. */
+                        closes || (closure === "loose" && missing > 0)
+                            ? styles.closed
+                            : styles.open,
+                    )}
+                >
                     <span className={styles.statusLeft}>
                         {closes ? (
                             <>
                                 <span className={styles.check}>
                                     <IconCheck />
                                 </span>
-                                Rateio fecha com o total
+                                {closure === "loose"
+                                    ? "Tudo distribuído"
+                                    : "Rateio fecha com o total"}
                             </>
                         ) : total === null ? (
                             "Informe o valor total primeiro"
                         ) : missing > 0 ? (
-                            "Ainda falta distribuir"
+                            closure === "loose" ? (
+                                "Ainda sobra para distribuir"
+                            ) : (
+                                "Ainda falta distribuir"
+                            )
                         ) : (
                             "Passou do total"
                         )}

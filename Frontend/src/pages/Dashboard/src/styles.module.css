@@ -294,15 +294,6 @@
     padding: 8px 0 4px;
 }
 
-.notice {
-    padding: 10px 14px;
-    border-radius: 10px;
-    background: var(--pos-soft);
-    color: var(--pos-ink);
-    font-size: 12.5px;
-    font-weight: 600;
-}
-
 .alert {
     display: flex;
     align-items: flex-start;
@@ -424,12 +415,44 @@
     padding: 10px 12px;
 }
 
-/* As DUAS saídas do mês vazio — clonar o anterior e montar do zero.
-   `wrap` porque o rótulo do clonar carrega o mês e a contagem, e em
-   390px os dois botões não cabem na mesma linha. */
-.emptyActions {
+/* **O fora do orçamento** — o `Unbudgeted` do mês. Ele é um BOTÃO, e
+   não uma linha de texto, porque o próximo passo de quem o lê é ir ver
+   de que gastos ele é feito. Tom de alerta porque ele só aparece quando
+   é maior que zero. */
+.unbudgeted {
+    margin-top: 12px;
+    width: 100%;
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--brand-soft);
+    border: 1px solid var(--brand-tint);
+    color: var(--brand);
+    font-family: var(--font);
+    cursor: pointer;
+    text-align: left;
+}
+
+.unbudgetedLabel {
+    display: inline-flex;
+    align-items: center;
     gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+}
+
+.unbudgetedLabel svg {
+    width: 15px;
+    height: 15px;
+}
+
+.unbudgetedValue {
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }

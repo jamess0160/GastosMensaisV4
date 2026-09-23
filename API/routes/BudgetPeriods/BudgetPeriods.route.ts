@@ -21,8 +21,8 @@ export const BudgetPeriods_route = express()
 //
 //  **O que sobrou da máquina do mês é o `ClosedAt`.** `CloseBudgetMonth` continua sendo a única
 //  coisa que sabe que um mês acabou, e o carimbo dela ganhou um segundo uso: mês fechado recusa
-//  escrita nas três rotas abaixo. É a trava que impede reescrever a história de agosto em
-//  novembro.
+//  escrita em toda rota de escrita abaixo. É a trava que impede reescrever a história de agosto
+//  em novembro.
 //
 //  Orçamento é **só de gasto**: entrada não tem categoria.
 
@@ -36,6 +36,19 @@ BudgetPeriods_route.get("/BudgetPeriods", BudgetPeriods_schema.getByMonth, Async
 
 //  Uma fatia nova no mês. Uma escrita só — não há mais definição para resolver antes.
 BudgetPeriods_route.post("/BudgetPeriods", BudgetPeriods_schema.create, AsyncHandler(BudgetPeriods_controller.create))
+
+//  **O rateio do mês inteiro numa escrita só**: `{ ReferenceMonth, Lines }`.
+//
+//  É o gesto da tela do orçamento — repartir o que entrou, mexendo em várias linhas e salvando
+//  UMA vez. O corpo é o mês **depois** da escrita, não um lote de criações: o que está no banco
+//  e não está na lista é apagado (fisicamente, como o DELETE de uma linha só), o que está nos
+//  dois é atualizado no lugar, e o que só está na lista é inserido — tudo numa transaction.
+//
+//  Nenhuma linha carrega `IdBudgetPeriod`, porque a identidade de uma fatia é o **alvo**; é a
+//  mesma regra que faz o PUT recusar alvo no corpo. E o rateio **não precisa fechar** contra a
+//  renda: sobrar é o normal, estourar é decisão de quem orça, e quem avisa é a tela. Ver
+//  sections/POST/allocate.ts, inclusive para o que acontece com a fatia de alvo arquivado.
+BudgetPeriods_route.post("/BudgetPeriods/allocate", BudgetPeriods_schema.allocate, AsyncHandler(BudgetPeriods_controller.allocate))
 
 //  **Repete a repartição de um mês no outro**: `{ From, To }`, os dois "YYYY-MM".
 //

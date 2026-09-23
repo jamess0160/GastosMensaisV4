@@ -23,6 +23,7 @@ const AddExpense = lazy(() =>
     import("@/pages/AddExpense/AddExpense").then((m) => ({ default: m.AddExpense })),
 );
 const Income = lazy(() => import("@/pages/Income/Income").then((m) => ({ default: m.Income })));
+const Budget = lazy(() => import("@/pages/Budget/Budget").then((m) => ({ default: m.Budget })));
 const Accounts = lazy(() =>
     import("@/pages/Accounts/Accounts").then((m) => ({ default: m.Accounts })),
 );
@@ -52,13 +53,21 @@ export interface ScreenRoute {
     element: ReactNode;
 }
 
-/** As 10 telas do chassi — as 8 do layout menos o login, mais o perfil,
- *  o espaço, o extrato e a fatura, que a API pede e o layout não
- *  desenha. */
+/** As 11 telas do chassi — as 8 do layout menos o login, mais o perfil,
+ *  o espaço, o extrato, a fatura e o orçamento, que a API pede e o
+ *  layout não desenha. */
 export const SHELL_SCREENS: ScreenRoute[] = [
     { index: true, element: load(<Dashboard />) },
     { path: "gastos", element: load(<Expenses />) },
     { path: "renda", element: load(<Income />) },
+    /* O ORÇAMENTO é uma tela sua desde a leva 9, e não mais o painel do
+       Início: repartir a renda do mês é um rateio inteiro — a renda no
+       topo, uma linha por fatia com dois seletores e um valor, o botão
+       de distribuir o que sobra e o "fora do orçamento" no fim —, e
+       dentro do Início isso empurraria para baixo os indicadores e as
+       três quebras. A divisão entre as duas é a que Contas tem com o
+       Extrato: lá se olha, aqui se decide. */
+    { path: "orcamento", element: load(<Budget />) },
     { path: "contas", element: load(<Accounts />) },
     /* O extrato é filho de Contas na URL porque é filho dela no
        produto: ele decompõe o saldo que aquela tela mostra somado, e o

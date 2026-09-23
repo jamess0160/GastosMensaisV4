@@ -1,0 +1,245 @@
+/* A tela de Orçamento não existe no layout — o que o layout desenha é o
+   BLOCO do Dashboard, com os cartões de teto. O que se reaproveita são
+   as medidas da folha compartilhada (o card, o KPI e a régua), para ela
+   não parecer de outro produto; o resto sai da forma da tela, que é um
+   rateio: renda no topo, linhas no meio, o que sobrou no fim. */
+
+/* ── A renda do mês ───────────────────────────────────────── */
+.income {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.incomeRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 28px;
+}
+
+.incomeItem {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 120px;
+}
+
+.incomeLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.incomeValue {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* O total é o número contra o qual o rateio se mede: ele fecha a linha
+   e vem destacado por isso, não por ser maior. */
+.incomeTotal {
+    margin-left: auto;
+    text-align: right;
+}
+
+.incomeTotal .incomeValue {
+    color: var(--brand);
+}
+
+.allocation {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Só o ESTOURO vira alerta. Sobrar é o estado normal de quem ainda não
+   terminou de repartir — pintar de vermelho o mês inteiro por isso
+   ensinaria que a tela está sempre errada. */
+.allocationOver {
+    background: var(--neg-soft);
+    border-color: var(--neg-soft);
+    color: var(--neg);
+}
+
+.incomeNote {
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-3);
+}
+
+/* ── O painel das fatias ──────────────────────────────────── */
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.emptyActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+/* O comprometido ao lado do valor da linha: o número e a régua, na
+   mesma medida da quebra por categoria do Início. */
+.rowSpent {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 110px;
+    flex-shrink: 0;
+}
+
+.rowSpentValue {
+    font-size: 11px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Mês fechado ──────────────────────────────────────────── */
+.closed {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: var(--r-md);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+}
+
+.closedIcon {
+    display: inline-flex;
+    color: var(--ink-2);
+}
+
+.closedIcon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.closedTitle {
+    font-size: 13.5px;
+    font-weight: 700;
+}
+
+.closedText {
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-2);
+}
+
+.readOnly {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.readOnlyRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+}
+
+.readOnlyName {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.readOnlyValue {
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Fora do orçamento ────────────────────────────────────── */
+.unbudgeted {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Maior que zero é o que a tela precisa acusar: é dinheiro que saiu e
+   não está em fatia nenhuma. Zero é o caso normal e fica em tom neutro. */
+.unbudgetedAlert {
+    border-color: var(--brand-tint);
+    background: var(--brand-soft);
+}
+
+.unbudgetedTop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.unbudgetedLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.unbudgetedIcon {
+    display: inline-flex;
+    color: var(--brand);
+}
+
+.unbudgetedIcon svg {
+    width: 15px;
+    height: 15px;
+}
+
+.unbudgetedValue {
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.unbudgetedText {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-2);
+}
+
+.unbudgetedAction {
+    display: flex;
+}
+
+@media (max-width: 720px) {
+    .incomeTotal {
+        margin-left: 0;
+        text-align: left;
+    }
+
+    /* A régua ao lado do valor não cabe em 390px junto dos dois
+       seletores: no telefone ela vira uma linha inteira debaixo deles. */
+    .rowSpent {
+        width: 100%;
+    }
+}

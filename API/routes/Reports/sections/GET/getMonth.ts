@@ -101,6 +101,13 @@ export class GetMonth {
             OpeningBalance,
             InitialBalances,
             Inflows: totals.Inflows,
+            //  **A renda do mês aberta pelo estado**, que é como a tela do orçamento abre:
+            //  "entrou X, a receber Y, total Z". Os três saem da mesma consulta, com o mesmo
+            //  filtro de transferência e de cancelada — refazer a divisão no cliente seria
+            //  refazer essas duas regras junto, que é o problema que esta feature existe para
+            //  não ter. Os dois fecham com o `Inflows`, por construção.
+            InflowsReceived: totals.InflowsReceived,
+            InflowsPending: totals.InflowsPending,
             Expenses: totals.Expenses,
             PastCommitments: totals.PastCommitments,
             OverdueReceivable: totals.OverdueReceivable,

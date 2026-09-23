@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    distributeRemainder,
     formatMoney,
     parseMoneyInput,
     splitClosesTotal,
@@ -104,5 +105,39 @@ describe("parseMoneyInput", () => {
 
     it("recusa string vazia", () => {
         expect(parseMoneyInput("   ")).toBeNull();
+    });
+});
+
+describe("distributeRemainder", () => {
+    // O gesto do orçamento: as fatias que o usuário já decidiu ficam de
+    // pé, e o botão fecha a diferença — ao contrário de "dividir
+    // igualmente", que joga fora o que estava escrito.
+    it("soma o que sobra ao que cada linha já tem", () => {
+        expect(distributeRemainder([1000, 500], 2000)).toEqual([1250, 750]);
+    });
+
+    it("fecha a diferença ao centavo, com a sobra na primeira linha", () => {
+        const values = distributeRemainder([100, 100, 100], 1000);
+
+        expect(values).toEqual([333.34, 333.33, 333.33]);
+        expect(splitClosesTotal(values, 1000)).toBe(true);
+    });
+
+    it("trata a linha vazia como zero", () => {
+        expect(distributeRemainder([null, null], 500)).toEqual([250, 250]);
+    });
+
+    // Distribuir uma sobra negativa reduziria fatias que ninguém mandou
+    // reduzir, e podia deixá-las abaixo de zero — que a API recusa.
+    it("não mexe em nada quando já passou do total", () => {
+        expect(distributeRemainder([800, 800], 1000)).toEqual([800, 800]);
+    });
+
+    it("não mexe em nada quando o rateio já fecha", () => {
+        expect(distributeRemainder([600, 400], 1000)).toEqual([600, 400]);
+    });
+
+    it("devolve lista vazia sem estourar", () => {
+        expect(distributeRemainder([], 1000)).toEqual([]);
     });
 });

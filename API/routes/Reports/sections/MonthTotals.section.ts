@@ -28,8 +28,9 @@ class Controller {
      * @param NextMonth primeiro dia do mês seguinte — limite exclusivo, corte meio aberto
      */
     public async run(IdWorkspace: number, ReferenceMonth: string, NextMonth: string) {
-        let [Inflows, Expenses, PastCommitments, OverdueReceivable, OverduePayable, OpenInvoices] = await Promise.all([
+        let [Inflows, InflowsReceived, Expenses, PastCommitments, OverdueReceivable, OverduePayable, OpenInvoices] = await Promise.all([
             this.sumInflows(IdWorkspace, ReferenceMonth, NextMonth),
+            this.sumInflows(IdWorkspace, ReferenceMonth, NextMonth, "received"),
             this.sumExpenses(IdWorkspace, ReferenceMonth, NextMonth),
             this.sumPastCommitments(IdWorkspace, ReferenceMonth),
             this.sumOverdueReceivable(IdWorkspace, ReferenceMonth),
@@ -37,21 +38,44 @@ class Controller {
             this.sumOpenInvoices(IdWorkspace, NextMonth),
         ])
 
-        return { Inflows, Expenses, PastCommitments, OverdueReceivable, OverduePayable, OpenInvoices }
+        return {
+            Inflows,
+            //  **A mesma soma, recortada pelo estado** — e a subtração fica aqui, não na tela.
+            //  A tela do orçamento abre pela renda ("entrou X, a receber Y, total Z"), e o par
+            //  recebido/pendente é a quarta forma de somar entrada deste arquivo: quem o
+            //  refizer no cliente refaz junto o filtro de transferência e o de cancelada, que
+            //  são justamente as duas regras que fazem o mesmo dinheiro ser contado duas vezes.
+            //  `InflowsPending` é a diferença, e não uma terceira consulta: `Status` só tem
+            //  três valores e a cancelada já saiu das duas.
+            InflowsReceived,
+            InflowsPending: Math.round((Inflows - InflowsReceived) * 100) / 100,
+            Expenses,
+            PastCommitments,
+            OverdueReceivable,
+            OverduePayable,
+            OpenInvoices,
+        }
     }
 
     //  **Quanto entrou no mês — e aqui a transferência NÃO conta.** É a regra oposta à do
     //  saldo da conta, que soma as duas pontas: mover 500 da corrente para a poupança não é
     //  patrimônio novo, e sem este filtro o mesmo dinheiro entraria de novo a cada movimento.
-    private sumInflows(IdWorkspace: number, ReferenceMonth: string, NextMonth: string) {
-        return this.total(KnexConnection
+    //  `Status` recorta a MESMA soma, e é por isso que ele é um parâmetro e não uma segunda
+    //  consulta copiada: o filtro de transferência e o de cancelada valem igual para o total e
+    //  para o recortado, e duas cópias divergem no dia em que uma das duas regras mudar.
+    private sumInflows(IdWorkspace: number, ReferenceMonth: string, NextMonth: string, Status?: "received" | "pending") {
+        let query = KnexConnection
             .sum({ Total: "TotalValue" })
             .from("Inflows")
             .where("IdWorkspace", IdWorkspace)
             .whereNot("Kind", "transfer")
             .whereNot("Status", "canceled")
             .where("CompetenceDate", ">=", ReferenceMonth)
-            .where("CompetenceDate", "<", NextMonth))
+            .where("CompetenceDate", "<", NextMonth)
+
+        if (Status) query.where("Status", Status)
+
+        return this.total(query)
     }
 
     //  **A perna, nunca o TotalValue da compra.** É o que faz o indicador funcionar com

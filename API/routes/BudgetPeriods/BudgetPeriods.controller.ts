@@ -1,5 +1,6 @@
 import { Request, Response } from "express"
 import { GetByMonth } from "./sections/GET/getByMonth"
+import { Allocate } from "./sections/POST/allocate"
 import { Clone } from "./sections/POST/clone"
 import { Create } from "./sections/POST/create"
 import { Remove } from "./sections/DELETE/remove"
@@ -13,6 +14,10 @@ class Controller {
 
     create = async (req: Request, res: Response) => {
         res.json(await new Create().run(res.locals.IdWorkspace, res.locals.IdUser, req.body))
+    }
+
+    allocate = async (req: Request, res: Response) => {
+        res.json(await new Allocate().run(res.locals.IdWorkspace, res.locals.IdUser, req.body))
     }
 
     clone = async (req: Request, res: Response) => {

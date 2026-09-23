@@ -289,6 +289,23 @@ export const budgetTargetName = (period: ApiTypes.BudgetPeriod): string =>
         .filter((part): part is string => part !== null)
         .join(" · ");
 
+/** **Os três números que descrevem uma fatia**, e nada além deles.
+ *
+ *  As três funções abaixo pediam uma `BudgetPeriod` inteira e usavam só
+ *  isto. A tela do Orçamento edita LINHAS — uma fatia que o usuário está
+ *  mexendo e ainda não salvou não tem id, nem alvo resolvido, nem
+ *  `ReferenceMonth` —, e é o mesmo estado que a régua dela precisa
+ *  desenhar. Pedir a linha inteira obrigaria a tela a inventar um período
+ *  de mentira a cada tecla, só para perguntar se já estourou. */
+export interface BudgetNumbers {
+    LimitValue: ApiTypes.Money;
+    /** O comprometido, que vem da API e NÃO se recalcula aqui. Numa linha
+     *  recém-criada é zero: nada foi gasto contra um alvo que ainda não
+     *  existe no mês. */
+    Spent: ApiTypes.Money;
+    AlertPercent: number;
+}
+
 /** Estado de um teto de orçamento. A API devolve `LimitValue`, `Spent` e
  *  `AlertPercent`; COMPARAR É TRABALHO DA TELA — é isto.
  *
@@ -296,7 +313,7 @@ export const budgetTargetName = (period: ApiTypes.BudgetPeriod): string =>
  *  `ok` sozinho, e é a leitura certa: não se estourou nada. */
 export type BudgetState = "ok" | "alert" | "over";
 
-export function budgetState(period: ApiTypes.BudgetPeriod): BudgetState {
+export function budgetState(period: BudgetNumbers): BudgetState {
     if (period.Spent > period.LimitValue) return "over";
     if (period.LimitValue > 0 && (period.Spent / period.LimitValue) * 100 >= period.AlertPercent) {
         return "alert";
@@ -309,9 +326,9 @@ export function budgetState(period: ApiTypes.BudgetPeriod): BudgetState {
  *  Passa de 100 sem problema — o estouro é informação, não erro, e quem
  *  apara na régua é a barra. Abaixo de zero, não: um mês em que os
  *  estornos superam as compras consumiu **0%** do teto, e não −12%. */
-export const budgetPercent = (period: ApiTypes.BudgetPeriod): number =>
+export const budgetPercent = (period: BudgetNumbers): number =>
     period.LimitValue > 0 ? Math.max(0, (period.Spent / period.LimitValue) * 100) : 0;
 
 /** O que sobra do teto. Negativo é estouro. */
-export const budgetRemaining = (period: ApiTypes.BudgetPeriod): ApiTypes.Money =>
+export const budgetRemaining = (period: BudgetNumbers): ApiTypes.Money =>
     fromCents(toCents(period.LimitValue) - toCents(period.Spent));

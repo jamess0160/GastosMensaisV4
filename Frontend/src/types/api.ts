@@ -1072,6 +1072,43 @@ export namespace ApiTypes {
         AlertPercent?: number;
     }
 
+    /** Uma linha do rateio do mês, como a tela do Orçamento a manda.
+     *
+     *  **Sem `IdBudgetPeriod`, de propósito**: a identidade de uma fatia é o
+     *  ALVO, não o id — a mesma regra que faz o PUT recusar alvo no corpo.
+     *  Mover uma fatia de lugar é apagar esta e cadastrar outra. */
+    export type BudgetAllocationLine =
+        | { IdCategory: number; IdPerson?: number; LimitValue: Money; AlertPercent?: number }
+        | { IdPerson: number; IdCategory?: number; LimitValue: Money; AlertPercent?: number };
+
+    /** **O rateio do mês inteiro numa escrita só** — o gesto da tela do
+     *  Orçamento: mexer em cinco linhas e salvar UMA vez.
+     *
+     *  A lista não é um lote de criações: ela é **o mês depois da escrita**.
+     *  O que está no banco e não está aqui é apagado (fisicamente, como o
+     *  DELETE de uma linha só), o que está nos dois é atualizado no lugar, e
+     *  o que só está aqui é inserido — tudo numa transaction, então ou o mês
+     *  fica como a tela mostra, ou não muda nada.
+     *
+     *  **O rateio NÃO precisa fechar contra a renda**, ao contrário dos dois
+     *  eixos do gasto: sobrar é o normal (é o que ainda não foi orçado) e
+     *  estourar é decisão de quem orça. A API nem lê a renda para responder —
+     *  quem avisa do estouro é a tela.
+     *
+     *  Duas recusas são só desta rota: **duas linhas para o mesmo alvo** é
+     *  406 (some os valores numa linha só), e a linha **sem alvo nenhum**
+     *  também. Mês FECHADO recusa com 403, antes de escrever uma linha.
+     *
+     *  A fatia cujo alvo foi ARQUIVADO sobrevive: o `GET` não a devolve, então
+     *  ela nunca esteve na tela e o cliente não tem como reenviá-la — apagá-la
+     *  seria perder calada uma linha que ninguém viu. */
+    export interface BudgetMonthAllocateBody {
+        ReferenceMonth: ReferenceMonth;
+        /** **Vazia é legítima** e quer dizer "este mês não tem orçamento": é o
+         *  usuário apagando todas as linhas e salvando. */
+        Lines: BudgetAllocationLine[];
+    }
+
     /** Repetir a repartição de um mês no outro: dois meses "YYYY-MM", e
      *  nada mais.
      *
@@ -1139,6 +1176,14 @@ export namespace ApiTypes {
          *  caixa — e é por isso que o rótulo da tela não diz
          *  "Recebido". */
         Inflows: Money;
+        /** **A mesma renda aberta pelo ESTADO** — "entrou" e "a receber", que é como a tela do
+         *  Orçamento abre: `InflowsReceived + InflowsPending === Inflows`, por construção.
+         *
+         *  Os dois saem da mesma consulta que o total, com o mesmo filtro de transferência e de
+         *  cancelada. Refazer a divisão no cliente seria refazer essas duas regras junto — e são
+         *  justamente elas que, replicadas, fazem o mesmo dinheiro ser contado duas vezes. */
+        InflowsReceived: Money;
+        InflowsPending: Money;
         /** Pernas com competência no mês, pendentes **e** pagas. */
         Expenses: Money;
         /** O atrasado, e ele entra no `Available` dos dois lados: uma

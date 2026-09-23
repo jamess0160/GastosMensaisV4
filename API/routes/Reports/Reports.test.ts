@@ -81,6 +81,8 @@ describe("Reports", () => {
                 OpeningBalance: 1000,
                 InitialBalances: 0,
                 Inflows: 0,
+                InflowsReceived: 0,
+                InflowsPending: 0,
                 Expenses: 0,
                 PastCommitments: 0,
                 OverdueReceivable: 0,
@@ -107,8 +109,42 @@ describe("Reports", () => {
 
             expect(response.body.OpeningBalance).toBe(1500)
             expect(response.body.Inflows).toBe(3000)
+            //  Recebida em agosto, prevista em setembro: o recorte por estado é do MÊS pedido
+            expect(response.body.InflowsReceived).toBe(0)
+            expect(response.body.InflowsPending).toBe(3000)
             //  1500 que já estavam + 3000 do mês: **4500, não 3000**
             expect(response.body.Available).toBe(4500)
+        })
+
+        //  **A renda do mês aberta pelo estado** — "entrou X, a receber Y, total Z", que é como
+        //  a tela do orçamento abre. Os três saem da MESMA consulta, com o mesmo filtro de
+        //  transferência e de cancelada: refazer a divisão no cliente seria refazer essas duas
+        //  regras junto, e é exatamente o que esta feature existe para não ter.
+        it("abre a renda do mês em recebida e a receber, e as duas fecham com o total", async () => {
+            let workspace = await buildWorkspace()
+
+            await receive(workspace, await createInflow(workspace, { TotalValue: 3200, CompetenceDate: "2026-09-05" }))
+            await createInflow(workspace, { TotalValue: 1800, CompetenceDate: "2026-09-20" })
+
+            //  Transferência não é renda nova, e cancelada não é renda nenhuma: nem uma nem
+            //  outra pode aparecer em qualquer um dos três números
+            let second = await workspace.client.post(`/Accounts`, { Name: "Poupança", InitialBalance: 0 })
+
+            await workspace.client.post(`/Inflows`, {
+                Description: "Entre contas",
+                TotalValue: 900,
+                Kind: "transfer",
+                IdFromAccount: workspace.IdAccount,
+                IdToAccount: second.body.IdAccount,
+                CompetenceDate: "2026-09-10",
+            })
+            await workspace.client.delete(`/Inflows/IdInflow=${await createInflow(workspace, { TotalValue: 400 })}`)
+
+            let response = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-09`)
+
+            expect(response.body.InflowsReceived).toBe(3200)
+            expect(response.body.InflowsPending).toBe(1800)
+            expect(response.body.Inflows).toBe(5000)
         })
 
         //  **O mesmo erro um mês antes, e este estava em produção.** O front grava o
@@ -956,6 +992,10 @@ describe("Reports", () => {
                 //  em todos os meses, e não fluxo de nenhum
                 InitialBalances: 0,
                 Inflows: 3000,
+                //  O salário de setembro ainda não chegou: o total do mês é tudo "a receber",
+                //  e é essa a abertura da tela do orçamento
+                InflowsReceived: 0,
+                InflowsPending: 3000,
                 Expenses: 500,
                 //  Cartão 'invoice' e tudo em setembro: competência e caixa coincidem, então
                 //  não há nada pesando antes e saindo depois

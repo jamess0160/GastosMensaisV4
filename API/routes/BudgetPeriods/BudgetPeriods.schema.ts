@@ -94,6 +94,37 @@ class Schema {
         })),
     ]
 
+    //  **O rateio do mês inteiro numa escrita só** — o gesto da tela do orçamento.
+    //
+    //  O corpo é o mês DEPOIS da escrita, e não um lote de criações: ver
+    //  sections/POST/allocate.ts. Nenhuma linha carrega `IdBudgetPeriod`, porque a identidade
+    //  de uma fatia é o alvo — a mesma regra que faz o PUT recusar alvo no corpo.
+    public readonly allocate = [
+        joiController.validateBody(Joi.object({
+            ReferenceMonth: referenceMonth.required(),
+            //  **Lista vazia é aceita**, ao contrário do `min(1)` do lote da Renda: aqui ela
+            //  quer dizer "este mês não tem orçamento", que é o usuário apagando todas as
+            //  linhas e salvando. Lá a lista vazia não tinha o que significar.
+            Lines: Joi.array().items(Joi.object({
+                IdCategory: Joi.number().optional(),
+                IdPerson: Joi.number().optional(),
+                //  positive, como no POST de uma linha só: valor zero é não ter a fatia, e isso
+                //  se faz tirando a linha da lista.
+                LimitValue: Joi.number().precision(2).positive().required(),
+                AlertPercent: Joi.number().integer().min(1).max(100).optional(),
+                //  Mesmo `or` do POST: pelo menos um alvo, possivelmente os dois. O alvo
+                //  repetido DENTRO da lista é 406 também, mas quem confere é a section — o Joi
+                //  valida item a item e não enxerga o conjunto.
+            }).or("IdCategory", "IdPerson")).required(),
+        })),
+        joiController.validateResponse(Joi.object({
+            msg: Joi.string().required(),
+            //  A mesma forma do `clone`: os ids do mês depois da escrita, na ordem em que o
+            //  corpo os mandou — que é a ordem da tela.
+            IdBudgetPeriods: Joi.array().items(Joi.number()).required(),
+        })),
+    ]
+
     public readonly update = [
         joiController.validateParams(Joi.object({
             IdBudgetPeriod: Joi.number().required(),

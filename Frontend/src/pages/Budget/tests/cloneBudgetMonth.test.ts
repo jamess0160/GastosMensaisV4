@@ -2,7 +2,7 @@ import { HttpResponse, http as msw } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { server } from "@/test/server";
 import { cloneBudgetMonth, previousMonth } from "../sections/cloneBudgetMonth";
-import { fakeDashboardContext } from "./context";
+import { fakeBudgetContext } from "./context";
 
 describe("previousMonth", () => {
     it("volta um mês", () => {
@@ -27,7 +27,7 @@ describe("cloneBudgetMonth", () => {
             }),
         );
 
-        await cloneBudgetMonth(fakeDashboardContext(), "2026-10");
+        await cloneBudgetMonth(fakeBudgetContext());
 
         // Dois meses e nada mais: não é o lote da Renda, porque as regras
         // do que vem e do que não vem são do servidor.
@@ -42,7 +42,7 @@ describe("cloneBudgetMonth", () => {
             ),
         );
 
-        await cloneBudgetMonth(fakeDashboardContext({ finishSubmit }), "2026-10");
+        await cloneBudgetMonth(fakeBudgetContext({ finishSubmit }));
 
         expect(finishSubmit).toHaveBeenCalledWith("3 fatias trazidas de Setembro · 2026.");
     });
@@ -55,7 +55,7 @@ describe("cloneBudgetMonth", () => {
             ),
         );
 
-        await cloneBudgetMonth(fakeDashboardContext({ finishSubmit }), "2026-10");
+        await cloneBudgetMonth(fakeBudgetContext({ finishSubmit }));
 
         expect(finishSubmit).toHaveBeenCalledWith("1 fatia trazida de Setembro · 2026.");
     });
@@ -72,7 +72,7 @@ describe("cloneBudgetMonth", () => {
             ),
         );
 
-        await cloneBudgetMonth(fakeDashboardContext({ finishSubmit, failSubmit }), "2026-10");
+        await cloneBudgetMonth(fakeBudgetContext({ finishSubmit, failSubmit }));
 
         expect(failSubmit).not.toHaveBeenCalled();
         expect(finishSubmit).toHaveBeenCalledWith(
@@ -94,7 +94,7 @@ describe("cloneBudgetMonth", () => {
             ),
         );
 
-        await cloneBudgetMonth(fakeDashboardContext({ failSubmit }), "2026-10");
+        await cloneBudgetMonth(fakeBudgetContext({ failSubmit }));
 
         expect(failSubmit).toHaveBeenCalledWith(
             "Este mês já foi fechado e não aceita mais alterações no orçamento.",

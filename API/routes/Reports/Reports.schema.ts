@@ -30,6 +30,13 @@ class Schema {
             InitialBalances: Joi.number().required(),
             /** Entradas com competência no mês, pendentes e recebidas, sem transferência */
             Inflows: Joi.number().required(),
+            /**
+             * O mesmo total recortado pelo estado — "entrou" e "a receber", que é como a tela
+             * do orçamento abre. Os dois somam exatamente o `Inflows`: saem da mesma consulta,
+             * com o mesmo filtro de transferência e de cancelada.
+             */
+            InflowsReceived: Joi.number().required(),
+            InflowsPending: Joi.number().required(),
             /** Pernas com competência no mês, pendentes e pagas */
             Expenses: Joi.number().required(),
             /**

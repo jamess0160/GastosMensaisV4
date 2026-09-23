@@ -1,26 +1,14 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./src/styles.module.css";
-import { DashboardController, type BudgetDraft, type DashboardContext } from "./controller";
-import { previousMonth } from "./sections/cloneBudgetMonth";
 import { useMonthScope } from "@/app/monthScope";
 import { useOpenModal } from "@/app/modalRoute";
 import { useSession } from "@/app/session";
-import {
-    useCategories,
-    useCategoryIndex,
-    usePaymentMethodIndex,
-    usePersonIndex,
-    usePersons,
-} from "@/data/catalogs";
-import { useInvalidateMovement, useMonthBudgets, useMonthLegs, useMonthReport } from "@/data/month";
+import { useCategoryIndex, usePaymentMethodIndex, usePersonIndex } from "@/data/catalogs";
+import { useMonthBudgets, useMonthLegs, useMonthReport } from "@/data/month";
 import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { HideOnMobile, Topbar } from "@/ui/topbar";
 import { BreakdownRow, BudgetBar, DeltaPill, KpiCard, ProgressMeter } from "@/ui/budget";
-import { FormError, FormField, FormGrid, Input, MoneyInput, SegmentedControl } from "@/ui/form";
-import { Select } from "@/ui/select";
-import { CategoryIcon } from "@/ui/iconCatalog";
-import { ConfirmDialog, FooterSpacer, Modal } from "@/ui/overlay";
 import { IconAlert, IconArrowDown, IconArrowUp, IconPlus } from "@/ui/icons";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import {
@@ -35,18 +23,20 @@ import {
 } from "@/lib/aggregate";
 import { accentColor, categoryColor, paletteColor } from "@/lib/categoryColor";
 import { formatMoney, fromCents, toCents } from "@/lib/money";
-import { formatMonthLabel, formatMonthShort } from "@/lib/date";
+import { formatMonthLabel } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
-const newBudgetDraft = (month: string): BudgetDraft => ({
-    IdBudgetPeriod: null,
-    Scope: "category",
-    IdCategory: null,
-    IdPerson: null,
-    ReferenceMonth: month,
-    LimitValue: null,
-    AlertPercent: 80,
-});
+/* ⚠️ O INÍCIO NÃO ESCREVE ORÇAMENTO, e desde a leva 9 não tem mais como.
+   O formulário de teto que morava aqui — com o seu modal, o seu seletor
+   de alvo e o seu confirm de remoção — foi absorvido pela tela do
+   Orçamento (`/orcamento`), porque o gesto que o produto pedia não é
+   "cadastrar um teto por vez": é repartir a renda do mês num rateio, que
+   é uma tela inteira. O que ficou aqui é a LEITURA, que é o que um
+   painel de início faz — a mesma divisão que Contas tem com o Extrato.
+
+   Com ela foram as três sections da página, e o Início voltou a ser uma
+   tela sem evento de negócio nenhum: não há `controller.tsx`, porque não
+   há o que ele declararia. */
 
 /** Um dos três painéis de quebra do layout: título, total e as linhas
  *  em ordem decrescente. A porcentagem é sobre o TOTAL do painel, que é
@@ -97,11 +87,6 @@ export function Dashboard() {
     const navigate = useNavigate();
 
     const [month, setMonth] = useMonthScope();
-    const [budgetDraft, setBudgetDraft] = useState<BudgetDraft | null>(null);
-    const [removing, setRemoving] = useState<number | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [notice, setNotice] = useState<string | null>(null);
-    const [pending, setPending] = useState(false);
 
     const {
         legs,
@@ -114,52 +99,18 @@ export function Dashboard() {
        para somar dois números que agora vêm prontos. */
     const report = useMonthReport(month);
     const budgets = useMonthBudgets(month);
-    /* O mês ANTERIOR, lido só para o estado vazio: é ele que diz quantas
-       fatias o botão de clonar vai trazer, e um botão que não diz o
-       tamanho do que faz é um botão que ninguém clica.
-
-       `enabled` gateado pelo mês da tela estar vazio — a leitura não
-       interessa em mês nenhum montado, e sem o gate seria uma requisição
-       a mais em toda visita ao Início. A chave de cache é a mesma de
-       sempre, então navegar para o mês anterior reaproveita a resposta. */
-    const previous = previousMonth(month);
-    const previousBudgets = useMonthBudgets(
-        previous,
-        !budgets.isPending && (budgets.data?.Periods.length ?? 0) === 0,
-    );
+    /* A leitura do mês ANTERIOR saiu daqui junto com o botão de clonar:
+       ela existia para dizer quantas fatias a cópia traria, e quem monta
+       um mês agora está na tela do Orçamento. Uma requisição a menos em
+       toda visita ao Início. */
     /* `useAccounts` continua sendo lido nesta tela — por dentro de
        `usePaymentMethodIndex`, que é quem dá nome à fatia "Por forma de
        pagamento". O que saiu foi a leitura DIRETA, que existia só para
        somar o `totalBalance`: esse número agora é o `CurrentBalance` da
        rota. Mesma chave de cache, nenhuma requisição a mais. */
-    const categories = useCategories();
     const categoryIndex = useCategoryIndex();
-    const persons = usePersons();
     const personIndex = usePersonIndex();
     const methodIndex = usePaymentMethodIndex();
-    const invalidateMovement = useInvalidateMovement();
-
-    const context = useMemo<DashboardContext>(
-        () => ({
-            budgetDraft,
-            beginSubmit() {
-                setPending(true);
-                setError(null);
-                setNotice(null);
-            },
-            failSubmit(message) {
-                setPending(false);
-                setError(message);
-            },
-            finishSubmit(message) {
-                setPending(false);
-                setNotice(message);
-                invalidateMovement();
-            },
-            closeBudgetForm: () => setBudgetDraft(null),
-        }),
-        [budgetDraft, invalidateMovement],
-    );
 
     /* ── Os números do mês, e todos vêm da rota ──────────────
        Nenhum deles se soma aqui — nem para conferir. As quatro regras
@@ -193,34 +144,18 @@ export function Dashboard() {
     const fixed = totalSpent(legsOfKind(legs, "fixed"));
     const installments = totalSpent(legsOfKind(legs, "installment"));
 
-    /* A rota passou a responder um ENVELOPE por causa do `Unbudgeted` —
-       o gasto do mês que não casou com fatia nenhuma. Aqui ele ainda não
-       é mostrado: a tela do orçamento é reescrita na etapa 12, e é lá que
-       ele ganha lugar. Ler só `Periods` é o mínimo para esta tela
-       continuar de pé. */
+    /* **A resposta é um ENVELOPE, e as duas metades entram na tela.**
+       `Periods` são as fatias; `Unbudgeted` é o gasto do mês que não
+       casou com nenhuma delas — e ele existe porque o casamento é
+       estrito: cada porção de gasto consome uma fatia ou NENHUMA. Sem
+       mostrá-lo, o gasto que não achou fatia simplesmente não apareceria
+       em lugar nenhum, e a regra viraria um sumiço silencioso de
+       dinheiro. Com ele fecha a conta que o usuário confere sozinho:
+       soma dos `Spent` + `Unbudgeted` = o gasto do mês. */
     const periods = budgets.data?.Periods ?? [];
-    /* Quantas fatias o botão de clonar vai trazer. É o mês anterior
-       INTEIRO: o que o servidor vai descartar por alvo arquivado ele não
-       conta aqui, e é a `msg` da resposta que dá o número final. Zero (ou
-       ainda carregando) esconde o botão — oferecer "clonar 0" é oferecer
-       um clique que não faz nada. */
-    const previousCount = previousBudgets.data?.Periods.length ?? 0;
+    const unbudgeted = budgets.data?.Unbudgeted ?? 0;
     const overBudget = periods.filter((period) => budgetState(period) === "over");
     const alerting = periods.filter((period) => budgetState(period) === "alert");
-    const activeCategories = (categories.data ?? []).filter((category) => category.Active);
-    const activePersons = (persons.data ?? []).filter((person) => person.Active);
-    /* Só existe UMA fatia por alvo em cada mês: repetir o alvo INTEIRO é
-       406. Os dois conjuntos são separados porque categoria 4 e pessoa 4
-       não são o mesmo alvo — e as fatias de alvo DUPLO ficam de fora dos
-       dois de propósito: "Luana em Mercado" não ocupa nem "Mercado" nem
-       "Luana", as três convivem. O formulário ainda monta um alvo por
-       vez; a tela é reescrita na etapa 12. */
-    const budgetedCategories = new Set(
-        periods.filter((period) => period.IdPerson === null).map((period) => period.IdCategory),
-    );
-    const budgetedPersons = new Set(
-        periods.filter((period) => period.IdCategory === null).map((period) => period.IdPerson),
-    );
     const hasPersonBudget = periods.some((period) => period.IdPerson !== null);
 
     /* A régua do cartão principal. Com teto cadastrado ela mede o
@@ -267,9 +202,6 @@ export function Dashboard() {
 
             <Page>
                 <PageHead title={`Início - ${formatMonthLabel(month)}`} />
-
-                {notice && <div className={styles.notice}>{notice}</div>}
-                <FormError>{error}</FormError>
 
                 {/* ── Faixa principal ──────────────────────────── */}
                 <div className={styles.hero}>
@@ -433,13 +365,12 @@ export function Dashboard() {
                                     )} disponíveis no total`}
                             </div>
                         </div>
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => setBudgetDraft(newBudgetDraft(month))}
-                        >
-                            <IconPlus />
-                            Adicionar orçamento
+                        {/* O Início não escreve orçamento: quem reparte
+                            a renda do mês é a tela do Orçamento, e o
+                            botão leva para lá com o mesmo mês na mão —
+                            o seletor do chassi é o mesmo nas duas. */}
+                        <Button variant="primary" size="sm" onClick={() => navigate("/orcamento")}>
+                            Abrir o orçamento
                         </Button>
                     </div>
 
@@ -486,88 +417,41 @@ export function Dashboard() {
                             onRetry={() => void budgets.refetch()}
                         />
                     ) : periods.length === 0 ? (
-                        /* ── O mês vazio e as suas DUAS saídas ──────────
+                        /* ── O mês vazio, e a saída é UMA: a tela do
+                              Orçamento.
+
                            Desde a leva 9 nada se materializa sozinho, e é
                            isso que faz outubro ser montável em setembro. O
-                           preço é que o mês novo nasce vazio, e é AQUI que
-                           ele se paga ou não: clonar o mês anterior, ou
-                           montar do zero.
-
-                           O botão de clonar DIZ QUANTAS LINHAS VAI TRAZER,
-                           porque "clonar setembro" sem número é um pulo no
-                           escuro — e o número é o do mês anterior inteiro,
-                           não o do que vai sobrar depois das exclusões do
-                           servidor (alvo já existente, alvo arquivado). Num
-                           mês vazio as duas contas coincidem, tirando o
-                           alvo arquivado entre um mês e outro; a `msg` da
-                           resposta é que dá o número final.
-
-                           Este estado vazio é o mínimo: a tela do orçamento
-                           é reescrita na etapa 12 e vai absorvê-lo. */
+                           preço é que o mês novo nasce vazio — e as duas
+                           saídas que este espaço oferecia (clonar o mês
+                           anterior, montar do zero) são as duas primeiras
+                           coisas que a tela do Orçamento mostra. Duplicá-las
+                           aqui seria manter dois lugares que escrevem o
+                           mesmo mês, e eles divergiriam na primeira regra
+                           nova. */
                         <EmptyState
                             inline
-                            title="Nenhum orçamento neste mês"
-                            description={
-                                previousCount > 0
-                                    ? `${formatMonthLabel(previous)} tem ${previousCount} fatia${
-                                          previousCount === 1 ? "" : "s"
-                                      } — traga-as para cá e ajuste o que mudou, ou comece do zero.`
-                                    : "Reparta o que entra no mês em fatias por categoria, por pessoa, ou pelas duas."
-                            }
+                            title="Este mês ainda não foi repartido"
+                            description="Reparta o que entra no mês em fatias por categoria, por pessoa, ou pelas duas — e acompanhe aqui o que cada uma já consumiu."
                             action={
-                                <div className={styles.emptyActions}>
-                                    {previousCount > 0 && (
-                                        <Button
-                                            variant="primary"
-                                            disabled={pending}
-                                            onClick={() =>
-                                                void DashboardController.cloneBudgetMonth(
-                                                    context,
-                                                    month,
-                                                )
-                                            }
-                                        >
-                                            Clonar {formatMonthShort(previous)} ({previousCount}{" "}
-                                            {previousCount === 1 ? "fatia" : "fatias"})
-                                        </Button>
-                                    )}
-                                    <Button
-                                        variant={previousCount > 0 ? "default" : "primary"}
-                                        onClick={() => setBudgetDraft(newBudgetDraft(month))}
-                                    >
-                                        <IconPlus />
-                                        Montar do zero
-                                    </Button>
-                                </div>
+                                <Button variant="primary" onClick={() => navigate("/orcamento")}>
+                                    <IconPlus />
+                                    Repartir {formatMonthLabel(month)}
+                                </Button>
                             }
                         />
                     ) : (
                         <>
                             <div className={styles.budgets}>
+                                {/* Clicar numa fatia leva ao rateio, e não
+                                    abre um formulário: mexer numa linha é
+                                    mexer na repartição do mês, e é lá que
+                                    ela se vê inteira. */}
                                 {periods.map((period) => (
                                     <BudgetBar
                                         key={period.IdBudgetPeriod}
                                         period={period}
-                                        onClick={() =>
-                                            setBudgetDraft({
-                                                IdBudgetPeriod: period.IdBudgetPeriod,
-                                                /* Estado de tela, não da API: o
-                                                   seletor de alvo some na edição
-                                                   (o alvo não se muda), então aqui
-                                                   ele só diz qual dos dois campos
-                                                   o formulário mostra. Na fatia de
-                                                   alvo duplo manda a pessoa. */
-                                                Scope:
-                                                    period.IdPerson !== null
-                                                        ? "person"
-                                                        : "category",
-                                                IdCategory: period.IdCategory,
-                                                IdPerson: period.IdPerson,
-                                                ReferenceMonth: month,
-                                                LimitValue: period.LimitValue,
-                                                AlertPercent: period.AlertPercent,
-                                            })
-                                        }
+                                        onClick={() => navigate("/orcamento")}
                                     />
                                 ))}
                             </div>
@@ -587,6 +471,31 @@ export function Dashboard() {
                                     no da pessoa: são duas perguntas sobre o mesmo dinheiro, e somar
                                     os dois é que seria contar duas vezes.
                                 </div>
+                            )}
+
+                            {/* ── O FORA DO ORÇAMENTO ────────────────
+                                O `Unbudgeted` do mês, e ele só aparece
+                                quando existe: é o gasto que não casou com
+                                fatia nenhuma, e é o que impede a regra
+                                estrita de casamento de ser silenciosa —
+                                sem esta linha, um gasto que não achou
+                                fatia não apareceria em lugar nenhum do
+                                orçamento. O número é da API: soma dos
+                                `Spent` + `Unbudgeted` = o gasto do mês. */}
+                            {unbudgeted > 0 && (
+                                <button
+                                    type="button"
+                                    className={styles.unbudgeted}
+                                    onClick={() => navigate("/gastos")}
+                                >
+                                    <span className={styles.unbudgetedLabel}>
+                                        <IconAlert />
+                                        Fora do orçamento
+                                    </span>
+                                    <span className={styles.unbudgetedValue}>
+                                        {formatMoney(unbudgeted)}
+                                    </span>
+                                </button>
                             )}
                         </>
                     )}
@@ -662,200 +571,6 @@ export function Dashboard() {
                         />
                     </div>
                 )}
-
-                {/* ── Formulário de teto ───────────────────────── */}
-                <Modal
-                    open={budgetDraft !== null}
-                    onClose={() => setBudgetDraft(null)}
-                    title={
-                        budgetDraft?.IdBudgetPeriod === null
-                            ? "Adicionar orçamento"
-                            : "Corrigir o teto deste mês"
-                    }
-                    subtitle={formatMonthLabel(month)}
-                    footer={
-                        <>
-                            {budgetDraft?.IdBudgetPeriod !== null && budgetDraft && (
-                                <Button
-                                    onClick={() => setRemoving(budgetDraft.IdBudgetPeriod)}
-                                    disabled={pending}
-                                >
-                                    Remover deste mês
-                                </Button>
-                            )}
-                            <FooterSpacer />
-                            <Button onClick={() => setBudgetDraft(null)} disabled={pending}>
-                                Cancelar
-                            </Button>
-                            <Button
-                                variant="primary"
-                                type="submit"
-                                form="budget-form"
-                                disabled={pending}
-                            >
-                                {pending ? "Salvando…" : "Salvar teto"}
-                            </Button>
-                        </>
-                    }
-                >
-                    {budgetDraft && (
-                        <form
-                            id="budget-form"
-                            onSubmit={(event: FormEvent) => {
-                                event.preventDefault();
-                                void DashboardController.saveBudget(context);
-                            }}
-                            style={{ display: "flex", flexDirection: "column", gap: 16 }}
-                        >
-                            <FormError>{error}</FormError>
-
-                            {/* O alvo é uma categoria OU uma pessoa, e os dois
-                                são exclusivos: mandar os dois, ou nenhum, é
-                                406. Como o teto do mês já congelado não muda
-                                de alvo, o seletor some na edição. */}
-                            {budgetDraft.IdBudgetPeriod === null && (
-                                <FormField
-                                    label="O teto é de"
-                                    help="Categoria soma o gasto inteiro; pessoa soma só o que foi atribuído a ela, rateado pela parcela."
-                                >
-                                    {() => (
-                                        <SegmentedControl
-                                            value={budgetDraft.Scope}
-                                            ariaLabel="Alvo do orçamento"
-                                            onChange={(Scope) =>
-                                                setBudgetDraft((c) => (c ? { ...c, Scope } : c))
-                                            }
-                                            options={[
-                                                { value: "category", label: "Uma categoria" },
-                                                { value: "person", label: "Uma pessoa" },
-                                            ]}
-                                        />
-                                    )}
-                                </FormField>
-                            )}
-
-                            {budgetDraft.Scope === "person" ? (
-                                <FormField label="Pessoa" required>
-                                    {(field) => (
-                                        <Select
-                                            {...field}
-                                            /* O alvo não se muda num mês já
-                                               congelado: mover o teto de lugar
-                                               é apagar este e cadastrar outro. */
-                                            disabled={budgetDraft.IdBudgetPeriod !== null}
-                                            value={budgetDraft.IdPerson}
-                                            onChange={(IdPerson) =>
-                                                setBudgetDraft((c) => (c ? { ...c, IdPerson } : c))
-                                            }
-                                            options={activePersons
-                                                .filter(
-                                                    (person) =>
-                                                        budgetDraft.IdBudgetPeriod !== null ||
-                                                        !budgetedPersons.has(person.IdPerson),
-                                                )
-                                                .map((person) => ({
-                                                    value: person.IdPerson,
-                                                    label: person.Name,
-                                                    color: paletteColor(person.IdPerson),
-                                                }))}
-                                            emptyLabel="Toda pessoa já tem teto neste mês"
-                                        />
-                                    )}
-                                </FormField>
-                            ) : (
-                                <FormField label="Categoria" required>
-                                    {(field) => (
-                                        <Select
-                                            {...field}
-                                            disabled={budgetDraft.IdBudgetPeriod !== null}
-                                            value={budgetDraft.IdCategory}
-                                            onChange={(IdCategory) =>
-                                                setBudgetDraft((c) =>
-                                                    c ? { ...c, IdCategory } : c,
-                                                )
-                                            }
-                                            options={activeCategories
-                                                .filter(
-                                                    (category) =>
-                                                        budgetDraft.IdBudgetPeriod !== null ||
-                                                        !budgetedCategories.has(
-                                                            category.IdCategory,
-                                                        ),
-                                                )
-                                                .map((category) => ({
-                                                    value: category.IdCategory,
-                                                    label: category.Description,
-                                                    icon: (
-                                                        <CategoryIcon iconKey={category.IconKey} />
-                                                    ),
-                                                    color: categoryColor(category),
-                                                }))}
-                                            emptyLabel="Toda categoria já tem teto neste mês"
-                                        />
-                                    )}
-                                </FormField>
-                            )}
-
-                            <FormGrid columns={2}>
-                                <FormField label="Teto do mês" required>
-                                    {(field) => (
-                                        <MoneyInput
-                                            {...field}
-                                            value={budgetDraft.LimitValue}
-                                            onValueChange={(LimitValue) =>
-                                                setBudgetDraft((c) =>
-                                                    c ? { ...c, LimitValue } : c,
-                                                )
-                                            }
-                                        />
-                                    )}
-                                </FormField>
-                                <FormField
-                                    label="Avisar em"
-                                    hint="%"
-                                    help="O aviso aparece quando o consumo chega nesta fatia do teto."
-                                >
-                                    {(field) => (
-                                        <Input
-                                            {...field}
-                                            type="number"
-                                            min={1}
-                                            max={100}
-                                            value={budgetDraft.AlertPercent}
-                                            onChange={(event) =>
-                                                setBudgetDraft((c) =>
-                                                    c
-                                                        ? {
-                                                              ...c,
-                                                              AlertPercent: Number(
-                                                                  event.target.value,
-                                                              ),
-                                                          }
-                                                        : c,
-                                                )
-                                            }
-                                        />
-                                    )}
-                                </FormField>
-                            </FormGrid>
-                        </form>
-                    )}
-                </Modal>
-
-                <ConfirmDialog
-                    open={removing !== null}
-                    onClose={() => setRemoving(null)}
-                    onConfirm={() => {
-                        const id = removing;
-                        setRemoving(null);
-                        if (id !== null) void DashboardController.removeBudgetPeriod(context, id);
-                    }}
-                    title="Remover o teto deste mês?"
-                    description="A definição continua valendo — some só o teto deste mês. Nenhum lançamento é afetado: um período é plano, não dinheiro."
-                    confirmLabel="Remover"
-                    danger
-                    pending={pending}
-                />
             </Page>
         </>
     );

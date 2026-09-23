@@ -82,4 +82,38 @@ export namespace BudgetPeriodsNamespace {
         /** O mes que recebe as copias. FECHADO RECUSA, com 403, antes de escrever uma linha. */
         To: string
     }
+
+    /**
+     * Uma linha do rateio da renda do mes, como a tela a manda.
+     *
+     * **Sem IdBudgetPeriod, de proposito**: a identidade de uma linha e o ALVO, e nao o id. E a
+     * mesma regra que o PUT ja impoe ao recusar alvo no corpo - mover uma fatia de lugar e
+     * apagar esta e cadastrar outra, porque e o alvo que diz o que a linha soma. Ver
+     * sections/POST/allocate.ts.
+     */
+    export interface AllocateBudgetLine {
+        IdCategory?: number
+        IdPerson?: number
+        LimitValue: number
+        /** Ausente vale 80, o mesmo default do POST de uma linha so. */
+        AlertPercent?: number
+    }
+
+    /**
+     * **O rateio do mes inteiro, numa escrita so.**
+     *
+     * A lista nao e um lote de criacoes: ela e o mes DEPOIS da escrita. O que esta no banco e
+     * nao esta aqui e apagado - fisicamente, como o DELETE de uma linha so -, o que esta nos
+     * dois e atualizado no lugar, e o que so esta aqui e inserido. Tudo dentro de uma
+     * transaction: ou o mes fica como a tela mostra, ou nao muda nada.
+     *
+     * **A lista VAZIA e legitima** e quer dizer "este mes nao tem orcamento": e o usuario que
+     * apagou todas as linhas e salvou. Nao e a chamada montada errada que o `min(1)` do lote da
+     * Renda barra - la a lista vazia nao tinha o que significar.
+     */
+    export interface AllocateBudgetMonthPayload {
+        /** "YYYY-MM". FECHADO RECUSA, com 403, antes de escrever uma linha. */
+        ReferenceMonth: string
+        Lines: AllocateBudgetLine[]
+    }
 }

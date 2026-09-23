@@ -12,6 +12,8 @@ const aMonthReport = (overrides: Partial<ApiTypes.MonthReport> = {}): ApiTypes.M
     ReferenceMonth: "2026-09-01",
     OpeningBalance: 1500,
     Inflows: 3000,
+    InflowsReceived: 3000,
+    InflowsPending: 0,
     Expenses: 500,
     OverdueReceivable: 0,
     OverduePayable: 0,

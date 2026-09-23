@@ -1,7 +1,7 @@
 import { errorMessage } from "@/api/client";
 import { BudgetPeriodsConnection } from "@/api/BudgetPeriods.connection";
 import { addMonths, formatMonthLabel } from "@/lib/date";
-import type { DashboardContext } from "../controller";
+import type { BudgetContext } from "../controller";
 import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
@@ -18,6 +18,11 @@ import type { ApiTypes } from "@/types/api";
    quando a pergunta aparece. É o mesmo gesto que a Renda já tem, e a
    simetria é proposital: as duas telas respondem "o mês que vem se
    parece com este".
+
+   A section nasceu no Início, ao lado do bloco de orçamento que era
+   tudo que a funcionalidade tinha de tela. Ela mudou de casa junto com
+   o gesto: quem monta um mês agora está no Orçamento, e o Início só
+   mostra o resultado.
 
    O QUE O CLIENTE NÃO FAZ. Ao contrário da Renda, ele não lista, não
    deixa escolher e não monta corpo nenhum: manda `{ From, To }` e
@@ -37,10 +42,8 @@ import type { ApiTypes } from "@/types/api";
 export const previousMonth = (month: ApiTypes.ReferenceMonth): ApiTypes.ReferenceMonth =>
     addMonths(month, -1);
 
-export async function cloneBudgetMonth(
-    context: DashboardContext,
-    month: ApiTypes.ReferenceMonth,
-): Promise<void> {
+export async function cloneBudgetMonth(context: BudgetContext): Promise<void> {
+    const month = context.month;
     const from = previousMonth(month);
 
     context.beginSubmit();

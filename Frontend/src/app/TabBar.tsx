@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import styles from "./TabBar.module.css";
 import {
     IconAccounts,
+    IconBudget,
     IconExpenses,
     IconExport,
     IconHome,
@@ -43,7 +44,7 @@ const right = [{ to: "/renda", label: "Renda", Icon: IconIncome }] as const;
 /** As rotas que vivem dentro do menu. Estar numa delas acende "Outros" —
  *  sem isso, quem abriu Contas fica sem nenhuma fatia marcada e perde a
  *  referência de onde está. */
-const inMenu = ["/contas", "/relatorio", "/personalizacao", "/perfil"];
+const inMenu = ["/orcamento", "/contas", "/relatorio", "/personalizacao", "/perfil"];
 
 export function TabBar() {
     const navigate = useNavigate();
@@ -86,6 +87,16 @@ export function TabBar() {
     const menuActive = inMenu.some((path) => location.pathname.startsWith(path));
 
     const menu: SheetMenuItem[] = [
+        {
+            /* O Orçamento entra pelo menu, e não como sexta fatia: a
+               barra tem CINCO, e repartir o mês é um gesto de uma vez
+               por mês — não uma área de visita constante como Gastos e
+               Renda. */
+            label: "Orçamento",
+            description: "Repartir a renda do mês em fatias",
+            icon: <IconBudget />,
+            onSelect: () => navigate("/orcamento"),
+        },
         {
             label: "Contas",
             description: "Contas, cartões e conciliação",

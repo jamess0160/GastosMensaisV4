@@ -16,8 +16,15 @@ import type { ApiTypes } from "@/types/api";
  *  aninhamento, e a soma de todas as linhas é o quanto do mês foi
  *  alocado.
  *
- *  **Mês fechado recusa escrita** nas três rotas de escrita: 403. É a
- *  trava que impede reescrever a história de agosto em novembro. */
+ *  **Mês fechado recusa escrita**: 403 em toda rota de escrita. É a trava
+ *  que impede reescrever a história de agosto em novembro.
+ *
+ *  **Esta connection escreve o mês INTEIRO, nunca uma linha por vez.** A
+ *  API continua tendo o `POST`, o `PUT` e o `DELETE` de uma fatia só —
+ *  são a granularidade certa para a rota, e têm teste —, mas o cliente
+ *  não os chama desde a leva 9: o gesto da tela do Orçamento é repartir a
+ *  renda e salvar uma vez, e três métodos sem chamador aqui seriam três
+ *  caminhos de escrita para manter alinhados com um que ninguém usa. */
 class Connection {
     private readonly route = "/BudgetPeriods";
 
@@ -47,15 +54,36 @@ class Connection {
         return data;
     }
 
-    /** Uma fatia nova no mês. UMA escrita — não há mais definição para
-     *  resolver antes. `Status` não é aceito: a linha nasce `open`.
+    /** **O rateio do mês inteiro numa escrita só** — o gesto da tela do
+     *  Orçamento: o usuário mexe em cinco linhas, apaga uma, cria outra, e
+     *  clica em salvar UMA vez.
      *
-     *  `IdCategory` e `IdPerson` já NÃO são exclusivos: pelo menos um,
-     *  possivelmente os dois. Sem nenhum é 406, e repetir o alvo INTEIRO
-     *  no mesmo mês também — mas "Mercado" e "Maria em Mercado" são
-     *  alvos diferentes e convivem. */
-    async create(body: ApiTypes.BudgetPeriodCreateBody): Promise<{ IdBudgetPeriod: number }> {
-        const { data } = await http.post<{ IdBudgetPeriod: number }>(this.route, body);
+     *  O corpo é **o mês depois da escrita**, não um lote de criações: o que
+     *  está no banco e não está na lista é apagado, o que está nos dois é
+     *  atualizado no lugar, e o que só está na lista é inserido — tudo numa
+     *  transaction. Com `POST`, `PUT` e `DELETE` linha a linha, esse clique
+     *  seriam sete requisições em sequência, e a quarta falhando deixaria o
+     *  mês num rateio que ninguém escreveu.
+     *
+     *  **Nenhuma linha leva `IdBudgetPeriod`**: a identidade de uma fatia é o
+     *  alvo. Uma linha que mudou de alvo não é um caso à parte — ela é uma
+     *  remoção mais uma inserção, e o `Spent` não se perde porque ele é do
+     *  mês e recalculado a cada leitura.
+     *
+     *  **O rateio não precisa fechar contra a renda**: sobrar é o normal e
+     *  estourar é decisão de quem orça. A API não lê a renda para responder —
+     *  o aviso é da tela, como o alerta do teto.
+     *
+     *  A resposta tem a forma do `clone`: os ids do mês depois da escrita, na
+     *  ordem em que o corpo os mandou. */
+    async allocate(body: ApiTypes.BudgetMonthAllocateBody): Promise<{
+        msg: string;
+        IdBudgetPeriods: number[];
+    }> {
+        const { data } = await http.post<{ msg: string; IdBudgetPeriods: number[] }>(
+            `${this.route}/allocate`,
+            body,
+        );
         return data;
     }
 
@@ -90,29 +118,6 @@ class Connection {
         const { data } = await http.post<{ msg: string; IdBudgetPeriods: number[] }>(
             `${this.route}/clone`,
             body,
-        );
-        return data;
-    }
-
-    /** `ReferenceMonth` e o alvo não são aceitos: mover a fatia de lugar
-     *  é apagar esta e cadastrar outra. */
-    async update(
-        idBudgetPeriod: number,
-        body: ApiTypes.BudgetPeriodUpdateBody,
-    ): Promise<{ msg: string }> {
-        const { data } = await http.put<{ msg: string }>(
-            `${this.route}/IdBudgetPeriod=${idBudgetPeriod}`,
-            body,
-        );
-        return data;
-    }
-
-    /** Delete FÍSICO — o único do projeto. Uma fatia é plano, não
-     *  lançamento: nada aponta para ela e nenhum dinheiro passou por ali.
-     *  E nada sobrevive a ela: não há mais definição perene por trás. */
-    async remove(idBudgetPeriod: number): Promise<{ msg: string }> {
-        const { data } = await http.delete<{ msg: string }>(
-            `${this.route}/IdBudgetPeriod=${idBudgetPeriod}`,
         );
         return data;
     }

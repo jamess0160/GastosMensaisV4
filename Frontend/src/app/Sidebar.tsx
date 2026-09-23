@@ -5,6 +5,7 @@ import { useSession, useSignOut } from "./session";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import {
     IconAccounts,
+    IconBudget,
     IconExpenses,
     IconExport,
     IconHome,
@@ -18,6 +19,9 @@ const primary = [
     { to: "/", label: "Início", Icon: IconHome, end: true },
     { to: "/gastos", label: "Gastos", Icon: IconExpenses },
     { to: "/renda", label: "Renda", Icon: IconIncome },
+    /* O Orçamento vem DEPOIS da Renda porque é dela que ele parte: a
+       tela abre pelo que entrou no mês e reparte esse número. */
+    { to: "/orcamento", label: "Orçamento", Icon: IconBudget },
     { to: "/contas", label: "Contas", Icon: IconAccounts },
     { to: "/relatorio", label: "Relatório", Icon: IconReport },
 ] as const;

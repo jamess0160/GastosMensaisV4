@@ -1,5 +1,6 @@
 import {
     ChartColumn,
+    ChartPie,
     Ellipsis,
     House,
     LogOut,
@@ -35,6 +36,10 @@ export const IconExpenses = adapt(ReceiptText, "IconExpenses");
 export const IconIncome = adapt(TrendingUp, "IconIncome");
 export const IconAccounts = adapt(Wallet, "IconAccounts");
 export const IconReport = adapt(ChartColumn, "IconReport");
+/** O ORÇAMENTO — a repartição da renda do mês. A pizza e não o alvo:
+ *  desde a leva 9 o orçamento não é um teto a acertar, é um bolo a
+ *  repartir. */
+export const IconBudget = adapt(ChartPie, "IconBudget");
 export const IconSettings = adapt(Settings, "IconSettings");
 export const IconExport = adapt(FileSpreadsheet, "IconExport");
 export const IconSignOut = adapt(LogOut, "IconSignOut");
