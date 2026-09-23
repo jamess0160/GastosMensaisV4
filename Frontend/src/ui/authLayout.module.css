@@ -230,6 +230,17 @@
     background: var(--surface-alt);
 }
 
+/* O `adapt` de ui/icons.tsx tira `width`/`height` do SVG de propósito —
+   quem dimensiona é a folha do contêiner. Este botão é desenhado aqui e
+   não é o `<Button>` de ui/primitives, então sem esta regra o ícone não
+   tem tamanho nenhum e ocupa a largura inteira do botão.
+   18px, e não os 16 do `.btn`: a proporção é com o texto, e o `.social`
+   tem 48px de altura e fonte 14 contra os 36px e fonte 13 da primitiva. */
+.social svg {
+    width: 18px;
+    height: 18px;
+}
+
 .divider {
     display: flex;
     align-items: center;
