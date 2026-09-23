@@ -109,14 +109,51 @@ plano original adiava está tomada: **toda** edição dos documentos pede aceite
 a de uma vírgula, porque manter "mudança relevante" e "ajuste de redação" seria um julgamento a
 cada commit, e errá-lo para menos é a própria falha que a etapa conserta.
 
+### Leva 9 — a primeira que nasce de uso real, fechada em 23/09
+
+**16 de 16 etapas**, escritas em 22/09 e executadas entre 22 e 23/09:
+[Levas/9. O que voltou de quem usa](Levas/9.%20O%20que%20voltou%20de%20quem%20usa.md). Ela é a primeira
+que não sai de uma lista interna: a entrada são treze retornos do dono depois do MVP no ar, e
+por isso ela mistura defeito de uma linha com **duas trocas de modelo**.
+
+**O cartão.** `ClosingOffsetDays` — a folga em dias corridos — saiu, e entrou **`ClosingDay`**, o
+dia do mês em que o cartão fecha; a relação entre os dois dias (`ClosingDay > DueDay` ⇒ fecha no
+mês anterior ao do vencimento) é a única coisa que o modelo infere, e o laço de rolagem do
+`InvoiceDates` morreu com ela. Em cima disso, a competência de uma compra em modo `purchase`
+passou a ser **o mês do ciclo que a pegou**, não o mês da compra: num cartão que fecha 30, o
+gasto de 31/08 pesa em setembro, que é quando a fatura que o cobra fecha. As duas migrations
+recalculam a perna já gravada, e isso **move dinheiro entre meses** para quem já tinha compra em
+cartão — o ponto sendo que os números velhos estavam errados. A fatura ganhou tela própria
+(`/contas/fatura/:id`), com navegação entre ciclos independente do mês global e o botão de
+quitar onde ela aparece, tudo sobre a tupla `(cartão, vencimento)` — sem tabela nova.
+
+**O orçamento.** A tabela `Budgets` morreu, e com ela o teto perene e a rotina que materializava
+o mês no dia 1º. `BudgetPeriods` passou a carregar o alvo direto — categoria **e/ou** pessoa, o
+que o `CHECK` antigo proibia —, e o orçamento virou **uma repartição da renda do mês**: qualquer
+mês é montável, inclusive o que ainda não chegou, clonando o anterior ou rateando a renda na
+tela nova `/orcamento`. Cada porção de gasto consome **uma** linha ou nenhuma, com precedência
+`(pessoa, categoria)` → `(pessoa, —)`, e o que não casa aparece como `Unbudgeted` em vez de
+sumir — sem isso a regra estrita seria silenciosa.
+
+O resto: a lista de Gastos passou a mostrar **a parcela, e não a compra** (a tabela e a faixa de
+indicadores voltaram a somar a mesma coisa, e o vermelho de atraso passou a olhar o `CashDate`);
+a categoria global acabou, cada espaço tem as suas treze e pode arquivar e reordenar; o cadastro
+por convite chega com o e-mail preenchido e travado; o rateio de pessoas nasce dividido; e o app
+ganhou **tema escuro**, com "sistema" por padrão e o carimbo antes da primeira pintura.
+
 ---
 
 ## A fila até o MVP
 
+**A fila está vazia desde 23/09/2026.** O único item que restava — o fechamento do cartão
+guardado como dia do mês — saiu com a leva 9, e o texto dele fica abaixo pelo diagnóstico, não
+pela pendência. O que chegar daqui pra frente vem de uso, como vieram os treze retornos da 9, e
+não desta lista.
+
 **A lacuna do cliente acabou.** Toda rota que a leva 5 consumia já existia com teste desde
 07/09, e foi a junção dos repositórios ter pegado a leva no meio que a deixou aberta. O que
-sobra na fila não é dívida de um lado contra o outro: é trabalho que nunca entrou em leva
-nenhuma, dos dois.
+entrou na fila depois disso não era dívida de um lado contra o outro: era trabalho que nunca
+tinha entrado em leva nenhuma, dos dois.
 
 **"Produção: o ambiente" saiu daqui em 11/09**, quando virou a [leva 8](Levas/8.%20O%20que%20só%20se%20prova%20subindo.md)
 inteira: imagem dos dois lados, `compose`, vhost do host, e-mail do domínio, os arquivos que o
@@ -131,7 +168,8 @@ item de fila não é o lugar de nenhum dos dois.
 
 ### 1. O fechamento do cartão guardado como dia do mês
 
-> **22/09/2026 — saiu da fila: virou as etapas 2 e 3 da [leva 9](Levas/9.%20O%20que%20voltou%20de%20quem%20usa.md).**
+> **22/09/2026 — saiu da fila: virou as etapas 2 e 3 da [leva 9](Levas/9.%20O%20que%20voltou%20de%20quem%20usa.md),
+> entregues em 22/09. Este item está fechado, e com ele a fila.**
 > Não por decisão de planejamento, e sim porque o uso real caiu em cima dele: o primeiro retorno
 > depois do MVP no ar foi um cartão que fecha dia 30, com o gasto de 31/08 pesando em agosto.
 > A leva 9 troca `ClosingOffsetDays` por `ClosingDay` e, **em cima disso**, faz a compra pesar no
@@ -216,7 +254,8 @@ e-mail do domínio, arquivos
 externos, infra e backup — é o que está em volta dos dois, e só subindo se sabe. Juntá-las faria
 uma leva em que metade das etapas não tem critério de aceite até o dia do deploy.
 
-**A 9 foi escrita em 22/09, e é a primeira que não nasce de uma lista interna.** As oito
+**A 9 foi escrita em 22/09, fechou em 23/09 com 16 de 16, e é a primeira que não nasce de uma
+lista interna.** As oito
 anteriores saíram do que o projeto sabia que devia; esta sai de treze retornos de quem usou o
 produto no ar. Por isso ela mistura o que nenhuma outra misturou: quatro defeitos de uma linha
 (o mês em inglês, a data vermelha, o convite sem o e-mail, o ícone que estoura o botão de

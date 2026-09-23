@@ -39,13 +39,26 @@ src/data/      Hooks de React Query: cadastros e movimento do mês
 src/lib/       Dinheiro, datas, agregações, DeviceKey, rascunho, download, cooldown
 src/pages/     Uma pasta por tela (ver Convenções)
 src/test/      Infra de teste: setup, servidor de mentira
-src/styles/    tokens.css (transcrição do :root do layout) + global.css
+src/styles/    tokens.css (o :root do layout + a paleta escura) + global.css
 src/types/     Tipos do contrato da API
 src/ui/        Primitivas transcritas da folha compartilhada do layout
 ```
 
 `Layout/` é material de referência, não código de produção — fica versionado porque é a fonte
 das conversões.
+
+**O tema é do aparelho, não da pessoa.** Claro, escuro e sistema — "sistema" é o padrão, e a
+escolha mora no `localStorage`, não no banco: o celular à noite e o desktop no escritório são o
+mesmo usuário com duas preferências, e assim o tema não custa coluna nem rota. Só os tokens que
+mudam são redeclarados, em dois seletores — a media query com `:root:not([data-theme="light"])`,
+que é o que deixa escolher **claro** num sistema escuro, e `:root[data-theme="dark"]`, para a
+escolha explícita vencer. Duas consequências que não são opcionais: **cor literal em folha não
+troca de tema**, então toda cor vem de token; e o `data-theme` é carimbado **antes da primeira
+pintura** por `public/theme.js`, um `<script src>` bloqueante no `<head>` — arquivo e não script
+inline porque a CSP do nginx é `script-src 'self'`, e um inline que funciona em `npm run dev` e
+é bloqueado em produção é o flash branco aparecendo só no servidor. As cores de categoria
+(`--cat-*`) e a marca **não invertem**: elas identificam, e o verde de "Casa" que muda com o tema
+muda a leitura do gráfico.
 
 **Os tipos da API vivem em `src/types/api.ts` e são escritos à mão.** Até 09/09/2026 eles eram
 transcritos de um documento de contrato mantido no outro repositório; agora a fonte é
@@ -216,7 +229,7 @@ o usuário veria o texto genérico no lugar da frase do servidor. Quem desempaco
 | Extrato | `/contas/extrato` | abertura → linhas assinadas → fechamento, por conta e por fatura, com a quitação no bloco do cartão |
 | Relatório | `/relatorio` | linha, barras e donut em ECharts, com filtros próprios de período |
 | Personalização | `/personalizacao` | categorias — com ordenação por ↑ ↓ e o grupo recolhido das arquivadas — e pessoas |
-| Perfil | `/perfil` | dados, senha, passkeys |
+| Perfil | `/perfil` | dados, senha, passkeys e aparência (claro · escuro · sistema) |
 | Espaço | `/espaco` | criar e editar o espaço, convidar e revogar convite, quem tem acesso — trocar papel, remover, sair e transferir a propriedade |
 
 Todas respondem em 390px. Abaixo de 900px a sidebar sai e entra a barra inferior
