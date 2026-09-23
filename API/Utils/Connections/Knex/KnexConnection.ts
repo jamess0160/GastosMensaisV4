@@ -44,7 +44,6 @@ export interface DBTypes {
 
     // Categorias e orcamento
     Categories: Database.Categories
-    Budgets: Database.Budgets
     BudgetPeriods: Database.BudgetPeriods
     Persons: Database.Persons
 

@@ -211,8 +211,8 @@ export namespace Utils {
      * O primeiro dia do mês de referência: "2026-08" vira "2026-08-01".
      *
      * A coluna `ReferenceMonth` é `date` e guarda sempre o dia 1 — é o que faz duas linhas do
-     * mesmo mês colidirem no `unique(IdBudget, ReferenceMonth)` em vez de conviverem por causa
-     * de um dia diferente.
+     * mesmo mês colidirem nos índices parciais de `BudgetPeriods` (um por formato de alvo) em
+     * vez de conviverem por causa de um dia diferente.
      */
     export function monthStart(reference: string) {
         return moment(reference, "YYYY-MM", true).format(calendarFormat)

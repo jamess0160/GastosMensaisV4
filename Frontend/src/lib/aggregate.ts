@@ -270,16 +270,24 @@ export function spentByMonthCategory(
 export const totalBalance = (accounts: readonly ApiTypes.Account[]): ApiTypes.Money =>
     sumMoney(accounts.filter((account) => account.Active).map((account) => account.Balance));
 
-/** O nome do alvo de um teto — categoria OU pessoa.
+/** O nome do alvo de uma fatia — pessoa, categoria, ou as DUAS.
  *
- *  Quem decide qual par ler é o `Scope`, nunca o id que veio nulo: é
- *  para isso que ele existe. O alvo ARQUIVADO some da lista do mês, e
- *  por isso o fallback aqui é um caso que não deveria acontecer — e não
- *  o normal. */
+ *  São três formatos desde a leva 9, então o nome é COMPOSTO do que veio
+ *  preenchido: "Luana", "Mercado", ou "Luana · Mercado". Não há mais um
+ *  `Scope` dizendo qual par ler — com três formatos ele mentiria.
+ *
+ *  A pessoa vem primeiro porque é ela que qualifica a fatia: "Luana em
+ *  mercado" é a leitura, não "mercado da Luana".
+ *
+ *  O alvo ARQUIVADO some da lista do mês, e por isso o fallback aqui é
+ *  um caso que não deveria acontecer — e não o normal. */
 export const budgetTargetName = (period: ApiTypes.BudgetPeriod): string =>
-    period.Scope === "person"
-        ? (period.Person?.Name ?? "Pessoa arquivada")
-        : (period.Category?.Description ?? "Categoria arquivada");
+    [
+        period.IdPerson !== null ? (period.Person?.Name ?? "Pessoa arquivada") : null,
+        period.IdCategory !== null ? (period.Category?.Description ?? "Categoria arquivada") : null,
+    ]
+        .filter((part): part is string => part !== null)
+        .join(" · ");
 
 /** Estado de um teto de orçamento. A API devolve `LimitValue`, `Spent` e
  *  `AlertPercent`; COMPARAR É TRABALHO DA TELA — é isto.

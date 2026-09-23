@@ -222,7 +222,6 @@ export function aBudgetPeriod(
     return {
         IdBudgetPeriod: 1,
         IdWorkspace: 1,
-        IdBudget: 1,
         ReferenceMonth: "2026-08-01",
         LimitValue: 800,
         AlertPercent: 80,
@@ -230,7 +229,6 @@ export function aBudgetPeriod(
         ClosedAt: null,
         CreatedAt: NOW,
         UpdatedAt: NOW,
-        Scope: "category",
         IdCategory: 1,
         Category: aCategory(),
         IdPerson: null,
@@ -240,13 +238,11 @@ export function aBudgetPeriod(
     };
 }
 
-/** Um teto de PESSOA: mesma tabela, mesma lista, `Scope` diferente — e
- *  os dois campos de categoria nulos. */
+/** Uma fatia de PESSOA: mesma lista, os dois campos de categoria nulos. */
 export function aPersonBudgetPeriod(
     overrides: Partial<ApiTypes.BudgetPeriod> = {},
 ): ApiTypes.BudgetPeriod {
     return aBudgetPeriod({
-        Scope: "person",
         IdCategory: null,
         Category: null,
         IdPerson: 4,
@@ -259,6 +255,19 @@ export function aPersonBudgetPeriod(
             CreatedAt: NOW,
             UpdatedAt: NOW,
         },
+        ...overrides,
+    });
+}
+
+/** A fatia de PESSOA **em** uma CATEGORIA — o terceiro formato de alvo,
+ *  que o `xor` do esquema antigo proibia e a leva 9 liberou. Os dois
+ *  pares vêm preenchidos, e é por isso que não há mais um `Scope`. */
+export function aPersonCategoryBudgetPeriod(
+    overrides: Partial<ApiTypes.BudgetPeriod> = {},
+): ApiTypes.BudgetPeriod {
+    return aPersonBudgetPeriod({
+        IdCategory: 1,
+        Category: aCategory(),
         ...overrides,
     });
 }

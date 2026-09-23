@@ -5,13 +5,13 @@ import { saveBudget } from "../sections/saveBudget";
 import { removeBudgetPeriod } from "../sections/removeBudgetPeriod";
 import { aBudgetDraft, fakeDashboardContext } from "./context";
 
-describe("saveBudget · definir (POST /Budgets)", () => {
+describe("saveBudget · criar (POST /BudgetPeriods)", () => {
     it("manda ReferenceMonth como YYYY-MM", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
-            msw.post("*/api/Budgets", async ({ request }) => {
+            msw.post("*/api/BudgetPeriods", async ({ request }) => {
                 body = (await request.json()) as Record<string, unknown>;
-                return HttpResponse.json({ IdBudget: 1, IdBudgetPeriod: 1 });
+                return HttpResponse.json({ IdBudgetPeriod: 1 });
             }),
         );
 
@@ -24,12 +24,12 @@ describe("saveBudget · definir (POST /Budgets)", () => {
         expect(body?.AlertPercent).toBe(80);
     });
 
-    it("manda IdCategory, e NUNCA IdPerson junto — os dois são exclusivos", async () => {
+    it("manda só o alvo que o formulário está editando", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
-            msw.post("*/api/Budgets", async ({ request }) => {
+            msw.post("*/api/BudgetPeriods", async ({ request }) => {
                 body = (await request.json()) as Record<string, unknown>;
-                return HttpResponse.json({ IdBudget: 1, IdBudgetPeriod: 1 });
+                return HttpResponse.json({ IdBudgetPeriod: 1 });
             }),
         );
 
@@ -39,18 +39,19 @@ describe("saveBudget · definir (POST /Budgets)", () => {
         expect(body).not.toHaveProperty("IdPerson");
     });
 
-    it("no teto de PESSOA manda IdPerson, e nenhuma categoria", async () => {
+    it("na fatia de PESSOA manda IdPerson, e nenhuma categoria", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
-            msw.post("*/api/Budgets", async ({ request }) => {
+            msw.post("*/api/BudgetPeriods", async ({ request }) => {
                 body = (await request.json()) as Record<string, unknown>;
-                return HttpResponse.json({ IdBudget: 2, IdBudgetPeriod: 2 });
+                return HttpResponse.json({ IdBudgetPeriod: 2 });
             }),
         );
 
         // O rascunho guarda os dois ids para o usuário poder trocar de
-        // alvo sem perder o que escolheu; quem decide o que vai no corpo
-        // é o `Scope`. Mandar os dois é 406.
+        // alvo sem perder o que escolheu; quem decide o que vai no corpo é
+        // o `Scope` do rascunho — estado de TELA, não da API. Os dois
+        // juntos já são um alvo válido, e é a etapa 12 que dá como montá-lo.
         await saveBudget(
             fakeDashboardContext({
                 budgetDraft: aBudgetDraft({ Scope: "person", IdPerson: 4, IdCategory: 1 }),
@@ -61,12 +62,12 @@ describe("saveBudget · definir (POST /Budgets)", () => {
         expect(body).not.toHaveProperty("IdCategory");
     });
 
-    it("nunca manda Status — o mês nasce aberto", async () => {
+    it("nunca manda Status — a fatia nasce aberta", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
-            msw.post("*/api/Budgets", async ({ request }) => {
+            msw.post("*/api/BudgetPeriods", async ({ request }) => {
                 body = (await request.json()) as Record<string, unknown>;
-                return HttpResponse.json({ IdBudget: 1, IdBudgetPeriod: 1 });
+                return HttpResponse.json({ IdBudgetPeriod: 1 });
             }),
         );
 
@@ -75,20 +76,38 @@ describe("saveBudget · definir (POST /Budgets)", () => {
         expect(body).not.toHaveProperty("Status");
     });
 
-    it("diz que a definição vale para o futuro", async () => {
+    it("confirma a fatia do mês", async () => {
+        server.use(msw.post("*/api/BudgetPeriods", () => HttpResponse.json({ IdBudgetPeriod: 1 })));
+        const context = fakeDashboardContext();
+
+        await saveBudget(context);
+
+        expect(context.finishSubmit).toHaveBeenCalledWith("Fatia definida para este mês.");
+    });
+
+    // Mês fechado não aceita escrita: a API responde 403 e a mensagem dela
+    // é o que a tela mostra — não há estado local dizendo que o mês fechou.
+    it("sobe a recusa do mês fechado como veio da API", async () => {
         server.use(
-            msw.post("*/api/Budgets", () => HttpResponse.json({ IdBudget: 1, IdBudgetPeriod: 1 })),
+            msw.post("*/api/BudgetPeriods", () =>
+                HttpResponse.json(
+                    { msg: "Este mês já foi fechado e não aceita mais alterações no orçamento." },
+                    { status: 403 },
+                ),
+            ),
         );
         const context = fakeDashboardContext();
 
         await saveBudget(context);
 
-        expect(context.finishSubmit).toHaveBeenCalledWith("Teto definido para este mês.");
+        expect(context.failSubmit).toHaveBeenCalledWith(
+            "Este mês já foi fechado e não aceita mais alterações no orçamento.",
+        );
     });
 });
 
 describe("saveBudget · corrigir (PUT /BudgetPeriods)", () => {
-    it("usa a rota do período, não a da definição", async () => {
+    it("manda só o valor e o alerta", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
             msw.put("*/api/BudgetPeriods/IdBudgetPeriod=5", async ({ request }) => {
@@ -101,15 +120,15 @@ describe("saveBudget · corrigir (PUT /BudgetPeriods)", () => {
             fakeDashboardContext({ budgetDraft: aBudgetDraft({ IdBudgetPeriod: 5 }) }),
         );
 
-        // `ReferenceMonth` e `IdBudget` não são aceitos: mover o teto de
-        // lugar é apagar este e cadastrar outro.
+        // `ReferenceMonth` e o alvo não são aceitos: mover a fatia de
+        // lugar é apagar esta e cadastrar outra.
         expect(body).not.toHaveProperty("ReferenceMonth");
-        expect(body).not.toHaveProperty("IdBudget");
         expect(body).not.toHaveProperty("IdCategory");
+        expect(body).not.toHaveProperty("IdPerson");
         expect(body).toEqual({ LimitValue: 800, AlertPercent: 80 });
     });
 
-    it("deixa claro que a definição não muda", async () => {
+    it("confirma a correção da fatia", async () => {
         server.use(
             msw.put("*/api/BudgetPeriods/IdBudgetPeriod=5", () => HttpResponse.json({ msg: "ok" })),
         );
@@ -119,9 +138,7 @@ describe("saveBudget · corrigir (PUT /BudgetPeriods)", () => {
 
         await saveBudget(context);
 
-        expect(context.finishSubmit).toHaveBeenCalledWith(
-            "Teto deste mês corrigido — a definição segue como estava.",
-        );
+        expect(context.finishSubmit).toHaveBeenCalledWith("Fatia deste mês corrigida.");
     });
 });
 
@@ -159,7 +176,7 @@ describe("saveBudget · validação local", () => {
 });
 
 describe("removeBudgetPeriod", () => {
-    it("apaga o mês e avisa que a definição sobrevive", async () => {
+    it("apaga a fatia do mês", async () => {
         server.use(
             msw.delete("*/api/BudgetPeriods/IdBudgetPeriod=5", () =>
                 HttpResponse.json({ msg: "Orçamento do mês removido com sucesso" }),
@@ -169,8 +186,8 @@ describe("removeBudgetPeriod", () => {
 
         await removeBudgetPeriod(context, 5);
 
-        // É o único delete físico do projeto — mas só do período: um
-        // período é plano, não lançamento.
+        // É o único delete físico do projeto: uma fatia é plano, não
+        // lançamento — e nada sobrevive a ela.
         expect(context.finishSubmit).toHaveBeenCalledWith("Orçamento removido deste mês.");
         expect(context.closeBudgetForm).toHaveBeenCalledOnce();
     });

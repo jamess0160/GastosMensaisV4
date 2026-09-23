@@ -63,11 +63,11 @@ const STATE_LABEL: Record<BudgetState, string> = {
     over: "Estourou",
 };
 
-/** O cartão de um teto no mês — de CATEGORIA ou de PESSOA.
+/** O cartão de uma fatia do mês — de pessoa, de categoria, ou das duas.
  *
- *  Quem decide qual par ler (`Category` ou `Person`) é o `Scope`: os dois
- *  convivem na mesma lista, e deduzir o tipo pelo id que veio nulo é
- *  justamente o que o campo existe para evitar. */
+ *  Os três formatos convivem na mesma lista, e o que a tela lê é o par
+ *  que veio preenchido: não há mais um `Scope`, porque com três formatos
+ *  um discriminador de dois valores mentiria. */
 export function BudgetBar({
     period,
     onClick,
@@ -80,10 +80,13 @@ export function BudgetBar({
     const remaining = budgetRemaining(period);
     const name = budgetTargetName(period);
     /* Pessoa não tem cor cadastrada; a paleta dá uma estável pelo id, a
-       mesma que a quebra "Por destino" do Início usa. */
+       mesma que a quebra "Por destino" do Início usa. Com pessoa no alvo
+       é ela que manda, inclusive na fatia de pessoa + categoria: a cor
+       serve para achar a fatia na lista, e o que distingue "Luana em
+       mercado" de "mercado" é a Luana. */
     const color =
-        period.Scope === "person"
-            ? paletteColor(period.IdPerson ?? 0)
+        period.IdPerson !== null
+            ? paletteColor(period.IdPerson)
             : period.Category
               ? categoryColor(period.Category)
               : "var(--ink-3)";

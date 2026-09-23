@@ -960,63 +960,57 @@ export namespace ApiTypes {
 
     export type BudgetPeriodStatus = "open" | "closed";
 
-    /** O alvo de um teto é uma CATEGORIA ou uma PESSOA, nunca os dois.
+    /** UMA FATIA DA RENDA DE UM MÊS.
      *
-     *  | `Scope`    | o que soma                          | eixo               |
-     *  |------------|-------------------------------------|--------------------|
-     *  | `category` | tudo que caiu naquela categoria     | o gasto inteiro    |
-     *  | `person`   | tudo ATRIBUÍDO àquela pessoa        | o eixo ANALÍTICO   |
+     *  Não existe mais definição perene: `Budgets` morreu junto com o
+     *  "para sempre" que ela guardava, e o mês não nasce mais de rotina
+     *  nenhuma — ele é montado. É isso que faz QUALQUER mês ser legível e
+     *  editável: passado, corrente ou futuro.
      *
-     *  Um gasto conta nos dois orçamentos, e isso NÃO é dupla contagem —
-     *  são duas perguntas diferentes sobre o mesmo dinheiro. O que não se
-     *  pode é somar os dois num total. */
-    export type BudgetScope = "category" | "person";
-
-    /** O mês congelado. Nunca leia o limite de um mês passado da definição.
+     *  O alvo tem TRÊS formatos, e o que a tela lê é simplesmente o par
+     *  que veio preenchido:
      *
-     *  O MÊS NASCE SOZINHO: todo dia 1º uma rotina do servidor
-     *  materializa o mês novo a partir de cada definição ativa, com o
-     *  teto que valia naquele dia, e nunca sobrescreve um mês que já
-     *  existe. `POST /Budgets` continua sendo o caminho de orçar AGORA
-     *  em vez de esperar a virada — e orçar de novo um alvo que a rotina
-     *  já criou responde 406. */
+     *  | alvo                  | o que soma                      | eixo             |
+     *  |-----------------------|---------------------------------|------------------|
+     *  | só `IdCategory`       | tudo que caiu naquela categoria | o gasto inteiro  |
+     *  | só `IdPerson`         | tudo ATRIBUÍDO àquela pessoa    | o eixo ANALÍTICO |
+     *  | os dois               | a pessoa NAQUELA categoria      | o eixo ANALÍTICO |
+     *
+     *  As fatias SOMAM lado a lado: "Luana 250" mais "Luana em Mercado
+     *  100" dão 350 para a Luana. Não há aninhamento nem teto dentro de
+     *  teto — a soma de todas as linhas é o quanto do mês foi alocado. */
     export interface BudgetPeriod {
         IdBudgetPeriod: number;
         IdWorkspace: number;
-        IdBudget: number;
         /** Volta como "YYYY-MM-01" mesmo sendo enviado como "YYYY-MM". */
         ReferenceMonth: CalendarDate;
         LimitValue: Money;
         AlertPercent: number;
         /** Quem escreve este campo é a ROTINA do servidor, não a tela:
-         *  todo dia 1º ela carimba `closed` e `ClosedAt` em cada período
-         *  do mês que acabou. Ele muda sozinho entre duas leituras — um
-         *  período lido como `open` em 31 de agosto volta `closed` em 1º
-         *  de setembro, sem nenhuma chamada nossa.
+         *  todo dia 1º ela carimba `closed` e `ClosedAt` em cada linha do
+         *  mês que acabou. Ele muda sozinho entre duas leituras — uma
+         *  linha lida como `open` em 31 de agosto volta `closed` em 1º de
+         *  setembro, sem nenhuma chamada nossa.
          *
-         *  **Fechado NÃO é travado**, e é por isso que a tela não desenha
-         *  nada a partir dele: `PUT /BudgetPeriods` de um mês `closed`
-         *  continua funcionando, porque corrigir o teto de um mês passado
-         *  é exatamente o que a tabela do mês congelado existe para
-         *  permitir. Um carimbo de "fechado" em todo mês passado não
-         *  informaria nada e sugeriria uma trava que não existe. */
+         *  **Fechado É TRAVADO**: `POST`, `PUT` e `DELETE` num mês
+         *  `closed` respondem 403. É a trava que impede reescrever a
+         *  história de agosto em novembro — e o único papel que sobrou da
+         *  máquina do mês congelado. */
         Status: BudgetPeriodStatus;
         ClosedAt: DateTime | null;
         CreatedAt: DateTime;
         UpdatedAt: DateTime;
-        /** Quem decide qual PAR ler. Não deduza o tipo pelo id que veio
-         *  nulo: o `Scope` existe exatamente para isso. */
-        Scope: BudgetScope;
-        /** Preenchidos em `Scope: "category"`, `null` no outro. */
+        /** PELO MENOS UM dos dois vem preenchido, possivelmente os dois.
+         *  Não há `Scope`: com três formatos, um discriminador de dois
+         *  valores mentiria. */
         IdCategory: number | null;
         Category: Category | null;
-        /** Preenchidos em `Scope: "person"`, `null` no outro. */
         IdPerson: number | null;
         Person: Person | null;
         /** Soma PERNAS por `CompetenceDate`, e conta pendente junto com
          *  pago — ao contrário do saldo da conta.
          *
-         *  Em `Scope: "person"` vale uma quarta regra: o comprometido é
+         *  Com pessoa no alvo vale uma quarta regra: o comprometido é
          *  RATEADO pelas parcelas —
          *  `ExpensePersons.Value × ExpensePayments.Value ÷ Expenses.TotalValue`.
          *
@@ -1025,20 +1019,20 @@ export namespace ApiTypes {
         Spent: Money;
     }
 
-    interface BudgetCreateCommon {
+    interface BudgetPeriodCreateCommon {
         ReferenceMonth: ReferenceMonth;
-        /** > 0. Teto zero é não ter teto: apague o mês. */
+        /** > 0. Valor zero é não ter a fatia: apague a linha. */
         LimitValue: Money;
         /** 1-100, default 80. */
         AlertPercent?: number;
     }
 
-    /** `IdCategory` e `IdPerson` são MUTUAMENTE EXCLUSIVOS: mandar os
-     *  dois, ou nenhum, é 406. A união expressa isso no tipo, em vez de
-     *  dois opcionais que compilariam nas duas formas erradas. */
-    export type BudgetCreateBody =
-        | (BudgetCreateCommon & { IdCategory: number; IdPerson?: never })
-        | (BudgetCreateCommon & { IdPerson: number; IdCategory?: never });
+    /** PELO MENOS UM alvo, possivelmente os dois — mandar nenhum é 406.
+     *  A união expressa isso no tipo, em vez de dois opcionais que
+     *  compilariam na forma vazia. */
+    export type BudgetPeriodCreateBody =
+        | (BudgetPeriodCreateCommon & { IdCategory: number; IdPerson?: number })
+        | (BudgetPeriodCreateCommon & { IdPerson: number; IdCategory?: number });
 
     export interface BudgetPeriodUpdateBody {
         LimitValue: Money;

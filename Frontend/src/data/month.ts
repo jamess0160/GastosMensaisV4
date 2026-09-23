@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQueries, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { queryKeys } from "./keys";
-import { BudgetsConnection } from "@/api/Budgets.connection";
+import { BudgetPeriodsConnection } from "@/api/BudgetPeriods.connection";
 import { ExpensePaymentsConnection } from "@/api/ExpensePayments.connection";
 import { ExpensesConnection } from "@/api/Expenses.connection";
 import { InflowsConnection } from "@/api/Inflows.connection";
@@ -77,7 +77,7 @@ export function useMonthBudgets(
 ): UseQueryResult<ApiTypes.BudgetPeriod[]> {
     return useQuery({
         queryKey: queryKeys.budgets(month),
-        queryFn: () => BudgetsConnection.list(month),
+        queryFn: () => BudgetPeriodsConnection.list(month),
     });
 }
 

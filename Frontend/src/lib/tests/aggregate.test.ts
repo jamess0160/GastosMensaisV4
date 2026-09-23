@@ -21,6 +21,7 @@ import {
     aBudgetPeriod,
     aLegRow,
     aPersonBudgetPeriod,
+    aPersonCategoryBudgetPeriod,
     anAccount,
     anExpense,
     anInflow,
@@ -323,9 +324,23 @@ describe("budgetPercent e budgetRemaining", () => {
 });
 
 describe("budgetTargetName", () => {
-    it("lê o par que o Scope manda ler, e não o id que veio nulo", () => {
+    it("lê o par que veio preenchido, um de cada vez", () => {
         expect(budgetTargetName(aBudgetPeriod())).toBe("Alimentação");
         expect(budgetTargetName(aPersonBudgetPeriod())).toBe("Maria");
+    });
+
+    /* O terceiro formato de alvo: a pessoa NAQUELA categoria. O nome é
+       composto porque nenhuma das duas metades sozinha identifica a
+       fatia — "Maria" e "Maria · Alimentação" convivem na mesma lista. */
+    it("compõe pessoa e categoria quando os dois vêm", () => {
+        expect(budgetTargetName(aPersonCategoryBudgetPeriod())).toBe("Maria · Alimentação");
+    });
+
+    /* O alvo arquivado some da lista do mês, então este é um caso que não
+       deveria acontecer — e não o normal. */
+    it("nomeia o alvo arquivado em vez de deixar a fatia sem nome", () => {
+        expect(budgetTargetName(aPersonBudgetPeriod({ Person: null }))).toBe("Pessoa arquivada");
+        expect(budgetTargetName(aBudgetPeriod({ Category: null }))).toBe("Categoria arquivada");
     });
 });
 

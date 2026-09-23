@@ -1,30 +1,27 @@
 import { errorMessage } from "@/api/client";
 import { BudgetPeriodsConnection } from "@/api/BudgetPeriods.connection";
-import { BudgetsConnection } from "@/api/Budgets.connection";
 import type { DashboardContext } from "../controller";
 
-/** Definir ou corrigir o teto de um ALVO no mês.
+/** Criar ou corrigir uma FATIA da renda do mês.
  *
- *  O alvo é uma CATEGORIA ou uma PESSOA, nunca os dois — mesma tabela,
- *  mesmo POST, mesma lista, e `IdCategory`/`IdPerson` são mutuamente
- *  exclusivos: mandar os dois, ou nenhum, é 406. Os dois somam coisas
- *  diferentes: a categoria soma o gasto inteiro, a pessoa soma o eixo
- *  ANALÍTICO (`ExpensePersons`), rateado pela parcela.
+ *  O alvo pode ser uma categoria, uma pessoa, ou as duas — desde a leva
+ *  9 `IdCategory` e `IdPerson` não são mais exclusivos, e o que é 406 é
+ *  mandar NENHUM dos dois. **Este formulário ainda monta uma fatia de um
+ *  alvo só**: a tela do orçamento é reescrita na etapa 12, e é lá que a
+ *  fatia de pessoa + categoria ganha como ser montada.
  *
  *  São DUAS rotas, e a diferença não é técnica:
  *
- *  - `POST /Budgets` resolve a DEFINIÇÃO vigente (cria, ou atualiza — só
- *    existe uma por alvo) e materializa o mês. Isso muda o FUTURO.
- *  - `PUT /BudgetPeriods` mexe em UM mês só, e a definição segue como
- *    estava. É a correção de um mês que já foi congelado.
+ *  - `POST /BudgetPeriods` cria a fatia. Uma escrita só: não há mais
+ *    definição perene para resolver antes.
+ *  - `PUT /BudgetPeriods` corrige o valor de uma fatia que já existe.
  *
- *  Mês passado guarda o teto que realmente valeu: nunca se lê o limite
- *  de um mês passado da definição. É essa separação que a escolha entre
- *  as duas rotas preserva.
+ *  As duas recusam com 403 num mês FECHADO — é a trava que impede
+ *  reescrever a história de agosto em novembro.
  *
  *  `ReferenceMonth` vai como "YYYY-MM" e volta como "YYYY-MM-01" — a
- *  coluna guarda o dia 1. E `ReferenceMonth`/`IdBudget` não são aceitos
- *  no PUT: mover o teto de lugar é apagar este e cadastrar outro. */
+ *  coluna guarda o dia 1. E `ReferenceMonth`/alvo não são aceitos no
+ *  PUT: mover a fatia de lugar é apagar esta e cadastrar outra. */
 export async function saveBudget(context: DashboardContext): Promise<void> {
     const draft = context.budgetDraft;
     if (!draft) return;
@@ -48,23 +45,23 @@ export async function saveBudget(context: DashboardContext): Promise<void> {
 
     try {
         if (draft.IdBudgetPeriod === null) {
-            await BudgetsConnection.upsert({
-                // Exatamente UM dos dois — a união do tipo é o que impede
-                // montar aqui um corpo que a API recusaria.
+            await BudgetPeriodsConnection.create({
+                // Pelo menos um dos dois — a união do tipo é o que impede
+                // montar aqui um corpo vazio, que a API recusaria.
                 ...(draft.Scope === "person" ? { IdPerson: target } : { IdCategory: target }),
                 ReferenceMonth: draft.ReferenceMonth,
                 LimitValue: draft.LimitValue,
                 AlertPercent: draft.AlertPercent,
             });
             context.closeBudgetForm();
-            context.finishSubmit("Teto definido para este mês.");
+            context.finishSubmit("Fatia definida para este mês.");
         } else {
             await BudgetPeriodsConnection.update(draft.IdBudgetPeriod, {
                 LimitValue: draft.LimitValue,
                 AlertPercent: draft.AlertPercent,
             });
             context.closeBudgetForm();
-            context.finishSubmit("Teto deste mês corrigido — a definição segue como estava.");
+            context.finishSubmit("Fatia deste mês corrigida.");
         }
     } catch (cause) {
         context.failSubmit(errorMessage(cause));

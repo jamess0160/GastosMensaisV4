@@ -2,20 +2,26 @@ import { removeBudgetPeriod } from "./sections/removeBudgetPeriod";
 import { saveBudget } from "./sections/saveBudget";
 import type { ApiTypes } from "@/types/api";
 
-/** O rascunho de um teto de orçamento.
+/** Qual dos dois campos de alvo o FORMULÁRIO está editando.
  *
- *  `IdBudgetPeriod` nulo é "definir o teto deste mês" (POST /Budgets, que
- *  resolve a definição e materializa o mês numa transaction);
- *  preenchido é "corrigir só este mês" (PUT /BudgetPeriods). São rotas
- *  diferentes porque são intenções diferentes: a primeira muda o futuro,
- *  a segunda mexe num mês só. */
+ *  É estado de tela, não da API: a resposta traz `IdCategory` e
+ *  `IdPerson` e nada mais, e desde a leva 9 os dois podem vir juntos. O
+ *  formulário ainda pede um alvo de cada vez — a tela do orçamento é
+ *  reescrita na etapa 12, e é lá que a fatia de pessoa + categoria ganha
+ *  como ser montada. */
+export type BudgetDraftScope = "category" | "person";
+
+/** O rascunho de uma fatia do orçamento.
+ *
+ *  `IdBudgetPeriod` nulo é "criar a fatia" (POST /BudgetPeriods);
+ *  preenchido é "corrigir o valor dela" (PUT). O alvo não se muda numa
+ *  fatia que já existe: mover é apagar esta e cadastrar outra. */
 export interface BudgetDraft {
     IdBudgetPeriod: number | null;
-    /** Categoria OU pessoa — os dois são mutuamente exclusivos, e mandar
-     *  os dois (ou nenhum) é 406. O rascunho guarda os dois ids para o
-     *  usuário poder trocar de alvo sem perder o que já escolheu; quem
-     *  decide qual vai no corpo é o `Scope`. */
-    Scope: ApiTypes.BudgetScope;
+    /** O rascunho guarda os dois ids para o usuário poder trocar de alvo
+     *  sem perder o que já escolheu; quem decide qual vai no corpo é o
+     *  `Scope` acima. */
+    Scope: BudgetDraftScope;
     IdCategory: number | null;
     IdPerson: number | null;
     ReferenceMonth: ApiTypes.ReferenceMonth;

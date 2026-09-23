@@ -1,11 +1,19 @@
 import { Request, Response } from "express"
+import { GetByMonth } from "./sections/GET/getByMonth"
+import { Create } from "./sections/POST/create"
 import { Remove } from "./sections/DELETE/remove"
 import { Update } from "./sections/PUT/update"
 
 class Controller {
 
-    //  Não há POST: o mês nasce junto com o cadastro do orçamento (POST /Budgets), dentro
-    //  da transaction dele — e é essa escrita que a rotina mensal vai passar a fazer.
+    getByMonth = async (req: Request, res: Response) => {
+        res.json(await new GetByMonth().run(res.locals.IdWorkspace, res.locals.IdUser, req.query.ReferenceMonth as string))
+    }
+
+    create = async (req: Request, res: Response) => {
+        res.json(await new Create().run(res.locals.IdWorkspace, res.locals.IdUser, req.body))
+    }
+
     update = async (req: Request, res: Response) => {
         res.json(await new Update().run(res.locals.IdWorkspace, Number(req.params.IdBudgetPeriod), res.locals.IdUser, req.body))
     }

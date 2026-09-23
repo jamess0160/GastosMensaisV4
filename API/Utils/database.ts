@@ -203,41 +203,35 @@ export namespace Database {
         UpdatedAt: Datetime
     }
 
-    /** A definicao vigente do teto da categoria. Uma linha por categoria, sem mes. */
-    export interface Budgets {
-        IdBudget: number
-        IdWorkspace: number
-        IdUser: number | null
-        /**
-         * O alvo do teto: IdCategory OU IdPerson, nunca os dois e nunca nenhum - um CHECK
-         * garante o xor, e dois indices parciais garantem a unicidade dentro de cada tipo.
-         *
-         * Sao duas perguntas diferentes sobre o mesmo dinheiro ("quanto foi de mercado" e
-         * "quanto foi da Maria"), entao um gasto conta nos dois. O que nao se pode e somar
-         * os dois num total.
-         */
-        IdCategory: number | null
-        /** O outro alvo possivel: o eixo ANALITICO (ExpensePersons), nao o financeiro. */
-        IdPerson: number | null
-        LimitValue: number
-        AlertPercent: number
-        Active: boolean
-        CreatedAt: Datetime
-        UpdatedAt: Datetime
-    }
-
     /**
-     * O historico: o teto que valeu em cada mes, congelado. Materializado por
-     * rotina a partir de Budgets, e editavel mes a mes sem mexer na definicao.
+     * UMA FATIA DA RENDA DE UM MES. Nao ha mais definicao perene: a tabela Budgets morreu
+     * na leva 9 (migration 20260922150000) junto com o "para sempre" que ela guardava.
+     *
+     * Cada linha e uma fatia do mes, e as fatias SOMAM lado a lado: "Luana 250" e
+     * "Luana + Mercado 100" dao 350 para a Luana. Nao ha aninhamento nem teto dentro de
+     * teto - a soma de todas as linhas e o quanto do mes foi alocado.
      */
     export interface BudgetPeriods {
         IdBudgetPeriod: number
         IdWorkspace: number
-        IdBudget: number
+        /**
+         * O alvo, em duas colunas anulaveis com um CHECK de PELO MENOS UM - o oposto do
+         * xor que Budgets impunha. Tres formatos validos, e um indice parcial unico por
+         * formato: so categoria, so pessoa, e pessoa + categoria ("250 para o Tiago em
+         * alimentacao").
+         */
+        IdCategory: number | null
+        /** O eixo ANALITICO (ExpensePersons), nunca o financeiro. */
+        IdPerson: number | null
         /** Sempre o dia 1 do mes. Vem do Postgres como "YYYY-MM-DD". */
         ReferenceMonth: CalendarDate
         LimitValue: number
         AlertPercent: number
+        /**
+         * Carimbado pela rotina CloseBudgetMonth, a unica coisa no sistema que sabe que um
+         * mes acabou. MES FECHADO NAO ACEITA ESCRITA: e a trava que impede reescrever a
+         * historia de agosto em novembro.
+         */
         Status: "open" | "closed"
         ClosedAt: Datetime | null
         CreatedAt: Datetime

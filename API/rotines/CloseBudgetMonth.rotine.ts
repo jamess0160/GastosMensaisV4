@@ -6,13 +6,16 @@ import { RotinesNamespace } from "./section/types"
 //  **Fecha o mês que acabou**: no dia 1º, todo `BudgetPeriods` do mês anterior que ainda está
 //  `open` passa a `closed`, com `ClosedAt` carimbado.
 //
-//  Anda junto com a materialização porque as duas são a mesma coisa vista dos dois lados da
-//  virada — uma abre o mês novo, a outra encerra o velho. São **duas rotinas** e não uma porque
-//  cada uma reivindica a sua linha em `RotineRuns`: um erro ao fechar agosto não pode deixar
-//  setembro sem os tetos dele.
+//  **É a única rotina do orçamento desde a leva 9.** Ela andava junto com uma
+//  `MaterializeBudgetPeriods`, que abria o mês novo a partir das definições perenes de
+//  `Budgets` — as duas morreram juntas quando o orçamento virou uma repartição da renda do mês:
+//  nada nasce sozinho, um mês tem orçamento porque alguém o montou.
 //
-//  O fechamento é evento de *tempo*, não de leitura, e é por isso que ele nunca teve como
-//  existir antes do motor: nenhuma rota podia decidir que um mês acabou.
+//  Esta ficou, e o carimbo dela ganhou um segundo uso. O fechamento é evento de *tempo*, não de
+//  leitura, e é por isso que ele nunca teve como existir antes do motor: nenhuma rota podia
+//  decidir que um mês acabou. Agora **mês fechado não aceita escrita** — é o `ClosedAt` daqui
+//  que impede reescrever a história de agosto em novembro, que era a razão pela qual o período
+//  existia congelado.
 export const CloseBudgetMonth: RotinesNamespace.Rotine = {
 
     name: "CloseBudgetMonth",

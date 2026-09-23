@@ -1,17 +1,26 @@
 import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tests"
 
-//  Testes integrados de BudgetPeriods — o mês congelado do orçamento. Um describe por rota de
-//  BudgetPeriods.route.ts, mais o fluxo end to end no fim.
+//  Testes integrados de BudgetPeriods — **o orçamento como repartição da renda de um mês**. Um
+//  describe por rota de BudgetPeriods.route.ts, mais o fluxo end to end no fim.
 //
-//  A definição é arranjo, não objeto de teste: o mês vem pelo POST /Budgets porque é de lá que
-//  ele nasce congelado, com o teto que valia na hora. Quem testa a definição é Budgets.test.ts.
+//  A suíte de `Budgets` foi absorvida por esta na leva 9, junto com a feature: o teto perene
+//  por alvo e a rotina que o congelava no dia 1º acabaram, e o que sobrou é a linha do mês —
+//  a única coisa que o usuário de fato escreve.
 //
-//  Duas coisas carregam a suíte, e são as duas que a separação em duas tabelas comprou:
+//  Quatro coisas carregam o arquivo:
 //
-//  1. **mexer no mês não mexe na definição** — "em dezembro pode 1.500" não reajusta nada e não
-//     vaza para agosto, que é o que faz "qual era meu teto em agosto" continuar tendo resposta;
-//  2. **o delete aqui é físico**, o único do projeto: o período é plano, não lançamento. A
-//     definição sobrevive a ele, porque é dela que a rotina mensal vai materializar os meses.
+//  1. **os três formatos de alvo** — só categoria, só pessoa, e pessoa + categoria. O terceiro
+//     é o que o `xor` antigo proibia, e é a razão da etapa: "250 para o Tiago em alimentação";
+//  2. **a unicidade de cada formato** — três índices parciais e não uma unique sobre as quatro
+//     colunas, porque NULL não conflita com NULL. "Mercado" e "Maria em Mercado" convivem no
+//     mesmo mês, e cada um deles duas vezes é 406;
+//  3. **qualquer mês** — passado, corrente ou futuro. Nada nasce de rotina, então outubro em
+//     setembro é só um POST;
+//  4. **mês fechado recusa escrita** — o `ClosedAt` que a rotina carimba é a trava que impede
+//     reescrever a história de agosto em novembro.
+//
+//  E o comprometido, que é o que dá sentido ao número ao lado: a parcela conta no mês em que
+//  vence, e o pendente conta junto com o pago, ao contrário do saldo.
 
 describe("BudgetPeriods", () => {
 
@@ -21,7 +30,7 @@ describe("BudgetPeriods", () => {
     let otherClient: TestClient
 
     beforeAll(async () => {
-        //  CASCADE: truncar Users leva Workspaces, Categories, Budgets e BudgetPeriods junto
+        //  CASCADE: truncar Users leva Workspaces, Categories e BudgetPeriods junto
         await TestDatabase.truncate(["Users"])
 
         root = await UsersFactory.create({ Name: "Dono dos orçamentos" })
@@ -29,6 +38,612 @@ describe("BudgetPeriods", () => {
 
         other = await UsersFactory.create({ Name: "Usuário de outro workspace" })
         otherClient = new TestClient(other.token)
+    })
+
+    describe("GET /BudgetPeriods", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            expect(response.status).toBe(406)
+        })
+
+        it("recusa token válido apontando para o workspace de outro usuário", async () => {
+            let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, root.workspace.IdWorkspace))
+
+            let response = await forged.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            expect(response.status).toBe(406)
+        })
+
+        //  O mês é a unidade aqui, ao contrário das listagens de movimento
+        it("recusa mês fora do formato YYYY-MM", async () => {
+            let workspace = await buildWorkspace()
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08-01`)).status).toBe(406)
+            expect((await workspace.client.get(`/BudgetPeriods`)).status).toBe(406)
+        })
+
+        it("devolve lista vazia quando o mês não tem orçamento", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual([])
+        })
+
+        it("devolve a fatia do mês com a categoria e o comprometido zerado", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { LimitValue: 800 })
+
+            let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toHaveLength(1)
+            expect(response.body[0]).toMatchObject({
+                LimitValue: 800,
+                AlertPercent: 80,
+                //  Nasce aberto: fechar o mês é trabalho da rotina do dia 1º
+                Status: "open",
+                ClosedAt: null,
+                //  Sempre o dia 1 do mês
+                ReferenceMonth: "2026-08-01",
+                IdPerson: null,
+                Person: null,
+                Spent: 0,
+            })
+            expect(response.body[0].Category.Description).toBe("Mercado")
+        })
+
+        //  Cada mês é uma lista: o de agosto não aparece na consulta de setembro
+        it("devolve só o mês pedido", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPeriod(workspace, { ReferenceMonth: "2026-09", LimitValue: 900 })
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([800])
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body.map(limit)).toEqual([900])
+        })
+
+        //  **Qualquer mês responde, e nada nasce sozinho.** Era o furo do modelo anterior:
+        //  `BudgetPeriods` só nascia pela rotina do dia 1º, então navegar para outubro em
+        //  setembro devolvia lista vazia e não havia como montar o mês que vem.
+        it("lê o mês futuro que foi montado à mão", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { ReferenceMonth: "2027-03", LimitValue: 1200 })
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2027-03`)).body.map(limit)).toEqual([1200])
+        })
+
+        it("não devolve o orçamento de outro workspace", async () => {
+            let owner = await buildWorkspace()
+
+            await createPeriod(owner)
+
+            expect((await otherClient.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body).toEqual([])
+        })
+
+        //  **O número que dá sentido à fatia.** Gasto lançado no mês, na categoria orçada.
+        it("soma o gasto do mês na categoria orçada", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { LimitValue: 800 })
+
+            await createExpense(workspace, { TotalValue: 300, ExpenseDate: "2026-08-10" })
+            await createExpense(workspace, { TotalValue: 120.5, ExpenseDate: "2026-08-28" })
+            //  Fora do mês e fora da categoria não entram
+            await createExpense(workspace, { TotalValue: 999, ExpenseDate: "2026-09-02" })
+            await createExpense(workspace, { TotalValue: 999, ExpenseDate: "2026-08-15", IdCategory: await createCategory(workspace, "Lazer") })
+
+            let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            expect(response.body[0].Spent).toBe(420.5)
+        })
+
+        //  Orçamento é **comprometido**, não realizado: o gasto lançado e ainda não quitado já
+        //  consumiu a fatia. É o oposto do saldo da conta, que só soma perna paga.
+        it("conta o gasto pendente junto com o pago", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { LimitValue: 800 })
+
+            await createExpense(workspace, { TotalValue: 100, ExpenseDate: "2026-08-10", Paid: true })
+            await createExpense(workspace, { TotalValue: 200, ExpenseDate: "2026-08-11" })
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(300)
+        })
+
+        it("não conta gasto cancelado", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { LimitValue: 800 })
+
+            let canceled = await createExpense(workspace, { TotalValue: 300, ExpenseDate: "2026-08-10" })
+
+            await workspace.client.delete(`/Expenses/IdExpense=${canceled.IdExpense}`)
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(0)
+        })
+
+        //  **A parcela pesa no mês em que vence, não no mês da compra.** Somar os 600 em agosto
+        //  estouraria a fatia por uma dívida que é de meio ano.
+        it("distribui a compra parcelada pelos meses das parcelas", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPeriod(workspace, { ReferenceMonth: "2026-09", LimitValue: 800 })
+
+            await createExpense(workspace, {
+                TotalValue: 600,
+                Kind: "installment",
+                InstallmentTotal: 6,
+                ExpenseDate: "2026-08-10",
+            })
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(100)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body[0].Spent).toBe(100)
+        })
+
+        //  **O teste que sustenta a decisão do rateio.** Sem ele, o mesmo gasto contaria 600
+        //  na fatia da pessoa e 100 na da categoria, e "quanto a Maria comprometeu em agosto"
+        //  não teria resposta certa.
+        it("rateia a parcela pelo rateio do gasto: 600 em 6x da Maria dão 100 no mês", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createPersonPeriod(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            await createExpense(workspace, {
+                TotalValue: 600,
+                Kind: "installment",
+                InstallmentTotal: 6,
+                ExpenseDate: "2026-08-10",
+                Persons: [{ IdPerson, Value: 600 }],
+            })
+
+            let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toHaveLength(1)
+            //  100, não 600: o rateio é do gasto e a parcela é da perna
+            expect(response.body[0].Spent).toBe(100)
+        })
+
+        //  São duas perguntas diferentes sobre o mesmo dinheiro, e as duas respondem o mesmo
+        //  número quando o gasto é todo de uma pessoa só. Somar as duas é que seria errado.
+        it("conta a mesma compra na fatia da categoria e na da pessoa", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPersonPeriod(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            await createExpense(workspace, {
+                TotalValue: 250,
+                ExpenseDate: "2026-08-10",
+                Persons: [{ IdPerson, Value: 250 }],
+            })
+
+            let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            expect(response.body).toHaveLength(2)
+            expect(response.body.map((item: { Spent: number }) => item.Spent)).toEqual([250, 250])
+        })
+
+        //  O rateio arredonda **uma vez, no fim**: a divisão em numeric do Postgres tem
+        //  precisão de sobra, e arredondar por parcela espalharia o erro.
+        it("arredonda o rateio uma vez, no fim", async () => {
+            let workspace = await buildWorkspace()
+            let maria = await createPerson(workspace, "Maria")
+            let joao = await createPerson(workspace, "João")
+
+            await createPersonPeriod(workspace, maria, { ReferenceMonth: "2026-08", LimitValue: 500 })
+            await createPersonPeriod(workspace, joao, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            await createExpense(workspace, {
+                TotalValue: 600,
+                Kind: "installment",
+                InstallmentTotal: 6,
+                ExpenseDate: "2026-08-10",
+                Persons: [{ IdPerson: maria, Value: 400 }, { IdPerson: joao, Value: 200 }],
+            })
+
+            let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            let byPerson = new Map(response.body.map((item: { IdPerson: number }) => [item.IdPerson, item]))
+
+            expect((byPerson.get(maria) as { Spent: number }).Spent).toBe(66.67)
+            expect((byPerson.get(joao) as { Spent: number }).Spent).toBe(33.33)
+        })
+
+        //  **Parece bug e não é.** Persons é opcional no gasto, então a soma das fatias de
+        //  pessoa não fecha com o total gasto do mês.
+        it("não conta na fatia de pessoa o gasto sem rateio", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPersonPeriod(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
+
+            await createExpense(workspace, { TotalValue: 250, ExpenseDate: "2026-08-10" })
+
+            let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            let byTarget = new Map(response.body.map((item: { IdPerson: number | null }) => [item.IdPerson, item]))
+
+            //  A categoria enxerga o gasto inteiro; a pessoa não enxerga nada
+            expect((byTarget.get(null) as { Spent: number }).Spent).toBe(250)
+            expect((byTarget.get(IdPerson) as { Spent: number }).Spent).toBe(0)
+        })
+
+        //  **Os três formatos na mesma lista.** É o exemplo que definiu o modelo, com 1.000
+        //  recebidos: Luana 250, Tiago em Alimentação 250, Mercado 500.
+        it("devolve os três formatos de alvo na mesma lista, com o alvo inteiro", async () => {
+            let workspace = await buildWorkspace()
+            let luana = await createPerson(workspace, "Luana")
+            let tiago = await createPerson(workspace, "Tiago")
+            let alimentacao = await createCategory(workspace, "Alimentação")
+
+            await createPersonPeriod(workspace, luana, { LimitValue: 250 })
+            await postPeriod(workspace, { IdPerson: tiago, IdCategory: alimentacao, LimitValue: 250 })
+            await createPeriod(workspace, { LimitValue: 500 })
+
+            let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toHaveLength(3)
+
+            let [onlyPerson, both, onlyCategory] = response.body
+
+            expect(onlyPerson).toMatchObject({ IdPerson: luana, IdCategory: null, Category: null, LimitValue: 250 })
+            expect(onlyPerson.Person.Name).toBe("Luana")
+
+            expect(both).toMatchObject({ IdPerson: tiago, IdCategory: alimentacao, LimitValue: 250 })
+            expect(both.Person.Name).toBe("Tiago")
+            expect(both.Category.Description).toBe("Alimentação")
+
+            expect(onlyCategory).toMatchObject({ IdPerson: null, Person: null, IdCategory: workspace.IdCategory, LimitValue: 500 })
+
+            //  As fatias **somam lado a lado**: é a repartição dos 1.000 do mês
+            expect(response.body.reduce((total: number, item: { LimitValue: number }) => total + item.LimitValue, 0)).toBe(1000)
+        })
+
+        //  O alvo arquivado perde o que mostrar e sai da tela, mas a linha continua no banco —
+        //  arquivar não é apagar, e o mês é histórico
+        it("esconde do mês a fatia de pessoa arquivada", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            let created = await createPersonPeriod(workspace, IdPerson, { LimitValue: 500 })
+
+            await workspace.client.delete(`/Persons/IdPerson=${IdPerson}`)
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body).toHaveLength(0)
+            expect(await findPeriodById(created.IdBudgetPeriod)).toBeDefined()
+        })
+
+        //  **O crédito volta ao orçamento no mês de competência do ESTORNO**, que costuma ser
+        //  outro mês. Agosto fica com a compra cheia e setembro recebe o crédito.
+        it("devolve o crédito do estorno no mês da competência dele", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPeriod(workspace, { ReferenceMonth: "2026-09", LimitValue: 800 })
+
+            //  Compra de 10/08 num cartão que fecha no 20: cai na fatura de agosto
+            await createExpense(workspace, { TotalValue: 500, ExpenseDate: "2026-08-10", IdPaymentMethod: card })
+
+            //  Estorno de 21/08: já é a fatura de setembro
+            await createExpense(workspace, { TotalValue: -150, ExpenseDate: "2026-08-21", IdPaymentMethod: card })
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(500)
+            //  **Spent negativo é resposta legítima:** o mês só teve o crédito
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body[0].Spent).toBe(-150)
+        })
+
+        //  O rateio por pessoa sobrevive ao sinal sem tocar na fórmula: (−150 × −150) ÷ −150
+        it("desce a fatia da pessoa com o sinal do estorno", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createPersonPeriod(workspace, IdPerson, { LimitValue: 500 })
+
+            await createExpense(workspace, {
+                TotalValue: 400,
+                ExpenseDate: "2026-08-10",
+                IdPaymentMethod: card,
+                Persons: [{ IdPerson, Value: 400 }],
+            })
+
+            await createExpense(workspace, {
+                TotalValue: -150,
+                ExpenseDate: "2026-08-10",
+                IdPaymentMethod: card,
+                Persons: [{ IdPerson, Value: -150 }],
+            })
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(250)
+        })
+
+        //  Num cartão em modo 'invoice', o que pesa no mês é a fatura que vence nele — a compra
+        //  do dia 21 num cartão que fecha no 20 já é do mês seguinte.
+        it("usa o vencimento da fatura no gasto de cartão", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPeriod(workspace, { ReferenceMonth: "2026-09", LimitValue: 800 })
+
+            await createExpense(workspace, { TotalValue: 150, ExpenseDate: "2026-08-21", IdPaymentMethod: card })
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body[0].Spent).toBe(0)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body[0].Spent).toBe(150)
+        })
+    })
+
+    describe("POST /BudgetPeriods", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().post(`/BudgetPeriods`, {
+                IdCategory: 1,
+                ReferenceMonth: "2026-08",
+                LimitValue: 800,
+            })
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa corpo sem mês ou valor", async () => {
+            let workspace = await buildWorkspace()
+
+            expect((await workspace.client.post(`/BudgetPeriods`, {})).status).toBe(406)
+            expect((await workspace.client.post(`/BudgetPeriods`, { IdCategory: workspace.IdCategory, ReferenceMonth: "2026-08" })).status).toBe(406)
+        })
+
+        //  **Sem alvo nenhum continua sendo 406.** O CHECK virou "pelo menos um", não "nenhum":
+        //  um valor que não diz do que é não soma contra coisa nenhuma.
+        it("recusa corpo sem alvo nenhum", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/BudgetPeriods`, {
+                ReferenceMonth: "2026-08",
+                LimitValue: 800,
+            })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  Valor zero é não ter a fatia, e isso se faz apagando a linha
+        it("recusa valor zero ou negativo", async () => {
+            let workspace = await buildWorkspace()
+
+            expect((await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { LimitValue: 0 }))).status).toBe(406)
+            expect((await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { LimitValue: -1 }))).status).toBe(406)
+        })
+
+        //  O IdCategory é sequencial e chega do cliente
+        it("recusa categoria de outro workspace", async () => {
+            let workspace = await buildWorkspace()
+            let stranger = await buildWorkspace()
+
+            let response = await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { IdCategory: stranger.IdCategory }))
+
+            expect(response.status).toBe(406)
+        })
+
+        //  O IdPerson chega do cliente e é sequencial, como todo id
+        it("recusa pessoa de outro workspace", async () => {
+            let workspace = await buildWorkspace()
+            let outro = await buildWorkspace()
+            let IdPerson = await createPerson(outro, "Maria do vizinho")
+
+            let response = await workspace.client.post(`/BudgetPeriods`, {
+                IdPerson,
+                ReferenceMonth: "2026-08",
+                LimitValue: 500,
+            })
+
+            expect(response.status).toBe(406)
+        })
+
+        it("recusa token válido apontando para o workspace de outro usuário", async () => {
+            let owner = await buildWorkspace()
+            let forged = new TestClient(UsersFactory.buildToken(other.user.IdUser, owner.user.workspace.IdWorkspace))
+
+            let response = await forged.post(`/BudgetPeriods`, buildBody(owner))
+
+            expect(response.status).toBe(406)
+            expect(await findPeriods(owner.user.workspace.IdWorkspace)).toHaveLength(0)
+        })
+
+        //  Ser membro não basta: montar o mês é escrita, e o viewer só lê
+        it("recusa membro viewer", async () => {
+            let owner = await buildWorkspace()
+            let viewerClient = await buildViewerClient(owner)
+
+            let response = await viewerClient.post(`/BudgetPeriods`, buildBody(owner))
+
+            expect(response.status).toBe(403)
+            expect(await findPeriods(owner.user.workspace.IdWorkspace)).toHaveLength(0)
+        })
+
+        //  **Uma escrita só.** Eram duas até a leva 9 — a definição vigente e o mês congelado.
+        it("grava a fatia de categoria", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { LimitValue: 800, AlertPercent: 90 }))
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({ IdBudgetPeriod: expect.any(Number) })
+
+            let [period] = await findPeriods(workspace.user.workspace.IdWorkspace)
+
+            expect(period).toMatchObject({
+                IdCategory: workspace.IdCategory,
+                IdPerson: null,
+                ReferenceMonth: "2026-08-01",
+                LimitValue: 800,
+                AlertPercent: 90,
+                Status: "open",
+            })
+        })
+
+        it("grava a fatia de pessoa com a categoria nula", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createPersonPeriod(workspace, IdPerson, { LimitValue: 500 })
+
+            let [period] = await findPeriods(workspace.user.workspace.IdWorkspace)
+
+            expect(period).toMatchObject({ IdPerson, IdCategory: null, LimitValue: 500 })
+        })
+
+        //  **O formato que o `xor` antigo proibia**, e a razão inteira da etapa.
+        it("grava a fatia de pessoa E categoria", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Tiago")
+            let IdCategory = await createCategory(workspace, "Alimentação")
+
+            let response = await postPeriod(workspace, { IdPerson, IdCategory, LimitValue: 250 })
+
+            expect(response.IdBudgetPeriod).toEqual(expect.any(Number))
+
+            expect(await findPeriodById(response.IdBudgetPeriod)).toMatchObject({ IdPerson, IdCategory, LimitValue: 250 })
+        })
+
+        //  **Os três formatos convivem no mesmo mês**, e é para isso que são três índices
+        //  parciais em vez de uma unique sobre as quatro colunas.
+        it("aceita os três formatos de alvo no mesmo mês", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Luana")
+
+            await createPeriod(workspace, { LimitValue: 500 })
+            await createPersonPeriod(workspace, IdPerson, { LimitValue: 250 })
+            await postPeriod(workspace, { IdPerson, IdCategory: workspace.IdCategory, LimitValue: 100 })
+
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(3)
+        })
+
+        //  **"Mercado" e "Luana em Mercado" não são o mesmo alvo.** A segunda não é um teto
+        //  dentro da primeira: as duas somam lado a lado, e a repetição que o índice barra é a
+        //  do alvo inteiro.
+        it("não confunde a fatia da categoria com a de pessoa + a mesma categoria", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Luana")
+
+            await createPeriod(workspace, { LimitValue: 500 })
+
+            let response = await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { IdPerson, LimitValue: 100 }))
+
+            expect(response.status).toBe(200)
+        })
+
+        it("recusa a mesma categoria duas vezes no mesmo mês", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace)
+
+            expect((await workspace.client.post(`/BudgetPeriods`, buildBody(workspace))).status).toBe(406)
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
+        })
+
+        it("recusa a mesma pessoa duas vezes no mesmo mês", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Maria")
+
+            await createPersonPeriod(workspace, IdPerson)
+
+            let response = await workspace.client.post(`/BudgetPeriods`, {
+                IdPerson,
+                ReferenceMonth: "2026-08",
+                LimitValue: 900,
+            })
+
+            expect(response.status).toBe(406)
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
+        })
+
+        it("recusa o mesmo par pessoa + categoria duas vezes no mesmo mês", async () => {
+            let workspace = await buildWorkspace()
+            let IdPerson = await createPerson(workspace, "Tiago")
+
+            await postPeriod(workspace, { IdPerson, IdCategory: workspace.IdCategory, LimitValue: 250 })
+
+            let response = await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { IdPerson, LimitValue: 300 }))
+
+            expect(response.status).toBe(406)
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
+        })
+
+        //  Duas categorias, duas fatias no mesmo mês
+        it("aceita mais de uma categoria no mesmo mês", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace)
+            await createPeriod(workspace, { IdCategory: await createCategory(workspace, "Lazer") })
+
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body).toHaveLength(2)
+        })
+
+        //  A mesma categoria em dois meses é duas linhas, e uma não sabe da outra: não há mais
+        //  definição perene por trás delas.
+        it("aceita a mesma categoria em meses diferentes, com valores diferentes", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            await createPeriod(workspace, { ReferenceMonth: "2026-09", LimitValue: 1000 })
+
+            expect((await findPeriods(workspace.user.workspace.IdWorkspace)).map(limit)).toEqual([800, 1000])
+        })
+
+        //  **Outubro pode ser montado em setembro**, e março de 2025 também. Nenhum dos dois
+        //  tinha como existir enquanto o mês nascia da rotina do dia 1º.
+        it("monta qualquer mês, passado ou futuro", async () => {
+            let workspace = await buildWorkspace()
+
+            expect((await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { ReferenceMonth: "2025-03" }))).status).toBe(200)
+            expect((await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { ReferenceMonth: "2027-12" }))).status).toBe(200)
+        })
+
+        //  **Mês fechado não aceita escrita.** É a trava que impede montar uma fatia em agosto
+        //  depois que a virada de setembro já o encerrou.
+        it("recusa a fatia nova em mês fechado", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { LimitValue: 800 })
+            await closeMonth(workspace, "2026-08-01")
+
+            let response = await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, {
+                IdCategory: await createCategory(workspace, "Lazer"),
+            }))
+
+            expect(response.status).toBe(403)
+            expect(await findPeriods(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
+        })
+
+        //  Um mês sem linha nenhuma nunca foi fechado: não houve o que encerrar, e registrar um
+        //  mês passado agora é caminho normal.
+        it("aceita montar um mês passado que nunca teve orçamento", async () => {
+            let workspace = await buildWorkspace()
+
+            await createPeriod(workspace, { ReferenceMonth: "2026-08" })
+            await closeMonth(workspace, "2026-08-01")
+
+            expect((await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { ReferenceMonth: "2026-07" }))).status).toBe(200)
+        })
     })
 
     describe("PUT /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", () => {
@@ -53,10 +668,10 @@ describe("BudgetPeriods", () => {
         })
 
         //  O IdBudgetPeriod é sequencial: sem o filtro de workspace no getUnique, a matrícula
-        //  conferida no próprio tenant liberaria mexer no teto do vizinho
+        //  conferida no próprio tenant liberaria mexer na fatia do vizinho
         it("recusa o período de outro workspace", async () => {
             let owner = await buildWorkspace()
-            let created = await createBudget(owner, { LimitValue: 800 })
+            let created = await createPeriod(owner, { LimitValue: 800 })
 
             let response = await otherClient.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, { LimitValue: 1 })
 
@@ -64,11 +679,11 @@ describe("BudgetPeriods", () => {
             expect((await findPeriodById(created.IdBudgetPeriod)).LimitValue).toBe(800)
         })
 
-        //  Ser membro não basta: mexer no teto é escrita, e o viewer só lê. 403, não 406 — aqui
-        //  o workspace existe para ele, o que falta é o papel.
+        //  Ser membro não basta: mexer no valor é escrita, e o viewer só lê. 403, não 406 —
+        //  aqui o workspace existe para ele, o que falta é o papel.
         it("recusa membro viewer", async () => {
             let owner = await buildWorkspace()
-            let created = await createBudget(owner, { LimitValue: 800 })
+            let created = await createPeriod(owner, { LimitValue: 800 })
             let viewerClient = await buildViewerClient(owner)
 
             let response = await viewerClient.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, { LimitValue: 1 })
@@ -77,12 +692,12 @@ describe("BudgetPeriods", () => {
             expect((await findPeriodById(created.IdBudgetPeriod)).LimitValue).toBe(800)
         })
 
-        //  "Em dezembro pode 1.500" não mexe na definição nem em nenhum outro mês
-        it("muda o teto só daquele mês", async () => {
+        //  Cada linha é uma fatia independente: corrigir dezembro não vaza para agosto
+        it("muda o valor só daquela fatia", async () => {
             let workspace = await buildWorkspace()
 
-            let august = await createBudget(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
-            let december = await createBudget(workspace, { ReferenceMonth: "2026-12", LimitValue: 800 })
+            let august = await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            let december = await createPeriod(workspace, { ReferenceMonth: "2026-12", LimitValue: 800 })
 
             let response = await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${december.IdBudgetPeriod}`, {
                 LimitValue: 1500,
@@ -92,27 +707,28 @@ describe("BudgetPeriods", () => {
             expect(response.status).toBe(200)
             expect(await findPeriodById(december.IdBudgetPeriod)).toMatchObject({ LimitValue: 1500, AlertPercent: 95 })
 
-            //  Agosto e a definição intactos
             expect((await findPeriodById(august.IdBudgetPeriod)).LimitValue).toBe(800)
-            expect((await findBudgets(workspace.user.workspace.IdWorkspace))[0].LimitValue).toBe(800)
         })
 
-        it("recusa mês ou orçamento no corpo", async () => {
+        it("recusa mês ou alvo no corpo", async () => {
             let workspace = await buildWorkspace()
-            let created = await createBudget(workspace)
+            let created = await createPeriod(workspace)
 
-            let response = await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, {
+            expect((await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, {
                 LimitValue: 900,
                 ReferenceMonth: "2026-09-01",
-            })
+            })).status).toBe(406)
 
-            expect(response.status).toBe(406)
+            expect((await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, {
+                LimitValue: 900,
+                IdCategory: workspace.IdCategory,
+            })).status).toBe(406)
         })
 
-        //  Teto zero é não ter teto, e isso se faz apagando o mês — não zerando o número
-        it("recusa teto zerado ou negativo", async () => {
+        //  Valor zero é não ter a fatia, e isso se faz apagando a linha — não zerando o número
+        it("recusa valor zerado ou negativo", async () => {
             let workspace = await buildWorkspace()
-            let created = await createBudget(workspace, { LimitValue: 800 })
+            let created = await createPeriod(workspace, { LimitValue: 800 })
 
             for (let LimitValue of [0, -100]) {
                 let response = await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, { LimitValue })
@@ -123,10 +739,10 @@ describe("BudgetPeriods", () => {
             expect((await findPeriodById(created.IdBudgetPeriod)).LimitValue).toBe(800)
         })
 
-        //  O alerta é percentual do teto: fora de 1..100, ou quebrado, ele não significa nada
+        //  O alerta é percentual do valor: fora de 1..100, ou quebrado, ele não significa nada
         it("recusa AlertPercent fora da faixa", async () => {
             let workspace = await buildWorkspace()
-            let created = await createBudget(workspace)
+            let created = await createPeriod(workspace)
 
             for (let AlertPercent of [0, 101, 80.5]) {
                 let response = await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, {
@@ -136,6 +752,20 @@ describe("BudgetPeriods", () => {
 
                 expect(response.status).toBe(406)
             }
+        })
+
+        //  **Mês fechado não aceita escrita** — é o que impede reescrever a história de agosto
+        //  em novembro, e a única coisa que ainda separa o mês vivido do que já passou.
+        it("recusa corrigir a fatia de um mês fechado", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createPeriod(workspace, { LimitValue: 800 })
+
+            await closeMonth(workspace, "2026-08-01")
+
+            let response = await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`, { LimitValue: 1500 })
+
+            expect(response.status).toBe(403)
+            expect((await findPeriodById(created.IdBudgetPeriod)).LimitValue).toBe(800)
         })
     })
 
@@ -161,7 +791,7 @@ describe("BudgetPeriods", () => {
 
         it("recusa o período de outro workspace", async () => {
             let owner = await buildWorkspace()
-            let created = await createBudget(owner)
+            let created = await createPeriod(owner)
 
             let response = await otherClient.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
 
@@ -173,7 +803,7 @@ describe("BudgetPeriods", () => {
         //  desfazer depois
         it("recusa membro viewer", async () => {
             let owner = await buildWorkspace()
-            let created = await createBudget(owner)
+            let created = await createPeriod(owner)
             let viewerClient = await buildViewerClient(owner)
 
             let response = await viewerClient.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
@@ -182,84 +812,162 @@ describe("BudgetPeriods", () => {
             expect(await findPeriodById(created.IdBudgetPeriod)).toBeDefined()
         })
 
-        //  Delete físico, ao contrário de toda tabela de cadastro: o período é plano, não
-        //  lançamento. A definição fica, porque é dela que a rotina vai materializar os
-        //  próximos meses.
-        it("apaga o mês e mantém a definição", async () => {
+        //  Delete físico, ao contrário de toda tabela de cadastro: a fatia é plano, não
+        //  lançamento. E nada sobrevive a ela — não há mais definição perene por trás.
+        it("apaga a fatia", async () => {
             let workspace = await buildWorkspace()
 
-            let created = await createBudget(workspace)
+            let created = await createPeriod(workspace)
 
             let response = await workspace.client.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
 
             expect(response.status).toBe(200)
             expect(await findPeriodById(created.IdBudgetPeriod)).toBeUndefined()
-            expect(await findBudgets(workspace.user.workspace.IdWorkspace)).toHaveLength(1)
-
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body).toEqual([])
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body).toEqual([])
         })
 
-        //  Apagar um mês não leva os outros junto: o delete é por id de período, e cada mês da
-        //  mesma categoria é uma linha
+        //  Apagar um mês não leva os outros junto: o delete é por id, e cada mês é uma linha
         it("não mexe nos outros meses da mesma categoria", async () => {
             let workspace = await buildWorkspace()
 
-            let august = await createBudget(workspace, { ReferenceMonth: "2026-08" })
-            let september = await createBudget(workspace, { ReferenceMonth: "2026-09" })
+            let august = await createPeriod(workspace, { ReferenceMonth: "2026-08" })
+            let september = await createPeriod(workspace, { ReferenceMonth: "2026-09" })
 
             expect((await workspace.client.delete(`/BudgetPeriods/IdBudgetPeriod=${august.IdBudgetPeriod}`)).status).toBe(200)
 
             expect(await findPeriodById(september.IdBudgetPeriod)).toBeDefined()
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-09`)).body).toHaveLength(1)
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body).toHaveLength(1)
         })
 
-        //  Apagado o mês, a categoria pode ser orçada de novo nele
-        it("libera o mês para um cadastro novo", async () => {
+        //  Apagada a fatia, o alvo pode ser orçado de novo naquele mês
+        it("libera o alvo para uma fatia nova no mesmo mês", async () => {
             let workspace = await buildWorkspace()
 
-            let created = await createBudget(workspace, { LimitValue: 800 })
+            let created = await createPeriod(workspace, { LimitValue: 800 })
 
             await workspace.client.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
 
-            let response = await workspace.client.post(`/Budgets`, buildBody(workspace, { LimitValue: 500 }))
+            let response = await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, { LimitValue: 500 }))
 
             expect(response.status).toBe(200)
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([500])
+            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([500])
+        })
+
+        //  Delete é escrita, e mês fechado não aceita escrita — aqui com mais razão, já que o
+        //  delete é físico e não há como desfazê-lo
+        it("recusa apagar a fatia de um mês fechado", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createPeriod(workspace)
+
+            await closeMonth(workspace, "2026-08-01")
+
+            let response = await workspace.client.delete(`/BudgetPeriods/IdBudgetPeriod=${created.IdBudgetPeriod}`)
+
+            expect(response.status).toBe(403)
+            expect(await findPeriodById(created.IdBudgetPeriod)).toBeDefined()
         })
     })
 
     describe("Fluxo end to end", () => {
 
-        //  O ajuste de um mês, só por HTTP: orça, corrige o teto daquele mês, cadastra o mês
-        //  seguinte e confirma que o ajuste ficou preso onde foi feito. Depois tira o mês, e a
-        //  definição continua de pé — dá para orçar agosto de novo.
-        it("ajusta um mês, não vaza para os outros e apaga sem levar a definição", async () => {
-            let workspace = await buildWorkspace()
+        //  O mês de uso do orçamento, só por HTTP: reparte a renda do mês nos três formatos,
+        //  gasta, acompanha o comprometido, corrige uma fatia, monta o mês seguinte antes de
+        //  ele chegar e confirma que o mês fechado recusa a escrita.
+        it("reparte a renda do mês, acompanha o comprometido e monta o mês seguinte", async () => {
+            let payload = {
+                Name: "Usuário do fluxo de orçamento",
+                Email: UsersFactory.buildEmail(),
+                Password: "Senha@123",
+                Phone: 549987654321,
+                AcceptedTerms: true,
+            }
 
-            let august = await createBudget(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
+            expect((await new TestClient().post("/Users", payload)).status).toBe(200)
 
-            expect((await workspace.client.put(`/BudgetPeriods/IdBudgetPeriod=${august.IdBudgetPeriod}`, {
-                LimitValue: 950,
-                AlertPercent: 90,
+            let flowClient = new TestClient()
+
+            expect((await flowClient.login(payload.Email, payload.Password)).status).toBe(200)
+
+            await flowClient.post(`/Accounts`, { Name: "Conta corrente", InitialBalance: 5000 })
+
+            let methods = (await flowClient.get(`/Accounts`)).body[0].PaymentMethods
+            let debit = methods.find((item: { Kind: string }) => item.Kind === "debit").IdPaymentMethod
+            let mercado = (await flowClient.post(`/Categories`, { Description: "Mercado" })).body.IdCategory
+            let alimentacao = (await flowClient.post(`/Categories`, { Description: "Alimentação" })).body.IdCategory
+            let tiago = (await flowClient.post(`/Persons`, { Name: "Tiago" })).body.IdPerson
+            let luana = (await flowClient.post(`/Persons`, { Name: "Luana" })).body.IdPerson
+
+            //  Agosto: os 1.000 do mês repartidos em três fatias — uma por formato de alvo
+            let fatias = [
+                { IdPerson: luana, LimitValue: 250 },
+                { IdPerson: tiago, IdCategory: alimentacao, LimitValue: 250 },
+                { IdCategory: mercado, LimitValue: 500 },
+            ]
+
+            let created: number[] = []
+
+            for (let fatia of fatias) {
+                let response = await flowClient.post(`/BudgetPeriods`, { ReferenceMonth: "2026-08", ...fatia })
+
+                expect(response.status).toBe(200)
+
+                created.push(response.body.IdBudgetPeriod)
+            }
+
+            let month = await flowClient.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+
+            expect(month.body).toHaveLength(3)
+            expect(month.body.reduce((total: number, item: { LimitValue: number }) => total + item.LimitValue, 0)).toBe(1000)
+            expect(month.body.map((item: { Spent: number }) => item.Spent)).toEqual([0, 0, 0])
+
+            //  Duas compras de mercado no mês, uma quitada e outra não: as duas comprometem
+            for (let expense of [{ Value: 300, Paid: true }, { Value: 250, Paid: false }]) {
+                expect((await flowClient.post(`/Expenses`, {
+                    Description: "Compra do mês",
+                    TotalValue: expense.Value,
+                    IdCategory: mercado,
+                    ExpenseDate: "2026-08-12",
+                    Payments: [{ IdPaymentMethod: debit, Value: expense.Value, Paid: expense.Paid }],
+                })).status).toBe(200)
+            }
+
+            let used = await flowClient.get(`/BudgetPeriods?ReferenceMonth=2026-08`)
+            let mercadoRow = used.body.find((item: { IdCategory: number | null, IdPerson: number | null }) => item.IdCategory === mercado && item.IdPerson === null)
+
+            expect(mercadoRow.Spent).toBe(550)
+            //  O alerta é do cliente: a API entrega os três números que ele compara
+            expect(mercadoRow.Spent / mercadoRow.LimitValue).toBeGreaterThan(0.68)
+
+            //  O mês apertou: sobe a fatia de mercado
+            expect((await flowClient.put(`/BudgetPeriods/IdBudgetPeriod=${mercadoRow.IdBudgetPeriod}`, { LimitValue: 600 })).status).toBe(200)
+            expect((await flowClient.get(`/BudgetPeriods?ReferenceMonth=2026-08`))
+                .body.find((item: { IdBudgetPeriod: number }) => item.IdBudgetPeriod === mercadoRow.IdBudgetPeriod).LimitValue).toBe(600)
+
+            //  **Setembro é montado antes de setembro chegar** — o que o modelo anterior não
+            //  tinha como oferecer, porque o mês só nascia na virada do dia 1º
+            expect((await flowClient.post(`/BudgetPeriods`, {
+                IdCategory: mercado,
+                ReferenceMonth: "2026-09",
+                LimitValue: 450,
             })).status).toBe(200)
 
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body[0]).toMatchObject({ LimitValue: 950, AlertPercent: 90 })
+            let september = await flowClient.get(`/BudgetPeriods?ReferenceMonth=2026-09`)
 
-            //  Setembro cadastrado com o teto de sempre: o ajuste de agosto não virou reajuste
-            await createBudget(workspace, { ReferenceMonth: "2026-09", LimitValue: 800 })
+            expect(september.body).toHaveLength(1)
+            expect(september.body[0]).toMatchObject({ LimitValue: 450, Spent: 0 })
 
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-09`)).body.map(limit)).toEqual([800])
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([950])
+            //  A virada fecha agosto, e agosto para de aceitar escrita
+            await TestDatabase.connection()
+                .update({ Status: "closed", ClosedAt: new Date() })
+                .from("BudgetPeriods")
+                .where("ReferenceMonth", "2026-08-01")
+                .whereIn("IdBudgetPeriod", created)
 
-            expect((await workspace.client.delete(`/BudgetPeriods/IdBudgetPeriod=${august.IdBudgetPeriod}`)).status).toBe(200)
+            expect((await flowClient.put(`/BudgetPeriods/IdBudgetPeriod=${created[0]}`, { LimitValue: 1 })).status).toBe(403)
+            expect((await flowClient.delete(`/BudgetPeriods/IdBudgetPeriod=${created[0]}`)).status).toBe(403)
 
-            //  Agosto sumiu da tela, setembro ficou, e a categoria pode ser orçada em agosto de
-            //  novo — porque a definição nunca saiu do lugar
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body).toEqual([])
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-09`)).body.map(limit)).toEqual([800])
-
-            expect((await workspace.client.post(`/Budgets`, buildBody(workspace, { ReferenceMonth: "2026-08", LimitValue: 700 }))).status).toBe(200)
-            expect((await workspace.client.get(`/Budgets?ReferenceMonth=2026-08`)).body.map(limit)).toEqual([700])
+            //  Setembro segue aberto e editável
+            expect((await flowClient.put(`/BudgetPeriods/IdBudgetPeriod=${september.body[0].IdBudgetPeriod}`, { LimitValue: 500 })).status).toBe(200)
         })
     })
 })
@@ -269,8 +977,10 @@ describe("BudgetPeriods", () => {
 interface TestWorkspace {
     user: TestUser
     client: TestClient
-    /** Orçamento é sempre de uma categoria, então todo arranjo já nasce com uma */
+    /** Todo arranjo já nasce com uma categoria e uma forma de pagamento: a fatia precisa de
+     *  alvo, e o comprometido precisa de gasto. */
     IdCategory: number
+    IdDebit: number
 }
 
 //  Cada teste arruma o seu workspace, porque a leitura do mês devolve tudo que existe nele
@@ -278,14 +988,21 @@ async function buildWorkspace(): Promise<TestWorkspace> {
     let user = await UsersFactory.create()
     let client = new TestClient(user.token)
 
+    await client.post(`/Accounts`, { Name: "Conta corrente", InitialBalance: 5000 })
+
+    let methods = (await client.get(`/Accounts`)).body[0].PaymentMethods
     let category = await client.post(`/Categories`, { Description: "Mercado" })
 
-    return { user, client, IdCategory: category.body.IdCategory }
+    return {
+        user,
+        client,
+        IdCategory: category.body.IdCategory,
+        IdDebit: methods.find((item: { Kind: string }) => item.Kind === "debit").IdPaymentMethod,
+    }
 }
 
-//  Um segundo usuário matriculado como viewer no workspace de quem chamou. Não há rota de
-//  convite ainda, então a matrícula vai direto ao banco — é o único estado desta suíte que o
-//  app não sabe produzir sozinho, e sem ele o assertRole nunca é exercitado.
+//  Um segundo usuário matriculado como viewer no workspace de quem chamou. A matrícula vai
+//  direto ao banco — sem ela o assertRole nunca é exercitado.
 async function buildViewerClient(workspace: TestWorkspace) {
     let viewer = await UsersFactory.create({ Name: "Convidado só de leitura" })
 
@@ -305,13 +1022,94 @@ function buildBody(workspace: TestWorkspace, overrides: Record<string, unknown> 
     }
 }
 
-//  O mês nasce pelo cadastro do orçamento: é o POST /Budgets que congela a linha
-async function createBudget(workspace: TestWorkspace, overrides: Record<string, unknown> = {}) {
-    let response = await workspace.client.post(`/Budgets`, buildBody(workspace, overrides))
+async function createPeriod(workspace: TestWorkspace, overrides: Record<string, unknown> = {}) {
+    let response = await workspace.client.post(`/BudgetPeriods`, buildBody(workspace, overrides))
 
     expect(response.status).toBe(200)
 
-    return response.body as { IdBudget: number, IdBudgetPeriod: number }
+    return response.body as { IdBudgetPeriod: number }
+}
+
+//  O corpo da fatia de pessoa NÃO passa pelo buildBody: ele carrega o IdCategory, e a fatia de
+//  pessoa pura é justamente a que não tem categoria nenhuma.
+async function createPersonPeriod(workspace: TestWorkspace, IdPerson: number, overrides: Record<string, unknown> = {}) {
+    let response = await workspace.client.post(`/BudgetPeriods`, {
+        IdPerson,
+        ReferenceMonth: "2026-08",
+        LimitValue: 500,
+        ...overrides,
+    })
+
+    expect(response.status).toBe(200)
+
+    return response.body as { IdBudgetPeriod: number }
+}
+
+//  O corpo livre, para o formato de alvo duplo e para o que não cabe nos dois helpers acima
+async function postPeriod(workspace: TestWorkspace, body: Record<string, unknown>) {
+    let response = await workspace.client.post(`/BudgetPeriods`, { ReferenceMonth: "2026-08", ...body })
+
+    expect(response.status).toBe(200)
+
+    return response.body as { IdBudgetPeriod: number }
+}
+
+function createPerson(workspace: TestWorkspace, Name: string) {
+    return workspace.client.post(`/Persons`, { Name }).then((response) => response.body.IdPerson as number)
+}
+
+function createCategory(workspace: TestWorkspace, Description: string) {
+    return workspace.client.post(`/Categories`, { Description }).then((response) => response.body.IdCategory as number)
+}
+
+//  **Nenhuma rota fecha um mês** — quem fecha é a rotina do dia 1º, e é ela que este UPDATE
+//  imita. Fazê-lo por HTTP seria inventar uma rota que o app não tem, e é justamente a ausência
+//  dela que faz o `ClosedAt` significar "o tempo passou", não "alguém clicou".
+async function closeMonth(workspace: TestWorkspace, ReferenceMonth: string) {
+    await TestDatabase.connection()
+        .update({ Status: "closed", ClosedAt: new Date() })
+        .from("BudgetPeriods")
+        .where("IdWorkspace", workspace.user.workspace.IdWorkspace)
+        .where("ReferenceMonth", ReferenceMonth)
+}
+
+//  **O modo é explícito de propósito.** O cadastro nasce 'purchase' — o cartão contado como
+//  débito —, e nos testes de fatura o que está sob prova é a outra regra: a compra pesando no
+//  mês em que a fatura vence.
+async function createCard(workspace: TestWorkspace, CompetenceMode: "invoice" | "purchase" = "invoice") {
+    let account = (await workspace.client.get(`/Accounts`)).body[0]
+
+    let response = await workspace.client.post(`/PaymentMethods`, {
+        IdAccount: account.IdAccount,
+        Name: "Cartão",
+        Kind: "credit_card",
+        DueDay: 28,
+        ClosingDay: 20,
+        CompetenceMode,
+    })
+
+    return response.body.IdPaymentMethod as number
+}
+
+async function createExpense(workspace: TestWorkspace, overrides: Record<string, any> = {}) {
+    let { Paid, IdPaymentMethod, ...rest } = overrides
+
+    let response = await workspace.client.post(`/Expenses`, {
+        Description: "Compra do mês",
+        TotalValue: 100,
+        IdCategory: workspace.IdCategory,
+        ExpenseDate: "2026-08-10",
+        Payments: [{
+            IdPaymentMethod: IdPaymentMethod ?? workspace.IdDebit,
+            Value: overrides.TotalValue ?? 100,
+            Paid: Boolean(Paid),
+        }],
+        ...rest,
+    })
+
+    expect(response.status).toBe(200)
+
+    return response.body as { IdExpense: number }
 }
 
 //#endregion
@@ -322,8 +1120,8 @@ function limit(item: { LimitValue: number }) {
     return item.LimitValue
 }
 
-function findBudgets(IdWorkspace: number) {
-    return TestDatabase.connection().select("*").from("Budgets").where("IdWorkspace", IdWorkspace).orderBy("IdBudget")
+function findPeriods(IdWorkspace: number) {
+    return TestDatabase.connection().select("*").from("BudgetPeriods").where("IdWorkspace", IdWorkspace).orderBy("IdBudgetPeriod")
 }
 
 function findPeriodById(IdBudgetPeriod: number) {

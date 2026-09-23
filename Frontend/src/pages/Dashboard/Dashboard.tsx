@@ -184,16 +184,19 @@ export function Dashboard() {
     const alerting = periods.filter((period) => budgetState(period) === "alert");
     const activeCategories = (categories.data ?? []).filter((category) => category.Active);
     const activePersons = (persons.data ?? []).filter((person) => person.Active);
-    /* Só existe UM teto por alvo em cada mês: orçar o mesmo duas vezes é
-       406. Os dois conjuntos são separados porque o alvo é de um tipo ou
-       do outro — categoria 4 e pessoa 4 não são o mesmo alvo. */
+    /* Só existe UMA fatia por alvo em cada mês: repetir o alvo INTEIRO é
+       406. Os dois conjuntos são separados porque categoria 4 e pessoa 4
+       não são o mesmo alvo — e as fatias de alvo DUPLO ficam de fora dos
+       dois de propósito: "Luana em Mercado" não ocupa nem "Mercado" nem
+       "Luana", as três convivem. O formulário ainda monta um alvo por
+       vez; a tela é reescrita na etapa 12. */
     const budgetedCategories = new Set(
-        periods.filter((period) => period.Scope === "category").map((period) => period.IdCategory),
+        periods.filter((period) => period.IdPerson === null).map((period) => period.IdCategory),
     );
     const budgetedPersons = new Set(
-        periods.filter((period) => period.Scope === "person").map((period) => period.IdPerson),
+        periods.filter((period) => period.IdCategory === null).map((period) => period.IdPerson),
     );
-    const hasPersonBudget = periods.some((period) => period.Scope === "person");
+    const hasPersonBudget = periods.some((period) => period.IdPerson !== null);
 
     /* A régua do cartão principal. Com teto cadastrado ela mede o
        consumo do teto; sem teto nenhum, mede o quanto do que entrou já
@@ -481,7 +484,16 @@ export function Dashboard() {
                                         onClick={() =>
                                             setBudgetDraft({
                                                 IdBudgetPeriod: period.IdBudgetPeriod,
-                                                Scope: period.Scope,
+                                                /* Estado de tela, não da API: o
+                                                   seletor de alvo some na edição
+                                                   (o alvo não se muda), então aqui
+                                                   ele só diz qual dos dois campos
+                                                   o formulário mostra. Na fatia de
+                                                   alvo duplo manda a pessoa. */
+                                                Scope:
+                                                    period.IdPerson !== null
+                                                        ? "person"
+                                                        : "category",
                                                 IdCategory: period.IdCategory,
                                                 IdPerson: period.IdPerson,
                                                 ReferenceMonth: month,

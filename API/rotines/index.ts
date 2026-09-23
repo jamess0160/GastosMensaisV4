@@ -1,5 +1,4 @@
 import { CloseBudgetMonth } from "./CloseBudgetMonth.rotine"
-import { MaterializeBudgetPeriods } from "./MaterializeBudgetPeriods.rotine"
 import { RotinesNamespace } from "./section/types"
 
 //  **O registro: a lista, e nada mais.** Mesmo papel do `Routes` em `routes/index.ts` — lá o
@@ -17,9 +16,12 @@ import { RotinesNamespace } from "./section/types"
 //  uma rotina que o código ainda acha que existe. Ligar e desligar, quando precisar, é editar
 //  esta lista — código, que o compilador confere e o deploy carrega junto.
 export const Rotines: RotinesNamespace.Rotine[] = [
-    //  As duas viradas do orçamento, no mesmo tick do dia 1º: uma abre o mês novo, a outra
-    //  encerra o velho. Separadas porque cada uma reivindica a sua linha em RotineRuns — um
-    //  erro ao fechar agosto não pode deixar setembro sem os tetos dele.
-    MaterializeBudgetPeriods,
+    //  **Uma só, desde a leva 9.** Eram duas — uma abria o mês novo materializando as
+    //  definições perenes, a outra encerrava o velho. A primeira foi apagada junto com a
+    //  tabela `Budgets`: nada nasce sozinho, um mês tem orçamento porque alguém o montou, e é
+    //  isso que faz qualquer mês ser editável em vez de só o que a rotina já criou.
+    //
+    //  Esta ficou porque é a única coisa no sistema que sabe que um mês acabou, e o `ClosedAt`
+    //  que ela carimba é a trava que impede reescrever a história de agosto em novembro.
     CloseBudgetMonth,
 ]
