@@ -10,7 +10,7 @@ import {
 import { useMonthScope } from "@/app/monthScope";
 import { useSession } from "@/app/session";
 import { useAccounts, useInvalidateCatalogs } from "@/data/catalogs";
-import { useInvalidateMovement, useInvoice, useMonthStatement } from "@/data/month";
+import { useInvoice } from "@/data/month";
 import { Badge, Button, Card, Overline, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
 import {
@@ -40,13 +40,7 @@ import {
 import { CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import { totalBalance } from "@/lib/aggregate";
-import {
-    COMPETENCE_LABEL,
-    cycleLabel,
-    invoiceOf,
-    MAX_DAY_OF_MONTH,
-    MIN_DAY_OF_MONTH,
-} from "@/lib/card";
+import { COMPETENCE_LABEL, MAX_DAY_OF_MONTH, MIN_DAY_OF_MONTH } from "@/lib/card";
 import { accentColor } from "@/lib/categoryColor";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatMoney } from "@/lib/money";
@@ -241,18 +235,33 @@ function CycleHint({ draft }: { draft: CardDraft }) {
 /** **A fatura ABERTA do cartão** — quanto ela já tem, quando fecha e
  *  quando vence —, com o caminho para a tela dela.
  *
- *  Ela responde outra pergunta que o bloco logo abaixo, e é por isso que
- *  são dois: aquele é a fatura do MÊS EXIBIDO, a que se quita; esta é a
- *  que está acumulando AGORA. Quem abre Contas em março para conferir um
- *  saldo antigo não está perguntando quanto a fatura de março custou —
- *  está perguntando quanto já tem na que vai chegar. E essa pergunta não
- *  tem mês: a fatura vai de fechamento a fechamento.
+ *  ── UM BLOCO SÓ, E UM CAMINHO SÓ PARA QUITAR ─────────────────
+ *
+ *  Até a etapa 5 havia DOIS blocos de fatura aqui: este e o da fatura do
+ *  MÊS EXIBIDO, que trazia o botão de quitar. O segundo saiu, e por três
+ *  motivos que são o mesmo motivo:
+ *
+ *  1. **Ele fazia a conta de ciclo no cliente.** O fechamento, o
+ *     vencimento e o "já está paga?" saíam de `invoiceOf`, sobre o
+ *     `DueDay`/`ClosingDay` do cadastro; este bloco pergunta ao servidor,
+ *     que é quem gravou o vencimento em cada perna. Duas respostas para a
+ *     mesma pergunta discordam no dia do fechamento — e discordar ali
+ *     significa oferecer quitar a fatura errada.
+ *  2. **A fatura não é um mês**, que é a tese da leva inteira. Presa ao
+ *     seletor do chassi, ela obrigava a trocar o mês do Início, dos
+ *     Gastos e do Relatório junto para olhar a anterior.
+ *  3. **Quitar é tirar dinheiro da conta, e quem faz isso tem que estar
+ *     vendo o que vai pagar.** O botão agora mora onde o ciclo inteiro
+ *     está na tela: a tela da Fatura (`/contas/fatura/:id`) e o bloco do
+ *     cartão no Extrato. Aqui fica a PORTA — "Ver fatura" —, não a
+ *     tesoura.
+ *
+ *  Quem abre Contas em março para conferir um saldo antigo não está
+ *  perguntando quanto a fatura de março custou: está perguntando quanto
+ *  já tem na que vai chegar. E essa pergunta não tem mês.
  *
  *  Componente próprio porque cada cartão tem a sua, e um hook dentro de
- *  um `map` não é hook. Quem diz qual fatura está aberta é o servidor —
- *  a requisição sai sem `DueDate` —, pelo mesmo motivo de sempre: ele é
- *  quem gravou o vencimento em cada perna, e uma segunda aritmética de
- *  ciclo aqui discordaria no dia do fechamento. */
+ *  um `map` não é hook. */
 function OpenInvoice({ method }: { method: ApiTypes.PaymentMethod }) {
     const navigate = useNavigate();
     const invoice = useInvoice(method.IdPaymentMethod, null);
@@ -301,22 +310,11 @@ export function Accounts() {
        total de Contas divergiria do de Início a cada troca de mês. */
     const [month, setMonth] = useMonthScope();
     const accounts = useAccounts();
-    /* O extrato do mês, sob a mesma chave de cache que a tela de Extrato
-       já buscou: é dele que sai a fatura de cada cartão — quanto vence e
-       quanto ainda está só previsto.
-       NÃO são as pernas do mês: elas vêm recortadas por competência, e
-       num cartão em modo `purchase` a compra de agosto vence em
-       setembro. Perguntando por competência e mandando quitar por
-       vencimento, a fatura ficava vazia nos dois meses. `Cards` já é o
-       par (cartão, vencimento) — o mesmo recorte do `payInvoice`. */
-    const statement = useMonthStatement(month);
-    /* Uma fatura por cartão no mês, indexada pelo id do cartão. */
-    const invoiceByCard = useMemo(
-        () => new Map((statement.data?.Cards ?? []).map((card) => [card.IdPaymentMethod, card])),
-        [statement.data],
-    );
+    /* O extrato do mês SAIU daqui junto com o bloco da fatura do mês
+       exibido: quem lê fatura agora é o `OpenInvoice`, cartão a cartão,
+       pela rota que devolve o ciclo pronto. Esta tela voltou a ser o
+       cadastro das contas e dos cartões, mais o saldo do mês. */
     const invalidateCatalogs = useInvalidateCatalogs();
-    const invalidateMovement = useInvalidateMovement();
 
     const navigate = useNavigate();
     /* O extrato manda para cá com `?IdPaymentMethod=`: a linha "Fatura"
@@ -329,15 +327,7 @@ export function Accounts() {
     const [cardDraft, setCardDraft] = useState<CardDraft | null>(null);
     const [openAccount, setOpenAccount] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
-    /* A confirmação de "Desfazer quitação": um clique errado ali tira
-       dezenas de pagamentos do saldo de uma vez. */
-    const [unpaying, setUnpaying] = useState<{
-        idPaymentMethod: number;
-        name: string;
-        due: ApiTypes.CalendarDate;
-    } | null>(null);
     const [archiving, setArchiving] = useState<{
         kind: "account" | "card";
         id: number;
@@ -351,7 +341,6 @@ export function Accounts() {
             beginSubmit() {
                 setPending(true);
                 setError(null);
-                setNotice(null);
             },
             failSubmit(message) {
                 setPending(false);
@@ -361,18 +350,10 @@ export function Accounts() {
                 setPending(false);
                 invalidateCatalogs();
             },
-            finishInvoice(message) {
-                setPending(false);
-                setNotice(message);
-                // Uma fatura mexe em dezenas de pernas, no `Status` de
-                // dezenas de gastos e no saldo da conta — que é somado a
-                // cada leitura, em todos os meses em cache.
-                invalidateMovement();
-            },
             closeAccountForm: () => setAccountDraft(null),
             closeCardForm: () => setCardDraft(null),
         }),
-        [accountDraft, cardDraft, invalidateCatalogs, invalidateMovement],
+        [accountDraft, cardDraft, invalidateCatalogs],
     );
 
     const active = (accounts.data ?? []).filter((account) => account.Active);
@@ -667,7 +648,6 @@ export function Accounts() {
                     {detail && (
                         <>
                             <FormError>{error}</FormError>
-                            <FormNotice>{notice}</FormNotice>
 
                             <div className={styles.sectionLabel}>
                                 <span>Formas que nasceram com a conta</span>
@@ -721,12 +701,6 @@ export function Accounts() {
                                     {detail.PaymentMethods.filter(
                                         (method) => method.Active && method.Kind === "credit_card",
                                     ).map((method) => {
-                                        const invoice = invoiceOf(
-                                            invoiceByCard.get(method.IdPaymentMethod),
-                                            method,
-                                            month,
-                                        );
-
                                         return (
                                             <div
                                                 className={styles.cardStack}
@@ -800,95 +774,12 @@ export function Accounts() {
                                                 </div>
 
                                                 {/* A fatura ABERTA, com o caminho para a tela
-                                                dela. Outra pergunta que o bloco de baixo: aquele
-                                                é a fatura do MÊS EXIBIDO, esta é a que está
-                                                acumulando agora — e essa não tem mês. */}
+                                                dela — e ela é o ÚNICO bloco de fatura daqui.
+                                                O bloco da fatura do mês exibido saiu, e o
+                                                botão de quitar foi com ele para onde o ciclo
+                                                inteiro está na tela; o porquê está na cabeça
+                                                do `OpenInvoice`. */}
                                                 <OpenInvoice method={method} />
-
-                                                {/* A FATURA, e é ela que faz o saldo descer. No cartão,
-                                                marcar uma compra como paga não tira dinheiro de conta
-                                                nenhuma — quem tira é este botão. A fatura não tem id:
-                                                ela é (cartão, vencimento), e é esse vencimento que vai
-                                                no corpo. */}
-                                                <div className={styles.invoice}>
-                                                    <div className={styles.invoiceBody}>
-                                                        <div className={styles.invoiceLabel}>
-                                                            Fatura que vence{" "}
-                                                            {formatShort(invoice.due)}
-                                                        </div>
-                                                        <div className={styles.invoiceValue}>
-                                                            {formatMoney(invoice.total)}
-                                                        </div>
-                                                        {/* De quais compras ela é feita — a
-                                                        mesma linha do Extrato, pelo mesmo
-                                                        motivo: o ciclo não é o mês, e num
-                                                        cartão em `purchase` essas compras
-                                                        pesaram no mês em que foram feitas. */}
-                                                        <div className={styles.invoiceCycle}>
-                                                            {cycleLabel(invoice.cycle)}
-                                                        </div>
-                                                        <div className={styles.invoiceCaption}>
-                                                            {statement.isPending
-                                                                ? "Carregando os lançamentos do mês…"
-                                                                : invoice.entries.length === 0
-                                                                  ? "Nenhum lançamento nesta fatura"
-                                                                  : invoice.paid
-                                                                    ? `Quitada · ${invoice.entries.length} lançamento${invoice.entries.length === 1 ? "" : "s"}`
-                                                                    : /* O gasto no cartão já nasce
-                                                                       na fatura, então "conferido"
-                                                                       deixou de ser notícia — o que
-                                                                       sobra de interessante é o
-                                                                       previsto, que é o que o
-                                                                       emissor ainda não registrou.
-                                                                       Zero previsto não vira linha:
-                                                                       é o caso comum. */
-                                                                      invoice.expected !== 0
-                                                                      ? `${formatMoney(invoice.expected)} previsto · ${invoice.entries.length} lançamento${invoice.entries.length === 1 ? "" : "s"}`
-                                                                      : `${invoice.entries.length} lançamento${invoice.entries.length === 1 ? "" : "s"}`}
-                                                        </div>
-                                                    </div>
-                                                    <span className={styles.invoiceActions}>
-                                                        {invoice.paid ? (
-                                                            <Button
-                                                                size="sm"
-                                                                disabled={pending}
-                                                                onClick={() =>
-                                                                    setUnpaying({
-                                                                        idPaymentMethod:
-                                                                            method.IdPaymentMethod,
-                                                                        name: method.Name,
-                                                                        due: invoice.due,
-                                                                    })
-                                                                }
-                                                            >
-                                                                Desfazer quitação
-                                                            </Button>
-                                                        ) : (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="primary"
-                                                                disabled={
-                                                                    pending ||
-                                                                    invoice.entries.length === 0
-                                                                }
-                                                                title={
-                                                                    invoice.entries.length === 0
-                                                                        ? "Fatura sem lançamento nenhum não é fatura"
-                                                                        : undefined
-                                                                }
-                                                                onClick={() =>
-                                                                    void AccountsController.payInvoice(
-                                                                        context,
-                                                                        method.IdPaymentMethod,
-                                                                        invoice.due,
-                                                                    )
-                                                                }
-                                                            >
-                                                                Quitar fatura
-                                                            </Button>
-                                                        )}
-                                                    </span>
-                                                </div>
                                             </div>
                                         );
                                     })}
@@ -1221,27 +1112,6 @@ export function Accounts() {
                         </form>
                     )}
                 </SlideOver>
-
-                <ConfirmDialog
-                    open={unpaying !== null}
-                    onClose={() => setUnpaying(null)}
-                    onConfirm={() => {
-                        const target = unpaying;
-                        setUnpaying(null);
-                        if (!target) return;
-                        void AccountsController.payInvoice(
-                            context,
-                            target.idPaymentMethod,
-                            target.due,
-                            true,
-                        );
-                    }}
-                    title={`Desfazer a quitação da fatura de ${unpaying?.name ?? ""}?`}
-                    description="Todos os lançamentos dessa fatura voltam a pesar no saldo da conta — podem ser dezenas de uma vez. Nenhum gasto é apagado: o que muda é só o estado da fatura."
-                    confirmLabel="Desfazer quitação"
-                    danger
-                    pending={pending}
-                />
 
                 <ConfirmDialog
                     open={archiving !== null}

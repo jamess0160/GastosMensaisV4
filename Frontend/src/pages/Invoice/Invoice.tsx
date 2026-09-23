@@ -2,11 +2,14 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { InvoiceController, type InvoiceContext } from "./controller";
+import { INVOICE_ACTION_LABEL, UNPAY_CONFIRM } from "@/app/payInvoice";
 import { useSession } from "@/app/session";
 import { useAccounts } from "@/data/catalogs";
-import { useInvoice } from "@/data/month";
+import { useInvalidateMovement, useInvoice } from "@/data/month";
 import { Badge, Button, Card, Overline, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
+import { FormError, FormNotice } from "@/ui/form";
+import { ConfirmDialog } from "@/ui/overlay";
 import { IconCard, IconChevronLeft, IconChevronRight } from "@/ui/icons";
 import {
     Cell,
@@ -52,8 +55,13 @@ import type { ApiTypes } from "@/types/api";
    foi; o que faltava era a rota que a devolve inteira, com o ciclo, o
    estado derivado e os vizinhos.
 
-   E o botão de QUITAR não está aqui: ele é da etapa 6. Esta tela só
-   mostra — quem quita, hoje, é o card do cartão em Contas.
+   E É AQUI QUE SE QUITA. O `payInvoice` existe desde a leva 6, mas só
+   tinha botão no card do cartão em Contas, recortado pelo mês do
+   chassi — enquanto a tela de Gastos recusa quitar perna de cartão
+   (406, "perna de cartão de crédito é quitada com a fatura"). A única
+   operação que faz o saldo do cartão descer não tinha botão na tela em
+   que a fatura aparece inteira; agora tem, ao lado do total que ela vai
+   tirar da conta.
    ════════════════════════════════════════════════════════════ */
 
 /** O estado da fatura, em uma palavra e com a cor certa.
@@ -93,7 +101,44 @@ export function Invoice() {
 
     const invoice = useInvoice(idPaymentMethod, due);
 
-    const context = useMemo<InvoiceContext>(() => ({ due, showCycle: setDue }), [due]);
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
+    /* A confirmação de "Desfazer quitação" — e só ela confirma. Quitar
+       registra um pagamento que a pessoa acabou de fazer e se desfaz com
+       um clique; desfazer devolve dezenas de lançamentos ao saldo de um
+       mês que pode já estar fechado. */
+    const [confirmingUndo, setConfirmingUndo] = useState(false);
+
+    const invalidateMovement = useInvalidateMovement();
+
+    const context = useMemo<InvoiceContext>(
+        () => ({
+            due,
+            showCycle: setDue,
+            beginPay() {
+                setPending(true);
+                setError(null);
+                setNotice(null);
+            },
+            failPay(message) {
+                setPending(false);
+                setError(message);
+            },
+            finishPay(message) {
+                setPending(false);
+                setNotice(message);
+                /* INVALIDAR, não recalcular. Uma fatura quitada mexe no
+                   saldo da conta, nos indicadores do Início, no extrato e
+                   no `Status` de dezenas de gastos ao mesmo tempo — e o
+                   saldo é somado pela API a cada leitura. Ajustar
+                   qualquer um desses números aqui seria a segunda conta,
+                   a que fica plausível e errada. */
+                invalidateMovement();
+            },
+        }),
+        [due, invalidateMovement],
+    );
 
     /* De que CONTA é o cartão. A fatura já traz o `IdAccount`, e o nome
        sai do cadastro que as telas de saldo já leram — mesma entrada de
@@ -227,6 +272,47 @@ export function Invoice() {
         </div>
     );
 
+    /* ── Quitar ──────────────────────────────────────────────
+       **É este botão que faz o saldo do cartão descer.** No crédito,
+       marcar uma compra como paga não tira dinheiro de conta nenhuma —
+       a tela de Gastos recusa quitar perna de cartão de propósito, com
+       406 —, e quem tira é o pagamento da fatura inteira, que quita o
+       ciclo de uma vez: um cartão concentrador tem 40 compras, e
+       ninguém marca 40.
+
+       O RÓTULO DIZ O QUE A FATURA É (ver `INVOICE_ACTION_LABEL`): numa
+       fatura ainda aberta ele vem com a ressalva em vez de sumir, porque
+       pagar adiantado — ou registrar hoje o pagamento já feito no app do
+       banco — é legítimo e acontece.
+
+       Desabilitado só quando não há ciclo nenhum: fatura sem perna não é
+       fatura paga, é fatura que não existe, e a API responde 406. O
+       PREVISTO conta para habilitar — ele fica fora do total, mas sai da
+       conta junto quando a fatura é quitada. */
+    const payButton = (data: ApiTypes.Invoice) => {
+        if (data.Status === "paid") {
+            return (
+                <Button size="sm" disabled={pending} onClick={() => setConfirmingUndo(true)}>
+                    {INVOICE_ACTION_LABEL.paid}
+                </Button>
+            );
+        }
+
+        const empty = data.Entries.length === 0 && data.Expected.length === 0;
+
+        return (
+            <Button
+                size="sm"
+                variant="primary"
+                disabled={pending || empty}
+                title={empty ? "Fatura sem lançamento nenhum não é fatura" : undefined}
+                onClick={() => void InvoiceController.payInvoice(context, data)}
+            >
+                {pending ? "Quitando…" : INVOICE_ACTION_LABEL[data.Status]}
+            </Button>
+        );
+    };
+
     /* ── O rodapé: as próximas faturas ───────────────────────
        Os vencimentos depois deste que JÁ TÊM parcela marcada, com o
        total de cada um. É o que responde "quanto do meu mês que vem já
@@ -302,6 +388,13 @@ export function Invoice() {
             <>
                 {cycleNav(data)}
 
+                {/* O resultado da quitação, onde o botão está. A frase
+                    carrega o NÚMERO DE PERNAS que mudaram de estado —
+                    "12 lançamentos saíram do saldo" é o que o usuário
+                    confere contra o extrato do banco. */}
+                <FormError>{error}</FormError>
+                <FormNotice>{notice}</FormNotice>
+
                 <Card padded={false} className={styles.section}>
                     <div className={styles.sectionHead}>
                         <div>
@@ -347,6 +440,11 @@ export function Invoice() {
                             <div className={`${styles.endValue} ${styles.endStrong}`}>
                                 {formatMoney(data.Total)}
                             </div>
+
+                            {/* O botão fica COLADO NO TOTAL, e não na
+                                Topbar: é esse número que ele tira da
+                                conta. */}
+                            <div className={styles.pay}>{payButton(data)}</div>
                         </div>
                     </div>
 
@@ -434,6 +532,27 @@ export function Invoice() {
                 />
 
                 {body()}
+
+                {/* Só o DESFAZER confirma, e a assimetria é de
+                    propósito: quitar registra um pagamento que acabou de
+                    acontecer e se desfaz com um clique; desfazer devolve
+                    dezenas de lançamentos ao saldo de um mês que pode já
+                    estar fechado. */}
+                <ConfirmDialog
+                    open={confirmingUndo && invoice.data !== undefined}
+                    onClose={() => setConfirmingUndo(false)}
+                    onConfirm={() => {
+                        const data = invoice.data;
+                        setConfirmingUndo(false);
+                        if (!data) return;
+                        void InvoiceController.payInvoice(context, data, true);
+                    }}
+                    title={UNPAY_CONFIRM.title(invoice.data?.Name ?? "")}
+                    description={UNPAY_CONFIRM.description}
+                    confirmLabel={UNPAY_CONFIRM.confirmLabel}
+                    danger
+                    pending={pending}
+                />
             </Page>
         </>
     );

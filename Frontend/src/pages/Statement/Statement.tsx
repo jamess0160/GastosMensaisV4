@@ -1,12 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./src/styles.module.css";
+import { StatementController, type StatementContext } from "./controller";
 import { useMonthScope } from "@/app/monthScope";
+import { INVOICE_ACTION_LABEL, UNPAY_CONFIRM } from "@/app/payInvoice";
 import { useSession } from "@/app/session";
 import { useAccounts } from "@/data/catalogs";
-import { useMonthStatement } from "@/data/month";
+import { useInvalidateMovement, useInvoice, useMonthStatement } from "@/data/month";
 import { Badge, Button, Card, Overline, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
+import { FormError, FormNotice } from "@/ui/form";
+import { ConfirmDialog } from "@/ui/overlay";
 import { IconArrowDown, IconArrowUp, IconCard, IconTransfer } from "@/ui/icons";
 import {
     Cell,
@@ -77,6 +81,55 @@ function signed(value: ApiTypes.Money): string {
 
 const toneOf = (value: ApiTypes.Money) => (value > 0 ? styles.pos : value < 0 ? styles.neg : "");
 
+/** **Quitar a fatura deste bloco** — o gesto que faz o saldo do cartão
+ *  descer, na tela em que a fatura aparece.
+ *
+ *  Componente próprio por causa do `useInvoice`: cada bloco tem o seu, e
+ *  um hook dentro de um `map` não é hook.
+ *
+ *  E por que uma leitura A MAIS, se o bloco já tem as linhas? Porque o
+ *  que decide o ROTULO do botão é o `Status`, e ele é derivado pela API
+ *  — `open` enquanto o ciclo ainda recebe compras, `closed` depois do
+ *  fechamento, `paid` acima dos dois. `GET /Reports/Statement` não o
+ *  traz, e derivá-lo aqui seria comparar "hoje" com o fechamento usando
+ *  o relógio do navegador, que o usuário mexe. A requisição cai na mesma
+ *  entrada de cache da tela da Fatura (`["invoice", cartão,
+ *  vencimento]`), então abrir uma depois da outra não pede duas vezes.
+ *
+ *  Enquanto a resposta não chega, botão nenhum: um "Quitar fatura" que
+ *  ainda não sabe se a fatura já está quitada é um convite a pagar duas
+ *  vezes. */
+function InvoiceAction({
+    card,
+    pending,
+    onPay,
+    onUndo,
+}: {
+    card: ApiTypes.StatementCard;
+    pending: boolean;
+    onPay: () => void;
+    onUndo: () => void;
+}) {
+    const invoice = useInvoice(card.IdPaymentMethod, card.DueDate);
+    const status = invoice.data?.Status;
+
+    if (status === undefined) return null;
+
+    if (status === "paid") {
+        return (
+            <Button size="sm" disabled={pending} onClick={onUndo}>
+                {INVOICE_ACTION_LABEL.paid}
+            </Button>
+        );
+    }
+
+    return (
+        <Button size="sm" variant="primary" disabled={pending} onClick={onPay}>
+            {pending ? "Quitando…" : INVOICE_ACTION_LABEL[status]}
+        </Button>
+    );
+}
+
 export function Statement() {
     const navigate = useNavigate();
     const { user } = useSession();
@@ -84,6 +137,41 @@ export function Statement() {
     const isMobile = useIsMobile();
 
     const statement = useMonthStatement(month);
+
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
+    /* A confirmação de "Desfazer quitação", e só ela confirma: quitar
+       registra um pagamento que acabou de acontecer, desfazer devolve
+       dezenas de lançamentos ao saldo de um mês que pode já estar
+       fechado. */
+    const [undoing, setUndoing] = useState<ApiTypes.StatementCard | null>(null);
+
+    const invalidateMovement = useInvalidateMovement();
+
+    const context = useMemo<StatementContext>(
+        () => ({
+            beginPay() {
+                setPending(true);
+                setError(null);
+                setNotice(null);
+            },
+            failPay(message) {
+                setPending(false);
+                setError(message);
+            },
+            finishPay(message) {
+                setPending(false);
+                setNotice(message);
+                /* INVALIDAR, não recalcular. A fatura quitada muda o
+                   `ClosingBalance` deste mesmo extrato, o saldo de
+                   Contas e os indicadores de Gastos ao mesmo tempo — e
+                   todos eles são somados pela API a cada leitura. */
+                invalidateMovement();
+            },
+        }),
+        [invalidateMovement],
+    );
 
     /* De que CONTA é cada cartão.
 
@@ -467,6 +555,18 @@ export function Statement() {
                         >
                             Abrir fatura
                         </Button>
+                        {/* E o botão que faz o saldo DESCER, ao lado do
+                            total que ele tira da conta. No crédito,
+                            marcar uma compra como paga não move dinheiro
+                            nenhum — a tela de Gastos recusa quitar perna
+                            de cartão com 406 —, e é a fatura inteira que
+                            se quita de uma vez. */}
+                        <InvoiceAction
+                            card={card}
+                            pending={pending}
+                            onPay={() => void StatementController.payInvoice(context, card)}
+                            onUndo={() => setUndoing(card)}
+                        />
                     </div>
                 </div>
 
@@ -533,6 +633,12 @@ export function Statement() {
                         >
                             Abrir fatura
                         </Button>
+                        <InvoiceAction
+                            card={card}
+                            pending={pending}
+                            onPay={() => void StatementController.payInvoice(context, card)}
+                            onUndo={() => setUndoing(card)}
+                        />
                     </div>
                 </div>
 
@@ -638,7 +744,29 @@ export function Statement() {
                     </button>
                 </div>
 
+                {/* O resultado da quitação, com o NÚMERO DE PERNAS que
+                    mudaram de estado — é ele que se confere contra o
+                    extrato do banco. */}
+                <FormError>{error}</FormError>
+                <FormNotice>{notice}</FormNotice>
+
                 {body()}
+
+                <ConfirmDialog
+                    open={undoing !== null}
+                    onClose={() => setUndoing(null)}
+                    onConfirm={() => {
+                        const target = undoing;
+                        setUndoing(null);
+                        if (!target) return;
+                        void StatementController.payInvoice(context, target, true);
+                    }}
+                    title={UNPAY_CONFIRM.title(undoing?.Name ?? "")}
+                    description={UNPAY_CONFIRM.description}
+                    confirmLabel={UNPAY_CONFIRM.confirmLabel}
+                    danger
+                    pending={pending}
+                />
             </Page>
         </>
     );

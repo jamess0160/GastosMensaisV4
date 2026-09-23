@@ -37,7 +37,6 @@ export function fakeAccountsContext(overrides: Partial<AccountsContext> = {}): A
         beginSubmit: vi.fn(),
         failSubmit: vi.fn(),
         finishSubmit: vi.fn(),
-        finishInvoice: vi.fn(),
         closeAccountForm: vi.fn(),
         closeCardForm: vi.fn(),
         ...overrides,

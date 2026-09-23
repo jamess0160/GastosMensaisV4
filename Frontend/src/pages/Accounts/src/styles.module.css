@@ -200,9 +200,8 @@
     margin-top: 1px;
 }
 
-/* O cartão de crédito no slide-over deixou de ser uma linha só: embaixo
-   do nome vem a FATURA do mês exibido, que é a unidade em que ele custa
-   dinheiro. */
+/* O cartão de crédito no slide-over não é uma linha só: embaixo do nome
+   vem a FATURA ABERTA, que é a unidade em que ele custa dinheiro. */
 .cardStack {
     display: flex;
     flex-direction: column;
@@ -220,20 +219,10 @@
     border-radius: 0;
 }
 
-/* A fatura ABERTA, acima da do mês exibido. Mesma caixa, e a diferença é
-   o que cada uma responde: esta é a que está acumulando AGORA e não tem
-   mês nenhum; a de baixo é a do mês que o seletor escolheu, que é a que
-   se quita. */
+/* A fatura ABERTA — a única caixa de fatura deste painel desde que a do
+   mês exibido saiu. Ela responde "quanto já tem na que vai chegar", que
+   é uma pergunta sem mês; quem quita é a tela da fatura. */
 .openInvoice {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding-top: 10px;
-    border-top: 1px dashed var(--border);
-}
-
-.invoice {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -253,16 +242,6 @@
     letter-spacing: 0.6px;
     text-transform: uppercase;
     color: var(--ink-2);
-}
-
-/* O ciclo que a fatura cobre, logo abaixo do rótulo dela: o vencimento
-   diz quando ela sai da conta, o ciclo diz de que compras ela é feita —
-   e os dois quase nunca caem no mesmo mês. */
-.invoiceCycle {
-    font-size: 11px;
-    color: var(--ink-3);
-    margin-top: 2px;
-    font-variant-numeric: tabular-nums;
 }
 
 .invoiceValue {

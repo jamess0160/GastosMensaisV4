@@ -31,6 +31,9 @@ export function fakeInvoiceContext(overrides: Partial<InvoiceContext> = {}): Inv
     return {
         due: null,
         showCycle: vi.fn(),
+        beginPay: vi.fn(),
+        failPay: vi.fn(),
+        finishPay: vi.fn(),
         ...overrides,
     };
 }
