@@ -99,6 +99,18 @@
     cursor: not-allowed;
 }
 
+/* O campo travado — o e-mail do cadastro por convite, que vem do
+   convite e não do usuário. Ele é `readOnly` e NÃO `disabled`, porque
+   desabilitado não é enviado no submit, some da navegação por teclado e
+   é ignorado por leitor de tela. O fundo é o mesmo do desabilitado só
+   para o olho não prometer edição; o texto mantém a cor normal, já que
+   este valor é justamente o que a pessoa precisa ler. */
+.input:read-only,
+.textarea:read-only {
+    background: var(--surface-alt);
+    cursor: default;
+}
+
 .invalid,
 .invalid:focus {
     border-color: var(--neg);

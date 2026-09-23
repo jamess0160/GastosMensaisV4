@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import styles from "./src/styles.module.css";
 import { InviteController, type InviteContext } from "./controller";
 import { useSessionQuery, useSwitchWorkspace } from "@/app/session";
-import { WorkspacesConnection } from "@/api/Workspaces.connection";
+import { useInvitePreview } from "@/data/invitePreview";
 import { ApiUnauthorizedError } from "@/api/client";
 import { AuthLayout } from "@/ui/AuthLayout";
 import { Button } from "@/ui/primitives";
@@ -42,14 +41,11 @@ export function Invite() {
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
-    const invite = useQuery({
-        queryKey: ["invite", hash],
-        queryFn: () => WorkspacesConnection.inviteByHash(hash),
-        enabled: hash !== "",
-        // Convite recusado é 406 com `msg` pronta: repetir a chamada não
-        // muda a resposta, e a mensagem é o que interessa.
-        retry: false,
-    });
+    /* A consulta mora em `src/data/invitePreview.ts` porque o CADASTRO
+       lê o mesmo hash pela mesma rota: é de lá que sai o e-mail com que
+       o formulário nasce preenchido e travado. Uma chave só é o que
+       impede as duas telas de pedirem a mesma coisa duas vezes. */
+    const invite = useInvitePreview(hash);
 
     /* Tem sessão? É o que decide qual dos dois caminhos a tela oferece.
        Quem não tem recebe 401, e aqui isso não é erro — é informação.

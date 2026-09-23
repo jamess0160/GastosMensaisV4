@@ -32,6 +32,14 @@ export const queryKeys = {
      *  rota não recebe nenhum dos dois — ela olha o workspace do cookie,
      *  e trocar de espaço limpa o cache inteiro de qualquer jeito. */
     invites: ["invites"] as const,
+    /** UM convite, lido pelo HASH e SEM sessão — a tela pública de
+     *  aceite e o cadastro que sai dela leem esta mesma entrada.
+     *
+     *  Não é um recorte de `invites` acima: aquela é a lista do espaço
+     *  da sessão, que só o dono lê. Esta é um convite só, lido por quem
+     *  ainda pode não ter conta, e por isso a chave leva o hash — é o
+     *  único identificador que o convite tem do lado de fora. */
+    invitePreview: (hash: string) => ["invite", hash] as const,
     /** Quem tem acesso ao espaço da sessão. Sem mês e sem id, pelo
      *  mesmo motivo de `invites`: a rota olha o workspace do cookie.
      *

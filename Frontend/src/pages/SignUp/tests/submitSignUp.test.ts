@@ -127,6 +127,29 @@ describe("submitSignUp", () => {
         expect(body?.InviteHash).toBe("Yk3s");
     });
 
+    it("manda o e-mail TRAVADO junto do hash — os dois são do mesmo convite", async () => {
+        /* O campo é `readOnly` e o valor vem da consulta do convite, não
+           do que foi digitado: é este par que a API confere antes da
+           transaction. Se um dia o e-mail voltar a ser o do estado livre,
+           é aqui que se vê — o corpo iria com o endereço errado e a
+           matrícula seria recusada com 406. */
+        let body: Record<string, unknown> | undefined;
+        server.use(
+            msw.post(signUp, async ({ request }) => {
+                body = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({ IdUser: 1, IdWorkspace: 4 });
+            }),
+        );
+        server.use(msw.post(login, () => HttpResponse.json({ msg: "ok" })));
+
+        await submitSignUp(
+            fakeSignUpContext({ inviteHash: "Yk3s", email: "convidado@exemplo.com" }),
+        );
+
+        expect(body?.Email).toBe("convidado@exemplo.com");
+        expect(body?.InviteHash).toBe("Yk3s");
+    });
+
     it("mostra a mensagem da API quando o e-mail já está em uso", async () => {
         server.use(
             msw.post(signUp, () =>
