@@ -86,10 +86,9 @@ import { ExpensesConnection } from "@/api/Expenses.connection";
 const gastos = await ExpensesConnection.list({ From: "2026-05-01", To: "2026-05-31" });
 ```
 
-As quinze de hoje: `Users`, `UsersAuth`, `Workspaces`, `Accounts`, `PaymentMethods`,
-`Categories`, `Persons`, `Tags`, `Inflows`, `Expenses`, `ExpensePayments`, `Budgets`,
-`BudgetPeriods`, `Reports` e `Utils` — o nome do arquivo, o da constante e o da rota são sempre
-o mesmo nome.
+As quatorze de hoje: `Users`, `UsersAuth`, `Workspaces`, `Accounts`, `PaymentMethods`,
+`Categories`, `Persons`, `Tags`, `Inflows`, `Expenses`, `ExpensePayments`, `BudgetPeriods`,
+`Reports` e `Utils` — o nome do arquivo, o da constante e o da rota são sempre o mesmo nome.
 
 **Os tipos do contrato vivem no namespace `ApiTypes`.** Todo o `src/types/api.ts` é exportado
 por ele, então no consumo o tipo diz de onde veio:
