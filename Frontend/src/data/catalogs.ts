@@ -12,10 +12,32 @@ import type { ApiTypes } from "@/types/api";
 
 const CATALOG_STALE_TIME = 5 * 60 * 1000;
 
+/** As categorias ATIVAS — a lista de escolha.
+ *
+ *  Sem `IncludeArchived`, e isso é decisão e não omissão: é esta função
+ *  que alimenta o seletor de gasto, o filtro da lista e o relatório, e
+ *  nenhum dos três pode passar a oferecer uma categoria arquivada. */
 export function useCategories(): UseQueryResult<ApiTypes.Category[]> {
     return useQuery({
         queryKey: queryKeys.categories,
         queryFn: () => CategoriesConnection.list(),
+        staleTime: CATALOG_STALE_TIME,
+    });
+}
+
+/** As ativas **e as arquivadas** — a leitura da Personalização, que é a
+ *  única tela que mostra o grupo das arquivadas e o botão que as traz de
+ *  volta.
+ *
+ *  **Entrada de cache própria** (`queryKeys.categoriesWithArchived`).
+ *  Reaproveitar a chave de `useCategories` faria abrir a Personalização
+ *  mudar o que toda tela enxerga — a arquivada voltaria ao seletor de
+ *  gasto e ao donut. O prefixo é o mesmo, então uma invalidação continua
+ *  alcançando as duas. */
+export function useCategoriesWithArchived(): UseQueryResult<ApiTypes.Category[]> {
+    return useQuery({
+        queryKey: queryKeys.categoriesWithArchived,
+        queryFn: () => CategoriesConnection.list({ IncludeArchived: true }),
         staleTime: CATALOG_STALE_TIME,
     });
 }
@@ -48,13 +70,10 @@ export function useAccounts(month?: ApiTypes.ReferenceMonth): UseQueryResult<Api
     });
 }
 
-/** Categoria pré-definida do sistema: `IdWorkspace: null`.
- *
- *  Ela aparece em todo workspace e a API recusa editar ou arquivar com
- *  406 — a tela usa isto para desabilitar os botões em vez de oferecer
- *  uma ação que sempre falha. */
-export const isSystemCategory = (category: ApiTypes.Category): boolean =>
-    category.IdWorkspace === null;
+/* Não há mais `isSystemCategory`: a pré-definida do sistema
+   (`IdWorkspace: null`), que a tela desabilitava porque a API recusava
+   editá-la, acabou na leva 9. Toda categoria é do espaço, e toda
+   categoria é editável, arquivável e reordenável por quem a vê. */
 
 /** Pessoa vinculada a um login não pode ser arquivada (406): o vínculo
  *  não é reconstruível por rota nenhuma. */
@@ -110,6 +129,12 @@ export function usePaymentMethodIndex(): Map<number, PaymentMethodOption> {
 }
 
 /** Invalida os cadastros depois de uma escrita neles.
+ *
+ *  `queryKeys.categories` é `["categories"]`, e a invalidação casa por
+ *  PREFIXO: uma chamada só alcança a lista de escolha e a lista com as
+ *  arquivadas. É por isso que a segunda entrada nasceu debaixo da
+ *  primeira — arquivar mexe nas duas ao mesmo tempo, e duas raízes
+ *  separadas seriam duas chances de esquecer uma.
  *
  *  As contas entram junto porque criar um cartão muda a lista de formas
  *  de pagamento, que vive dentro de `GET /Accounts`. Invalida a RAIZ:

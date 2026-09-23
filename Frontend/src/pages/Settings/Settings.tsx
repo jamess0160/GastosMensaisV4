@@ -8,8 +8,7 @@ import {
 } from "./controller";
 import {
     isLinkedPerson,
-    isSystemCategory,
-    useCategories,
+    useCategoriesWithArchived,
     useInvalidateCatalogs,
     usePersons,
 } from "@/data/catalogs";
@@ -19,12 +18,13 @@ import { FormError, FormField, Input } from "@/ui/form";
 import { CategoryPreview, ColorPicker, IconPicker } from "@/ui/controls";
 import { ConfirmDialog } from "@/ui/overlay";
 import { CategoryIcon } from "@/ui/iconCatalog";
-import { IconArchive, IconEdit, IconUser } from "@/ui/icons";
+import { IconArchive, IconArrowDown, IconArrowUp, IconEdit, IconUser } from "@/ui/icons";
 import { Cell, CellActions, IconButton, Table, TableHead, TableRow } from "@/ui/table";
 import { CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { categoryColor } from "@/lib/categoryColor";
+import type { ApiTypes } from "@/types/api";
 
 type Tab = "categories" | "persons";
 
@@ -54,14 +54,31 @@ export function Settings() {
         null,
     );
 
-    const categories = useCategories();
+    /* A ÚNICA tela que pede a lista com as arquivadas — e por isso ela
+       tem entrada de cache própria (`useCategoriesWithArchived`). Ler
+       daqui a mesma chave do seletor de gasto faria abrir esta tela
+       devolver a categoria arquivada ao formulário de lançamento e ao
+       donut do relatório. */
+    const categories = useCategoriesWithArchived();
     const persons = usePersons();
     const invalidateCatalogs = useInvalidateCatalogs();
+
+    /* A API já devolve ordenado por `Position` — o cliente não reordena
+       nada por conta própria, só separa os dois grupos. */
+    const activeCategories = useMemo(
+        () => (categories.data ?? []).filter((category) => category.Active),
+        [categories.data],
+    );
+    const archivedCategories = useMemo(
+        () => (categories.data ?? []).filter((category) => !category.Active),
+        [categories.data],
+    );
 
     const context = useMemo<SettingsContext>(
         () => ({
             categoryDraft,
             personDraft,
+            activeCategories,
             beginSubmit() {
                 setPending(true);
                 setError(null);
@@ -79,11 +96,66 @@ export function Settings() {
             resetCategoryDraft: () => setCategoryDraft(emptyCategory()),
             resetPersonDraft: () => setPersonDraft(emptyPerson()),
         }),
-        [categoryDraft, personDraft, invalidateCatalogs],
+        [categoryDraft, personDraft, activeCategories, invalidateCatalogs],
     );
 
-    const activeCategories = (categories.data ?? []).filter((category) => category.Active);
     const activePersons = (persons.data ?? []).filter((person) => person.Active);
+
+    /* O ladrilho colorido mais o nome — a mesma marcação na tabela e no
+       card, escrita uma vez porque as duas listas agora existem em três
+       lugares (ativas na tabela, ativas no card, arquivadas no grupo). */
+    const categoryName = (category: ApiTypes.Category) => {
+        const color = categoryColor(category);
+
+        return (
+            <>
+                <span
+                    className={styles.tile}
+                    style={{ background: `${color}1f`, color, borderColor: `${color}33` }}
+                >
+                    <CategoryIcon iconKey={category.IconKey} />
+                </span>
+                <div className={styles.nameText}>
+                    <div className={styles.nameTitle}>{category.Description}</div>
+                </div>
+            </>
+        );
+    };
+
+    const editCategory = (category: ApiTypes.Category) =>
+        setCategoryDraft({
+            IdCategory: category.IdCategory,
+            Description: category.Description,
+            IconKey: category.IconKey,
+            Color: category.Color,
+        });
+
+    /* ↑ ↓ em cada linha, e não arrastar: arrastar é o gesto óbvio no
+       desktop e briga com o scroll em 390px, que é a largura em que
+       este produto é usado. Duas setas resolvem o mesmo problema nas
+       duas larguras, sem um caminho de código por dispositivo.
+
+       As setas das pontas ficam desabilitadas porque não há troca a
+       fazer — a section também recusa, mas um botão que não faz nada
+       é pior do que um botão apagado. */
+    const orderArrows = (idCategory: number, index: number) => (
+        <>
+            <IconButton
+                label="Subir"
+                disabled={pending || index === 0}
+                onClick={() => void SettingsController.moveCategory(context, idCategory, -1)}
+            >
+                <IconArrowUp />
+            </IconButton>
+            <IconButton
+                label="Descer"
+                disabled={pending || index === activeCategories.length - 1}
+                onClick={() => void SettingsController.moveCategory(context, idCategory, 1)}
+            >
+                <IconArrowDown />
+            </IconButton>
+        </>
+    );
 
     return (
         <Page>
@@ -123,69 +195,73 @@ export function Settings() {
                                 error={categories.error}
                                 onRetry={() => void categories.refetch()}
                             />
-                        ) : activeCategories.length === 0 ? (
-                            <EmptyState
-                                title="Nenhuma categoria ainda"
-                                description="Crie a primeira ao lado — categoria é obrigatória em todo gasto."
-                            />
-                        ) : isMobile ? (
-                            <CardList>
-                                {activeCategories.map((category) => {
-                                    const system = isSystemCategory(category);
-                                    const color = categoryColor(category);
-
-                                    return (
-                                        <ItemCard
-                                            key={category.IdCategory}
-                                            title={
-                                                <>
-                                                    <span
-                                                        className={styles.tile}
-                                                        style={{
-                                                            background: `${color}1f`,
-                                                            color,
-                                                            borderColor: `${color}33`,
-                                                        }}
-                                                    >
-                                                        <CategoryIcon iconKey={category.IconKey} />
+                        ) : (
+                            <>
+                                {activeCategories.length === 0 ? (
+                                    <EmptyState
+                                        title="Nenhuma categoria ativa"
+                                        description="Crie uma ao lado — categoria é obrigatória em todo gasto. As arquivadas continuam abaixo."
+                                    />
+                                ) : isMobile ? (
+                                    <CardList>
+                                        {activeCategories.map((category, index) => (
+                                            <ItemCard
+                                                key={category.IdCategory}
+                                                title={categoryName(category)}
+                                                trailing={
+                                                    <span className={styles.cardActions}>
+                                                        {orderArrows(category.IdCategory, index)}
+                                                        <IconButton
+                                                            label="Editar"
+                                                            onClick={() => editCategory(category)}
+                                                        >
+                                                            <IconEdit />
+                                                        </IconButton>
+                                                        <IconButton
+                                                            label="Arquivar"
+                                                            onClick={() =>
+                                                                setArchiving({
+                                                                    kind: "categories",
+                                                                    id: category.IdCategory,
+                                                                    name: category.Description,
+                                                                })
+                                                            }
+                                                        >
+                                                            <IconArchive />
+                                                        </IconButton>
                                                     </span>
-                                                    {category.Description}
-                                                </>
-                                            }
-                                            badges={
-                                                system ? (
-                                                    <Badge>Do sistema</Badge>
-                                                ) : (
-                                                    <Badge tone="brand">Sua</Badge>
-                                                )
-                                            }
-                                            trailing={
-                                                <span className={styles.cardActions}>
+                                                }
+                                            />
+                                        ))}
+                                    </CardList>
+                                ) : (
+                                    <Table columns="minmax(0,1fr) 90px 110px">
+                                        <TableHead>
+                                            <span>Categoria</span>
+                                            <span>Ordem</span>
+                                            <span style={{ textAlign: "right" }}>Ações</span>
+                                        </TableHead>
+                                        {activeCategories.map((category, index) => (
+                                            <TableRow key={category.IdCategory}>
+                                                <div className={styles.name}>
+                                                    {categoryName(category)}
+                                                </div>
+
+                                                <Cell>
+                                                    <span className={styles.cardActions}>
+                                                        {orderArrows(category.IdCategory, index)}
+                                                    </span>
+                                                </Cell>
+
+                                                <CellActions>
                                                     <IconButton
-                                                        label={
-                                                            system
-                                                                ? "Categoria do sistema não pode ser editada"
-                                                                : "Editar"
-                                                        }
-                                                        disabled={system}
-                                                        onClick={() =>
-                                                            setCategoryDraft({
-                                                                IdCategory: category.IdCategory,
-                                                                Description: category.Description,
-                                                                IconKey: category.IconKey,
-                                                                Color: category.Color,
-                                                            })
-                                                        }
+                                                        label="Editar"
+                                                        onClick={() => editCategory(category)}
                                                     >
                                                         <IconEdit />
                                                     </IconButton>
                                                     <IconButton
-                                                        label={
-                                                            system
-                                                                ? "Categoria do sistema não pode ser arquivada"
-                                                                : "Arquivar"
-                                                        }
-                                                        disabled={system}
+                                                        label="Arquivar"
                                                         onClick={() =>
                                                             setArchiving({
                                                                 kind: "categories",
@@ -196,95 +272,59 @@ export function Settings() {
                                                     >
                                                         <IconArchive />
                                                     </IconButton>
-                                                </span>
-                                            }
-                                        />
-                                    );
-                                })}
-                            </CardList>
-                        ) : (
-                            <Table columns="minmax(0,1fr) 120px 110px">
-                                <TableHead>
-                                    <span>Categoria</span>
-                                    <span>Origem</span>
-                                    <span style={{ textAlign: "right" }}>Ações</span>
-                                </TableHead>
-                                {activeCategories.map((category) => {
-                                    const system = isSystemCategory(category);
-                                    const color = categoryColor(category);
+                                                </CellActions>
+                                            </TableRow>
+                                        ))}
+                                    </Table>
+                                )}
 
-                                    return (
-                                        <TableRow key={category.IdCategory}>
-                                            <div className={styles.name}>
-                                                <span
-                                                    className={styles.tile}
-                                                    style={{
-                                                        background: `${color}1f`,
-                                                        color,
-                                                        borderColor: `${color}33`,
-                                                    }}
-                                                >
-                                                    <CategoryIcon iconKey={category.IconKey} />
-                                                </span>
-                                                <div className={styles.nameText}>
-                                                    <div className={styles.nameTitle}>
-                                                        {category.Description}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                {/* O grupo das arquivadas: recolhido, no FIM, e só
+                                    existe quando há alguma. É o que faz arquivar ter
+                                    volta — sem ele a categoria sumia da tela junto
+                                    com o botão que a traria de novo, e "arquivar"
+                                    era um delete com outro nome.
 
-                                            <Cell>
-                                                {system ? (
-                                                    <Badge>Do sistema</Badge>
-                                                ) : (
-                                                    <Badge tone="brand">Sua</Badge>
-                                                )}
-                                            </Cell>
-
-                                            <CellActions>
-                                                {/* Categoria do sistema responde 406 em
-                                                    editar e arquivar: o botão desabilitado
-                                                    diz por quê, em vez de falhar depois. */}
-                                                <IconButton
-                                                    label={
-                                                        system
-                                                            ? "Categoria do sistema não pode ser editada"
-                                                            : "Editar"
+                                    `<details>` nativo e não um estado de React: o
+                                    navegador já dá o teclado, o foco e o
+                                    `aria-expanded` de graça. */}
+                                {archivedCategories.length > 0 && (
+                                    <details className={styles.archived}>
+                                        <summary>
+                                            Arquivadas
+                                            <Badge>{archivedCategories.length}</Badge>
+                                        </summary>
+                                        <p className={styles.archivedHint}>
+                                            Elas saíram das listas de escolha, mas os lançamentos
+                                            antigos continuam apontando para elas — o relatório do
+                                            mês passado não muda. Desarquivar devolve a categoria ao
+                                            fim da lista.
+                                        </p>
+                                        <CardList>
+                                            {archivedCategories.map((category) => (
+                                                <ItemCard
+                                                    key={category.IdCategory}
+                                                    title={categoryName(category)}
+                                                    trailing={
+                                                        <Button
+                                                            size="sm"
+                                                            disabled={pending}
+                                                            onClick={() =>
+                                                                void SettingsController.restoreCategory(
+                                                                    context,
+                                                                    category.IdCategory,
+                                                                    category.Description,
+                                                                )
+                                                            }
+                                                        >
+                                                            Desarquivar
+                                                        </Button>
                                                     }
-                                                    disabled={system}
-                                                    onClick={() =>
-                                                        setCategoryDraft({
-                                                            IdCategory: category.IdCategory,
-                                                            Description: category.Description,
-                                                            IconKey: category.IconKey,
-                                                            Color: category.Color,
-                                                        })
-                                                    }
-                                                >
-                                                    <IconEdit />
-                                                </IconButton>
-                                                <IconButton
-                                                    label={
-                                                        system
-                                                            ? "Categoria do sistema não pode ser arquivada"
-                                                            : "Arquivar"
-                                                    }
-                                                    disabled={system}
-                                                    onClick={() =>
-                                                        setArchiving({
-                                                            kind: "categories",
-                                                            id: category.IdCategory,
-                                                            name: category.Description,
-                                                        })
-                                                    }
-                                                >
-                                                    <IconArchive />
-                                                </IconButton>
-                                            </CellActions>
-                                        </TableRow>
-                                    );
-                                })}
-                            </Table>
+                                                />
+                                            ))}
+                                        </CardList>
+                                    </details>
+                                )}
+                            </>
                         )}
                     </div>
 

@@ -128,11 +128,43 @@
 }
 
 /* As ações no rodapé do card, no telefone — os mesmos dois botões da
-   coluna "Ações" da tabela, em linha. */
+   coluna "Ações" da tabela, em linha. Também é a caixa das setas ↑ ↓ na
+   coluna "Ordem". */
 .cardActions {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+}
+
+/* ── O grupo das arquivadas ───────────────────────────────────
+   Recolhido e no fim da lista: a categoria arquivada não é escolha, é
+   histórico com volta. `<details>` nativo — o navegador dá o teclado, o
+   foco e o estado de expandido sem estado de React nenhum. */
+.archived {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface-alt);
+    padding: 12px 14px;
+}
+
+.archived > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.archivedHint {
+    font-size: 12px;
+    color: var(--ink-2);
+    line-height: 1.5;
+    margin: 10px 0 12px;
 }
 
 @media (max-width: 1100px) {

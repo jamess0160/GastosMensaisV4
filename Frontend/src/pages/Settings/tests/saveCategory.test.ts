@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import { server } from "@/test/server";
 import { saveCategory } from "../sections/saveCategory";
 import { archiveCategory } from "../sections/archiveCategory";
+import { restoreCategory } from "../sections/restoreCategory";
+import { moveCategory } from "../sections/moveCategory";
 import { savePerson } from "../sections/savePerson";
 import { archivePerson } from "../sections/archivePerson";
-import { aCategoryDraft, aPersonDraft, fakeSettingsContext } from "./context";
+import { aCategory, aCategoryDraft, aPersonDraft, fakeSettingsContext } from "./context";
 
 describe("saveCategory", () => {
     it("cria mandando a CHAVE do ícone, não um caminho de arquivo", async () => {
@@ -75,21 +77,106 @@ describe("saveCategory", () => {
 });
 
 describe("archiveCategory", () => {
-    it("mostra a mensagem da API quando a categoria é do sistema", async () => {
+    it("mostra a mensagem da API quando o id não é do espaço", async () => {
         server.use(
             msw.delete("*/api/Categories/IdCategory=1", () =>
-                HttpResponse.json(
-                    { msg: "Categoria pré-definida não pode ser arquivada!" },
-                    { status: 406 },
-                ),
+                HttpResponse.json({ msg: "Categoria não encontrada!" }, { status: 406 }),
             ),
         );
         const context = fakeSettingsContext();
 
         await archiveCategory(context, 1);
 
+        // Não há mais "pré-definida do sistema": desde a leva 9 toda
+        // categoria é do espaço, e um id alheio é simplesmente um id que
+        // não existe aqui.
+        expect(context.failSubmit).toHaveBeenCalledWith("Categoria não encontrada!");
+    });
+});
+
+describe("restoreCategory", () => {
+    it("desarquiva pelo PUT, com Active true e a Description junto", async () => {
+        let body: unknown;
+        server.use(
+            msw.put("*/api/Categories/IdCategory=7", async ({ request }) => {
+                body = await request.json();
+                return HttpResponse.json({ msg: "ok" });
+            }),
+        );
+        const context = fakeSettingsContext();
+
+        await restoreCategory(context, 7, "Pets");
+
+        // É o MESMO PUT da edição: arquivar e desarquivar são os dois
+        // sentidos de uma coluna só, e por isso não há rota `restore`. A
+        // Description vai junto porque o corpo a exige.
+        expect(body).toEqual({ Description: "Pets", Active: true });
+        expect(context.finishSubmit).toHaveBeenCalledWith("Categoria desarquivada.");
+    });
+});
+
+describe("moveCategory", () => {
+    const list = [aCategory(1, "Casa"), aCategory(2, "Mercado"), aCategory(3, "Pets")];
+
+    it("manda a lista COMPLETA de ids na ordem nova, não só a que mexeu", async () => {
+        let body: unknown;
+        server.use(
+            msw.put("*/api/Categories/reorder", async ({ request }) => {
+                body = await request.json();
+                return HttpResponse.json({ msg: "ok" });
+            }),
+        );
+        const context = fakeSettingsContext({ activeCategories: list });
+
+        await moveCategory(context, 2, -1);
+
+        // A lista inteira é o que faz a última escrita ganhar inteira: uma
+        // escrita parcial sobre `Position` deixaria duas categorias na
+        // mesma posição quando duas pessoas reordenam ao mesmo tempo.
+        expect(body).toEqual({ IdCategories: [2, 1, 3] });
+        expect(context.finishSubmit).toHaveBeenCalledWith("Ordem salva.");
+    });
+
+    it("desce trocando com o vizinho de baixo", async () => {
+        let body: unknown;
+        server.use(
+            msw.put("*/api/Categories/reorder", async ({ request }) => {
+                body = await request.json();
+                return HttpResponse.json({ msg: "ok" });
+            }),
+        );
+
+        await moveCategory(fakeSettingsContext({ activeCategories: list }), 1, 1);
+
+        expect(body).toEqual({ IdCategories: [2, 1, 3] });
+    });
+
+    it("não gasta requisição na ponta da lista", async () => {
+        // Sem handler declarado: uma requisição aqui QUEBRA o teste, que é
+        // exatamente o que se quer provar.
+        const context = fakeSettingsContext({ activeCategories: list });
+
+        await moveCategory(context, 1, -1);
+        await moveCategory(context, 3, 1);
+
+        expect(context.beginSubmit).not.toHaveBeenCalled();
+    });
+
+    it("mostra a mensagem da API quando a lista é recusada", async () => {
+        server.use(
+            msw.put("*/api/Categories/reorder", () =>
+                HttpResponse.json(
+                    { msg: "A lista precisa trazer todas as categorias ativas do espaço!" },
+                    { status: 406 },
+                ),
+            ),
+        );
+        const context = fakeSettingsContext({ activeCategories: list });
+
+        await moveCategory(context, 2, -1);
+
         expect(context.failSubmit).toHaveBeenCalledWith(
-            "Categoria pré-definida não pode ser arquivada!",
+            "A lista precisa trazer todas as categorias ativas do espaço!",
         );
     });
 });

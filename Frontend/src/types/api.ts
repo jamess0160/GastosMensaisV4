@@ -522,12 +522,15 @@ export namespace ApiTypes {
 
     /* ── 7. Categories ────────────────────────────────────────── */
 
-    /** Lista plana, só de gasto. `IdWorkspace: null` = pré-definida do
-     *  sistema: aparece em todo workspace e não pode ser editada nem
-     *  arquivada (406). Use isso para desabilitar os botões na tela. */
+    /** Lista plana, só de gasto, e TODA linha é de um workspace.
+     *
+     *  `IdWorkspace: null` — a pré-definida do sistema, que aparecia em
+     *  todo espaço e não podia ser editada nem arquivada — deixou de
+     *  existir na leva 9: cada espaço ganhou a sua cópia das treze, e com
+     *  ela o direito de renomear, arquivar e reordenar. */
     export interface Category {
         IdCategory: number;
-        IdWorkspace: number | null;
+        IdWorkspace: number;
         Description: string;
         /** O NOME DO COMPONENTE do ícone no lucide-react — "ShoppingCart",
          *  não um caminho de arquivo. Quem transforma o nome em desenho é
@@ -540,6 +543,14 @@ export namespace ApiTypes {
         UpdatedAt: DateTime;
     }
 
+    /** O mesmo recorte do `IncludeCanceled` de gastos: ausente esconde a
+     *  arquivada, presente traz a lista inteira. O PADRÃO é esconder — o
+     *  seletor de gasto, o filtro e o relatório leem esta rota, e nenhum
+     *  deles pode oferecer uma categoria arquivada. */
+    export interface CategoryListQuery {
+        IncludeArchived?: boolean;
+    }
+
     export interface CategoryCreateBody {
         Description: string;
         IconKey?: string | null;
@@ -547,8 +558,21 @@ export namespace ApiTypes {
         Position?: number | null;
     }
 
+    /** `Description` é obrigatória mesmo no PUT que só arquiva: o corpo é
+     *  de edição parcial no resto, não nela. */
     export interface CategoryUpdateBody extends Partial<CategoryCreateBody> {
         Description: string;
+        /** Arquiva (false) e desarquiva (true) — a mesma coluna que o
+         *  DELETE zera. Desarquivar sem mandar `Position` põe a categoria
+         *  no FIM da lista: a posição antiga já é de outra. */
+        Active?: boolean;
+    }
+
+    /** A lista COMPLETA de ids ativos, na ordem desejada — nunca um par
+     *  (id, posição). É o que faz a última escrita ganhar inteira em vez
+     *  de deixar a ordem meio aplicada; lista incompleta responde 406. */
+    export interface CategoryReorderBody {
+        IdCategories: number[];
     }
 
     /* ── 8. Persons ───────────────────────────────────────────── */

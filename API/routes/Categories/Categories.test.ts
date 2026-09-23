@@ -121,6 +121,39 @@ describe("Categories", () => {
 
             expect(response.body.map(description)).toEqual([])
         })
+
+        //  O outro lado do caso acima, e o que faz arquivar ter volta: sem este recorte a
+        //  categoria arquivada não aparecia em lugar nenhum — sumia da tela junto com o botão
+        //  que a traria de volta, e "arquivar" era um delete com outro nome.
+        it("devolve a arquivada com IncludeArchived=true, e só então", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+
+            let archived = await workspaceClient.post(`/Categories`, { Description: "Arquivada" })
+            await workspaceClient.post(`/Categories`, { Description: "Viva" })
+
+            await workspaceClient.delete(`/Categories/IdCategory=${archived.body.IdCategory}`)
+
+            expect((await workspaceClient.get(`/Categories`)).body.map(description)).toEqual(["Viva"])
+
+            let response = await workspaceClient.get(`/Categories?IncludeArchived=true`)
+
+            expect(response.status).toBe(200)
+            expect(response.body.map(description).sort()).toEqual(["Arquivada", "Viva"])
+        })
+
+        //  O recorte não atravessa o tenant: pedir a lista inteira é pedir a do próprio espaço.
+        it("não devolve a arquivada de outro workspace nem com IncludeArchived=true", async () => {
+            let owner = await UsersFactory.create()
+            let ownerClient = new TestClient(owner.token)
+
+            let created = await ownerClient.post(`/Categories`, { Description: "Arquivada do vizinho" })
+            await ownerClient.delete(`/Categories/IdCategory=${created.body.IdCategory}`)
+
+            let response = await new TestClient((await UsersFactory.create()).token).get(`/Categories?IncludeArchived=true`)
+
+            expect(response.body.map(description)).not.toContain("Arquivada do vizinho")
+        })
     })
 
     describe("POST /Categories", () => {
@@ -272,6 +305,180 @@ describe("Categories", () => {
                 Color: "#123456",
                 IconKey: "home",
             })
+        })
+
+        //  **O ciclo completo.** Arquivar era de mão única: o DELETE gravava Active = false e
+        //  rota nenhuma devolvia. O Active no corpo do PUT é o outro sentido da MESMA coluna,
+        //  e é por isso que não virou uma rota `restore` própria.
+        it("arquiva e desarquiva pelo Active do corpo", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+
+            let created = await workspaceClient.post(`/Categories`, { Description: "Pets" })
+
+            expect((await workspaceClient.put(`/Categories/IdCategory=${created.body.IdCategory}`, { Description: "Pets", Active: false })).status).toBe(200)
+            expect((await findCategoryById(created.body.IdCategory)).Active).toBe(false)
+            expect((await workspaceClient.get(`/Categories`)).body.map(description)).not.toContain("Pets")
+
+            expect((await workspaceClient.put(`/Categories/IdCategory=${created.body.IdCategory}`, { Description: "Pets", Active: true })).status).toBe(200)
+            expect((await findCategoryById(created.body.IdCategory)).Active).toBe(true)
+            expect((await workspaceClient.get(`/Categories`)).body.map(description)).toContain("Pets")
+        })
+
+        //  O PUT é a única leitura da feature que ENXERGA a arquivada — sem isso ele
+        //  responderia "não encontrada" justamente à linha que veio desarquivar.
+        it("alcança a categoria já arquivada, que é quem precisa voltar", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+
+            let created = await workspaceClient.post(`/Categories`, { Description: "Some e volta" })
+
+            await workspaceClient.delete(`/Categories/IdCategory=${created.body.IdCategory}`)
+
+            let response = await workspaceClient.put(`/Categories/IdCategory=${created.body.IdCategory}`, { Description: "Some e volta", Active: true })
+
+            expect(response.status).toBe(200)
+            expect((await findCategoryById(created.body.IdCategory)).Active).toBe(true)
+        })
+
+        //  **Desarquivar devolve a linha ao FIM, não ao lugar que ela ocupava.** A posição
+        //  antiga já é de outra a essa altura: reaparecer no meio da lista seria uma ordem que
+        //  só o desempate por id decide, e `Position` ficaria empatada.
+        it("desarquiva para o fim da lista, não para a posição antiga", async () => {
+            let mine = await createSeededWorkspace("Espaço que arquiva e volta")
+
+            let pets = (await mine.client.get(`/Categories`)).body.find(named("Pets"))
+
+            await mine.client.delete(`/Categories/IdCategory=${pets.IdCategory}`)
+            await mine.client.put(`/Categories/IdCategory=${pets.IdCategory}`, { Description: "Pets", Active: true })
+
+            let list = (await mine.client.get(`/Categories`)).body
+
+            expect(list.map(description).at(-1)).toBe("Pets")
+            //  E sem empate: a posição é uma a mais que a maior que estava em uso
+            expect(list.filter((item: { Position: number }) => item.Position === pets.Position)).toHaveLength(0)
+        })
+
+        //  Quem manda a posição junto está dizendo onde quer a linha, e essa palavra é mais
+        //  recente que a regra do "vai para o fim".
+        it("respeita a Position que o corpo manda ao desarquivar", async () => {
+            let user = await UsersFactory.create()
+            let workspaceClient = new TestClient(user.token)
+
+            let created = await workspaceClient.post(`/Categories`, { Description: "Escolhe o lugar", Position: 9 })
+
+            await workspaceClient.delete(`/Categories/IdCategory=${created.body.IdCategory}`)
+            await workspaceClient.put(`/Categories/IdCategory=${created.body.IdCategory}`, { Description: "Escolhe o lugar", Active: true, Position: 2 })
+
+            expect((await findCategoryById(created.body.IdCategory)).Position).toBe(2)
+        })
+    })
+
+    //  **A ordem, pela lista COMPLETA de ids.** A `Position` era lida (`orderBy`) e escrita
+    //  por rota nenhuma além do PUT de uma linha só — reordenar não existia. E ela é a lista
+    //  inteira, não "mova o id X para a posição N": é o que faz a última escrita ganhar
+    //  inteira em vez de deixar a ordem meio aplicada.
+    describe("PUT /Categories/reorder", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().put(`/Categories/reorder`, { IdCategories: [1] })
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa lista vazia", async () => {
+            let response = await client.put(`/Categories/reorder`, { IdCategories: [] })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  **O critério da etapa.** Subir "Mercado" para o topo muda a ordem em todas as
+        //  listas do espaço — e não muda nada no outro.
+        it("grava a ordem pedida, e só no próprio espaço", async () => {
+            let mine = await createSeededWorkspace("Espaço que reordena pela rota")
+            let neighbour = await createSeededWorkspace("Espaço que não pediu nada")
+
+            let before = (await mine.client.get(`/Categories`)).body
+            let mercado = before.find(named("Mercado"))
+
+            //  "Mercado" para o topo, o resto na ordem em que já estava
+            let IdCategories = [mercado.IdCategory, ...ids(before).filter((id) => id !== mercado.IdCategory)]
+
+            let response = await mine.client.put(`/Categories/reorder`, { IdCategories })
+
+            expect(response.status).toBe(200)
+
+            let after = (await mine.client.get(`/Categories`)).body
+
+            expect(after.map(description)[0]).toBe("Mercado")
+            expect(ids(after)).toEqual(IdCategories)
+            //  1, 2, 3… sem buraco e sem empate
+            expect(after.map((item: { Position: number }) => item.Position)).toEqual(IdCategories.map((_, index) => index + 1))
+
+            //  O vizinho não se mexeu
+            expect((await neighbour.client.get(`/Categories`)).body.map(description)).toEqual(CategoriesSeed.map(description))
+        })
+
+        //  Aceitar a lista curta seria numerar 1..N só o que veio e deixar o resto com a
+        //  numeração velha — duas categorias na mesma posição.
+        it("recusa lista incompleta, sem gravar nada", async () => {
+            let mine = await createSeededWorkspace("Espaço da lista curta")
+
+            let before = (await mine.client.get(`/Categories`)).body
+
+            let response = await mine.client.put(`/Categories/reorder`, { IdCategories: ids(before).slice(0, 3).reverse() })
+
+            expect(response.status).toBe(406)
+            expect(ids((await mine.client.get(`/Categories`)).body)).toEqual(ids(before))
+        })
+
+        //  Id de outro tenant: o mesmo 406 de "não encontrada" que toda rota daqui dá — e,
+        //  antes disso, nenhuma escrita.
+        it("recusa id de outro workspace, sem gravar nada", async () => {
+            let mine = await createSeededWorkspace("Espaço que recebe id alheio")
+            let neighbour = await createSeededWorkspace("Espaço dono do id")
+
+            let before = (await mine.client.get(`/Categories`)).body
+            let intruder = ids((await neighbour.client.get(`/Categories`)).body)[0]
+
+            let response = await mine.client.put(`/Categories/reorder`, { IdCategories: [intruder, ...ids(before)] })
+
+            expect(response.status).toBe(406)
+            expect(ids((await mine.client.get(`/Categories`)).body)).toEqual(ids(before))
+            expect((await findCategoryById(intruder)).Position).toBe(CategoriesSeed[0].Position)
+        })
+
+        //  Id repetido não é pego por nenhuma das outras duas conferências: com [1, 1, 2]
+        //  sobre um espaço de [1, 2] não sobra id desconhecido nem id faltando.
+        it("recusa o mesmo id duas vezes", async () => {
+            let mine = await createSeededWorkspace("Espaço do id repetido")
+
+            let before = ids((await mine.client.get(`/Categories`)).body)
+
+            let response = await mine.client.put(`/Categories/reorder`, { IdCategories: [before[0], ...before] })
+
+            expect(response.status).toBe(406)
+            expect(ids((await mine.client.get(`/Categories`)).body)).toEqual(before)
+        })
+
+        //  A lista é a das ATIVAS: posição é lugar na lista de escolha, e perder esse lugar é
+        //  o que arquivar quer dizer. Mandar a arquivada junto é mandar um id que esta rota
+        //  não conhece.
+        it("não conta a arquivada nem na lista completa nem como id válido", async () => {
+            let mine = await createSeededWorkspace("Espaço com uma arquivada")
+
+            let seeded = (await mine.client.get(`/Categories`)).body
+            let pets = seeded.find(named("Pets"))
+
+            await mine.client.delete(`/Categories/IdCategory=${pets.IdCategory}`)
+
+            //  Com ela na lista: id desconhecido
+            expect((await mine.client.put(`/Categories/reorder`, { IdCategories: ids(seeded) })).status).toBe(406)
+
+            //  Sem ela: a lista está completa
+            let active = ids(seeded).filter((id) => id !== pets.IdCategory)
+
+            expect((await mine.client.put(`/Categories/reorder`, { IdCategories: active })).status).toBe(200)
         })
     })
 

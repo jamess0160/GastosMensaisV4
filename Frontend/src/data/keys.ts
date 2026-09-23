@@ -11,7 +11,23 @@ import type { ApiTypes } from "@/types/api";
 
 export const queryKeys = {
     /* Cadastros — mudam pouco e são lidos por quase toda tela. */
+    /** As ATIVAS. É esta a lista que o seletor de gasto, o filtro e o
+     *  relatório leem, e é por isso que ela é a chave curta. */
     categories: ["categories"] as const,
+    /** As ativas **e as arquivadas**, que é a leitura da Personalização.
+     *
+     *  **Entrada de cache separada, de propósito.** Pôr `IncludeArchived`
+     *  na mesma chave trocaria o que TODAS as telas enxergam: quem abrisse
+     *  a Personalização deixaria a categoria arquivada no seletor de gasto
+     *  e no donut do relatório, que é exatamente o contrário do que
+     *  arquivar quer dizer. Duas chaves são duas requisições, e é o preço
+     *  certo — a lista tem treze linhas e é a única tela que precisa da
+     *  segunda.
+     *
+     *  Debaixo do MESMO prefixo `["categories"]` também de propósito: a
+     *  invalidação do React Query casa por prefixo, então uma escrita em
+     *  categoria continua sendo UMA invalidação que alcança as duas. */
+    categoriesWithArchived: ["categories", "archived"] as const,
     /** Os convites PENDENTES do espaço da sessão. Sem mês e sem id: a
      *  rota não recebe nenhum dos dois — ela olha o workspace do cookie,
      *  e trocar de espaço limpa o cache inteiro de qualquer jeito. */
