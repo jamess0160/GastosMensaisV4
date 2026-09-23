@@ -8,7 +8,7 @@ começar em 6 está em [../RoadMap MVP.md](../RoadMap%20MVP.md#as-levas-daqui-pr
 | [6. O cartão, o uso real e a gestão de membros](6.%20O%20cartão,%20o%20uso%20real%20e%20a%20gestão%20de%20membros.md) | escrita em 09/09/2026, **fechada** em 09/09/2026 — 18 de 18 etapas |
 | [7. O que a lei cobra e o que só quebra em produção](7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md) | escrita em 10/09/2026, 12 de 12 etapas fechadas no mesmo dia — **reaberta** em 11/09/2026 com a etapa 13, **fechada** no mesmo dia: 13 de 13 |
 | [8. O que só se prova subindo](8.%20O%20que%20só%20se%20prova%20subindo.md) | escrita em 11/09/2026, **9 de 10 etapas** fechadas entre 11/09 e 13/09 — falta a do e-mail do domínio, que depende de conta no provedor e de registro no DNS |
-| [9. O que voltou de quem usa](9.%20O%20que%20voltou%20de%20quem%20usa.md) | escrita em 22/09/2026, **em execução** desde 22/09 — 10 de 16 etapas fechadas |
+| [9. O que voltou de quem usa](9.%20O%20que%20voltou%20de%20quem%20usa.md) | escrita em 22/09/2026, **em execução** desde 22/09 — 11 de 16 etapas fechadas |
 
 **A 9 é a primeira que não nasce de uma lista interna.** As oito anteriores saíram do que o
 projeto sabia que devia; esta sai de treze retornos de quem usou o produto no ar, e por isso ela
