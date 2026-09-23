@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import styles from "./split.module.css";
 import { cx } from "./form";
 import { Button } from "./primitives";
@@ -50,6 +50,12 @@ import type { ApiTypes } from "@/types/api";
    "distribuir o que sobra igualmente", que PRESERVA as fatias já
    decididas e fecha a diferença. Um parâmetro só para as duas
    diferenças porque elas são a mesma diferença.
+
+   ── E uma terceira diferença: nascer dividido ──
+
+   No eixo de PESSOAS do gasto o rateio se reparte sozinho enquanto
+   ninguém digitou valor nenhum. É o parâmetro `autoSplit`, e o porquê de
+   ele não valer para os outros dois consumidores está lá.
    ════════════════════════════════════════════════════════════ */
 
 /** Quem tem que fechar com o total e quem não tem. Ver o cabeçalho. */
@@ -109,6 +115,61 @@ export function splitIsClosed(lines: readonly SplitLine[], total: ApiTypes.Money
     );
 }
 
+/** **O rateio recém-nascido: o total repartido entre quem já foi
+ *  escolhido.** Uma pessoa leva o total inteiro; duas levam metade cada;
+ *  três levam 33,34 / 33,33 / 33,33 — o centavo da sobra na PRIMEIRA
+ *  linha, porque quem reparte é o `splitEvenly`, o mesmo do botão de
+ *  dividir igualmente e a mesma regra que a API usa no parcelamento.
+ *
+ *  Só as linhas que JÁ TÊM alvo entram na conta, e as outras voltam a
+ *  ficar vazias: uma linha recém-adicionada, ainda sem pessoa escolhida,
+ *  não é uma fatia — dar valor a ela deixaria o rateio sem fechar, já que
+ *  linha sem alvo não conta para o total (ver `usable`, abaixo).
+ *
+ *  Sem total não há o que repartir, e o rateio fica como está: a divisão
+ *  acontece quando o valor do gasto for digitado.
+ *
+ *  **A divisão PARA no primeiro valor digitado à mão** — é o que o
+ *  `pristine` diz. Dali em diante acrescentar uma pessoa só acrescenta uma
+ *  linha vazia: sobrescrever um valor deliberado é pior do que não
+ *  preencher nada.
+ *
+ *  Devolve **as mesmas linhas, por referência**, quando não há o que
+ *  mudar. É isso que deixa o efeito que a chama comparar com `!==` e não
+ *  entrar em laço chamando `onChange` com o que já está na tela.
+ *
+ *  ⚠️ **O alvo aqui é só o `id`, e é de propósito.** Quem tem um segundo
+ *  eixo é o orçamento, e ele não liga a divisão automática — ver o
+ *  parâmetro `autoSplit`. */
+export function autoSplitLines(
+    lines: SplitLine[],
+    total: ApiTypes.Money | null,
+    pristine: boolean,
+): SplitLine[] {
+    if (!pristine) return lines;
+
+    const targets = lines.filter((line) => line.id !== null).length;
+    if (total === null || total === 0 || targets === 0) return lines;
+
+    const parts = splitEvenly(total, targets);
+    let next = 0;
+
+    const divided = lines.map((line) =>
+        line.id === null ? { ...line, value: null } : { ...line, value: parts[next++] },
+    );
+
+    // Só o VALOR muda aqui, então é só ele que precisa ser comparado.
+    const same = divided.every((line, index) => line.value === lines[index].value);
+
+    return same ? lines : divided;
+}
+
+/** **O rateio ainda está intocado?** Nascer com valor já é ser tocado: um
+ *  rateio que chega preenchido é a EDIÇÃO de um gasto gravado, e
+ *  redistribuí-lo apagaria a decisão de quem o lançou. */
+export const splitIsPristine = (lines: readonly SplitLine[]) =>
+    lines.every((line) => line.value === null);
+
 export function SplitEditor({
     label,
     hint,
@@ -124,6 +185,7 @@ export function SplitEditor({
     required = false,
     disabled = false,
     closure = "strict",
+    autoSplit = false,
     rowExtra,
 }: {
     label: string;
@@ -150,6 +212,20 @@ export function SplitEditor({
      *  o que sobra é o que ainda não foi orçado. Padrão `"strict"` —
      *  quem chama para o gasto não passa nada e nada muda. */
     closure?: SplitClosure;
+    /** **O rateio nasce dividido?** Ligado, escolher, acrescentar ou tirar
+     *  uma pessoa reparte o total entre as linhas que já têm alvo — ver
+     *  `autoSplitLines`. A redistribuição PARA no primeiro valor digitado à
+     *  mão: dali em diante acrescentar uma linha não mexe no que já foi
+     *  escrito, porque sobrescrever um valor deliberado é pior do que não
+     *  preencher nada.
+     *
+     *  **Só o eixo de PESSOAS do gasto liga isto, e o padrão é desligado.**
+     *  O eixo financeiro não nasce dividido: pagar um gasto com duas formas
+     *  é raro, e repartir sozinho tiraria dinheiro de uma conta que ninguém
+     *  escolheu. O orçamento também não: lá as fatias são decisões, e o que
+     *  sobra é o que ainda não foi orçado. Os eixos são diferentes
+     *  justamente nisto — um é de quem é o custo, o outro mexe saldo. */
+    autoSplit?: boolean;
     /** O que desenhar DEPOIS do valor, na mesma linha: no orçamento é o
      *  comprometido da fatia com a régua. Uma função do índice porque só
      *  quem chama sabe o que aquela linha é. */
@@ -158,6 +234,26 @@ export function SplitEditor({
     // O texto digitado fica cru enquanto o campo está em foco: formatar
     // a cada tecla faria o cursor pular no meio do número.
     const [drafts, setDrafts] = useState<Record<number, string>>({});
+
+    /* O "intocado" da divisão automática, medido no PRIMEIRO render de
+       propósito: a tela de gasto só monta o formulário depois de carregar
+       o que vai editar, então as linhas que chegam aqui já são as do
+       banco — e um rateio gravado não se redistribui sozinho. */
+    const [pristine, setPristine] = useState(() => splitIsPristine(lines));
+
+    /* A divisão automática roda no EFEITO, e não no handler de cada
+       botão, porque nem tudo que a dispara é um clique daqui: o total do
+       gasto é um campo da TELA, e digitá-lo depois de escolher as pessoas
+       tem que dividir naquele momento. Acrescentar, tirar e escolher
+       pessoa passam pelo mesmo caminho de graça.
+
+       Quem impede o laço é o `autoSplitLines`, que devolve as mesmas
+       linhas quando não há o que mudar. */
+    useEffect(() => {
+        if (!autoSplit) return;
+        const next = autoSplitLines(lines, total, pristine);
+        if (next !== lines) onChange(next);
+    }, [autoSplit, pristine, lines, total, onChange]);
 
     /* **A linha existe quando tem ALVO e valor** — e com o segundo eixo
        ligado, "ter alvo" é ter QUALQUER um dos dois. É a única conta que
@@ -186,6 +282,8 @@ export function SplitEditor({
 
     const distribute = () => {
         if (total === null || lines.length === 0) return;
+        setDrafts({});
+
         // O centavo que sobra vai na PRIMEIRA linha — a mesma regra que
         // a API usa no parcelamento, nos dois casos.
         //
@@ -193,6 +291,16 @@ export function SplitEditor({
         // escrito: no gasto o rateio nasce vazio e repartir o total é o
         // gesto certo; no orçamento as fatias são decisões que alguém
         // tomou, e o botão só fecha a diferença. Ver o cabeçalho.
+        //
+        // Onde a divisão automática está ligada o botão é ela mesma, e
+        // volta a armá-la: o que ele desfaz é justamente o valor digitado
+        // à mão que a tinha parado, e é para isso que ele continua ali.
+        if (autoSplit) {
+            setPristine(true);
+            onChange(autoSplitLines(lines, total, true));
+            return;
+        }
+
         const parts =
             closure === "loose"
                 ? distributeRemainder(
@@ -200,7 +308,6 @@ export function SplitEditor({
                       total,
                   )
                 : splitEvenly(total, lines.length);
-        setDrafts({});
         onChange(lines.map((line, index) => ({ ...line, value: parts[index] })));
     };
 
@@ -288,6 +395,10 @@ export function SplitEditor({
                                         ...current,
                                         [index]: event.target.value,
                                     }));
+                                    // O valor digitado à mão é o que para a
+                                    // divisão automática — daqui em diante
+                                    // ninguém reescreve o que foi decidido.
+                                    setPristine(false);
                                     patch(index, { value: parseMoneyInput(event.target.value) });
                                 }}
                                 onBlur={() =>

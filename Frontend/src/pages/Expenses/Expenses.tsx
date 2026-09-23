@@ -1152,6 +1152,11 @@ export function Expenses() {
                                     setSeriesDraft((c) => (c ? { ...c, persons: newPersons } : c))
                                 }
                                 total={seriesDraft.TotalValue}
+                                /* Mesmo eixo, mesma divisão automática do
+                                   formulário de gasto. O rateio que já veio
+                                   gravado não é mexido: quem nasce com valor
+                                   não está intocado. */
+                                autoSplit
                             />
 
                             <FormField label="Observações">

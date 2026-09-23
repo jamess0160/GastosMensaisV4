@@ -536,6 +536,11 @@ export function AddExpense() {
                         lines={draft.persons}
                         onChange={(next) => patch({ persons: next })}
                         total={draft.TotalValue}
+                        /* O caso comum é o gasto de uma pessoa só, ou
+                           rachado meio a meio: escolher a pessoa já
+                           preenche o valor. Só aqui — o eixo financeiro,
+                           abaixo, não nasce dividido. */
+                        autoSplit
                     />
                 </div>
 
