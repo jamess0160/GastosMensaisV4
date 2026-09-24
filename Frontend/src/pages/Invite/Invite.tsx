@@ -132,7 +132,8 @@ export function Invite() {
                     desenho — vai por WhatsApp —, e é o e-mail que fecha a
                     tranca. Dizer isso aqui evita o 406 mais comum. */}
                 <div className={`${styles.lock} ${sameEmail ? "" : styles.mismatch}`}>
-                    Este convite é de <b>{preview.Email}</b>. Só uma conta com esse e-mail pode entrar
+                    Este convite é de <b>{preview.Email}</b>. Só uma conta com esse e-mail pode
+                    entrar
                     {signedIn && !sameEmail && (
                         <>
                             <br />
@@ -183,10 +184,7 @@ export function Invite() {
     };
 
     return (
-        <AuthLayout
-            heading="Você foi convidado"
-            subheading=""
-        >
+        <AuthLayout heading="Você foi convidado" subheading="">
             {body()}
         </AuthLayout>
     );

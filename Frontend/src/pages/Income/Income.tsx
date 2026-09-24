@@ -691,8 +691,8 @@ export function Income() {
                         draft?.IdInflow !== null && draft
                             ? "Editar entrada"
                             : draft?.Kind === "transfer"
-                                ? "Transferir entre contas"
-                                : "Nova entrada"
+                              ? "Transferir entre contas"
+                              : "Nova entrada"
                     }
                     subtitle={
                         draft?.Kind === "transfer"
@@ -738,20 +738,20 @@ export function Income() {
                                                 setDraft((c) =>
                                                     c
                                                         ? {
-                                                            ...c,
-                                                            Kind,
-                                                            // Rateio é proibido em
-                                                            // transferência; a origem só
-                                                            // existe nela.
-                                                            persons:
-                                                                Kind === "transfer"
-                                                                    ? []
-                                                                    : c.persons,
-                                                            IdFromAccount:
-                                                                Kind === "transfer"
-                                                                    ? c.IdFromAccount
-                                                                    : null,
-                                                        }
+                                                              ...c,
+                                                              Kind,
+                                                              // Rateio é proibido em
+                                                              // transferência; a origem só
+                                                              // existe nela.
+                                                              persons:
+                                                                  Kind === "transfer"
+                                                                      ? []
+                                                                      : c.persons,
+                                                              IdFromAccount:
+                                                                  Kind === "transfer"
+                                                                      ? c.IdFromAccount
+                                                                      : null,
+                                                          }
                                                         : c,
                                                 )
                                             }
@@ -805,10 +805,10 @@ export function Income() {
                                                 setDraft((c) =>
                                                     c
                                                         ? {
-                                                            ...c,
-                                                            CompetenceDate:
-                                                                CompetenceDate ?? today(),
-                                                        }
+                                                              ...c,
+                                                              CompetenceDate:
+                                                                  CompetenceDate ?? today(),
+                                                          }
                                                         : c,
                                                 )
                                             }

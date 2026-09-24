@@ -86,7 +86,7 @@ const inviteLink = (hash: string): string =>
     `${window.location.origin}/convite/${encodeURIComponent(hash)}`;
 
 export function Workspace() {
-    const { workspace, workspacesPending, isOwner, workspaces } = useSession();
+    const { workspace, workspacesPending, isOwner } = useSession();
     const queryClient = useQueryClient();
     const switchWorkspace = useSwitchWorkspace();
 
@@ -312,7 +312,6 @@ export function Workspace() {
                 {/* ── O nome ────────────────────────────────── */}
                 <Card>
                     <div className={styles.section}>
-
                         <FormError>{errors.name}</FormError>
                         <FormNotice>{done.name}</FormNotice>
 

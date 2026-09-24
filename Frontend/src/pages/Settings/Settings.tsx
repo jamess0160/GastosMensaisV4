@@ -389,9 +389,7 @@ export function Settings() {
                                         )}
                                     </FormField>
 
-                                    <FormField
-                                        label="Cor"
-                                    >
+                                    <FormField label="Cor">
                                         {() => (
                                             <ColorPicker
                                                 value={categoryDraft.Color}

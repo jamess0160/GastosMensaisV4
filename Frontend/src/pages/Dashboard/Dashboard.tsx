@@ -468,7 +468,8 @@ export function Dashboard() {
                                 >
                                     <span className={styles.unbudgetedLabel}>
                                         <IconAlert />
-                                        Foi encontrado {formatMoney(unbudgeted)} em gastos fora do orçamento
+                                        Foi encontrado {formatMoney(unbudgeted)} em gastos fora do
+                                        orçamento
                                     </span>
                                 </button>
                             )}

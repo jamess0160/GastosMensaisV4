@@ -564,10 +564,7 @@ export function Report() {
             ) : (
                 <>
                     <div className={styles.kpis}>
-                        <KpiCard
-                            label="Gasto no período"
-                            value={total}
-                        />
+                        <KpiCard label="Gasto no período" value={total} />
                         <KpiCard
                             label="Dia mais caro"
                             value={busiest.value}

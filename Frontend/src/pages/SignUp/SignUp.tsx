@@ -155,9 +155,7 @@ export function SignUp() {
                 {/* `readOnly`, e NUNCA `disabled`: campo desabilitado
                     não é enviado no submit nativo, some da navegação por
                     teclado e é ignorado por leitor de tela. */}
-                <FormField
-                    label="E-mail"
-                >
+                <FormField label="E-mail">
                     {(field) => (
                         <Input
                             {...field}

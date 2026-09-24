@@ -78,6 +78,16 @@ compõe os meses do intervalo reaproveitando o mesmo cache por chave.
 **Indentação de 4 espaços em todo o projeto.** Garantida por [.editorconfig](.editorconfig) e
 [.prettierrc.json](.prettierrc.json); `npm run format` aplica e `npm run format:check` verifica.
 
+**`endOfLine: "auto"` não é preferência, é o que faz o `format:check` dizer a verdade aqui.** O
+desenvolvimento é no Windows com `core.autocrlf=true`, então **o git entrega CRLF no checkout** —
+e o padrão do prettier é `"lf"`. Com os dois juntos, todo arquivo que o git materializa de novo
+reprova no `format:check` sem ter um único problema de formatação, e o gate passa a acusar
+ruído: quem o vê falhar aprende a ignorá-lo, que é o pior estado possível para uma verificação.
+O `"auto"` aceita o fim de linha que o arquivo já tem e só reclama de formatação de verdade.
+**O que entra no repositório é LF de qualquer jeito**, porque o git normaliza na gravação — e os
+arquivos que um programa do Linux lê (`*.sh`, `deploy/**`) são travados em LF pelo
+[.gitattributes](../.gitattributes) da raiz, que explica esse caso por extenso.
+
 **Uma connection por rota da API.** Cada rota tem um arquivo `[Rota].connection.ts`, em que a
 classe se chama sempre `Connection` e o que se exporta é a constante `[Rota]Connection` — uma
 instância:
