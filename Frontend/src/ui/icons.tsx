@@ -99,10 +99,28 @@ export const IconCash = adapt(Banknote, "IconCash");
  *  tamanho natural, 512px. Embrulhado assim, ele se comporta como
  *  qualquer outro ícone daqui, e nenhuma folha precisou mudar.
  *
- *  Não herda `currentColor` — e é o certo: é a marca, com as cores dela. */
+ *  Não herda `currentColor` — e é o certo: é a marca, com as cores dela.
+ *  Mas ela INVERTE com o tema, e as duas coisas não se contradizem: o
+ *  desenho é preto sólido sobre transparente, e no escuro preto sobre
+ *  `--surface` não é uma marca discreta, é um buraco do tamanho de um
+ *  ícone. Uma marca monocromática invisível não identifica nada. Quem
+ *  decide é o `--pix-invert` (`none` no claro, `invert(1)` no escuro),
+ *  em `src/styles/tokens.css`, junto com todo o resto que muda de tema —
+ *  e não um segundo arquivo `pix-dark.webp`, que seriam dois arquivos
+ *  para manter em sincronia produzindo o mesmo pixel que a inversão
+ *  produz.
+ *
+ *  O `style` inline é o caminho mínimo aqui: este arquivo não importa
+ *  folha nenhuma, e um CSS Module só para uma declaração custaria mais
+ *  do que resolve. */
 export function IconPix({ className }: IconProps) {
     return (
-        <svg viewBox="0 0 24 24" className={className} aria-hidden>
+        <svg
+            viewBox="0 0 24 24"
+            className={className}
+            style={{ filter: "var(--pix-invert)" }}
+            aria-hidden
+        >
             <image href="/pix.webp" width="24" height="24" />
         </svg>
     );

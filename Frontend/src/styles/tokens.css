@@ -15,6 +15,18 @@
     --brand-press: #e85f00;
     --brand-soft: #fff8ea;
     --brand-tint: #ffe9d6;
+    /* A marca do Pix e um `.webp` preto solido sobre transparente
+       (`public/pix.webp`), e token nenhum alcanca cor dentro de um
+       arquivo de imagem: no escuro ela some contra `--surface`. Entao o
+       que troca de tema aqui e uma INVERSAO, nao uma cor — preto puro
+       invertido da branco puro, que e a versao monocromatica clara da
+       mesma marca, e nao uma cor inventada. Unico consumidor:
+       `IconPix`, em `src/ui/icons.tsx`.
+
+       Por que nao um segundo arquivo `pix-dark.webp`: seriam dois
+       arquivos para manter em sincronia — e um `preload` a mais para
+       acertar — produzindo o mesmo pixel que a inversao produz. */
+    --pix-invert: none;
 
     /* ── Semanticas ────────────────────────────────────────── */
     --neg: #ff001a;
@@ -168,6 +180,7 @@
         --brand-press: #ff8124;
         --brand-soft: #3a2812;
         --brand-tint: #4d3419;
+        --pix-invert: invert(1);
 
         --neg-soft: #3b1a1e;
         --neg-press: #ff2d43;
@@ -207,6 +220,7 @@
     --brand-press: #ff8124;
     --brand-soft: #3a2812;
     --brand-tint: #4d3419;
+    --pix-invert: invert(1);
 
     --neg-soft: #3b1a1e;
     --neg-press: #ff2d43;
