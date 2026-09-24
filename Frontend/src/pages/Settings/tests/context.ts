@@ -3,7 +3,7 @@ import type { CategoryDraft, PersonDraft, SettingsContext } from "../controller"
 import type { ApiTypes } from "@/types/api";
 
 /** Uma categoria como a API a devolve. `Position` acompanha a ordem da
- *  lista, que é o que `moveCategory` troca. */
+ *  lista, que é o que a alça de arrastar reescreve. */
 export const aCategory = (
     IdCategory: number,
     Description: string,
@@ -40,7 +40,6 @@ export function fakeSettingsContext(overrides: Partial<SettingsContext> = {}): S
     return {
         categoryDraft: aCategoryDraft(),
         personDraft: aPersonDraft(),
-        activeCategories: [],
         beginSubmit: vi.fn(),
         failSubmit: vi.fn(),
         finishSubmit: vi.fn(),

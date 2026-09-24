@@ -24,10 +24,6 @@ export interface PersonDraft {
 export interface SettingsContext {
     categoryDraft: CategoryDraft;
     personDraft: PersonDraft;
-    /** As ativas, **na ordem em que a tela as mostra**. Quem reordena
-     *  precisa da lista inteira: a rota recebe todos os ids na ordem
-     *  nova, e é esta a ordem que a seta mexe. */
-    activeCategories: ApiTypes.Category[];
     beginSubmit(): void;
     failSubmit(message: string): void;
     /** Gravou: relê os cadastros e fecha o formulário. */

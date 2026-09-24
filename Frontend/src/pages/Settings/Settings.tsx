@@ -14,11 +14,12 @@ import {
 } from "@/data/catalogs";
 import { Badge, Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Tabs } from "@/ui/Tabs";
-import { FormError, FormField, Input } from "@/ui/form";
+import { cx, FormError, FormField, Input } from "@/ui/form";
 import { CategoryPreview, ColorPicker, IconPicker } from "@/ui/controls";
 import { ConfirmDialog } from "@/ui/overlay";
 import { CategoryIcon } from "@/ui/iconCatalog";
-import { IconArchive, IconArrowDown, IconArrowUp, IconEdit, IconUser } from "@/ui/icons";
+import { IconArchive, IconEdit, IconGrip, IconUser } from "@/ui/icons";
+import { useReorder } from "@/ui/reorder";
 import { Cell, CellActions, IconButton, Table, TableHead, TableRow } from "@/ui/table";
 import { CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
@@ -78,7 +79,6 @@ export function Settings() {
         () => ({
             categoryDraft,
             personDraft,
-            activeCategories,
             beginSubmit() {
                 setPending(true);
                 setError(null);
@@ -96,8 +96,21 @@ export function Settings() {
             resetCategoryDraft: () => setCategoryDraft(emptyCategory()),
             resetPersonDraft: () => setPersonDraft(emptyPerson()),
         }),
-        [categoryDraft, personDraft, activeCategories, invalidateCatalogs],
+        [categoryDraft, personDraft, invalidateCatalogs],
     );
+
+    /* A ordenação das ativas. O hook é UM para as duas listas — a tabela
+       do desktop e os cards do telefone —, e é isso que faz o gesto ser
+       o mesmo nas duas larguras em vez de dois caminhos de código.
+       As arquivadas ficam FORA: o que move linha entre os grupos é
+       arquivar e desarquivar, que é outro gesto. */
+    const reorder = useReorder({
+        items: activeCategories,
+        getId: (category) => category.IdCategory,
+        label: (category, position, total) => `${category.Description}, ${position} de ${total}`,
+        disabled: pending,
+        onCommit: (ids) => SettingsController.moveCategory(context, ids),
+    });
 
     const activePersons = (persons.data ?? []).filter((person) => person.Active);
 
@@ -130,31 +143,20 @@ export function Settings() {
             Color: category.Color,
         });
 
-    /* ↑ ↓ em cada linha, e não arrastar: arrastar é o gesto óbvio no
-       desktop e briga com o scroll em 390px, que é a largura em que
-       este produto é usado. Duas setas resolvem o mesmo problema nas
-       duas larguras, sem um caminho de código por dispositivo.
+    /* A alça: onde o arrasto começa, e o único lugar da linha com
+       `touch-action: none` (ver `.grip` na folha). O dedo em qualquer
+       outro ponto continua rolando a lista, que era a objeção de 390px
+       contra arrastar.
 
-       As setas das pontas ficam desabilitadas porque não há troca a
-       fazer — a section também recusa, mas um botão que não faz nada
-       é pior do que um botão apagado. */
-    const orderArrows = (idCategory: number, index: number) => (
-        <>
-            <IconButton
-                label="Subir"
-                disabled={pending || index === 0}
-                onClick={() => void SettingsController.moveCategory(context, idCategory, -1)}
-            >
-                <IconArrowUp />
-            </IconButton>
-            <IconButton
-                label="Descer"
-                disabled={pending || index === activeCategories.length - 1}
-                onClick={() => void SettingsController.moveCategory(context, idCategory, 1)}
-            >
-                <IconArrowDown />
-            </IconButton>
-        </>
+       É um `<button>` de propósito: com foco nele, ↑ e ↓ movem a linha
+       uma posição. As setas que existiam em cada linha não sumiram,
+       viraram o teclado da alça — e o `aria-label` que o hook monta diz
+       a posição ("Mercado, 3 de 13"), que é o que quem não vê a lista
+       precisa saber para mover. */
+    const dragHandle = (index: number) => (
+        <button type="button" className={styles.grip} {...reorder.handleProps(index)}>
+            <IconGrip />
+        </button>
     );
 
     return (
@@ -204,52 +206,73 @@ export function Settings() {
                                     />
                                 ) : isMobile ? (
                                     <CardList>
-                                        {activeCategories.map((category, index) => (
-                                            <ItemCard
+                                        {reorder.items.map((category, index) => (
+                                            /* O card não leva classe própria, então
+                                               quem carrega o estado de arrasto é este
+                                               invólucro da página — a lista é um flex
+                                               em coluna, e um `<div>` a mais nela não
+                                               muda o desenho. */
+                                            <div
                                                 key={category.IdCategory}
-                                                title={categoryName(category)}
-                                                trailing={
-                                                    <span className={styles.cardActions}>
-                                                        {orderArrows(category.IdCategory, index)}
-                                                        <IconButton
-                                                            label="Editar"
-                                                            onClick={() => editCategory(category)}
-                                                        >
-                                                            <IconEdit />
-                                                        </IconButton>
-                                                        <IconButton
-                                                            label="Arquivar"
-                                                            onClick={() =>
-                                                                setArchiving({
-                                                                    kind: "categories",
-                                                                    id: category.IdCategory,
-                                                                    name: category.Description,
-                                                                })
-                                                            }
-                                                        >
-                                                            <IconArchive />
-                                                        </IconButton>
-                                                    </span>
-                                                }
-                                            />
+                                                className={cx(
+                                                    reorder.draggingId === category.IdCategory &&
+                                                        styles.dragging,
+                                                )}
+                                            >
+                                                <ItemCard
+                                                    title={categoryName(category)}
+                                                    trailing={
+                                                        <span className={styles.cardActions}>
+                                                            {dragHandle(index)}
+                                                            <IconButton
+                                                                label="Editar"
+                                                                onClick={() =>
+                                                                    editCategory(category)
+                                                                }
+                                                            >
+                                                                <IconEdit />
+                                                            </IconButton>
+                                                            <IconButton
+                                                                label="Arquivar"
+                                                                onClick={() =>
+                                                                    setArchiving({
+                                                                        kind: "categories",
+                                                                        id: category.IdCategory,
+                                                                        name: category.Description,
+                                                                    })
+                                                                }
+                                                            >
+                                                                <IconArchive />
+                                                            </IconButton>
+                                                        </span>
+                                                    }
+                                                />
+                                            </div>
                                         ))}
                                     </CardList>
                                 ) : (
-                                    <Table columns="minmax(0,1fr) 90px 110px">
+                                    <Table columns="minmax(0,1fr) 60px 110px">
                                         <TableHead>
                                             <span>Categoria</span>
                                             <span>Ordem</span>
                                             <span style={{ textAlign: "right" }}>Ações</span>
                                         </TableHead>
-                                        {activeCategories.map((category, index) => (
-                                            <TableRow key={category.IdCategory}>
+                                        {reorder.items.map((category, index) => (
+                                            <TableRow
+                                                key={category.IdCategory}
+                                                className={
+                                                    reorder.draggingId === category.IdCategory
+                                                        ? styles.dragging
+                                                        : undefined
+                                                }
+                                            >
                                                 <div className={styles.name}>
                                                     {categoryName(category)}
                                                 </div>
 
                                                 <Cell>
                                                     <span className={styles.cardActions}>
-                                                        {orderArrows(category.IdCategory, index)}
+                                                        {dragHandle(index)}
                                                     </span>
                                                 </Cell>
 

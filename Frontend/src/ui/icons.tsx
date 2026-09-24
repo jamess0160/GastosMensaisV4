@@ -15,6 +15,7 @@ import {
     Eye,
     EyeOff,
     Fingerprint,
+    GripVertical,
     Landmark,
     Layers,
     Pencil,
@@ -72,6 +73,10 @@ export const IconCheck = adapt(Check, "IconCheck");
 export const IconEdit = adapt(Pencil, "IconEdit");
 export const IconArchive = adapt(Archive, "IconArchive");
 export const IconCopy = adapt(Copy, "IconCopy");
+/** A alça de arrastar (`src/ui/reorder.ts`). Os seis pontos são o
+ *  desenho que o olho já leu como "isto se pega": é a alça que diz onde
+ *  o gesto começa, e sem ela o arrasto seria uma descoberta. */
+export const IconGrip = adapt(GripVertical, "IconGrip");
 
 /* ── Navegação e seleção ──────────────────────────────────── */
 export const IconChevronDown = adapt(ChevronDown, "IconChevronDown");

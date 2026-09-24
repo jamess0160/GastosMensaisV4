@@ -128,12 +128,78 @@
 }
 
 /* As ações no rodapé do card, no telefone — os mesmos dois botões da
-   coluna "Ações" da tabela, em linha. Também é a caixa das setas ↑ ↓ na
+   coluna "Ações" da tabela, em linha. Também é a caixa da alça na
    coluna "Ordem". */
 .cardActions {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+}
+
+/* ── A alça de arrastar ───────────────────────────────────────
+   `touch-action: none` mora AQUI, e em nenhum outro lugar. É o que
+   deixa o dedo arrastar a linha sem o navegador entender o gesto como
+   rolagem — e, posto na linha ou na lista, é o que mataria o scroll da
+   tela em 390px. Essa colisão era a objeção inteira contra arrastar; a
+   alça é o que a desfaz, porque o dedo em qualquer outro ponto da linha
+   continua rolando.
+
+   Ela é um `<button>` (ver `dragHandle` em `Settings.tsx`): as setas
+   ↑ ↓ que existiam em cada linha não sumiram, viraram o teclado dela. */
+.grip {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--ink-3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.grip svg {
+    width: 16px;
+    height: 16px;
+}
+
+.grip:hover:not([aria-disabled="true"]) {
+    background: var(--surface-alt);
+    color: var(--ink);
+}
+
+/* `aria-disabled` e não `:disabled`: um botão desabilitado perde o foco
+   para o `<body>`, e a segunda seta seguida cairia no vazio. */
+.grip[aria-disabled="true"] {
+    opacity: 0.35;
+    cursor: progress;
+}
+
+.grip[data-dragging="true"] {
+    background: var(--brand-soft);
+    color: var(--brand);
+    cursor: grabbing;
+}
+
+/* A linha no ar. A lista já se reordenou em estado local, então ela
+   está NO destino, não pairando sobre ele — o realce é o que diz qual
+   linha o dedo carrega, e o alvo de soltar é a posição que ela já
+   ocupa. */
+.dragging {
+    background: var(--brand-soft);
+    border-radius: 10px;
+}
+
+/* No telefone a alça é o alvo de um dedo, não de um cursor. */
+@media (max-width: 900px) {
+    .grip {
+        width: 34px;
+        height: 34px;
+    }
 }
 
 /* ── O grupo das arquivadas ───────────────────────────────────
