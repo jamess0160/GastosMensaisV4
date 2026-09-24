@@ -87,6 +87,38 @@ class Connection {
         return data;
     }
 
+    /** **Quanto já foi comprometido nos alvos que a tela está montando —
+     *  antes de gravar.**
+     *
+     *  `list` devolve o `Spent` por `IdBudgetPeriod`, e uma fatia só tem id
+     *  depois de gravada: nenhum alvo recém-escolhido tinha gasto para
+     *  mostrar, e o par `(pessoa, categoria)` — que ninguém gravou ainda —
+     *  nunca teria. A régua ficava em zero exatamente no momento em que o
+     *  número decide o valor que a pessoa vai digitar.
+     *
+     *  **É um `POST` e é uma LEITURA**: não escreve nada, e o método é o que
+     *  é porque a pergunta tem uma lista no corpo — uma query string com
+     *  trinta pares `(categoria, pessoa)` seria a mesma coisa pior. Por ser
+     *  leitura, ela responde ao `viewer` e responde num mês FECHADO, ao
+     *  contrário das duas escritas daqui.
+     *
+     *  **E ela não é um cálculo que o cliente poderia fazer.** O casamento
+     *  porção → fatia é a regra de dinheiro mais delicada do orçamento
+     *  (precedência do par exato sobre a mesada, porção com dono que nunca
+     *  cai na fatia de categoria, o resto virando `Unbudgeted`), e replicá-la
+     *  aqui para "só mostrar uma prévia" seria a segunda cópia dela — cuja
+     *  primeira divergência é uma prévia plausível e errada.
+     *
+     *  A resposta volta **na ordem do corpo** e traz o alvo de cada linha,
+     *  que é como o chamador a reencontra: não há id para indexar. */
+    async preview(body: ApiTypes.BudgetPreviewBody): Promise<ApiTypes.BudgetPreviewResponse> {
+        const { data } = await http.post<ApiTypes.BudgetPreviewResponse>(
+            `${this.route}/preview`,
+            body,
+        );
+        return data;
+    }
+
     /** **Repete a repartição de um mês no outro** — `{ From, To }`, os
      *  dois "YYYY-MM".
      *

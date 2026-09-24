@@ -5,7 +5,12 @@ import { BudgetController, type BudgetContext, type BudgetLine } from "./control
 import { previousMonth } from "./sections/cloneBudgetMonth";
 import { useMonthScope } from "@/app/monthScope";
 import { useCategories, usePersons } from "@/data/catalogs";
-import { useInvalidateMovement, useMonthBudgets, useMonthReport } from "@/data/month";
+import {
+    useBudgetPreview,
+    useInvalidateMovement,
+    useMonthBudgets,
+    useMonthReport,
+} from "@/data/month";
 import { Button, Card, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
 import { SplitEditor, type SplitOption } from "@/ui/SplitEditor";
@@ -14,7 +19,13 @@ import { FormError, FormNotice, cx } from "@/ui/form";
 import { CategoryIcon } from "@/ui/iconCatalog";
 import { IconAlert, IconPlus } from "@/ui/icons";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
-import { budgetPercent, budgetState, budgetTargetName, sumMoney } from "@/lib/aggregate";
+import {
+    budgetPercent,
+    budgetState,
+    budgetTargetKey,
+    budgetTargetName,
+    sumMoney,
+} from "@/lib/aggregate";
 import { categoryColor, paletteColor } from "@/lib/categoryColor";
 import { formatDateTime, formatMonthLabel, formatMonthShort } from "@/lib/date";
 import { formatMoney, fromCents, toCents } from "@/lib/money";
@@ -67,12 +78,6 @@ import type { ApiTypes } from "@/types/api";
 /** A linha em branco do rateio. Os DOIS alvos nascem vazios: a fatia
  *  pode ser de pessoa, de categoria, ou das duas. */
 const emptyBudgetLine = (): BudgetLine => ({ id: null, secondaryId: null, value: null });
-
-/** O alvo como string, do jeito que a API o compara: `null` não casa
- *  com `null` em lugar nenhum, e é o alvo ausente que distingue
- *  "Mercado" de "Luana em Mercado". */
-const targetKey = (IdCategory: number | null, IdPerson: number | null) =>
-    `${IdCategory ?? ""}|${IdPerson ?? ""}`;
 
 /** As fatias que o mês tem, viradas em linhas do editor.
  *
@@ -206,21 +211,51 @@ export function Budget() {
         [categories.data],
     );
 
-    /** O comprometido de cada alvo, para a régua ao lado da linha.
+    /* ── O comprometido do alvo que está SENDO MONTADO ────────
+       `GET /BudgetPeriods` devolve o `Spent` por `IdBudgetPeriod`, e uma
+       fatia só tem id depois de gravada: enquanto a régua saía daí,
+       nenhum alvo recém-escolhido mostrava gasto — e o par
+       `(pessoa, categoria)`, que ninguém gravou ainda, nunca mostrava.
+       Zero exatamente no momento em que o número decide o valor que a
+       pessoa vai digitar.
+
+       A prévia responde a mesma pergunta para um alvo que ainda não
+       existe, e **com o mesmo código do servidor**: o casamento porção →
+       fatia é a regra de dinheiro mais delicada do orçamento, e
+       recalculá-la aqui seria a segunda cópia dela.
+
+       A chave de cache leva o mês e os ALVOS, então ela é refeita quando
+       um seletor muda e não quando um valor é digitado — é o que
+       dispensa debounce. */
+    const preview = useBudgetPreview(
+        month,
+        lines.map((line) => ({ IdCategory: line.secondaryId ?? null, IdPerson: line.id })),
+    );
+
+    /** As fatias GRAVADAS, indexadas pelo alvo — e elas continuam sendo
+     *  lidas por duas coisas que a prévia não responde:
      *
-     *  `Spent` vem da API e **não se recalcula aqui** — a linha só o
-     *  encontra pelo alvo. Uma linha de alvo novo não tem nenhum, e zero
-     *  é a resposta certa: nada foi gasto contra uma fatia que ainda não
-     *  existe no mês. */
-    const spentByTarget = useMemo(
+     *  - o **`AlertPercent`** do medidor, que não está na resposta da
+     *    prévia e não deve estar: ele é uma decisão guardada na fatia,
+     *    não um cálculo do mês;
+     *  - o **`Spent` enquanto a prévia não respondeu** — a resposta certa
+     *    para o alvo que já existe, e a única que esta tela tinha antes.
+     *    Sem isso, cada troca de seletor piscaria uma régua em zero. */
+    const savedByTarget = useMemo(
         () =>
             new Map(
-                periods.map((period) => [targetKey(period.IdCategory, period.IdPerson), period]),
+                periods.map((period) => [
+                    budgetTargetKey(period.IdCategory, period.IdPerson),
+                    period,
+                ]),
             ),
         [periods],
     );
 
-    const unbudgeted = budgets.data?.Unbudgeted ?? 0;
+    /* O "fora do orçamento" também sai da prévia: é o que o faz se mover
+       enquanto a pessoa monta o mês, em vez de só depois de salvar. O do
+       mês gravado é o que fica no lugar até ela responder. */
+    const unbudgeted = preview.data?.Unbudgeted ?? budgets.data?.Unbudgeted ?? 0;
 
     const loading = budgets.isPending || persons.isPending || categories.isPending;
     const previousCount = previousBudgets.data?.Periods.length ?? 0;
@@ -396,25 +431,31 @@ export function Budget() {
                             total={income}
                             disabled={pending}
                             rowExtra={(_, line) => {
-                                const period = spentByTarget.get(
-                                    targetKey(line.secondaryId ?? null, line.id),
-                                );
+                                const key = budgetTargetKey(line.secondaryId ?? null, line.id);
+                                const period = savedByTarget.get(key);
+
+                                /* A prévia primeiro; a fatia gravada
+                                   enquanto ela não respondeu. O
+                                   `AlertPercent` vem sempre da fatia — a
+                                   prévia não o tem, e não deve ter. */
+                                const spent =
+                                    preview.data?.spentByTarget.get(key) ?? period?.Spent ?? 0;
 
                                 return (
                                     <span className={styles.rowSpent}>
                                         <span className={styles.rowSpentValue}>
-                                            {formatMoney(period?.Spent ?? 0)}
+                                            {formatMoney(spent)}
                                         </span>
                                         <ProgressMeter
                                             height={6}
                                             percent={budgetPercent({
                                                 LimitValue: line.value ?? 0,
-                                                Spent: period?.Spent ?? 0,
+                                                Spent: spent,
                                                 AlertPercent: period?.AlertPercent ?? 80,
                                             })}
                                             state={budgetState({
                                                 LimitValue: line.value ?? 0,
-                                                Spent: period?.Spent ?? 0,
+                                                Spent: spent,
                                                 AlertPercent: period?.AlertPercent ?? 80,
                                             })}
                                         />
@@ -433,7 +474,10 @@ export function Budget() {
                             desta tela.
 
                             Vem da API como tudo o mais aqui: soma dos
-                            `Spent` + `Unbudgeted` = o gasto do mês. */}
+                            `Spent` + `Unbudgeted` = o gasto do mês. E vem
+                            da PRÉVIA, não do mês gravado, que é o que o
+                            faz descer conforme os alvos cobrem o gasto —
+                            antes de salvar. */}
                         <Card
                             className={cx(
                                 styles.unbudgeted,

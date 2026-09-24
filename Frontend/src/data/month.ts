@@ -7,7 +7,7 @@ import { ExpensesConnection } from "@/api/Expenses.connection";
 import { InflowsConnection } from "@/api/Inflows.connection";
 import { PaymentMethodsConnection } from "@/api/PaymentMethods.connection";
 import { ReportsConnection } from "@/api/Reports.connection";
-import { paymentLegs, type ExpenseLeg } from "@/lib/aggregate";
+import { budgetTargetKey, paymentLegs, type ExpenseLeg } from "@/lib/aggregate";
 import { monthRange, monthsBetween } from "@/lib/date";
 import type { ApiTypes } from "@/types/api";
 
@@ -95,6 +95,120 @@ export function useMonthBudgets(
         queryFn: () => BudgetPeriodsConnection.list(month),
         enabled,
     });
+}
+
+/** Um alvo do rascunho do rateio: os DOIS lados podem estar vazios
+ *  enquanto a pessoa monta a linha, e é por isso que este tipo não é o
+ *  `ApiTypes.BudgetPreviewTarget` — aquele já é o alvo válido. */
+export interface BudgetPreviewTargetDraft {
+    IdCategory: number | null;
+    IdPerson: number | null;
+}
+
+/** A prévia do mês, do jeito que a tela a lê: o comprometido indexado pelo
+ *  ALVO, porque é o alvo que a linha conhece — a fatia ainda não tem id. */
+export interface BudgetPreview {
+    /** `budgetTargetKey(IdCategory, IdPerson)` → o comprometido do alvo. */
+    spentByTarget: Map<string, ApiTypes.Money>;
+    /** O gasto do mês que não casou com nenhum dos alvos do corpo. É ele que
+     *  faz o "fora do orçamento" se mover ANTES de salvar. */
+    Unbudgeted: ApiTypes.Money;
+}
+
+/** **O comprometido dos alvos que a tela do Orçamento está MONTANDO.**
+ *
+ *  `useMonthBudgets` devolve o `Spent` por `IdBudgetPeriod`, e uma fatia só
+ *  tem id depois de gravada: nenhum alvo recém-escolhido tinha gasto para
+ *  mostrar, e o par `(pessoa, categoria)` — que ninguém gravou ainda —
+ *  nunca teria. A régua ficava em zero exatamente no momento em que o
+ *  número decide o valor que a pessoa vai digitar.
+ *
+ *  **O número continua sendo o da API**, como todo o resto daqui: o
+ *  casamento porção → fatia é a regra de dinheiro mais delicada do
+ *  orçamento, e refazê-la no navegador para "só mostrar uma prévia" seria a
+ *  segunda implementação dela — cuja primeira divergência é uma prévia
+ *  plausível e errada.
+ *
+ *  **A chave leva o mês e os ALVOS, nunca os valores**, e é isso que
+ *  dispensa debounce: trocar um seletor é uma pergunta nova, digitar "250"
+ *  não é. Os alvos entram normalizados — sem os vazios, sem repetição e em
+ *  ordem estável —, e as três normalizações têm motivo:
+ *
+ *  - **o alvo vazio sai**: a linha em branco que o botão "adicionar fatia"
+ *    cria tem os dois lados nulos, e o `or` da rota a recusaria com 406 —
+ *    derrubando a prévia do resto da lista junto;
+ *  - **o repetido sai**: dois alvos iguais são 406 na rota, e a tela passa
+ *    por esse estado no meio de uma edição (trocar a categoria da segunda
+ *    linha para a da primeira). Uma prévia que morre enquanto se edita é
+ *    pior do que nenhuma;
+ *  - **a ordem é estável** porque a ordem das linhas na tela não é uma
+ *    pergunta diferente: mover uma fatia de lugar não muda o comprometido
+ *    de ninguém, e sem isso seria uma entrada de cache nova a cada
+ *    reordenação. */
+export function useBudgetPreview(
+    month: ApiTypes.ReferenceMonth,
+    targets: readonly BudgetPreviewTargetDraft[],
+): UseQueryResult<BudgetPreview> {
+    const Targets = previewTargets(targets);
+
+    return useQuery({
+        /* A chave é o array de alvos normalizados, e não o array de linhas:
+           o React Query compara a chave pelo CONTEÚDO, então duas rendas
+           com os mesmos alvos são a mesma entrada — nenhuma requisição. */
+        queryKey: queryKeys.budgetPreview(
+            month,
+            Targets.map((target) =>
+                budgetTargetKey(target.IdCategory ?? null, target.IdPerson ?? null),
+            ),
+        ),
+        queryFn: () => BudgetPeriodsConnection.preview({ ReferenceMonth: month, Targets }),
+        /* A resposta vem na ordem do corpo e traz o alvo de cada linha; o
+           índice dela não serve para nada aqui, porque a ordem do corpo é a
+           normalizada e não a da tela. Quem reencontra a linha é o alvo. */
+        select: (data): BudgetPreview => ({
+            spentByTarget: new Map(
+                data.Targets.map((target) => [
+                    budgetTargetKey(target.IdCategory, target.IdPerson),
+                    target.Spent,
+                ]),
+            ),
+            Unbudgeted: data.Unbudgeted,
+        }),
+    });
+}
+
+/** Os alvos do rascunho virados no corpo da prévia: sem os vazios, sem
+ *  repetição, e em ordem estável. Ver `useBudgetPreview` para o porquê dos
+ *  três. */
+function previewTargets(
+    targets: readonly BudgetPreviewTargetDraft[],
+): ApiTypes.BudgetPreviewTarget[] {
+    const byKey = new Map<string, ApiTypes.BudgetPreviewTarget>();
+
+    for (const draft of targets) {
+        const target = previewTarget(draft);
+
+        if (target === null) continue;
+
+        byKey.set(budgetTargetKey(draft.IdCategory, draft.IdPerson), target);
+    }
+
+    return [...byKey.entries()]
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([, target]) => target);
+}
+
+/** O alvo válido, ou `null` quando a linha ainda não escolheu nenhum dos
+ *  dois lados. Os três ramos existem porque a união do tipo é o que impede
+ *  a forma vazia de compilar — e é a mesma coisa que o `or` da rota diz. */
+function previewTarget(draft: BudgetPreviewTargetDraft): ApiTypes.BudgetPreviewTarget | null {
+    if (draft.IdCategory !== null && draft.IdPerson !== null) {
+        return { IdCategory: draft.IdCategory, IdPerson: draft.IdPerson };
+    }
+    if (draft.IdCategory !== null) return { IdCategory: draft.IdCategory };
+    if (draft.IdPerson !== null) return { IdPerson: draft.IdPerson };
+
+    return null;
 }
 
 export function useExpenseDetail(idExpense: number | null): UseQueryResult<ApiTypes.ExpenseDetail> {

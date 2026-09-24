@@ -1285,6 +1285,206 @@ describe("BudgetPeriods", () => {
         })
     })
 
+    //  **O comprometido de um alvo que ainda NÃO foi gravado.**
+    //
+    //  O defeito que a rota fecha: o `GET` devolve o `Spent` por `IdBudgetPeriod`, e uma fatia só
+    //  tem id depois de gravada — então nenhum alvo recém-escolhido mostrava gasto, e é justamente
+    //  no momento de escolher o alvo que a pessoa precisa do número para decidir o valor. O par
+    //  `(pessoa, categoria)` era o caso mais visível: ninguém o gravou ainda, logo não havia linha
+    //  para achar, logo régua em zero.
+    //
+    //  O que esta suíte trava é a **simetria com o `allocate`** (mesmo corpo sem os valores, mesma
+    //  recusa de alvo repetido, mesma lista vazia legítima) e as três coisas que a separam das
+    //  escritas: ela responde ao viewer, responde num mês fechado, e não confere se o alvo existe.
+    //  A regra do casamento em si não é reprovada aqui — ela é a mesma do `GET`, e está no
+    //  describe dele.
+    describe("POST /BudgetPeriods/preview", () => {
+
+        it("recusa sem token", async () => {
+            let response = await client.anonymous().post(`/BudgetPeriods/preview`, { ReferenceMonth: "2026-08", Targets: [] })
+
+            expect(response.status).toBe(401)
+        })
+
+        it("recusa sessão sem workspace selecionado", async () => {
+            let response = await new TestClient(UsersFactory.buildToken(root.user.IdUser)).post(`/BudgetPeriods/preview`, { ReferenceMonth: "2026-08", Targets: [] })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  **A guarda é `assertMember`, não `assertRole`**: ninguém precisa poder escrever para
+        //  poder olhar. É um POST porque a pergunta tem uma lista no corpo, não porque escreve.
+        it("responde ao viewer", async () => {
+            let workspace = await buildWorkspace()
+            let viewerClient = await buildViewerClient(workspace)
+
+            let response = await viewerClient.post(`/BudgetPeriods/preview`, {
+                ReferenceMonth: "2026-08",
+                Targets: [{ IdCategory: workspace.IdCategory }],
+            })
+
+            expect(response.status).toBe(200)
+        })
+
+        it("recusa mês fora do formato YYYY-MM", async () => {
+            let workspace = await buildWorkspace()
+
+            expect((await workspace.client.post(`/BudgetPeriods/preview`, { ReferenceMonth: "2026-08-01", Targets: [] })).status).toBe(406)
+            expect((await workspace.client.post(`/BudgetPeriods/preview`, { Targets: [] })).status).toBe(406)
+        })
+
+        //  **O defeito do retorno, em um teste.** Um gasto de 300 da Luana em Mercado, nenhuma
+        //  fatia gravada no mês: montar a linha `(Luana, Mercado)` mostra 300 comprometidos antes
+        //  de salvar. Pelo `GET` isso é zero, e sempre seria — a fatia não tem id.
+        it("devolve o gasto do par (pessoa, categoria) sem fatia gravada nenhuma", async () => {
+            let workspace = await buildWorkspace()
+            let luana = await createPerson(workspace, "Luana")
+
+            await createExpense(workspace, { TotalValue: 300, Persons: [{ IdPerson: luana, Value: 300 }] })
+
+            expect((await readMonth(workspace)).Periods).toHaveLength(0)
+
+            let preview = await previewMonth(workspace, [{ IdPerson: luana, IdCategory: workspace.IdCategory }])
+
+            expect(preview.Targets).toEqual([{ IdPerson: luana, IdCategory: workspace.IdCategory, Spent: 300 }])
+            expect(preview.Unbudgeted).toBe(0)
+        })
+
+        //  A precedência do casamento vale igual na prévia, porque é o mesmo código: a porção
+        //  `(Luana, Mercado)` acha o par exato e **não** cai na mesada dela, que fica em zero.
+        it("respeita a precedência do par exato sobre a mesada", async () => {
+            let workspace = await buildWorkspace()
+            let luana = await createPerson(workspace, "Luana")
+
+            await createExpense(workspace, { TotalValue: 300, Persons: [{ IdPerson: luana, Value: 300 }] })
+
+            let preview = await previewMonth(workspace, [
+                { IdPerson: luana },
+                { IdPerson: luana, IdCategory: workspace.IdCategory },
+            ])
+
+            expect(preview.Targets.map((target) => target.Spent)).toEqual([0, 300])
+            expect(preview.Unbudgeted).toBe(0)
+        })
+
+        //  A porção **anônima** — a perna de um gasto sem rateio — só casa com o alvo sem pessoa, e
+        //  a porção com dono nunca escorrega para a linha de categoria. Os dois alvos da mesma
+        //  categoria convivem, e cada um soma o seu.
+        it("casa a porção anônima com o alvo sem pessoa, e a com dono com o par", async () => {
+            let workspace = await buildWorkspace()
+            let luana = await createPerson(workspace, "Luana")
+
+            await createExpense(workspace, { TotalValue: 300 })
+            await createExpense(workspace, { TotalValue: 100, Persons: [{ IdPerson: luana, Value: 100 }] })
+
+            let preview = await previewMonth(workspace, [
+                { IdCategory: workspace.IdCategory },
+                { IdPerson: luana, IdCategory: workspace.IdCategory },
+            ])
+
+            expect(preview.Targets.map((target) => target.Spent)).toEqual([300, 100])
+            expect(preview.Unbudgeted).toBe(0)
+        })
+
+        //  **A prévia é, ao centavo, o que o `GET` do mês devolveria depois de salvar** — e é essa
+        //  simetria que justifica a rota existir em vez de a tela calcular. Mesmo `BudgetSpent`,
+        //  com o índice da lista no lugar do `IdBudgetPeriod`.
+        it("responde o mesmo que o mês gravado responderia", async () => {
+            let workspace = await buildWorkspace()
+            let example = await buildAllocationExample(workspace)
+
+            await createExpense(workspace, { TotalValue: 100, IdCategory: example.alimentacao, Persons: [{ IdPerson: example.tiago, Value: 100 }] })
+            await createExpense(workspace, { TotalValue: 100, Persons: [{ IdPerson: example.luana, Value: 100 }] })
+            await createExpense(workspace, { TotalValue: 300 })
+            await createExpense(workspace, { TotalValue: 1000, IdCategory: example.casa })
+
+            let month = await readMonth(workspace)
+
+            let preview = await previewMonth(workspace, [
+                { IdPerson: example.luana },
+                { IdPerson: example.tiago, IdCategory: example.alimentacao },
+                { IdCategory: workspace.IdCategory },
+            ])
+
+            expect(preview.Targets.map((target) => target.Spent)).toEqual([
+                month.spent.get(example.luanaPeriod),
+                month.spent.get(example.tiagoFood),
+                month.spent.get(example.mercado),
+            ])
+            expect(preview.Unbudgeted).toBe(month.Unbudgeted)
+        })
+
+        //  Mesma recusa do `allocate`, e pelo mesmo motivo — o Joi valida item a item e não
+        //  enxerga o conjunto. Sem ela, o segundo alvo igual sobrescreveria a chave do primeiro no
+        //  índice do casamento, e a tela mostraria o comprometido numa linha e zero na outra.
+        it("recusa dois alvos iguais na mesma lista", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/BudgetPeriods/preview`, {
+                ReferenceMonth: "2026-08",
+                Targets: [{ IdCategory: workspace.IdCategory }, { IdCategory: workspace.IdCategory }],
+            })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  O `or` do Joi, como no `allocate`: um alvo que não diz de que é não tem o que somar.
+        it("recusa o alvo com os dois ids vazios", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/BudgetPeriods/preview`, {
+                ReferenceMonth: "2026-08",
+                Targets: [{ IdCategory: workspace.IdCategory }, {}],
+            })
+
+            expect(response.status).toBe(406)
+        })
+
+        //  **Lista vazia é aceita, e a resposta dela importa**: um mês sem alvo nenhum tem o gasto
+        //  inteiro no `Unbudgeted` — que é a resposta certa, não zero. É o estado da tela antes de
+        //  a pessoa escolher o primeiro alvo.
+        it("põe o gasto do mês inteiro no Unbudgeted quando a lista é vazia", async () => {
+            let workspace = await buildWorkspace()
+
+            await createExpense(workspace, { TotalValue: 420.5 })
+
+            let preview = await previewMonth(workspace, [])
+
+            expect(preview.Targets).toEqual([])
+            expect(preview.Unbudgeted).toBe(420.5)
+        })
+
+        //  **A rota não confere se o alvo existe**, ao contrário do `allocate`, que grava: o id de
+        //  outro tenant não casa com porção nenhuma — elas saem de `Expenses.IdWorkspace` — e volta
+        //  com zero. Nada vaza, e não há escrita para proteger.
+        it("devolve zero para o alvo de outro workspace, em vez de 406", async () => {
+            let workspace = await buildWorkspace()
+            let neighbour = await buildWorkspace()
+
+            await createExpense(neighbour, { TotalValue: 700 })
+
+            let preview = await previewMonth(workspace, [{ IdCategory: neighbour.IdCategory }])
+
+            expect(preview.Targets.map((target) => target.Spent)).toEqual([0])
+            expect(preview.Unbudgeted).toBe(0)
+        })
+
+        //  **Mês fechado RESPONDE**, e é a única coisa da feature que um mês fechado ainda faz com
+        //  um corpo: as quatro escritas devolvem 403. Ler agosto em novembro é legítimo, e é o que
+        //  a tela já faz em modo de leitura.
+        it("responde 200 num mês fechado", async () => {
+            let workspace = await buildWorkspace()
+
+            await createExpense(workspace, { TotalValue: 250 })
+            await createPeriod(workspace, { LimitValue: 800 })
+            await closeMonth(workspace, "2026-08-01")
+
+            let preview = await previewMonth(workspace, [{ IdCategory: workspace.IdCategory }])
+
+            expect(preview.Targets.map((target) => target.Spent)).toEqual([250])
+        })
+    })
+
     describe("PUT /BudgetPeriods/IdBudgetPeriod=:IdBudgetPeriod", () => {
 
         it("recusa sem token", async () => {
@@ -1806,6 +2006,25 @@ async function readMonth(workspace: TestWorkspace, ReferenceMonth = "2026-08") {
         spent: new Map(Periods.map((item): [number, number] => [item.IdBudgetPeriod, item.Spent])),
         total: Periods.reduce((sum, item) => sum + item.Spent, 0),
         Unbudgeted: response.body.Unbudgeted as number,
+    }
+}
+
+/**
+ * A prévia do mês, lida **na ordem do corpo** — que é a única ordem que ela tem: não há
+ * `IdBudgetPeriod` para indexar, porque a fatia ainda não existe. É o ponto inteiro da rota.
+ */
+async function previewMonth(
+    workspace: TestWorkspace,
+    Targets: Array<{ IdCategory?: number, IdPerson?: number }>,
+    ReferenceMonth = "2026-08",
+) {
+    let response = await workspace.client.post(`/BudgetPeriods/preview`, { ReferenceMonth, Targets })
+
+    expect(response.status).toBe(200)
+
+    return response.body as {
+        Targets: Array<{ IdCategory: number | null, IdPerson: number | null, Spent: number }>
+        Unbudgeted: number
     }
 }
 

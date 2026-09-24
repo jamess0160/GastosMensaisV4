@@ -70,6 +70,28 @@ export const queryKeys = {
     inflows: (month: ApiTypes.ReferenceMonth) => ["inflows", month] as const,
     inflow: (idInflow: number) => ["inflow", idInflow] as const,
     budgets: (month: ApiTypes.ReferenceMonth) => ["budgets", month] as const,
+    /** A prévia do comprometido dos alvos que a tela do Orçamento está
+     *  MONTANDO — o mesmo número do `Spent`, para um alvo que ainda não
+     *  foi gravado.
+     *
+     *  **A chave é o mês mais os alvos, e nada além deles.** É isso que
+     *  faz a prévia ser refeita quando um SELETOR muda e **não** quando
+     *  um valor é digitado — e é o que dispensa debounce: digitar "250"
+     *  não muda alvo nenhum, então não muda a chave, então não há
+     *  requisição. Pôr o valor aqui seria uma requisição por tecla.
+     *
+     *  `targets` chega já normalizado pelo `useBudgetPreview`: sem os
+     *  alvos vazios, sem repetição e em **ordem estável**. Ordem estável
+     *  porque a ordem das linhas na tela não é uma pergunta diferente —
+     *  arrastar a segunda fatia para cima não muda o comprometido de
+     *  nenhuma delas, e sem a normalização isso seria uma entrada de
+     *  cache nova e uma requisição a mais.
+     *
+     *  Debaixo do prefixo `["budgets", month]` de propósito: salvar o
+     *  rateio invalida a raiz `budgets`, e a prévia tem que ser refeita
+     *  junto — o mês gravado mudou. */
+    budgetPreview: (month: ApiTypes.ReferenceMonth, targets: readonly string[]) =>
+        ["budgets", month, "preview", targets] as const,
 
     /* Relatórios — o número já somado pelo servidor. Mesma unidade de
        cache, o MÊS, para o Início e quem mais vier lerem a mesma

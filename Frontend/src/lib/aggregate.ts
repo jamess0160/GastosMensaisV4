@@ -289,6 +289,17 @@ export const budgetTargetName = (period: ApiTypes.BudgetPeriod): string =>
         .filter((part): part is string => part !== null)
         .join(" · ");
 
+/** O alvo de uma fatia como STRING — a chave pela qual a tela do Orçamento
+ *  encontra o comprometido de uma linha, e a mesma que a API usa nas
+ *  sections do orçamento.
+ *
+ *  `null` não casa com `null` em lugar nenhum — nem no SQL nem num mapa de
+ *  pares —, e é justamente o alvo AUSENTE que distingue "Mercado" de
+ *  "Luana em Mercado": dois alvos diferentes, que convivem no mesmo mês e
+ *  somam lado a lado. */
+export const budgetTargetKey = (IdCategory: number | null, IdPerson: number | null): string =>
+    `${IdCategory ?? ""}|${IdPerson ?? ""}`;
+
 /** **Os três números que descrevem uma fatia**, e nada além deles.
  *
  *  As três funções abaixo pediam uma `BudgetPeriod` inteira e usavam só
@@ -299,9 +310,11 @@ export const budgetTargetName = (period: ApiTypes.BudgetPeriod): string =>
  *  de mentira a cada tecla, só para perguntar se já estourou. */
 export interface BudgetNumbers {
     LimitValue: ApiTypes.Money;
-    /** O comprometido, que vem da API e NÃO se recalcula aqui. Numa linha
-     *  recém-criada é zero: nada foi gasto contra um alvo que ainda não
-     *  existe no mês. */
+    /** O comprometido, que vem da API e NÃO se recalcula aqui — nem para
+     *  uma linha que ainda não foi salva: quem responde pelo alvo que está
+     *  sendo montado é `POST /BudgetPeriods/preview`, com o mesmo código
+     *  que responde pela fatia gravada. Zero aqui é o que a tela mostra
+     *  enquanto a prévia não respondeu, não a resposta dela. */
     Spent: ApiTypes.Money;
     AlertPercent: number;
 }

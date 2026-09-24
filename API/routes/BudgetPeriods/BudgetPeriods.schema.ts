@@ -125,6 +125,45 @@ class Schema {
         })),
     ]
 
+    //  **O comprometido dos alvos que a tela está montando, antes de gravar.**
+    //
+    //  O corpo é o do `allocate` **sem os valores**, e a simetria é deliberada: a prévia pergunta
+    //  o que o allocate faria, e a resposta dela é a mesma que o `getByMonth` daria depois de
+    //  salvar. Mesmo `or` por item, mesma aceitação de lista vazia — ver sections/POST/preview.ts,
+    //  inclusive para por que esta rota é um POST que não escreve nada.
+    public readonly preview = [
+        joiController.validateBody(Joi.object({
+            ReferenceMonth: referenceMonth.required(),
+            //  **Vazia é aceita**, como no `allocate`: um mês sem fatia nenhuma tem `Unbudgeted`
+            //  igual ao gasto inteiro dele, e essa é a resposta certa — não zero.
+            Targets: Joi.array().items(Joi.object({
+                IdCategory: Joi.number().optional(),
+                IdPerson: Joi.number().optional(),
+                //  Sem `LimitValue` e sem `AlertPercent`: a prévia não pergunta nada sobre o
+                //  valor. O `AlertPercent` em especial **não volta na resposta** e não deve — ele
+                //  é uma decisão guardada na fatia, não um cálculo do mês.
+                //
+                //  Mesmo `or` do `allocate`: pelo menos um alvo, possivelmente os dois. O alvo
+                //  repetido DENTRO da lista é 406 também, e quem confere é a section, pelo mesmo
+                //  motivo de lá — o Joi valida item a item e não enxerga o conjunto.
+            }).or("IdCategory", "IdPerson")).required(),
+        })),
+        joiController.validateResponse(Joi.object({
+            //  Na ordem em que o corpo mandou, porque é o alvo que a tela conhece: não há
+            //  `IdBudgetPeriod` para devolver — a fatia ainda não existe.
+            Targets: Joi.array().items(Joi.object({
+                IdCategory: Joi.number().allow(null).required(),
+                IdPerson: Joi.number().allow(null).required(),
+                //  O mesmo número do `Spent` da fatia gravada, pela mesma regra e pelo mesmo
+                //  código. Pode vir negativo, como lá.
+                Spent: Joi.number().required(),
+            })).required(),
+            //  Do MÊS, não de alvo nenhum — e é ele que faz o "fora do orçamento" da tela se mover
+            //  antes de salvar.
+            Unbudgeted: Joi.number().required(),
+        })),
+    ]
+
     public readonly update = [
         joiController.validateParams(Joi.object({
             IdBudgetPeriod: Joi.number().required(),

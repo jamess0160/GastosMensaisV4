@@ -50,6 +50,21 @@ BudgetPeriods_route.post("/BudgetPeriods", BudgetPeriods_schema.create, AsyncHan
 //  sections/POST/allocate.ts, inclusive para o que acontece com a fatia de alvo arquivado.
 BudgetPeriods_route.post("/BudgetPeriods/allocate", BudgetPeriods_schema.allocate, AsyncHandler(BudgetPeriods_controller.allocate))
 
+//  **O comprometido dos alvos que a tela está MONTANDO**: `{ ReferenceMonth, Targets }` →
+//  `{ Targets: [{ IdCategory, IdPerson, Spent }], Unbudgeted }`.
+//
+//  O `GET` acima devolve o `Spent` por `IdBudgetPeriod`, e uma fatia só tem id depois de gravada —
+//  então nenhum alvo recém-escolhido mostrava gasto, que é justamente o número de que a pessoa
+//  precisa para decidir o valor. Esta rota responde a mesma pergunta para um alvo que ainda não
+//  existe, **com o mesmo código**: `BudgetSpent` inteiro, com o índice da lista no papel de
+//  `IdBudgetPeriod`. Replicar o casamento no navegador seria a segunda cópia da regra de dinheiro
+//  mais delicada do orçamento.
+//
+//  Três coisas a separam das quatro escritas acima, e as três estão em sections/POST/preview.ts:
+//  ela é um **POST que não escreve nada** (a pergunta tem uma lista no corpo), a guarda é
+//  `assertMember` e não `assertRole`, e **mês fechado responde** em vez de 403.
+BudgetPeriods_route.post("/BudgetPeriods/preview", BudgetPeriods_schema.preview, AsyncHandler(BudgetPeriods_controller.preview))
+
 //  **Repete a repartição de um mês no outro**: `{ From, To }`, os dois "YYYY-MM".
 //
 //  É o desconto do preço que a leva 9 cobrou ao matar a rotina do dia 1º: nada nasce sozinho,

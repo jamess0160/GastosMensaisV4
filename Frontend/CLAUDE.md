@@ -233,7 +233,7 @@ o usuário veria o texto genérico no lugar da frase do servidor. Quem desempaco
 | Gastos | `/gastos` | lista **por perna** (a parcela, não a compra), detalhe, quitação da perna, série, cancelamento |
 | Adicionar / editar gasto | `/gastos/novo`, `/gastos/:id/editar` | mesma página, em modal |
 | Renda | `/renda` | entrada, transferência, e clonar o mês anterior |
-| Orçamento | `/orcamento` | a renda do mês no topo, o rateio dela em fatias de pessoa e/ou categoria, "distribuir o que sobra", o clone do mês anterior e o "fora do orçamento" |
+| Orçamento | `/orcamento` | a renda do mês no topo, o rateio dela em fatias de pessoa e/ou categoria — com o comprometido de cada alvo **em prévia, antes de salvar** (`POST /BudgetPeriods/preview`) —, "distribuir o que sobra", o clone do mês anterior e o "fora do orçamento" |
 | Contas | `/contas` | contas e cartões, com seletor de mês; o card do cartão mostra a fatura aberta e linka para ela |
 | Fatura | `/contas/fatura/:idPaymentMethod` | um ciclo por vez, com navegação própria — a fatura **não é um mês** e não segue o seletor do chassi —, o que já está nela, o previsto, os próximos vencimentos e a quitação |
 | Extrato | `/contas/extrato` | abertura → linhas assinadas → fechamento, por conta e por fatura, com a quitação no bloco do cartão |

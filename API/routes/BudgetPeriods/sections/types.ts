@@ -116,4 +116,50 @@ export namespace BudgetPeriodsNamespace {
         ReferenceMonth: string
         Lines: AllocateBudgetLine[]
     }
+
+    /**
+     * Um alvo da previa: o mesmo alvo da fatia, **sem valor nenhum**.
+     *
+     * Pelo menos um dos dois, como em toda parte desta feature - o `or` do Joi barra o item sem
+     * alvo. Nao ha `LimitValue` nem `AlertPercent` porque a previa nao pergunta nada sobre o
+     * valor: ela responde quanto JA foi gasto contra aquele alvo, que e justamente o numero que
+     * decide o valor que a pessoa vai digitar.
+     */
+    export interface PreviewBudgetTarget {
+        IdCategory?: number
+        IdPerson?: number
+    }
+
+    /**
+     * **O corpo do `allocate` sem os valores** - e a simetria e deliberada: a previa pergunta o
+     * que o allocate faria, e a resposta dela e a mesma que o `GET` do mes daria depois de
+     * salvar.
+     *
+     * **A lista VAZIA e legitima**, pelo mesmo motivo do allocate e com uma resposta que importa:
+     * um mes sem fatia nenhuma tem `Unbudgeted` igual ao gasto inteiro dele, e essa e a resposta
+     * certa, nao zero.
+     */
+    export interface PreviewBudgetMonthPayload {
+        /** "YYYY-MM". Mes FECHADO responde: ler agosto em novembro nao escreve em agosto. */
+        ReferenceMonth: string
+        Targets: PreviewBudgetTarget[]
+    }
+
+    /** O comprometido de UM alvo. O alvo volta resolvido (`null` onde o corpo omitiu), porque e
+     *  por ele que a tela acha a linha - a previa nao tem id para devolver. */
+    export interface PreviewTargetSpent extends BudgetTargetPayload {
+        /** Ver BudgetSpent.section.ts: a mesma regra, o mesmo numero que o `GET` daria. */
+        Spent: number
+    }
+
+    /**
+     * A previa do mes: o comprometido de cada alvo do corpo, **na ordem em que ele os mandou**, e
+     * o que sobrou fora de todos eles.
+     *
+     * Fecha a mesma conta do `GET`: soma dos `Spent` + `Unbudgeted` = o gasto do mes inteiro.
+     */
+    export interface PreviewPayload {
+        Targets: PreviewTargetSpent[]
+        Unbudgeted: number
+    }
 }

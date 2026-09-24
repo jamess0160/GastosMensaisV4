@@ -3,6 +3,7 @@ import { GetByMonth } from "./sections/GET/getByMonth"
 import { Allocate } from "./sections/POST/allocate"
 import { Clone } from "./sections/POST/clone"
 import { Create } from "./sections/POST/create"
+import { Preview } from "./sections/POST/preview"
 import { Remove } from "./sections/DELETE/remove"
 import { Update } from "./sections/PUT/update"
 
@@ -18,6 +19,10 @@ class Controller {
 
     allocate = async (req: Request, res: Response) => {
         res.json(await new Allocate().run(res.locals.IdWorkspace, res.locals.IdUser, req.body))
+    }
+
+    preview = async (req: Request, res: Response) => {
+        res.json(await new Preview().run(res.locals.IdWorkspace, res.locals.IdUser, req.body))
     }
 
     clone = async (req: Request, res: Response) => {

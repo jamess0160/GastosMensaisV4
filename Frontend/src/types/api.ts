@@ -1123,6 +1123,60 @@ export namespace ApiTypes {
         To: ReferenceMonth;
     }
 
+    /** Um alvo da PRÉVIA: o alvo de uma fatia, **sem valor nenhum**.
+     *
+     *  Pelo menos um dos dois, como no rateio — e a união diz isso no
+     *  tipo, em vez de dois opcionais que compilariam na forma vazia. */
+    export type BudgetPreviewTarget =
+        { IdCategory: number; IdPerson?: number } | { IdPerson: number; IdCategory?: number };
+
+    /** **Quanto já foi comprometido nos alvos que a tela está montando —
+     *  antes de gravar.**
+     *
+     *  O `Spent` de `BudgetPeriod` vem indexado por `IdBudgetPeriod`, e
+     *  uma fatia só tem id depois de gravada: por isso um alvo
+     *  recém-escolhido não tinha gasto para mostrar, e o par
+     *  `(pessoa, categoria)` — que ninguém gravou ainda — nunca tinha.
+     *  Era zero na régua exatamente no momento em que o número decide o
+     *  valor que a pessoa vai digitar.
+     *
+     *  **O corpo é o do rateio sem os valores**, e a simetria é
+     *  deliberada: a prévia pergunta o que o rateio faria, e a resposta é
+     *  a mesma que o `GET` do mês daria depois de salvar. Daí as mesmas
+     *  duas recusas: dois alvos iguais na lista é 406, e o alvo com os
+     *  dois ids vazios também.
+     *
+     *  **O que ela NÃO responde é o `AlertPercent`** — e não deve: ele é
+     *  uma decisão guardada na fatia, não um cálculo do mês. O medidor
+     *  continua lendo o da fatia gravada.
+     *
+     *  Mês FECHADO responde, ao contrário das quatro escritas: ler agosto
+     *  em novembro é legítimo, e é o que a tela já faz em leitura. */
+    export interface BudgetPreviewBody {
+        ReferenceMonth: ReferenceMonth;
+        /** **Vazia é legítima**, como no rateio: é a tela antes do
+         *  primeiro alvo escolhido, e a resposta certa para ela é o gasto
+         *  do mês inteiro no `Unbudgeted` — não zero. */
+        Targets: BudgetPreviewTarget[];
+    }
+
+    /** A prévia do mês: o comprometido de cada alvo **na ordem em que o
+     *  corpo os mandou** — não há id para indexar, porque a fatia ainda
+     *  não existe —, e o que sobrou fora de todos eles.
+     *
+     *  O `Spent` é o mesmo número do da fatia gravada, pela mesma regra e
+     *  pelo mesmo código do servidor; o `Unbudgeted` é do MÊS, e é ele que
+     *  faz o "fora do orçamento" da tela se mover antes de salvar. Fecha a
+     *  mesma conta: soma dos `Spent` + `Unbudgeted` = o gasto do mês. */
+    export interface BudgetPreviewResponse {
+        Targets: Array<{
+            IdCategory: number | null;
+            IdPerson: number | null;
+            Spent: Money;
+        }>;
+        Unbudgeted: Money;
+    }
+
     /* ── 15. Reports ──────────────────────────────────────────── */
 
     /** Os dois indicadores do Início, somados no SERVIDOR.
