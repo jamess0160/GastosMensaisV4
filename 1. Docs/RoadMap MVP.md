@@ -265,9 +265,16 @@ por alvo e vira uma repartição da renda do mês, com a pessoa e a categoria na
 duas são migration sobre dado de produção, e é isso que define o tamanho da leva.
 
 **A 10 foi escrita em 23/09, no mesmo dia em que a 9 fechou e foi validada no ar, e está em
-execução** — 8 etapas, das quais uma só toca a API. Ela é o **segundo** retorno de uso, e o que
-a separa da 9 é o tamanho: sem migration, sem troca de modelo, sete itens de cliente. O oitavo
-é o que o produto nunca teve — **a porta de entrada**: quem se cadastra cai num espaço com as
+execução** — 9 etapas, das quais duas tocam a API. Ela é o **segundo** retorno de uso, e o que a
+separa da 9 é o que cada uma faz com o modelo: a 9 **trocou** dois, com migration que recalculou
+perna já gravada; a 10 tem uma migration só, e ela **apaga**. O **rateio da renda entre pessoas
+sai do produto**: ele era o rascunho de "de quem é esse dinheiro" de uma época em que o
+orçamento era um teto perene por categoria e não sabia responder isso — a leva 9 fez o orçamento
+ser a repartição da renda do mês por pessoa e/ou categoria, e manter os dois é manter duas
+respostas para a mesma pergunta, que nada obriga a concordar. `InflowPersons` é dropada, o eixo
+sai da tela de Renda, e com ele saem as N requisições por mês que a coluna "Destino" obrigava.
+O resto da leva é cliente, e um item dela é o que o produto nunca teve — **a porta de entrada**:
+quem se cadastra cai num espaço com as
 treze categorias e mais nada, e a ordem em que ele precisa ser montado (conta antes de tudo,
 porque é ela que cria as formas de pagamento; renda antes do orçamento, porque orçar é repartir
 a renda) atravessa cinco telas que só sabem dizer que estão vazias. A 10 também é a primeira

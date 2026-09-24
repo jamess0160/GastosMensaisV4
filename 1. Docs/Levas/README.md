@@ -9,13 +9,15 @@ começar em 6 está em [../RoadMap MVP.md](../RoadMap%20MVP.md#as-levas-daqui-pr
 | [7. O que a lei cobra e o que só quebra em produção](7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md) | escrita em 10/09/2026, 12 de 12 etapas fechadas no mesmo dia — **reaberta** em 11/09/2026 com a etapa 13, **fechada** no mesmo dia: 13 de 13 |
 | [8. O que só se prova subindo](8.%20O%20que%20só%20se%20prova%20subindo.md) | escrita em 11/09/2026, **9 de 10 etapas** fechadas entre 11/09 e 13/09 — falta a do e-mail do domínio, que depende de conta no provedor e de registro no DNS |
 | [9. O que voltou de quem usa](9.%20O%20que%20voltou%20de%20quem%20usa.md) | escrita em 22/09/2026, **fechada** em 23/09/2026 — 16 de 16 etapas |
-| [10. O segundo retorno, e a porta de entrada](10.%20O%20segundo%20retorno,%20e%20a%20porta%20de%20entrada.md) | escrita em 23/09/2026, **em execução** — 0 de 8 etapas |
+| [10. O segundo retorno, e a porta de entrada](10.%20O%20segundo%20retorno,%20e%20a%20porta%20de%20entrada.md) | escrita em 23/09/2026, **em execução** — 0 de 9 etapas |
 
-**A 10 é o segundo retorno de uso, e o que a separa da 9 é o tamanho.** A 9 trocou dois modelos
-com migration sobre dado de produção; aqui não há migration nenhuma, sete dos oito itens são de
-cliente, e o oitavo é o que o produto nunca teve: uma **porta de entrada**. Ela também é a
-primeira leva que **inverte duas decisões escritas** — as setas de ordenar categoria e a
-biometria em qualquer aparelho —, e o plano diz em cada etapa por que a inversão é legítima.
+**A 10 é o segundo retorno de uso, e o que a separa da 9 é o que cada uma faz com o modelo.** A
+9 **trocou** dois, com migration que recalculou perna gravada; a 10 tem uma migration só, e ela
+**apaga** — o rateio da renda entre pessoas sai do produto, porque era o rascunho de uma
+pergunta que o orçamento da leva 9 passou a responder direito. Fora isso ela é a primeira leva
+que **inverte decisões escritas** em vez de acrescentar (as setas de ordenar categoria, a
+biometria em qualquer aparelho), e traz o que o produto nunca teve: uma **porta de entrada**
+para quem acabou de se cadastrar. O plano diz em cada etapa por que a inversão é legítima.
 
 **A 9 é a primeira que não nasce de uma lista interna.** As oito anteriores saíram do que o
 projeto sabia que devia; esta sai de treze retornos de quem usou o produto no ar, e por isso ela
