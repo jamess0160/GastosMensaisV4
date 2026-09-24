@@ -69,7 +69,7 @@
 .allocationOver {
     background: var(--neg-soft);
     border-color: var(--neg-soft);
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .incomeNote {

@@ -50,7 +50,7 @@
     margin-top: 6px;
     font-size: 11.5px;
     font-weight: 600;
-    color: var(--neg);
+    color: var(--neg-ink);
     line-height: 1.45;
 }
 
@@ -413,7 +413,7 @@
     padding: 10px 14px;
     border-radius: 10px;
     background: var(--neg-soft);
-    color: var(--neg);
+    color: var(--neg-ink);
     font-size: 12.5px;
     font-weight: 600;
     line-height: 1.45;

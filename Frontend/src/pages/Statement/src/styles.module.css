@@ -159,7 +159,7 @@
 }
 
 .neg {
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .divider {

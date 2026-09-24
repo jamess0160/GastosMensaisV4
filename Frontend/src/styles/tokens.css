@@ -35,6 +35,23 @@
        literal em quatro lugares (`overlay` e `Profile`), inclusive num
        comentario que prometia que ele morava aqui. */
     --neg-press: #e00017;
+    /* O irmao de tinta que o positivo sempre teve e o negativo nao: o
+       layout desenhou `--pos`/`--pos-ink` e parou ali, entao este
+       valor — como o do `--neg-press` acima — NAO vem do `:root` do
+       layout, e nao existe la o que conferir. Ele nasceu de medida:
+       `--neg` (`#ff001a`) da 3,99:1 sobre `--surface` no claro e
+       3,89:1 sobre `--neg-soft` no escuro, abaixo do 4,5:1 do AA, e
+       era ele que pintava todo texto vermelho do produto. Estes dois
+       passam de 4,5:1 sobre TODOS os fundos que o produto usa
+       (`--surface`, `--surface-alt`, `--screen`, `--page` e
+       `--neg-soft`) nos dois temas — o claro no pior caso 4,67:1, o
+       escuro 5,33:1.
+
+       `--neg` continua sendo preenchimento e borda, e e por isso que
+       ele nao foi so corrigido: clarea-lo para agradar o texto
+       pioraria o `--on-accent` (branco) que vai em cima dele no botao
+       de excluir. */
+    --neg-ink: #d5001a;
     --pos: #00dc8c;
     --pos-soft: #ddf8ee;
     --pos-ink: #009c63;
@@ -184,6 +201,7 @@
 
         --neg-soft: #3b1a1e;
         --neg-press: #ff2d43;
+        --neg-ink: #ff6b76;
         --pos-soft: #11362b;
         --pos-ink: #4ae0a4;
 
@@ -224,6 +242,7 @@
 
     --neg-soft: #3b1a1e;
     --neg-press: #ff2d43;
+    --neg-ink: #ff6b76;
     --pos-soft: #11362b;
     --pos-ink: #4ae0a4;
 

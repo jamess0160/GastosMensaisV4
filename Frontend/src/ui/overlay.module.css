@@ -193,7 +193,7 @@
 
 .dangerMark {
     background: var(--neg-soft);
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .confirmTitle {
@@ -342,11 +342,11 @@
 
 .sheetRowDanger .sheetIcon {
     background: var(--neg-soft);
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .sheetRowDanger .sheetLabel {
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .sheetCancel {

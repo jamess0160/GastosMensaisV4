@@ -52,7 +52,7 @@
 }
 
 .heroNegative {
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 /* A régua do cartão principal — o "76% do orçamento usado" do layout.
@@ -122,7 +122,7 @@
 
 .arrowDown {
     background: var(--neg-soft);
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .flowName {
@@ -185,7 +185,7 @@
 }
 
 .overdueNeg {
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .overdueNote {

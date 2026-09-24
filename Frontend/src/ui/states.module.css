@@ -41,7 +41,7 @@
 
 .markError {
     background: var(--neg-soft);
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .title {
@@ -133,5 +133,5 @@
 
 .overdue {
     background: var(--neg-soft);
-    color: var(--neg);
+    color: var(--neg-ink);
 }

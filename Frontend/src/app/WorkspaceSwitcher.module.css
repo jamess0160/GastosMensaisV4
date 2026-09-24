@@ -226,7 +226,7 @@
 .error {
     font-size: 11px;
     line-height: 1.4;
-    color: var(--neg);
+    color: var(--neg-ink);
     padding: 4px 8px 6px;
 }
 

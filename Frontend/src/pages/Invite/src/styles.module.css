@@ -57,7 +57,7 @@
 }
 
 .mismatch {
-    color: var(--neg);
+    color: var(--neg-ink);
     border-color: var(--neg);
 }
 

@@ -165,7 +165,7 @@
     padding: 2px 8px;
     border-radius: var(--r-pill);
     background: var(--neg-soft);
-    color: var(--neg);
+    color: var(--neg-ink);
     font-size: 10px;
     font-weight: 700;
     display: inline-flex;
@@ -317,7 +317,7 @@
 }
 
 .dueWarn {
-    color: var(--neg);
+    color: var(--neg-ink);
     font-weight: 700;
 }
 

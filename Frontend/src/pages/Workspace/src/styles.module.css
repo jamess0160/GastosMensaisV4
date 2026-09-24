@@ -204,7 +204,7 @@
 }
 
 .expired {
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .inviteActions {

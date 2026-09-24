@@ -254,7 +254,7 @@
 }
 
 .kpiNeg .kpiBig {
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .kpiPos .kpiBig {
@@ -283,7 +283,7 @@
 
 .deltaDown {
     background: var(--neg-soft);
-    color: var(--neg);
+    color: var(--neg-ink);
 }
 
 .deltaMute {

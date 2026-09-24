@@ -266,7 +266,7 @@
     padding: 10px 14px;
     border-radius: 10px;
     background: var(--neg-soft);
-    color: var(--neg);
+    color: var(--neg-ink);
     font-size: 12.5px;
     font-weight: 600;
 }
