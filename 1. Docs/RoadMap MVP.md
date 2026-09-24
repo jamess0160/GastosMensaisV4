@@ -24,8 +24,9 @@ tudo que descrevia o projeto quando ele era **dois repositórios** está congela
 
 ### API — três levas, todas fechadas
 
-O esquema está **completo**: as 23 tabelas existem em `API/migrations/` (as 22 de domínio mais
-`RotineRuns`), e todas as de domínio têm código em cima.
+O esquema está **completo**: as 22 tabelas existem em `API/migrations/` (as 21 de domínio mais
+`RotineRuns`), e todas as de domínio têm código em cima. Duas nasceram aqui e foram dropadas
+depois — `Budgets` na leva 9 e `InflowPersons` na leva 10 —, e não contam.
 
 | Leva | O que entregou | Estado |
 | --- | --- | --- |

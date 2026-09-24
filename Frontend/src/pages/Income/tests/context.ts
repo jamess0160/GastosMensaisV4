@@ -11,7 +11,6 @@ export const anInflowDraft = (overrides: Partial<InflowDraft> = {}): InflowDraft
     CompetenceDate: "2026-08-05",
     ExpectedDate: null,
     Notes: "",
-    persons: [],
     received: false,
     ...overrides,
 });

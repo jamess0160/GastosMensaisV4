@@ -39,38 +39,15 @@ describe("submitInflow · entrada", () => {
         expect(seen.body).not.toHaveProperty("Status");
     });
 
-    it("leva o rateio quando ele fecha com o total", async () => {
+    //  A entrada não tem rateio: nem chave, nem lista vazia. O rateio da
+    //  renda saiu do produto na leva 10 — quem reparte a renda do mês por
+    //  pessoa é o Orçamento
+    it("nunca manda Persons — a entrada não tem rateio", async () => {
         const seen = capture();
 
-        await submitInflow(
-            fakeIncomeContext({
-                draft: anInflowDraft({
-                    TotalValue: 5000,
-                    persons: [
-                        { id: 1, value: 3000 },
-                        { id: 2, value: 2000 },
-                    ],
-                }),
-            }),
-        );
+        await submitInflow(fakeIncomeContext());
 
-        expect(seen.body?.Persons).toEqual([
-            { IdPerson: 1, Value: 3000 },
-            { IdPerson: 2, Value: 2000 },
-        ]);
-    });
-
-    it("recusa rateio que não fecha, antes de chamar a API", async () => {
-        const context = fakeIncomeContext({
-            draft: anInflowDraft({ TotalValue: 5000, persons: [{ id: 1, value: 3000 }] }),
-        });
-
-        await submitInflow(context);
-
-        expect(context.failSubmit).toHaveBeenCalledWith(
-            "A soma do rateio entre pessoas precisa fechar com o total.",
-        );
-        expect(context.beginSubmit).not.toHaveBeenCalled();
+        expect(seen.body).not.toHaveProperty("Persons");
     });
 
     it("recusa valor zero ou negativo — saída é gasto, não entrada", async () => {
@@ -96,19 +73,6 @@ describe("submitInflow · transferência", () => {
         expect(seen.body?.IdFromAccount).toBe(2);
     });
 
-    it("NÃO manda Persons — rateio é proibido em transferência", async () => {
-        const seen = capture();
-
-        await submitInflow(
-            fakeIncomeContext({
-                draft: anInflowDraft({ Kind: "transfer", IdFromAccount: 2, IdToAccount: 1 }),
-            }),
-        );
-
-        // Nem lista vazia: a chave não pode existir.
-        expect(seen.body).not.toHaveProperty("Persons");
-    });
-
     it("recusa transferência sem conta de origem", async () => {
         const context = fakeIncomeContext({
             draft: anInflowDraft({ Kind: "transfer", IdFromAccount: null }),
@@ -128,23 +92,6 @@ describe("submitInflow · transferência", () => {
 
         expect(context.failSubmit).toHaveBeenCalledWith(
             "A conta de origem precisa ser diferente da de destino.",
-        );
-    });
-
-    it("recusa transferência com rateio", async () => {
-        const context = fakeIncomeContext({
-            draft: anInflowDraft({
-                Kind: "transfer",
-                IdFromAccount: 2,
-                IdToAccount: 1,
-                persons: [{ id: 1, value: 5000 }],
-            }),
-        });
-
-        await submitInflow(context);
-
-        expect(context.failSubmit).toHaveBeenCalledWith(
-            "Transferência não tem rateio — ela é neutra para o patrimônio.",
         );
     });
 });
@@ -167,28 +114,8 @@ describe("submitInflow · edição", () => {
         expect(body).not.toHaveProperty("IdFromAccount");
         expect(body).not.toHaveProperty("IdToAccount");
         expect(body).not.toHaveProperty("Status");
-    });
-
-    it("manda o rateio explícito, porque a API o reconfere contra o novo total", async () => {
-        let body: Record<string, unknown> | undefined;
-        server.use(
-            msw.put("*/api/Inflows/IdInflow=1", async ({ request }) => {
-                body = (await request.json()) as Record<string, unknown>;
-                return HttpResponse.json({ msg: "ok" });
-            }),
-        );
-
-        await submitInflow(
-            fakeIncomeContext({
-                draft: anInflowDraft({
-                    IdInflow: 1,
-                    TotalValue: 6000,
-                    persons: [{ id: 1, value: 6000 }],
-                }),
-            }),
-        );
-
-        expect(body?.Persons).toEqual([{ IdPerson: 1, Value: 6000 }]);
+        // E nem Persons: a entrada não tem rateio desde a leva 10.
+        expect(body).not.toHaveProperty("Persons");
     });
 });
 

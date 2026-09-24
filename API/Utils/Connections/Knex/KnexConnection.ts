@@ -49,7 +49,6 @@ export interface DBTypes {
 
     // Entradas
     Inflows: Database.Inflows
-    InflowPersons: Database.InflowPersons
 
     // Gastos
     Expenses: Database.Expenses

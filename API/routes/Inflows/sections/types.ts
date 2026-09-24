@@ -1,11 +1,5 @@
 export namespace InflowsNamespace {
 
-    /** Uma linha do rateio: quem recebeu e quanto, em valor absoluto — nunca em porcentagem. */
-    export interface SplitPayload {
-        IdPerson: number
-        Value: number
-    }
-
     export interface ListFilters {
         /** Data de calendário "YYYY-MM-DD". Ver periodQuery em Utils/joiSchemas.ts. */
         From?: string
@@ -27,8 +21,6 @@ export namespace InflowsNamespace {
         CompetenceDate: string
         ExpectedDate: string | null
         Notes: string | null
-        /** Só em Kind='inflow'. A soma tem que fechar com o TotalValue. */
-        Persons: SplitPayload[]
     }
 
     //  Sem Kind e sem contas: mudar qualquer um dos três reescreveria o que o lançamento
@@ -39,7 +31,5 @@ export namespace InflowsNamespace {
         CompetenceDate: string
         ExpectedDate?: string | null
         Notes?: string | null
-        /** Omitir mantém o rateio gravado; enviar substitui ele inteiro. */
-        Persons?: SplitPayload[]
     }
 }

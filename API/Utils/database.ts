@@ -285,21 +285,6 @@ export namespace Database {
         UpdatedAt: Datetime
     }
 
-    /**
-     * Quem recebeu: rateio da entrada entre Persons, por valor absoluto.
-     * Soma dos Value tem que fechar com Inflows.TotalValue.
-     * So existe para Kind='inflow'.
-     */
-    export interface InflowPersons {
-        IdInflowPerson: number
-        IdWorkspace: number
-        IdInflow: number
-        IdPerson: number
-        Value: number
-        CreatedAt: Datetime
-        UpdatedAt: Datetime
-    }
-
     //#endregion
 
     //#region Gastos

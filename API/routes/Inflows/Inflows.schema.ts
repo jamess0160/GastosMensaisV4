@@ -5,13 +5,6 @@ import { isoDate, periodQuery } from "root/Utils/joiSchemas"
 const status = Joi.string().valid("pending", "received", "canceled")
 const kind = Joi.string().valid("inflow", "transfer")
 
-//  Uma linha do rateio. Valor absoluto, nunca porcentagem: porcentagem obrigaria a decidir
-//  onde cai o centavo do arredondamento em toda leitura.
-const splitItem = Joi.object({
-    IdPerson: Joi.number().required(),
-    Value: Joi.number().precision(2).positive().required(),
-})
-
 const inflowResponse = Joi.object({
     IdInflow: Joi.number().required(),
     IdWorkspace: Joi.number().required(),
@@ -52,13 +45,6 @@ const inflowBody = Joi.object({
     CompetenceDate: isoDate.required(),
     ExpectedDate: isoDate.allow(null).default(null),
     Notes: Joi.string().trim().allow(null).default(null),
-    //  Só em "inflow". O forbidden aqui e a mensagem da section dizem a mesma coisa: a
-    //  transferência não muda o dono do dinheiro, então não há o que ratear.
-    Persons: Joi.array().items(splitItem).when("Kind", {
-        is: "transfer",
-        then: Joi.forbidden(),
-        otherwise: Joi.optional(),
-    }).default([]),
     //  Sem Status: a entrada nasce pendente, e só receive/cancel a movem.
 })
 
@@ -78,21 +64,15 @@ class Schema {
         joiController.validateResponse(Joi.array().items(inflowResponse)),
     ]
 
+    //  A resposta é a MESMA da lista: sem o rateio, a entrada por id não tem nada que a
+    //  linha da lista não tenha. O GET por id continua existindo porque reler antes de
+    //  editar é o que evita salvar em cima de uma versão velha do cache — e porque a
+    //  cancelada sai por aqui, ao contrário da lista.
     public readonly getUnique = [
         joiController.validateParams(Joi.object({
             IdInflow: Joi.number().required(),
         })),
-        joiController.validateResponse(inflowResponse.keys({
-            Persons: Joi.array().items(Joi.object({
-                IdInflowPerson: Joi.number().required(),
-                IdWorkspace: Joi.number().required(),
-                IdInflow: Joi.number().required(),
-                IdPerson: Joi.number().required(),
-                Value: Joi.number().required(),
-                CreatedAt: Joi.date().required(),
-                UpdatedAt: Joi.date().required(),
-            })).required(),
-        })),
+        joiController.validateResponse(inflowResponse),
     ]
 
     public readonly create = [
@@ -126,8 +106,6 @@ class Schema {
             CompetenceDate: isoDate.required(),
             ExpectedDate: isoDate.allow(null).optional(),
             Notes: Joi.string().trim().allow(null).optional(),
-            //  Omitir mantém o rateio gravado; enviar substitui ele inteiro.
-            Persons: Joi.array().items(splitItem).optional(),
             //  Sem Kind, sem contas e sem Status: os três reescreveriam o que o lançamento
             //  significa, e o saldo das contas envolvidas junto. Ver sections/PUT/update.ts.
         })),

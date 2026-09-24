@@ -48,8 +48,8 @@ export class class_Persons_model extends BaseModel {
         return this.KnexConnection.update({ ...record, UpdatedAt: this.KnexConnection.fn.now() }).from("Persons").where("IdPerson", IdPerson)
     }
 
-    //  Soft delete: ExpensePersons e InflowPersons apontam para cá com ON DELETE RESTRICT, e o
-    //  rateio do mês passado tem que continuar apontando para quem de fato entrou nele.
+    //  Soft delete: ExpensePersons aponta para cá com ON DELETE RESTRICT, e o rateio do gasto do
+    //  mês passado tem que continuar apontando para quem de fato entrou nele.
     delete(IdPerson: number) {
         return this.KnexConnection.update({ Active: false, UpdatedAt: this.KnexConnection.fn.now() }).from("Persons").where("IdPerson", IdPerson)
     }

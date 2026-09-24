@@ -1,21 +1,21 @@
 import { errorMessage } from "@/api/client";
 import { InflowsConnection } from "@/api/Inflows.connection";
-import { splitIsClosed, usableLines } from "@/ui/SplitEditor";
 import type { IncomeContext, InflowDraft } from "../controller";
-import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
    Entrada e transferência moram na mesma tabela e se separam por
-   `Kind`. As regras não são simétricas:
+   `Kind`, e a única assimetria que sobrou é a conta de origem:
 
-   | Kind       | IdFromAccount        | Rateio    |
-   |------------|----------------------|-----------|
-   | inflow     | só aceita null       | permitido |
-   | transfer   | obrigatório, ≠ To    | PROIBIDO  |
+   | Kind       | IdFromAccount        |
+   |------------|----------------------|
+   | inflow     | só aceita null       |
+   | transfer   | obrigatório, ≠ To    |
 
-   A transferência é neutra para o patrimônio — mover 1.000 do Nubank
-   para o Itaú não é renda. É por isso que ela não tem rateio: não há
-   custo de ninguém a dividir, só dinheiro trocando de bolso.
+   Uma entrada é descrição, valor, as duas datas, a conta em que cai e a
+   observação. O rateio entre pessoas saiu do produto na leva 10: quem
+   responde "de quem é esse dinheiro" é o Orçamento, que é a repartição
+   da renda do mês — duas respostas para a mesma pergunta divergem na
+   primeira vez que alguém preenche uma e esquece a outra.
    ════════════════════════════════════════════════════════════ */
 
 export function validateInflow(draft: InflowDraft): string | null {
@@ -31,17 +31,6 @@ export function validateInflow(draft: InflowDraft): string | null {
         if (draft.IdFromAccount === draft.IdToAccount) {
             return "A conta de origem precisa ser diferente da de destino.";
         }
-        if (usableLines(draft.persons).length > 0) {
-            return "Transferência não tem rateio — ela é neutra para o patrimônio.";
-        }
-    }
-
-    if (
-        draft.Kind === "inflow" &&
-        usableLines(draft.persons).length > 0 &&
-        !splitIsClosed(draft.persons, draft.TotalValue)
-    ) {
-        return "A soma do rateio entre pessoas precisa fechar com o total.";
     }
 
     return null;
@@ -60,29 +49,17 @@ export async function submitInflow(context: IncomeContext): Promise<void> {
 
     context.beginSubmit();
 
-    const persons: ApiTypes.SplitInput[] = usableLines(draft.persons).map((line) => ({
-        IdPerson: line.id,
-        Value: line.value,
-    }));
-
     try {
         if (draft.IdInflow !== null) {
             // `Kind`, contas e `Status` não se editam: os três
             // reescreveriam o que o lançamento significa, e o saldo das
             // contas envolvidas junto.
-            //
-            // O rateio é reconferido pela API contra o NOVO total mesmo
-            // quando não é enviado — por isso ele vai sempre daqui:
-            // quando só o total muda, é o rateio gravado que deixa de
-            // fechar, e mandá-lo explícito é o que dá ao usuário a
-            // chance de corrigir na mesma tela.
             await InflowsConnection.update(draft.IdInflow, {
                 Description: draft.Description.trim(),
                 TotalValue: draft.TotalValue as number,
                 CompetenceDate: draft.CompetenceDate,
                 ExpectedDate: draft.ExpectedDate,
                 Notes: draft.Notes.trim() || null,
-                ...(draft.Kind === "inflow" ? { Persons: persons } : {}),
             });
             context.closeForm();
             context.finishSubmit("Entrada atualizada.");
@@ -99,8 +76,6 @@ export async function submitInflow(context: IncomeContext): Promise<void> {
             CompetenceDate: draft.CompetenceDate,
             ExpectedDate: draft.ExpectedDate,
             Notes: draft.Notes.trim() || null,
-            // Rateio é proibido em transferência — nem lista vazia.
-            ...(draft.Kind === "inflow" ? { Persons: persons } : {}),
         });
 
         context.closeForm();

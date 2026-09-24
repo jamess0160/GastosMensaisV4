@@ -5,8 +5,10 @@ import { Persons_schema } from "./Persons.schema"
 
 export const Persons_route = express()
 
-//  Quem recebeu ou quem gastou. É a ponta de destino dos dois rateios (InflowPersons e
-//  ExpensePersons), que apontam para cá e nunca para Users — pessoa não precisa de login.
+//  Quem gastou. É a ponta de destino do rateio do gasto (ExpensePersons, com ON DELETE RESTRICT)
+//  e do alvo de pessoa do orçamento, e as duas apontam para cá e nunca para Users — pessoa não
+//  precisa de login. O rateio da RENDA apontava para cá também, até a leva 10 tirá-lo do produto
+//  junto com a tabela (migration 20260923100000).
 //
 //  CRUD escopado por tenant como o resto: o IdWorkspace vem do token, toda section abre com
 //  assertMember/assertRole e usa o IdWorkspace que volta da matrícula.

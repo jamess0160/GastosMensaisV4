@@ -105,7 +105,7 @@ export function useExpenseDetail(idExpense: number | null): UseQueryResult<ApiTy
     });
 }
 
-export function useInflowDetail(idInflow: number | null): UseQueryResult<ApiTypes.InflowDetail> {
+export function useInflowDetail(idInflow: number | null): UseQueryResult<ApiTypes.Inflow> {
     return useQuery({
         queryKey: queryKeys.inflow(idInflow ?? 0),
         queryFn: () => InflowsConnection.get(idInflow as number),
@@ -267,47 +267,20 @@ export function useRangeLegs(
 
 /* ── Detalhes do mês ──────────────────────────────────────── */
 
-/* O `get(id)` por gasto SAIU daqui. Ele existia para preencher as
-   colunas de destino e forma de pagamento da lista de Gastos e os dois
-   breakdowns do Início — uma requisição por gasto do mês —, e as duas
-   coisas agora vêm dentro da perna. O que sobrou de exclusivo do
-   detalhe são as TAGS, e elas só aparecem no slide-over de um gasto:
-   `useExpenseDetail`, uma consulta, quando o painel abre.
+/* O `get(id)` por LINHA DO MÊS saiu daqui, dos dois lados.
 
-   Entradas são outra história: `GET /Inflows` continua sem trazer
-   `Persons`, e a coluna "Destino" da tela de Renda depende dele. */
+   No gasto ele existia para preencher as colunas de destino e forma de
+   pagamento da lista e os dois breakdowns do Início — uma requisição por
+   gasto do mês —, e as duas coisas agora vêm dentro da perna. O que
+   sobrou de exclusivo do detalhe são as TAGS, e elas só aparecem no
+   slide-over de um gasto: `useExpenseDetail`, uma consulta, quando o
+   painel abre.
 
-/** O mesmo para entradas: só o `get(id)` traz `Persons`, e é dele que
- *  sai a coluna "Destino" da tela de Renda. */
-export function useMonthInflowDetails(month: ApiTypes.ReferenceMonth): {
-    byId: Map<number, ApiTypes.InflowDetail>;
-    isPending: boolean;
-} {
-    const list = useMonthInflows(month);
-
-    const details = useQueries({
-        queries: (list.data ?? []).map((inflow) => ({
-            queryKey: queryKeys.inflow(inflow.IdInflow),
-            queryFn: () => InflowsConnection.get(inflow.IdInflow),
-        })),
-    });
-
-    // Ver o comentário do `stamp` acima.
-    const stamp = details
-        .map((query) => `${query.data?.IdInflow ?? 0}:${query.dataUpdatedAt}`)
-        .join(",");
-
-    const byId = useMemo(() => {
-        const index = new Map<number, ApiTypes.InflowDetail>();
-        for (const query of details) {
-            if (query.data) index.set(query.data.IdInflow, query.data);
-        }
-        return index;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [stamp]);
-
-    return { byId, isPending: list.isPending || details.some((query) => query.isPending) };
-}
+   Na entrada o custo era o mesmo, por um campo que deixou de existir: o
+   `useMonthInflowDetails` buscava `GET /Inflows/:id` de CADA entrada do
+   mês para desenhar a coluna "Destino" da tela de Renda, que era o
+   rateio entre pessoas. A leva 10 tirou o rateio da renda do produto, e
+   a tela de Renda voltou a ser uma requisição de lista. */
 
 /* ── Invalidação ──────────────────────────────────────────── */
 

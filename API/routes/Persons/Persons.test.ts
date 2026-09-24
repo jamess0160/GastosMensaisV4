@@ -293,8 +293,8 @@ describe("Persons", () => {
             expect((await findPersonById(created.body.IdPerson)).Active).toBe(true)
         })
 
-        //  Soft delete: ExpensePersons e InflowPersons apontam para cá com ON DELETE RESTRICT,
-        //  e o rateio de março tem que continuar apontando para quem entrou nele
+        //  Soft delete: ExpensePersons aponta para cá com ON DELETE RESTRICT, e o rateio do
+        //  gasto de março tem que continuar apontando para quem entrou nele
         it("arquiva a pessoa sem apagar a linha", async () => {
             let user = await UsersFactory.create({ Name: "Dono" })
             let workspaceClient = new TestClient(user.token)

@@ -4,8 +4,8 @@ import { Persons_model } from "../../Persons.model"
 
 //  Arquiva a pessoa (Active = false).
 //
-//  Não é delete físico: ExpensePersons e InflowPersons apontam para cá com ON DELETE RESTRICT,
-//  e o rateio de março tem que continuar apontando para quem de fato entrou nele.
+//  Não é delete físico: ExpensePersons aponta para cá com ON DELETE RESTRICT, e o rateio do
+//  gasto de março tem que continuar apontando para quem de fato entrou nele.
 export class Remove {
     public async run(SelectedIdWorkspace: number, IdPerson: number, IdUser: number) {
         let { IdWorkspace } = await WorkspacesAcessControl.assertRole(SelectedIdWorkspace, IdUser, ["owner", "editor"])

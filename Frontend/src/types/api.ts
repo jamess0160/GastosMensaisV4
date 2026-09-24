@@ -609,19 +609,15 @@ export namespace ApiTypes {
     export type InflowKind = "inflow" | "transfer";
     export type InflowStatus = "pending" | "received" | "canceled";
 
-    export interface InflowPerson {
-        IdInflowPerson: number;
-        IdWorkspace: number;
-        IdInflow: number;
-        IdPerson: number;
-        Value: Money;
-        CreatedAt: DateTime;
-        UpdatedAt: DateTime;
-    }
-
     /** Transferência é neutra para o patrimônio: todo total de "quanto
      *  entrou" tem que filtrar `Kind !== "transfer"`. No saldo da conta,
-     *  ao contrário, ela conta nos dois lados. */
+     *  ao contrário, ela conta nos dois lados.
+     *
+     *  **É o tipo inteiro da entrada, e o `GET` por id devolve o mesmo.**
+     *  Não há `InflowDetail`: o rateio entre pessoas saiu do produto na
+     *  leva 10, e sem ele a entrada por id não tem nada que a linha da
+     *  lista não tenha — um sinônimo seria uma segunda palavra para a
+     *  mesma coisa. */
     export interface Inflow {
         IdInflow: number;
         IdWorkspace: number;
@@ -641,11 +637,6 @@ export namespace ApiTypes {
         UpdatedAt: DateTime;
     }
 
-    /** Só o GET por id traz o rateio. */
-    export interface InflowDetail extends Inflow {
-        Persons: InflowPerson[];
-    }
-
     export interface InflowListQuery {
         From?: CalendarDate;
         To?: CalendarDate;
@@ -654,6 +645,13 @@ export namespace ApiTypes {
         Kind?: InflowKind;
     }
 
+    /** Uma linha de rateio: quem e quanto, em valor absoluto — nunca
+     *  porcentagem, porque `soma das partes === total` não vale em ponto
+     *  flutuante.
+     *
+     *  Mora aqui por herança e é do **gasto**: a entrada não tem mais
+     *  rateio (leva 10). Quem o usa é `ExpenseCreateBody`/`Update` e o
+     *  eixo de pessoas do orçamento. */
     export interface SplitInput {
         IdPerson: number;
         Value: Money;
@@ -669,8 +667,6 @@ export namespace ApiTypes {
         CompetenceDate: CalendarDate;
         ExpectedDate?: CalendarDate | null;
         Notes?: string | null;
-        /** Proibido em `transfer`. Se vier, a soma fecha com TotalValue. */
-        Persons?: SplitInput[];
     }
 
     /** O corpo do `POST /Inflows/batch`.
@@ -689,8 +685,6 @@ export namespace ApiTypes {
         CompetenceDate: CalendarDate;
         ExpectedDate?: CalendarDate | null;
         Notes?: string | null;
-        /** Omitir mantém; enviar substitui a lista inteira. */
-        Persons?: SplitInput[];
     }
 
     /* ── 11-12. Expenses e ExpensePayments ────────────────────── */

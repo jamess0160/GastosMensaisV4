@@ -8,8 +8,11 @@ export const Inflows_route = express()
 //  Entradas **e** transferências entre contas, discriminadas pelo Kind — a primeira feature de
 //  movimento, e a que estreia o saldo calculado (Accounts/sections/AccountBalance.section.ts).
 //
-//  InflowPersons não tem rota: o rateio é montado junto com a entrada e sai embutido no GET de
-//  uma entrada só. Por isso é um segundo model dentro desta pasta, como WorkspaceMembers.
+//  Uma entrada é descrição, valor, as duas datas, a conta em que cai e a observação — e nada
+//  mais. O rateio entre pessoas saiu do produto na leva 10 junto com a tabela InflowPersons
+//  (migration 20260923100000): quem responde "de quem é esse dinheiro" é o orçamento, que desde
+//  a leva 9 é a repartição da renda do mês. Duas respostas para a mesma pergunta divergem na
+//  primeira vez que alguém preenche uma e esquece a outra.
 
 //  Lista do período: ?From=YYYY-MM-DD&To=YYYY-MM-DD (&Status=&Kind=). Sem Status, a cancelada
 //  fica de fora. O formato do período é o mesmo de Expenses — ver Utils/joiSchemas.ts.

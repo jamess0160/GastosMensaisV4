@@ -3,11 +3,8 @@ import { InflowsConnection } from "@/api/Inflows.connection";
 import type { IncomeContext, InflowDraft } from "../controller";
 import type { ApiTypes } from "@/types/api";
 
-/** Traduz a entrada que veio da API para o rascunho do formulário.
- *
- *  Só o `get(id)` traz `Persons` — a lista do mês não desenha rateio e
- *  não o carrega. */
-export function toDraft(inflow: ApiTypes.InflowDetail): InflowDraft {
+/** Traduz a entrada que veio da API para o rascunho do formulário. */
+export function toDraft(inflow: ApiTypes.Inflow): InflowDraft {
     return {
         IdInflow: inflow.IdInflow,
         Description: inflow.Description,
@@ -18,15 +15,16 @@ export function toDraft(inflow: ApiTypes.InflowDetail): InflowDraft {
         CompetenceDate: inflow.CompetenceDate,
         ExpectedDate: inflow.ExpectedDate,
         Notes: inflow.Notes ?? "",
-        persons: inflow.Persons.map((person) => ({
-            id: person.IdPerson,
-            value: person.Value,
-        })),
         received: inflow.Status === "received",
     };
 }
 
-/** Carrega uma entrada para edição. */
+/** Carrega uma entrada para edição.
+ *
+ *  Continua pedindo `GET /Inflows/:id` mesmo agora que ele devolve o
+ *  mesmo que a lista — e por um motivo melhor do que o de antes: reler a
+ *  entrada antes de editar é o que evita salvar em cima de uma versão
+ *  velha do cache. */
 export async function loadInflowForEdit(context: IncomeContext, idInflow: number): Promise<void> {
     context.beginSubmit();
 

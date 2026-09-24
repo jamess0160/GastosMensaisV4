@@ -12,18 +12,21 @@ class Connection {
     private readonly route = "/Inflows";
 
     /** Filtra por `CompetenceDate`. Sem `Status`, as canceladas ficam de
-     *  fora. As duas pontas do período são independentes. A lista não traz
-     *  o rateio — use `get` para isso. */
+     *  fora. As duas pontas do período são independentes. A linha vem
+     *  INTEIRA: não há nada que só o `get` saiba. */
     async list(query: ApiTypes.InflowListQuery = {}): Promise<ApiTypes.Inflow[]> {
         const { data } = await http.get<ApiTypes.Inflow[]>(this.route, { params: query });
         return data;
     }
 
-    /** A mesma linha, mais `Persons`. */
-    async get(idInflow: number): Promise<ApiTypes.InflowDetail> {
-        const { data } = await http.get<ApiTypes.InflowDetail>(
-            `${this.route}/IdInflow=${idInflow}`,
-        );
+    /** A mesma linha da lista, por id — e é isso, desde que o rateio saiu
+     *  do produto (leva 10).
+     *
+     *  Continua valendo por dois motivos: a cancelada sai por aqui e não
+     *  pela lista, e reler a entrada antes de editar é o que evita salvar
+     *  em cima de uma versão velha do cache. */
+    async get(idInflow: number): Promise<ApiTypes.Inflow> {
+        const { data } = await http.get<ApiTypes.Inflow>(`${this.route}/IdInflow=${idInflow}`);
         return data;
     }
 
@@ -34,8 +37,8 @@ class Connection {
     }
 
     /** Não se edita `Kind`, contas nem `Status`. Editar uma entrada já
-     *  recebida é permitido, e o rateio é reconferido contra o NOVO total
-     *  mesmo quando não foi enviado. */
+     *  recebida é permitido: sem saldo em cache não há o que corrigir
+     *  além da própria linha. */
     async update(idInflow: number, body: ApiTypes.InflowUpdateBody): Promise<{ msg: string }> {
         const { data } = await http.put<{ msg: string }>(
             `${this.route}/IdInflow=${idInflow}`,

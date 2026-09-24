@@ -2,7 +2,6 @@ import { WorkspacesAcessControl } from "root/routes/Workspaces/sections/AcessCon
 import { KnexTransaction } from "root/Utils/Connections/Knex/KnexConnection"
 import { APIError } from "root/Utils/Logs"
 import { InflowKind } from "../InflowKind.section"
-import { InflowSplit } from "../InflowSplit.section"
 import { InflowsNamespace } from "../types"
 import { CreateOne } from "./createOne"
 
@@ -12,8 +11,8 @@ import { CreateOne } from "./createOne"
 //  paralelo: o que é 406 sozinho é 406 no lote.
 //
 //  Esta rota substitui o "clonar o mês anterior" que a pendência 11 pedia. Quem escolhe o que
-//  clonar é o usuário, item a item, e o cliente monta as cópias (avanço das datas, aparo do dia
-//  no mês curto, rateio junto). Ao servidor sobrou gravar — e por isso **idempotência não é
+//  clonar é o usuário, item a item, e o cliente monta as cópias (avanço das datas e aparo do dia
+//  no mês curto). Ao servidor sobrou gravar — e por isso **idempotência não é
 //  problema daqui**: não há repetição silenciosa a evitar, só duplo clique, e quem desabilita o
 //  botão enquanto grava é o cliente.
 export class CreateBatch {
@@ -38,15 +37,14 @@ export class CreateBatch {
         return { msg: "Entradas cadastradas com sucesso", IdInflows }
     }
 
-    //  A msg carrega qual item foi recusado. "O rateio não fecha com o total", sem dizer qual
-    //  das cinco linhas, é um erro que o usuário não consegue consertar — ele teria que
-    //  conferir todas à mão. O Index no data é a posição no array que ele mandou (base 0),
-    //  para a tela conseguir destacar a linha.
+    //  A msg carrega qual item foi recusado. "A conta não é deste workspace", sem dizer qual das
+    //  cinco linhas, é um erro que o usuário não consegue consertar — ele teria que conferir
+    //  todas à mão. O Index no data é a posição no array que ele mandou (base 0), para a tela
+    //  conseguir destacar a linha.
     private async assertItems(IdWorkspace: number, items: InflowsNamespace.CreateInflowPayload[]) {
         for (let [Index, item] of items.entries()) {
             try {
                 await InflowKind.assertAccounts(IdWorkspace, item)
-                await InflowSplit.assertSplit(IdWorkspace, item.Kind, item.TotalValue, item.Persons)
             } catch (error) {
                 if (error instanceof APIError) {
                     throw new APIError({

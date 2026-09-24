@@ -6,14 +6,9 @@ import { clonable } from "./sections/cloneMonth";
 import { validateInflow } from "./sections/submitInflow";
 import { useMonthScope } from "@/app/monthScope";
 import { useSession } from "@/app/session";
-import { useAccounts, usePersonIndex, usePersons } from "@/data/catalogs";
-import {
-    useInflowDetail,
-    useInvalidateMovement,
-    useMonthInflowDetails,
-    useMonthInflows,
-} from "@/data/month";
-import { Avatar, Badge, Button, Card, Chip, PageHead, Workspace as Page } from "@/ui/primitives";
+import { useAccounts } from "@/data/catalogs";
+import { useInflowDetail, useInvalidateMovement, useMonthInflows } from "@/data/month";
+import { Badge, Button, Card, Chip, PageHead, Workspace as Page } from "@/ui/primitives";
 import { Topbar } from "@/ui/topbar";
 import {
     ClearFilters,
@@ -35,7 +30,6 @@ import {
     Textarea,
 } from "@/ui/form";
 import { Select } from "@/ui/select";
-import { SplitEditor } from "@/ui/SplitEditor";
 import { ConfirmDialog, FooterSpacer, Modal, SlideOver } from "@/ui/overlay";
 import { IconArrowUp, IconBank, IconCopy, IconEdit, IconPlus, IconTransfer } from "@/ui/icons";
 import {
@@ -76,7 +70,6 @@ const newDraft = (kind: ApiTypes.InflowKind): InflowDraft => ({
     CompetenceDate: today(),
     ExpectedDate: null,
     Notes: "",
-    persons: [],
     received: false,
 });
 
@@ -90,7 +83,6 @@ export function Income() {
     const [urlQuery] = useSearchParams();
     const [statuses, setStatuses] = useState<ApiTypes.InflowStatus[]>([]);
     const [kinds, setKinds] = useState<ApiTypes.InflowKind[]>([]);
-    const [idPersons, setIdPersons] = useState<number[]>([]);
     const [search, setSearch] = useState("");
     /* A escolha da clonagem. `null` é "ainda não mexeu" e vale por
        TODAS marcadas — que é como o painel abre. */
@@ -109,11 +101,8 @@ export function Income() {
 
     const { user } = useSession();
     const inflows = useMonthInflows(month);
-    const monthDetails = useMonthInflowDetails(month);
     const detail = useInflowDetail(openInflow);
     const accounts = useAccounts();
-    const persons = usePersons();
-    const personIndex = usePersonIndex();
     const invalidateMovement = useInvalidateMovement();
 
     const context = useMemo<IncomeContext>(
@@ -146,7 +135,6 @@ export function Income() {
         [accounts.data],
     );
     const activeAccounts = (accounts.data ?? []).filter((account) => account.Active);
-    const activePersons = (persons.data ?? []).filter((person) => person.Active);
 
     /** As duas pontas da transferência escolhem da mesma lista de contas —
      *  e a cor do cadastro é o que separa uma da outra de relance. */
@@ -157,24 +145,17 @@ export function Income() {
         color: accentColor(account.Color),
     }));
 
-    /* O destino vive no DETALHE — a lista não traz `Persons`. Enquanto
-       ele não chega, a linha não passa no filtro de destino; sem filtro
-       de destino, o detalhe não interfere em nada. */
+    /* Os três recortes saem todos da própria linha da lista — não há
+       mais filtro que precise de uma segunda requisição para responder. */
     const rows = useMemo(() => {
         const term = search.trim().toLowerCase();
         return (inflows.data ?? []).filter((inflow) => {
             if (statuses.length > 0 && !statuses.includes(inflow.Status)) return false;
             if (kinds.length > 0 && !kinds.includes(inflow.Kind)) return false;
             if (term && !inflow.Description.toLowerCase().includes(term)) return false;
-            if (idPersons.length > 0) {
-                const found = monthDetails.byId.get(inflow.IdInflow);
-                if (!found?.Persons.some((person) => idPersons.includes(person.IdPerson))) {
-                    return false;
-                }
-            }
             return true;
         });
-    }, [inflows.data, statuses, kinds, search, idPersons, monthDetails.byId]);
+    }, [inflows.data, statuses, kinds, search]);
 
     const all = inflows.data ?? [];
     const received = totalReceived(all);
@@ -185,13 +166,11 @@ export function Income() {
             .map((inflow) => inflow.TotalValue),
     );
 
-    const hasFilters =
-        statuses.length > 0 || kinds.length > 0 || idPersons.length > 0 || search.trim() !== "";
+    const hasFilters = statuses.length > 0 || kinds.length > 0 || search.trim() !== "";
 
     const clearAll = () => {
         setStatuses([]);
         setKinds([]);
-        setIdPersons([]);
         setSearch("");
     };
 
@@ -220,24 +199,19 @@ export function Income() {
         setCloning(true);
     };
 
-    /** O que cada linha precisa além do que a lista traz — a tabela e a
-     *  lista de cards leem daqui.
+    /** O que a linha mostra além da descrição — a tabela e a lista de
+     *  cards leem daqui.
      *
-     *  O destino é o RATEIO da entrada, e ele só existe no `get(id)`; a
-     *  conta virou a linha de apoio da descrição, e na transferência ela
-     *  é o par "origem → destino". */
+     *  A conta em que o dinheiro cai é a linha de apoio da descrição, e
+     *  na transferência ela é o par "origem → destino": é ela que
+     *  responde "onde isso entrou". */
     const lineOf = (row: ApiTypes.Inflow) => {
         const to = accountIndex.get(row.IdToAccount);
         const from = row.IdFromAccount !== null ? accountIndex.get(row.IdFromAccount) : null;
-        const found = monthDetails.byId.get(row.IdInflow);
-        const split = found?.Persons ?? [];
 
         return {
             isTransfer: row.Kind === "transfer",
             route: `${from ? `${from.Name} → ` : ""}${to?.Name ?? "conta arquivada"}`,
-            found,
-            split,
-            firstPerson: split.length > 0 ? personIndex.get(split[0].IdPerson) : undefined,
         };
     };
 
@@ -368,17 +342,9 @@ export function Income() {
                             é só de gasto"), então o filtro de categoria que
                             o layout desenha aqui não existe — em vez de um
                             seletor que não filtra nada, ele simplesmente não
-                            entra. */}
-                        <FilterMultiSelect
-                            values={idPersons}
-                            onChange={setIdPersons}
-                            ariaLabel="Pessoa"
-                            allLabel="Todas as pessoas"
-                            options={activePersons.map((person) => ({
-                                value: person.IdPerson,
-                                label: person.Name,
-                            }))}
-                        />
+                            entra. O filtro de PESSOA saiu na leva 10 pelo
+                            mesmo motivo: a entrada não tem mais rateio, e o
+                            que ele recortava deixou de existir. */}
 
                         {hasFilters && <ClearFilters onClick={clearAll} />}
                     </FilterBar>
@@ -432,13 +398,6 @@ export function Income() {
                                         <>
                                             <StatusBadge status={row.Status} kind="inflow" />
                                             <Chip>{line.route}</Chip>
-                                            {line.firstPerson && (
-                                                <Chip>
-                                                    {line.firstPerson.Name}
-                                                    {line.split.length > 1 &&
-                                                        ` +${line.split.length - 1}`}
-                                                </Chip>
-                                            )}
                                             <span className={styles.meta}>
                                                 {formatDate(row.CompetenceDate)}
                                             </span>
@@ -469,10 +428,13 @@ export function Income() {
                         </div>
                     </CardList>
                 ) : (
-                    <Table columns="minmax(0,1.6fr) minmax(0,1fr) 120px 140px 170px">
+                    <Table columns="minmax(0,1.6fr) 120px 140px 170px">
+                        {/* Quatro colunas: a de "Destino" era o rateio
+                            entre pessoas, e ele saiu do produto na leva
+                            10. Onde o dinheiro cai continua embaixo da
+                            descrição, que é onde já estava. */}
                         <TableHead>
                             <span>Descrição</span>
-                            <span>Destino</span>
                             <span>Data</span>
                             <span style={{ textAlign: "right" }}>Valor</span>
                             <span>Status</span>
@@ -502,28 +464,6 @@ export function Income() {
                                             </div>
                                         </div>
                                     </RowTrigger>
-
-                                    <Cell>
-                                        {line.isTransfer ? (
-                                            <span className={styles.meta}>não tem rateio</span>
-                                        ) : line.split.length === 0 ? (
-                                            <span className={styles.meta}>
-                                                {line.found ? "—" : ""}
-                                            </span>
-                                        ) : (
-                                            <span className={styles.who}>
-                                                <Avatar
-                                                    name={line.firstPerson?.Name ?? "?"}
-                                                    size={22}
-                                                />
-                                                <span className={styles.whoName}>
-                                                    {line.firstPerson?.Name ?? "Pessoa arquivada"}
-                                                    {line.split.length > 1 &&
-                                                        ` +${line.split.length - 1}`}
-                                                </span>
-                                            </span>
-                                        )}
-                                    </Cell>
 
                                     <Cell>
                                         <DueDate
@@ -640,30 +580,6 @@ export function Income() {
                                     <StatusBadge status={inflow.Status} kind="inflow" />
                                 </div>
 
-                                {inflow.Kind !== "transfer" && inflow.Persons.length > 0 && (
-                                    <>
-                                        <div className={styles.sectionLabel}>
-                                            <span>De quem é a entrada</span>
-                                        </div>
-                                        <div className={styles.splitRows}>
-                                            {inflow.Persons.map((person) => (
-                                                <div
-                                                    className={styles.splitRow}
-                                                    key={person.IdInflowPerson}
-                                                >
-                                                    <span>
-                                                        {personIndex.get(person.IdPerson)?.Name ??
-                                                            "Pessoa arquivada"}
-                                                    </span>
-                                                    <span className={styles.splitValue}>
-                                                        {formatMoney(person.Value)}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-
                                 {inflow.ExpectedDate && (
                                     <div className={styles.detailMeta}>
                                         Previsto para {formatDate(inflow.ExpectedDate)}
@@ -740,13 +656,8 @@ export function Income() {
                                                         ? {
                                                               ...c,
                                                               Kind,
-                                                              // Rateio é proibido em
-                                                              // transferência; a origem só
-                                                              // existe nela.
-                                                              persons:
-                                                                  Kind === "transfer"
-                                                                      ? []
-                                                                      : c.persons,
+                                                              // A conta de origem só existe
+                                                              // na transferência.
                                                               IdFromAccount:
                                                                   Kind === "transfer"
                                                                       ? c.IdFromAccount
@@ -866,23 +777,11 @@ export function Income() {
                                 )}
                             </FormField>
 
-                            {draft.Kind === "inflow" && (
-                                <SplitEditor
-                                    label="De quem é a entrada"
-                                    hint="Opcional — não muda o saldo, só a análise"
-                                    optionLabel="Pessoa"
-                                    addLabel="Outra pessoa"
-                                    options={activePersons.map((person) => ({
-                                        id: person.IdPerson,
-                                        label: person.Name,
-                                    }))}
-                                    lines={draft.persons}
-                                    onChange={(persons) =>
-                                        setDraft((c) => (c ? { ...c, persons } : c))
-                                    }
-                                    total={draft.TotalValue}
-                                />
-                            )}
+                            {/* O `SplitEditor` de "De quem é a entrada"
+                                ficava aqui, e saiu na leva 10 com o rateio
+                                da renda: quem reparte a renda do mês por
+                                pessoa é o Orçamento. O componente continua
+                                vivo — o gasto e o orçamento o usam. */}
 
                             <FormField label="Observações">
                                 {(field) => (

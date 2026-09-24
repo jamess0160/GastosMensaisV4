@@ -3,10 +3,13 @@ import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tes
 //  Testes integrados de Inflows. Um describe por rota de Inflows.route.ts, mais o fluxo end to
 //  end no fim.
 //
-//  É a primeira feature de movimento, então metade dos casos aqui é sobre as duas coisas que o
-//  modelo não deixa o banco garantir: as regras do Kind (entrada tem uma conta, transferência
-//  tem duas e diferentes) e o rateio que precisa fechar exatamente com o total. A outra metade
-//  é o saldo — que não é coluna nenhuma, é calculado dos lançamentos a cada leitura.
+//  É a primeira feature de movimento, então metade dos casos aqui é sobre o que o modelo não
+//  deixa o banco garantir com mensagem: as regras do Kind (entrada tem uma conta, transferência
+//  tem duas e diferentes). A outra metade é o saldo — que não é coluna nenhuma, é calculado dos
+//  lançamentos a cada leitura.
+//
+//  Os casos de rateio da entrada saíram na leva 10, com a tabela: uma entrada não tem mais
+//  pessoas, e o que sobrou do eixo analítico é o rateio do GASTO (Expenses.test.ts).
 
 describe("Inflows", () => {
 
@@ -147,24 +150,19 @@ describe("Inflows", () => {
             expect(response.status).toBe(406)
         })
 
-        it("devolve a entrada com o rateio", async () => {
+        //  A resposta é a MESMA da lista desde que o rateio saiu — e o Persons ausente é o que
+        //  este teste trava: enquanto a chave sobrevivesse em algum lugar, o cliente teria
+        //  motivo para continuar lendo o que não existe mais
+        it("devolve a entrada, e sem rateio nenhum", async () => {
             let workspace = await buildWorkspace()
-            let child = await createPerson(workspace, "Filha")
 
-            let created = await createInflow(workspace, {
-                Description: "Salário",
-                TotalValue: 300,
-                Persons: [
-                    { IdPerson: workspace.user.person.IdPerson, Value: 200 },
-                    { IdPerson: child, Value: 100 },
-                ],
-            })
+            let created = await createInflow(workspace, { Description: "Salário", TotalValue: 300 })
 
             let response = await workspace.client.get(`/Inflows/IdInflow=${created.IdInflow}`)
 
             expect(response.status).toBe(200)
-            expect(response.body.Persons).toHaveLength(2)
-            expect(response.body.Persons.map((item: { Value: number }) => item.Value)).toEqual([200, 100])
+            expect(response.body).toMatchObject({ Description: "Salário", TotalValue: 300 })
+            expect(response.body).not.toHaveProperty("Persons")
         })
     })
 
@@ -254,72 +252,27 @@ describe("Inflows", () => {
             expect(response.status).toBe(406)
         })
 
-        //  Ratear entre contas próprias uma transferência não significa nada: o dinheiro não
-        //  mudou de dono
-        it("recusa rateio em transferência", async () => {
+        //  Uma entrada não tem mais pessoas: a chave que sobrevivesse num cliente antigo é
+        //  recusada como qualquer outra desconhecida, não ignorada em silêncio
+        it("recusa Persons no corpo", async () => {
             let workspace = await buildWorkspace()
-            let second = await createAccount(workspace, "Poupança")
 
-            let response = await workspace.client.post(`/Inflows`, {
-                ...buildBody(workspace, { Kind: "transfer", IdFromAccount: workspace.IdAccount, IdToAccount: second }),
+            let response = await workspace.client.post(`/Inflows`, buildBody(workspace, {
                 Persons: [{ IdPerson: workspace.user.person.IdPerson, Value: 100 }],
-            })
-
-            expect(response.status).toBe(406)
-        })
-
-        //  O invariante que silencia: um rateio que não fecha não quebra nada na hora, só faz
-        //  todo relatório por pessoa mostrar menos dinheiro do que entrou
-        it("recusa rateio que não fecha com o total", async () => {
-            let workspace = await buildWorkspace()
-
-            let response = await workspace.client.post(`/Inflows`, buildBody(workspace, {
-                TotalValue: 300,
-                Persons: [{ IdPerson: workspace.user.person.IdPerson, Value: 200 }],
-            }))
-
-            expect(response.status).toBe(406)
-        })
-
-        it("recusa pessoa de outro workspace no rateio", async () => {
-            let workspace = await buildWorkspace()
-
-            let response = await workspace.client.post(`/Inflows`, buildBody(workspace, {
-                TotalValue: 100,
-                Persons: [{ IdPerson: other.person.IdPerson, Value: 100 }],
-            }))
-
-            expect(response.status).toBe(406)
-        })
-
-        it("recusa a mesma pessoa duas vezes no rateio", async () => {
-            let workspace = await buildWorkspace()
-
-            let response = await workspace.client.post(`/Inflows`, buildBody(workspace, {
-                TotalValue: 100,
-                Persons: [
-                    { IdPerson: workspace.user.person.IdPerson, Value: 60 },
-                    { IdPerson: workspace.user.person.IdPerson, Value: 40 },
-                ],
             }))
 
             expect(response.status).toBe(406)
         })
 
         //  Nasce pendente: é o recebimento que entra no saldo, e ele é uma ação à parte
-        it("cria a entrada pendente com o rateio na mesma transaction", async () => {
+        it("cria a entrada pendente", async () => {
             let workspace = await buildWorkspace()
-            let child = await createPerson(workspace, "Filha")
 
             let response = await workspace.client.post(`/Inflows`, buildBody(workspace, {
                 Description: "Salário",
                 TotalValue: 1000,
                 CompetenceDate: "2026-08-05",
                 ExpectedDate: "2026-08-05",
-                Persons: [
-                    { IdPerson: workspace.user.person.IdPerson, Value: 700 },
-                    { IdPerson: child, Value: 300 },
-                ],
             }))
 
             expect(response.status).toBe(200)
@@ -339,8 +292,6 @@ describe("Inflows", () => {
             })
             //  Data de calendário: sai como veio, sem passar por fuso
             expect(inflow.CompetenceDate).toBe("2026-08-05")
-
-            expect(await findSplit(response.body.IdInflow)).toHaveLength(2)
         })
 
         it("cria a transferência entre duas contas", async () => {
@@ -362,14 +313,6 @@ describe("Inflows", () => {
             })
         })
 
-        it("aceita entrada sem rateio nenhum", async () => {
-            let workspace = await buildWorkspace()
-
-            let response = await workspace.client.post(`/Inflows`, buildBody(workspace))
-
-            expect(response.status).toBe(200)
-            expect(await findSplit(response.body.IdInflow)).toHaveLength(0)
-        })
     })
 
     describe("POST /Inflows/batch", () => {
@@ -428,52 +371,16 @@ describe("Inflows", () => {
             expect(await accountBalance(workspace)).toBe(1000)
         })
 
-        //  Cada item é o MESMO corpo do POST avulso, validado pelo MESMO schema: o rateio vem
-        //  junto e fecha com o total, como sozinho
-        it("grava o rateio de cada item", async () => {
-            let workspace = await buildWorkspace()
-            let maria = await createPerson(workspace, "Maria")
-
-            let response = await workspace.client.post(`/Inflows/batch`, {
-                Inflows: [
-                    buildBody(workspace, { TotalValue: 300, Persons: [{ IdPerson: maria, Value: 300 }] }),
-                    buildBody(workspace, { TotalValue: 200 }),
-                ],
-            })
-
-            expect(response.status).toBe(200)
-            expect(await findSplit(response.body.IdInflows[0])).toHaveLength(1)
-            expect(await findSplit(response.body.IdInflows[1])).toHaveLength(0)
-        })
-
-        //  **O teste da etapa.** Tudo ou nada: o item 2 derruba os 3, e o banco fica no estado
-        //  em que estava. É por isso que o miolo passou a receber a transaction.
-        it("derruba o lote inteiro quando um item não fecha o rateio", async () => {
-            let workspace = await buildWorkspace()
-            let maria = await createPerson(workspace, "Maria do lote")
-
-            let response = await workspace.client.post(`/Inflows/batch`, {
-                Inflows: [
-                    buildBody(workspace, { Description: "Primeira" }),
-                    buildBody(workspace, { Description: "Segunda", TotalValue: 200, Persons: [{ IdPerson: maria, Value: 150 }] }),
-                    buildBody(workspace, { Description: "Terceira" }),
-                ],
-            })
-
-            expect(response.status).toBe(406)
-            expect(await countInflows(workspace)).toBe(0)
-        })
-
-        //  "O rateio não fecha com o total", sem dizer qual das linhas, é um erro que o usuário
+        //  "A conta não é deste workspace", sem dizer qual das linhas, é um erro que o usuário
         //  não consegue consertar — ele teria que conferir todas à mão
         it("diz qual item foi recusado", async () => {
             let workspace = await buildWorkspace()
-            let maria = await createPerson(workspace, "Maria do índice")
+            let stranger = await buildWorkspace()
 
             let response = await workspace.client.post(`/Inflows/batch`, {
                 Inflows: [
                     buildBody(workspace, { Description: "Primeira" }),
-                    buildBody(workspace, { Description: "Segunda", TotalValue: 200, Persons: [{ IdPerson: maria, Value: 150 }] }),
+                    buildBody(workspace, { Description: "Segunda", IdToAccount: stranger.IdAccount }),
                 ],
             })
 
@@ -607,62 +514,16 @@ describe("Inflows", () => {
             })
         })
 
-        it("substitui o rateio inteiro quando o corpo o traz", async () => {
+        it("recusa Persons no corpo", async () => {
             let workspace = await buildWorkspace()
-            let child = await createPerson(workspace, "Filha")
-
-            let created = await createInflow(workspace, {
-                TotalValue: 100,
-                Persons: [{ IdPerson: workspace.user.person.IdPerson, Value: 100 }],
-            })
+            let created = await createInflow(workspace, { TotalValue: 100 })
 
             let response = await workspace.client.put(`/Inflows/IdInflow=${created.IdInflow}`, {
                 ...buildUpdateBody({ TotalValue: 100 }),
-                Persons: [
-                    { IdPerson: workspace.user.person.IdPerson, Value: 60 },
-                    { IdPerson: child, Value: 40 },
-                ],
-            })
-
-            expect(response.status).toBe(200)
-
-            let split = await findSplit(created.IdInflow)
-
-            expect(split).toHaveLength(2)
-            expect(split.map((item) => item.Value)).toEqual([60, 40])
-        })
-
-        //  O invariante é conferido mesmo sem o rateio no corpo: quando só o total muda, é o
-        //  rateio antigo que deixa de fechar
-        it("recusa mudar o total deixando o rateio gravado sem fechar", async () => {
-            let workspace = await buildWorkspace()
-
-            let created = await createInflow(workspace, {
-                TotalValue: 100,
                 Persons: [{ IdPerson: workspace.user.person.IdPerson, Value: 100 }],
             })
-
-            let response = await workspace.client.put(`/Inflows/IdInflow=${created.IdInflow}`, buildUpdateBody({ TotalValue: 150 }))
 
             expect(response.status).toBe(406)
-            expect((await findInflow(created.IdInflow)).TotalValue).toBe(100)
-        })
-
-        it("mantém o rateio gravado quando o corpo não o traz", async () => {
-            let workspace = await buildWorkspace()
-
-            let created = await createInflow(workspace, {
-                TotalValue: 100,
-                Persons: [{ IdPerson: workspace.user.person.IdPerson, Value: 100 }],
-            })
-
-            let response = await workspace.client.put(`/Inflows/IdInflow=${created.IdInflow}`, buildUpdateBody({
-                Description: "Só o nome",
-                TotalValue: 100,
-            }))
-
-            expect(response.status).toBe(200)
-            expect(await findSplit(created.IdInflow)).toHaveLength(1)
         })
 
         //  É o que a decisão de não guardar saldo compra: não há cache para corrigir, o extrato
@@ -992,17 +853,11 @@ describe("Inflows", () => {
             let checking = await flowClient.post(`/Accounts`, { Name: "Conta corrente", InitialBalance: 200 })
             let savings = await flowClient.post(`/Accounts`, { Name: "Poupança", InitialBalance: 0 })
 
-            //  A pessoa do dono já existe desde o cadastro: dá para ratear sem cadastrar nada
-            let persons = await flowClient.get(`/Persons`)
-
-            expect(persons.body).toHaveLength(1)
-
             let salary = await flowClient.post(`/Inflows`, {
                 Description: "Salário de agosto",
                 TotalValue: 3000,
                 IdToAccount: checking.body.IdAccount,
                 CompetenceDate: "2026-08-05",
-                Persons: [{ IdPerson: persons.body[0].IdPerson, Value: 3000 }],
             })
 
             expect(salary.status).toBe(200)
@@ -1029,15 +884,14 @@ describe("Inflows", () => {
             expect(await balanceOf(flowClient, checking.body.IdAccount)).toBe(2000)
             expect(await balanceOf(flowClient, savings.body.IdAccount)).toBe(1200)
 
-            //  A lista do mês traz as duas, e o detalhe traz o rateio
+            //  A lista do mês traz as duas, e o detalhe traz a mesma linha por id
             let month = await flowClient.get(`/Inflows?From=2026-08-01&To=2026-08-31`)
 
             expect(month.body).toHaveLength(2)
 
             let detail = await flowClient.get(`/Inflows/IdInflow=${salary.body.IdInflow}`)
 
-            expect(detail.body.Persons).toHaveLength(1)
-            expect(detail.body.Persons[0].Value).toBe(3000)
+            expect(detail.body).toMatchObject({ Description: "Salário de agosto", TotalValue: 3000, Status: "received" })
 
             //  Estorno: cancelar a transferência devolve o dinheiro para a conta de origem
             expect((await flowClient.delete(`/Inflows/IdInflow=${transfer.body.IdInflow}`)).status).toBe(200)
@@ -1071,10 +925,6 @@ async function buildWorkspace(): Promise<TestWorkspace> {
 
 function createAccount(workspace: TestWorkspace, Name: string) {
     return workspace.client.post(`/Accounts`, { Name, InitialBalance: 0 }).then((response) => response.body.IdAccount as number)
-}
-
-function createPerson(workspace: TestWorkspace, Name: string) {
-    return workspace.client.post(`/Persons`, { Name }).then((response) => response.body.IdPerson as number)
 }
 
 function buildBody(workspace: TestWorkspace, overrides: Record<string, unknown> = {}) {
@@ -1148,10 +998,6 @@ async function countInflows(workspace: TestWorkspace) {
 
 function findInflow(IdInflow: number) {
     return TestDatabase.connection().select("*").from("Inflows").where("IdInflow", IdInflow).first()
-}
-
-function findSplit(IdInflow: number) {
-    return TestDatabase.connection().select("*").from("InflowPersons").where("IdInflow", IdInflow).orderBy("IdInflowPerson")
 }
 
 //#endregion

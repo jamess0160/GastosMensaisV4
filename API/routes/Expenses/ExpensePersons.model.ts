@@ -1,7 +1,10 @@
 import { BaseModel, MaybeArray } from "root/Utils/Base"
 import { Database } from "root/Utils/database"
 
-//  **Eixo analítico: quem consumiu.** Não move saldo nenhum — é o espelho de InflowPersons.
+//  **Eixo analítico: quem consumiu.** Não move saldo nenhum. Havia um espelho deste eixo na
+//  renda (InflowPersons), e ele saiu do produto na leva 10: este ficou porque alimenta o
+//  casamento do orçamento (BudgetPeriods/sections/BudgetSpent) e a quebra "Por destino" do
+//  Início — o da renda não alimentava nada.
 //
 //  Nunca confundir com ExpensePayments, que é o eixo financeiro: duas formas de pagamento e
 //  duas pessoas geram **2 + 2 linhas, nunca 4**. Se o código produzir 4, o modelo foi entendido

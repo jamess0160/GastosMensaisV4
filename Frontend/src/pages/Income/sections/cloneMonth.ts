@@ -8,8 +8,8 @@ import type { ApiTypes } from "@/types/api";
    Clonar o mês anterior.
 
    O que se repete todo mês é a renda: salário, aluguel recebido, a
-   mesada. Redigitar isso — com o rateio — é o trabalho mais chato da
-   tela, e era o botão desabilitado que o layout desenhava.
+   mesada. Redigitar isso é o trabalho mais chato da tela, e era o botão
+   desabilitado que o layout desenhava.
 
    A ESCOLHA É DO USUÁRIO. A tela lista o mês anterior e ele marca o que
    quer trazer; nada é adivinhado. Isso resolve de graça o problema que
@@ -17,12 +17,14 @@ import type { ApiTypes } from "@/types/api";
    porque cada linha foi escolhida à mão.
 
    O QUE O CLIENTE FAZ, E O QUE NÃO FAZ. Ele lista, deixa escolher,
-   busca o rateio de cada escolhida (a lista não traz `Persons`), avança
-   as datas e monta os corpos. Gravar é UMA chamada — `POST
-   /Inflows/batch` —, porque atomicidade é do banco: com um POST por
-   entrada, a terceira recusada deixaria o mês pela metade e sem como
-   voltar atrás. O lote é tudo ou nada, e a `msg` da recusa diz qual
-   item caiu ("Item 2: ..."), contando a partir de 1.
+   avança as datas e monta os corpos — a partir da própria LINHA DA
+   LISTA, que já tem tudo que a cópia leva. Buscar `GET /Inflows/:id` de
+   cada escolhida era o preço do rateio entre pessoas, e ele saiu do
+   produto na leva 10. Gravar é UMA chamada — `POST /Inflows/batch` —,
+   porque atomicidade é do banco: com um POST por entrada, a terceira
+   recusada deixaria o mês pela metade e sem como voltar atrás. O lote é
+   tudo ou nada, e a `msg` da recusa diz qual item caiu ("Item 2: ..."),
+   contando a partir de 1.
    ════════════════════════════════════════════════════════════ */
 
 /** As entradas que valem a pena clonar: renda, não transferência, e
@@ -36,29 +38,24 @@ export const clonable = (inflows: readonly ApiTypes.Inflow[]): ApiTypes.Inflow[]
 
 /** Uma entrada do mês anterior vira o corpo da cópia deste mês.
  *
+ *  Recebe a LINHA DA LISTA: ela já tem tudo que a cópia leva, e é por
+ *  isso que clonar não busca mais o detalhe de cada escolhida.
+ *
  *  As duas datas andam um mês com o dia aparado (`addMonthsToDate`): um
  *  salário do dia 31 vira 28/02, nunca 03/03. `Status` não vai no corpo
  *  — toda cópia nasce pendente, e é o `receive` de cada uma que move
  *  saldo. É isso que torna a operação segura mesmo quando o usuário
  *  clona sem prestar atenção. */
-export function cloneBody(detail: ApiTypes.InflowDetail): ApiTypes.InflowCreateBody {
+export function cloneBody(inflow: ApiTypes.Inflow): ApiTypes.InflowCreateBody {
     return {
-        Description: detail.Description,
-        TotalValue: detail.TotalValue,
+        Description: inflow.Description,
+        TotalValue: inflow.TotalValue,
         Kind: "inflow",
         IdFromAccount: null,
-        IdToAccount: detail.IdToAccount,
-        CompetenceDate: addMonthsToDate(detail.CompetenceDate, 1),
-        ExpectedDate: detail.ExpectedDate === null ? null : addMonthsToDate(detail.ExpectedDate, 1),
-        Notes: detail.Notes,
-        ...(detail.Persons.length > 0
-            ? {
-                  Persons: detail.Persons.map((person) => ({
-                      IdPerson: person.IdPerson,
-                      Value: person.Value,
-                  })),
-              }
-            : {}),
+        IdToAccount: inflow.IdToAccount,
+        CompetenceDate: addMonthsToDate(inflow.CompetenceDate, 1),
+        ExpectedDate: inflow.ExpectedDate === null ? null : addMonthsToDate(inflow.ExpectedDate, 1),
+        Notes: inflow.Notes,
     };
 }
 
@@ -74,16 +71,10 @@ export async function cloneMonth(
     context.beginSubmit();
 
     try {
-        /* O rateio só existe no `get(id)`, e ele é a parte que dá
-           trabalho de redigitar — clonar sem ele seria clonar pela
-           metade. São poucas chamadas (um mês tem cinco a dez entradas)
-           e só das escolhidas. */
-        const details = await Promise.all(
-            chosen.map((inflow) => InflowsConnection.get(inflow.IdInflow)),
-        );
-
+        /* Uma requisição só, e ela é a gravação: as linhas escolhidas já
+           estão em mãos. */
         const { IdInflows } = await InflowsConnection.createBatch({
-            Inflows: details.map(cloneBody),
+            Inflows: chosen.map(cloneBody),
         });
 
         context.closeCloneMonth();
