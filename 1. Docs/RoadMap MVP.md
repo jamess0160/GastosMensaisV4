@@ -40,13 +40,17 @@ Etapa por etapa, com commit e data: [Old/API/Levas executadas.md](Old/API/Levas%
 09/09, o `GET /Workspaces/self` passando a dizer **qual** espaço está selecionado (`7c0f11b`) —
 que fecha a última pendência que o front tinha contra a API.
 
-**16 suítes de integração**, sem um único teste unitário e sem nada mockado. A última contagem
-registrada é **732 testes**, no fim da leva 7.
+**15 suítes de integração**, sem um único teste unitário e sem nada mockado. A última contagem
+registrada é **811 testes**, no fim da leva 10 — eram 732 no fim da 7. A décima sexta suíte não
+foi apagada por descuido: `Budgets.test.ts` morreu com a tabela que ela cobria, na etapa 9 da
+leva 9 (`bedb31b`), quando o teto perene virou a repartição do mês e o que restou dela passou a
+ser coberto por `BudgetPeriods.test.ts`.
 
 ### Front — cinco levas, todas fechadas
 
 **16 telas**, todas respondendo em 390px, todas ligadas na API de verdade — mais as três que a
-leva 7 acrescentou, que não consomem rota nenhuma: `/termos`, `/privacidade` e a de 404.
+leva 7 acrescentou, que não consomem rota nenhuma: `/termos`, `/privacidade` e a de 404. A leva 9
+somou a do orçamento e a da fatura, e a 10 somou `/bem-vindo`, o assistente dos primeiros passos.
 
 | Leva | O que entregou | Estado |
 | --- | --- | --- |
@@ -141,6 +145,43 @@ indicadores voltaram a somar a mesma coisa, e o vermelho de atraso passou a olha
 a categoria global acabou, cada espaço tem as suas treze e pode arquivar e reordenar; o cadastro
 por convite chega com o e-mail preenchido e travado; o rateio de pessoas nasce dividido; e o app
 ganhou **tema escuro**, com "sistema" por padrão e o carimbo antes da primeira pintura.
+
+### Leva 10 — o segundo retorno, e a porta de entrada, fechada em 24/09
+
+**9 de 9 etapas**, escritas em 23/09 e executadas entre 23 e 24/09:
+[Levas/10. O segundo retorno, e a porta de entrada](Levas/10.%20O%20segundo%20retorno,%20e%20a%20porta%20de%20entrada.md).
+Ela é o segundo retorno de uso, e o que a separa da 9 é o que cada uma faz com o modelo: a 9
+**trocou** dois, com migration que recalculou perna gravada; a 10 tem uma migration só, e ela
+**apaga**.
+
+**O rateio da renda entre pessoas saiu do produto**, e `InflowPersons` foi dropada. Ele era o
+rascunho de "de quem é esse dinheiro" de uma época em que o orçamento era um teto perene por
+categoria e não sabia responder isso; a leva 9 fez o orçamento **ser** a repartição da renda do
+mês, e manter os dois é manter duas respostas para a mesma pergunta que nada obriga a concordar.
+Uma renda tem descrição, valor, as duas datas, a conta em que cai e a observação. Com o eixo
+saiu também o que ele custava: a coluna "Destino" obrigava um `GET /Inflows/:id` **por entrada
+do mês**, e o clone do mês anterior fazia o mesmo por linha escolhida — a tela de Renda de um mês
+de oito entradas abria com nove requisições e agora abre com uma.
+
+**O produto ganhou porta de entrada.** `/bem-vindo` é uma tela de quatro passos — conta, cartão,
+pessoas, renda — que o cadastro abre no lugar do Início, na ordem que a API impõe: sem conta não
+há onde lançar nada, porque é o cadastro dela que cria as formas de pagamento; o cartão é o único
+método que não nasce junto; e orçar é repartir a renda, então a renda vem antes. **Nada é
+guardado para saber se o assistente já passou** — sem coluna e sem bandeira no navegador: quem
+tem zero contas vê um botão de retomada no Início, derivado como o `Balance` e o `Spent`. Quem
+entra por convite não passa pelo assistente, porque o espaço dele já está montado.
+
+**O orçamento passou a responder antes de gravar.** `POST /BudgetPeriods/preview` é o corpo do
+`allocate` sem os valores, e responde com o mesmo `BudgetSpent` que o `GET` do mês usa: o
+comprometido de um alvo que **ainda não existe** — que era o número que faltava exatamente no
+momento em que ele decide o valor a digitar. Nada da regra de casamento foi para o navegador.
+
+O resto: o vermelho de texto ganhou `--neg-ink` e saiu de 3,41:1 no pior caso para 4,67:1 no
+claro e 5,33:1 no escuro (o `--neg` continua sendo preenchimento, que não inverte); a marca do
+Pix inverte no tema escuro por token, em vez de um segundo arquivo; a lista de Gastos passou a
+ter ordem dentro de cada grupo; as categorias se reordenam **arrastando pela alça**, com as setas
+virando o teclado dela; a biometria saiu do desktop; e o rateio do gasto voltou a mostrar a
+pessoa arquivada que ele já aponta, em vez de uma linha em branco que recusa ao salvar.
 
 ---
 
@@ -265,8 +306,8 @@ biometria) ao lado de **duas trocas de modelo**
 por alvo e vira uma repartição da renda do mês, com a pessoa e a categoria na mesma linha. As
 duas são migration sobre dado de produção, e é isso que define o tamanho da leva.
 
-**A 10 foi escrita em 23/09, no mesmo dia em que a 9 fechou e foi validada no ar, e está em
-execução** — 9 etapas, das quais duas tocam a API. Ela é o **segundo** retorno de uso, e o que a
+**A 10 foi escrita em 23/09, no mesmo dia em que a 9 fechou e foi validada no ar, e fechou em
+24/09** — 9 de 9 etapas, das quais duas tocam a API. Ela é o **segundo** retorno de uso, e o que a
 separa da 9 é o que cada uma faz com o modelo: a 9 **trocou** dois, com migration que recalculou
 perna já gravada; a 10 tem uma migration só, e ela **apaga**. O **rateio da renda entre pessoas
 sai do produto**: ele era o rascunho de "de quem é esse dinheiro" de uma época em que o

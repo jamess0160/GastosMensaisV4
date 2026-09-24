@@ -182,7 +182,14 @@ src/pages/Login/
 src/test/
     setup.ts                   fuso fixado + ciclo do MSW
     server.ts                  servidor de mentira, sem handler por padrão
+    navigator.ts               forja o navigator, e o RESTAURA (não é teste)
 ```
+
+O `navigator.ts` existe por um detalhe que morde calado: `userAgent`, `platform` e
+`maxTouchPoints` são **getters do protótipo** no jsdom, então atribuir por cima não faz nada — e
+as suítes rodam no mesmo processo, então quem forja e não restaura vaza o aparelho falso para as
+outras. Ele guarda o descritor original de cada chave e o devolve no `afterEach`; onde não havia
+propriedade própria, apaga a que criou.
 
 O que é coberto: `src/lib/` (dinheiro e datas), as `sections/` de cada página e o interceptor
 de erro do client. O que **não** é: marcação, snapshots e as primitivas visuais — teste de
@@ -223,8 +230,9 @@ o usuário veria o texto genérico no lugar da frase do servidor. Quem desempaco
 
 | Tela | Rota | Estado |
 |---|---|---|
-| Login | `/login` | senha, biometria, convite de passkey, "manter conectado por 30 dias" |
-| Criar conta | `/cadastro` | com login logo depois do `POST /Users` |
+| Login | `/login` | senha, "manter conectado por 30 dias" e — **só em aparelho móvel** — a biometria e o convite de passkey (`src/lib/device.ts`) |
+| Criar conta | `/cadastro` | com login logo depois do `POST /Users`, e daí para `/bem-vindo` — menos quem veio de convite, que cai no Início |
+| Primeiros passos | `/bem-vindo` | conta → cartão → pessoas → renda, a ordem que a API impõe. Fora do menu: a porta é o cadastro, e a retomada é o botão que o Início mostra enquanto o espaço tem zero contas |
 | Convite | `/convite/:hash` | pública |
 | Esqueci a senha | `/esqueci-senha` | pública, com contador de 2 min no botão |
 | Criar senha nova | `/recuperar-senha` | pública, lê o `?Token=` do link do e-mail |
@@ -232,7 +240,7 @@ o usuário veria o texto genérico no lugar da frase do servidor. Quem desempaco
 | Início | `/` | indicadores vindos de `GET /Reports/Month`, com o bloco de orçamento **em leitura** — decidir é no Orçamento |
 | Gastos | `/gastos` | lista **por perna** (a parcela, não a compra), detalhe, quitação da perna, série, cancelamento |
 | Adicionar / editar gasto | `/gastos/novo`, `/gastos/:id/editar` | mesma página, em modal |
-| Renda | `/renda` | entrada, transferência, e clonar o mês anterior |
+| Renda | `/renda` | entrada, transferência, e clonar o mês anterior. **Sem rateio entre pessoas desde a leva 10** — quem responde "de quem é esse dinheiro" é o Orçamento |
 | Orçamento | `/orcamento` | a renda do mês no topo, o rateio dela em fatias de pessoa e/ou categoria — com o comprometido de cada alvo **em prévia, antes de salvar** (`POST /BudgetPeriods/preview`) —, "distribuir o que sobra", o clone do mês anterior e o "fora do orçamento" |
 | Contas | `/contas` | contas e cartões, com seletor de mês; o card do cartão mostra a fatura aberta e linka para ela |
 | Fatura | `/contas/fatura/:idPaymentMethod` | um ciclo por vez, com navegação própria — a fatura **não é um mês** e não segue o seletor do chassi —, o que já está nela, o previsto, os próximos vencimentos e a quitação |
