@@ -1,5 +1,6 @@
 import { HttpResponse, http as msw } from "msw";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { restoreNavigator, stubMobileNavigator } from "@/test/navigator";
 import { server } from "@/test/server";
 import { submitLogin } from "../sections/submitLogin";
 import { fakeLoginContext } from "./context";
@@ -15,6 +16,12 @@ const deviceAlreadyAnswered = () =>
     server.use(msw.get(checkDevice, () => HttpResponse.json({ UseAuth: false })));
 
 describe("submitLogin", () => {
+    /* O convite é só de aparelho móvel, e o jsdom anuncia um desktop:
+       sem forjar o aparelho, a consulta do `checkDevice` nem sairia e
+       estes testes descreveriam o gate, não o login. */
+    beforeEach(stubMobileNavigator);
+    afterEach(restoreNavigator);
+
     beforeEach(deviceAlreadyAnswered);
 
     it("entra quando a credencial está certa", async () => {
@@ -105,6 +112,9 @@ describe("submitLogin", () => {
 describe("submitLogin · convite de biometria", () => {
     const loginOk = () => server.use(msw.post(route, () => HttpResponse.json({ msg: "ok" })));
 
+    beforeEach(stubMobileNavigator);
+    afterEach(restoreNavigator);
+
     it("convida quando o aparelho nunca foi perguntado", async () => {
         loginOk();
         server.use(msw.get(checkDevice, () => HttpResponse.json({ UseAuth: null })));
@@ -163,5 +173,31 @@ describe("submitLogin · convite de biometria", () => {
 
         expect(context.finishSignIn).toHaveBeenCalledOnce();
         expect(context.setInviteBiometrics).not.toHaveBeenCalled();
+    });
+});
+
+/* Sem `stubMobileNavigator` nenhum: o aparelho do jsdom é o desktop. */
+describe("submitLogin · no desktop", () => {
+    it("entra sem consultar o aparelho e sem convidar", async () => {
+        /* O `checkDevice` responderia "nunca perguntei", que é o único
+           caminho que convida — e mesmo assim ele não é chamado. O
+           handler espiona em vez de faltar porque a consulta tem o erro
+           engolido: sem handler, ela sairia, falharia e o teste
+           continuaria verde sem o gate. */
+        const asked = vi.fn();
+        server.use(msw.post(route, () => HttpResponse.json({ msg: "ok" })));
+        server.use(
+            msw.get(checkDevice, () => {
+                asked();
+                return HttpResponse.json({ UseAuth: null });
+            }),
+        );
+        const context = fakeLoginContext();
+
+        await submitLogin(context);
+
+        expect(asked).not.toHaveBeenCalled();
+        expect(context.setInviteBiometrics).not.toHaveBeenCalled();
+        expect(context.finishSignIn).toHaveBeenCalledOnce();
     });
 });

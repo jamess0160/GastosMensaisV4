@@ -1,5 +1,6 @@
 import { HttpResponse, http as msw } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { restoreNavigator, stubMobileNavigator } from "@/test/navigator";
 import { server } from "@/test/server";
 import { loadBiometricsAvailability } from "../sections/loadBiometricsAvailability";
 import { fakeLoginContext } from "./context";
@@ -7,6 +8,12 @@ import { fakeLoginContext } from "./context";
 const route = "*/api/UsersAuth/checkDevice/DeviceKey=:deviceKey";
 
 describe("loadBiometricsAvailability", () => {
+    /* A oferta de biometria é só de aparelho móvel, e o jsdom anuncia um
+       desktop: sem forjar o aparelho, todo teste daqui descreveria o gate
+       do desktop em vez do tri-estado do `checkDevice`. */
+    beforeEach(stubMobileNavigator);
+    afterEach(restoreNavigator);
+
     // O checkDevice é tri-estado, e os três casos levam a telas diferentes.
     it("oferece biometria quando há passkey neste aparelho", async () => {
         server.use(msw.get(route, () => HttpResponse.json({ UseAuth: true })));
@@ -53,5 +60,30 @@ describe("loadBiometricsAvailability", () => {
         await expect(loadBiometricsAvailability(context)).resolves.toBeUndefined();
 
         expect(context.setOfferBiometrics).toHaveBeenCalledWith(false);
+    });
+});
+
+/* Sem `stubMobileNavigator` nenhum: o aparelho do jsdom é o desktop, que
+   é exatamente o caso desta suíte. */
+describe("loadBiometricsAvailability · no desktop", () => {
+    it("não consulta o aparelho nem oferece biometria", async () => {
+        /* O handler existe e ESPIONA: o aparelho tem DeviceKey e a
+           resposta seria a que mais oferece biometria. O que se afirma é
+           que a requisição não sai — e ela é espionada em vez de omitida
+           porque a section engole o erro da consulta, então um handler
+           ausente passaria despercebido por ela. */
+        const asked = vi.fn();
+        server.use(
+            msw.get(route, () => {
+                asked();
+                return HttpResponse.json({ UseAuth: true });
+            }),
+        );
+        const context = fakeLoginContext();
+
+        await loadBiometricsAvailability(context);
+
+        expect(asked).not.toHaveBeenCalled();
+        expect(context.setOfferBiometrics).not.toHaveBeenCalled();
     });
 });

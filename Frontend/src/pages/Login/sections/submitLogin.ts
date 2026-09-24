@@ -1,10 +1,16 @@
 import { errorMessage } from "@/api/client";
 import { UsersConnection } from "@/api/Users.connection";
 import { UsersAuthConnection } from "@/api/UsersAuth.connection";
+import { isMobileDevice } from "@/lib/device";
 import type { LoginContext } from "../controller";
 
-/** O convite de biometria só aparece quando este aparelho nunca foi
- *  perguntado.
+/** O convite de biometria só aparece em aparelho móvel, e lá só quando
+ *  este aparelho nunca foi perguntado.
+ *
+ *  O gate do aparelho vem PRIMEIRO, e é o mesmo do botão "Entrar com
+ *  biometria": no desktop o convite nunca foi decisão de produto, foi o
+ *  WebAuthn oferecendo autenticador de plataforma em qualquer lugar. Ele
+ *  grava credencial de verdade, então não se convida onde não se oferece.
  *
  *  `checkDevice` é tri-estado: `true` já tem passkey aqui (e o botão de
  *  biometria já apareceu antes do login), `false` é recusa registrada, e
@@ -14,6 +20,7 @@ import type { LoginContext } from "../controller";
  *  Falhar a consulta não pode segurar quem acabou de entrar, então o
  *  erro é engolido: na dúvida, não convida. */
 async function shouldInviteBiometrics(deviceKey: string | null): Promise<boolean> {
+    if (!isMobileDevice()) return false;
     if (!deviceKey) return true;
 
     try {
