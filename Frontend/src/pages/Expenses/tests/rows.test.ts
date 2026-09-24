@@ -4,6 +4,7 @@ import {
     isLegOverdue,
     legMatches,
     legStatus,
+    sortLegs,
     type LegFilters,
 } from "../src/rows";
 import { paymentLegs, totalSpent, type ExpenseLeg } from "@/lib/aggregate";
@@ -230,5 +231,142 @@ describe("installmentLabel", () => {
         const [avulso] = paymentLegs([aLegRow(anExpense())]);
 
         expect(installmentLabel(avulso.payment)).toBeNull();
+    });
+});
+
+describe("sortLegs", () => {
+    /** Uma perna com o que a ordenação lê: a descrição e a
+     *  `ExpenseDate`. O `IdExpense` só existe para que duas pernas de
+     *  mesmo nome não sejam a mesma compra. */
+    let nextId = 100;
+    const aLeg = (
+        Description: string,
+        ExpenseDate: ApiTypes.CalendarDate,
+        payment: Partial<ApiTypes.ExpensePayment> = {},
+    ): ExpenseLeg =>
+        paymentLegs([
+            aLegRow(anExpense({ IdExpense: ++nextId, Description, ExpenseDate }), payment),
+        ])[0];
+
+    const descriptions = (legs: readonly ExpenseLeg[]) =>
+        legs.map((leg) => leg.expense.Description);
+
+    describe("Fixos e Parcelados: descrição, desempatando pelo dia do mês", () => {
+        it("ordena com acento no lugar certo, e não pelo code point", () => {
+            /* Com `<` entre strings, "Água" sairia DEPOIS de "Zoológico"
+               — o code point de `Á` é maior que o de `Z`. */
+            const fixos = [
+                aLeg("Zoológico", "2026-09-10"),
+                aLeg("Água", "2026-09-15"),
+                aLeg("Energia", "2026-09-12"),
+            ];
+
+            expect(descriptions(sortLegs("fixed", fixos))).toEqual([
+                "Água",
+                "Energia",
+                "Zoológico",
+            ]);
+        });
+
+        it("a caixa não decide: 'internet' vem antes de 'Zelador'", () => {
+            const fixos = [aLeg("Zelador", "2026-09-05"), aLeg("internet", "2026-09-20")];
+
+            expect(descriptions(sortLegs("fixed", fixos))).toEqual(["internet", "Zelador"]);
+        });
+
+        it("nomes iguais saem do menor dia do mês para o maior", () => {
+            const fixos = [aLeg("Aluguel", "2026-09-20"), aLeg("Aluguel", "2026-09-05")];
+
+            expect(sortLegs("fixed", fixos).map((leg) => leg.expense.ExpenseDate)).toEqual([
+                "2026-09-05",
+                "2026-09-20",
+            ]);
+        });
+
+        it("o desempate é a ExpenseDate, não a CashDate da fatura", () => {
+            /* Dois fixos no MESMO cartão: a `CashDate` é o vencimento da
+               fatura, igual nos dois — desempatar por ela empilharia os
+               dois no mesmo dia e deixaria a ordem ao acaso. */
+            const naFatura = {
+                DueDate: "2026-10-04",
+                CompetenceDate: "2026-09-01",
+                CashDate: "2026-10-04",
+            } as const;
+            const fixos = [
+                aLeg("Streaming", "2026-09-22", naFatura),
+                aLeg("Streaming", "2026-09-03", naFatura),
+            ];
+
+            const ordenados = sortLegs("fixed", fixos);
+
+            expect(ordenados.map((leg) => leg.payment.CashDate)).toEqual([
+                "2026-10-04",
+                "2026-10-04",
+            ]);
+            expect(ordenados.map((leg) => leg.expense.ExpenseDate)).toEqual([
+                "2026-09-03",
+                "2026-09-22",
+            ]);
+        });
+
+        it("Parcelados seguem a mesma chave dos Fixos", () => {
+            const parcelados = [
+                aLeg("Televisão", "2026-09-04"),
+                aLeg("Ar-condicionado", "2026-09-28"),
+                aLeg("Ar-condicionado", "2026-09-07"),
+            ];
+
+            expect(
+                sortLegs("installment", parcelados).map((leg) => [
+                    leg.expense.Description,
+                    leg.expense.ExpenseDate,
+                ]),
+            ).toEqual([
+                ["Ar-condicionado", "2026-09-07"],
+                ["Ar-condicionado", "2026-09-28"],
+                ["Televisão", "2026-09-04"],
+            ]);
+        });
+    });
+
+    describe("Avulsos: data do gasto, desempatando pela descrição", () => {
+        it("sai do primeiro dia do mês para o último", () => {
+            const avulsos = [
+                aLeg("Farmácia", "2026-09-21"),
+                aLeg("Padaria", "2026-09-02"),
+                aLeg("Mercado", "2026-09-13"),
+            ];
+
+            expect(descriptions(sortLegs("single", avulsos))).toEqual([
+                "Padaria",
+                "Mercado",
+                "Farmácia",
+            ]);
+        });
+
+        it("dois do mesmo dia saem em ordem alfabética, com acento no lugar certo", () => {
+            const avulsos = [
+                aLeg("Zoológico", "2026-09-09"),
+                aLeg("Água", "2026-09-09"),
+                aLeg("padaria", "2026-09-09"),
+            ];
+
+            expect(descriptions(sortLegs("single", avulsos))).toEqual([
+                "Água",
+                "padaria",
+                "Zoológico",
+            ]);
+        });
+    });
+
+    it("não mexe na lista que recebeu, e não tira nem acrescenta perna", () => {
+        const avulsos = [aLeg("Padaria", "2026-09-20"), aLeg("Mercado", "2026-09-02")];
+
+        const ordenados = sortLegs("single", avulsos);
+
+        expect(descriptions(avulsos)).toEqual(["Padaria", "Mercado"]);
+        // Ordenar não soma nada: a mesma lista, o mesmo total.
+        expect(ordenados).toHaveLength(2);
+        expect(totalSpent(ordenados)).toBe(totalSpent(avulsos));
     });
 });

@@ -14,7 +14,14 @@ import {
     usePaymentMethods,
 } from "@/data/catalogs";
 import { useExpenseDetail, useInvalidateMovement, useMonthLegs } from "@/data/month";
-import { installmentLabel, isLegOverdue, legMatches, legStatus, type LegFilters } from "./src/rows";
+import {
+    installmentLabel,
+    isLegOverdue,
+    legMatches,
+    legStatus,
+    sortLegs,
+    type LegFilters,
+} from "./src/rows";
 import { Avatar, Badge, Button, Card, Chip, PageHead, Workspace as Page } from "@/ui/primitives";
 import { HideOnMobile, Topbar } from "@/ui/topbar";
 import {
@@ -219,11 +226,19 @@ export function Expenses() {
         [monthLegs.allLegs, filters],
     );
 
+    /* O grupo tem ordem FIXA dentro dele, e `sortLegs` é quem a sabe:
+       depois do filtro e antes de agrupar. A tabela do desktop e a lista
+       de cards do mobile leem este mesmo `grouped`, que é o que impede
+       as duas de divergirem — e nenhum total muda, porque a faixa de
+       indicadores soma `legs`, que sai de `rows`. */
     const grouped = useMemo(
         () =>
             KIND_ORDER.map((groupKind) => ({
                 kind: groupKind,
-                items: rows.filter((leg) => leg.expense.Kind === groupKind),
+                items: sortLegs(
+                    groupKind,
+                    rows.filter((leg) => leg.expense.Kind === groupKind),
+                ),
             })).filter((group) => group.items.length > 0),
         [rows],
     );

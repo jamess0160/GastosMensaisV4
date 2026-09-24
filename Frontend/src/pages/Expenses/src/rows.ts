@@ -12,8 +12,10 @@ import type { ApiTypes } from "@/types/api";
    indicadores da MESMA tela já somava a parcela: o mês dizia
    "Total: 1.340" com uma tabela que somava 1.240.
 
-   Três perguntas, e as três mudam de resposta quando a unidade muda.
-   Ficam aqui, sem React, porque é o que dá para testar sem montar tela.
+   Três perguntas mudam de resposta quando a unidade muda, e uma quarta
+   — em que ORDEM as pernas de um grupo saem — mora aqui pelo mesmo
+   motivo que elas: sem React, porque é o que dá para testar sem montar
+   tela.
    ════════════════════════════════════════════════════════════ */
 
 /** O estado da PARCELA, não o da compra.
@@ -95,4 +97,64 @@ export function legMatches(leg: ExpenseLeg, filters: LegFilters): boolean {
     if (term && !leg.expense.Description.toLowerCase().includes(term)) return false;
 
     return true;
+}
+
+/* ── A ordem dentro do grupo ───────────────────────────────── */
+
+/** O collator do português, instanciado UMA vez.
+ *
+ *  Ordem alfabética aqui não é `<` entre strings: com a comparação crua
+ *  "Água" sai depois de "Zoológico" (o code point de `Á` é maior que o
+ *  de `Z`) e "internet" depois de "Zelador". `Intl.Collator("pt-BR")`
+ *  resolve acento e caixa, e construí-lo é caro — um por comparação é o
+ *  custo real desta escolha, num `sort` que roda a cada digitada no
+ *  filtro. */
+const collator = new Intl.Collator("pt-BR");
+
+const byDescription = (a: ExpenseLeg, b: ExpenseLeg): number =>
+    collator.compare(a.expense.Description, b.expense.Description);
+
+/** A `ExpenseDate`, e nunca a `CashDate`.
+ *
+ *  Num gasto fixo a `ExpenseDate` da ocorrência é o dia da recorrência
+ *  naquele mês — o dia que o usuário escolheu. A `CashDate` de um fixo
+ *  no cartão é o vencimento da FATURA, igual para todo fixo daquele
+ *  cartão: desempatar por ela empilharia todos no mesmo dia. E é a
+ *  `ExpenseDate` que a coluna da tabela mostra.
+ *
+ *  É string `"YYYY-MM-DD"`, então comparar a string inteira já ordena
+ *  por data e os dois últimos caracteres são o dia do mês — converter
+ *  para `Date` é o erro que o `CLAUDE.md` da raiz explica. */
+const expenseDate = (leg: ExpenseLeg): ApiTypes.CalendarDate => leg.expense.ExpenseDate;
+
+const compareText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+const byExpenseDate = (a: ExpenseLeg, b: ExpenseLeg): number =>
+    compareText(expenseDate(a), expenseDate(b));
+
+const byDayOfMonth = (a: ExpenseLeg, b: ExpenseLeg): number =>
+    compareText(expenseDate(a).slice(8), expenseDate(b).slice(8));
+
+/** A ordem de um grupo da lista, e o grupo é que decide a chave.
+ *
+ *  | Grupo | Primária | Desempate |
+ *  |---|---|---|
+ *  | Fixos | descrição | dia do mês |
+ *  | Parcelados | descrição | dia do mês |
+ *  | Avulsos | data do gasto | descrição |
+ *
+ *  O fixo e o parcelado são a MESMA linha todo mês — "Aluguel",
+ *  "Geladeira 3/6" —, e o que se faz com eles é procurar um nome numa
+ *  lista conhecida: alfabética é a ordem de quem procura. O avulso é o
+ *  contrário: é o que aconteceu no mês, cada linha uma vez só, e a
+ *  pergunta é "o que eu gastei" na ordem em que gastei.
+ *
+ *  Não há seletor de ordenação na tela, e a tabela do desktop e os
+ *  cards do mobile chamam ESTA função — é o que impede as duas de
+ *  divergirem. Ordenar não soma nada: nenhum total muda. */
+export function sortLegs(kind: ApiTypes.ExpenseKind, legs: readonly ExpenseLeg[]): ExpenseLeg[] {
+    const [primary, tiebreak] =
+        kind === "single" ? [byExpenseDate, byDescription] : [byDescription, byDayOfMonth];
+
+    return [...legs].sort((a, b) => primary(a, b) || tiebreak(a, b));
 }
