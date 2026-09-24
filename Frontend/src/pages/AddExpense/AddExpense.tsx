@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { AddExpenseController, type AddExpenseContext, type ExpenseDraft } from "./controller";
 import { validateExpense } from "./sections/submitExpense";
-import { useCategories, usePaymentMethods, usePersons } from "@/data/catalogs";
+import { useCategoriesWithArchived, usePaymentMethods, usePersons } from "@/data/catalogs";
 import { useInvalidateMovement } from "@/data/month";
 import { Button, Card } from "@/ui/primitives";
 import { FooterSpacer, SlideOver } from "@/ui/overlay";
@@ -28,6 +28,7 @@ import { CategoryIcon } from "@/ui/iconCatalog";
 import { IconAlert, METHOD_ICON } from "@/ui/icons";
 import { EmptyState, LoadingRows } from "@/ui/states";
 import { accentColor, categoryColor } from "@/lib/categoryColor";
+import { withReferencedOptions } from "@/lib/catalogOptions";
 import { formatMoney, splitEvenly, withSignOf } from "@/lib/money";
 import { addMonths, formatDate, formatMonthLabel, today, toReferenceMonth } from "@/lib/date";
 import { clearDraft, readDraft, writeDraft } from "@/lib/draftStorage";
@@ -116,7 +117,19 @@ export function AddExpense() {
        o painel inteiro no caso comum de uma forma só. */
     const [splitPayments, setSplitPayments] = useState(false);
 
-    const categories = useCategories();
+    /* **A lista COM as arquivadas, e não a de escolha.** Quem oferece o
+       que escolher é o `withReferencedOptions` lá embaixo, que filtra o
+       ativo daqui — a arquivada só chega à tela se este gasto já apontar
+       para ela. Isso não contraria o aviso de `catalogs.ts` (abrir a
+       Personalização não pode devolver a arquivada ao seletor e ao donut):
+       o que este formulário não pode é OFERECÊ-LA, e ele não oferece.
+       Custa a entrada de cache própria — a mesma da Personalização, com
+       `staleTime` de catálogo —, e é o único jeito de saber o NOME de uma
+       categoria arquivada: o `GET /Expenses/:id` traz só `IdCategory`. */
+    const categories = useCategoriesWithArchived();
+    /* `usePersons` já devolve as arquivadas junto: quem filtra `Active` é
+       cada tela. Aqui o dado já estava carregado, e era só parar de
+       descartá-lo. */
     const persons = usePersons();
     const methods = usePaymentMethods();
     const invalidateMovement = useInvalidateMovement();
@@ -278,10 +291,29 @@ export function AddExpense() {
        cartão: ver `acceptsRefund`. */
     const amountField = useMoneyField(draft.TotalValue, setTotal, acceptsRefund(draft));
 
-    const activeCategories = (categories.data ?? []).filter((item) => item.Active);
-    const activePersons = (persons.data ?? []).filter((person) => person.Active);
+    /* Os dois seletores oferecem o CADASTRO ATIVO, e mostram além dele o
+       arquivado que este gasto já aponta — ver `withReferencedOptions`.
+       Sem isso a linha do arquivado aparece em branco com o valor
+       preenchido, e salvar a descrição leva 406 por uma escolha que quem
+       está editando nem enxerga. */
+    const allCategories = categories.data ?? [];
+    const allPersons = persons.data ?? [];
 
-    const category = activeCategories.find((item) => item.IdCategory === draft.IdCategory);
+    const categoryOptions = withReferencedOptions(
+        allCategories.filter((item) => item.Active),
+        allCategories,
+        [draft.IdCategory],
+        { id: (item) => item.IdCategory, label: (item) => item.Description },
+    );
+
+    const personOptions = withReferencedOptions(
+        allPersons.filter((person) => person.Active),
+        allPersons,
+        draft.persons.map((line) => line.id),
+        { id: (person) => person.IdPerson, label: (person) => person.Name },
+    );
+
+    const category = categoryOptions.find((option) => option.id === draft.IdCategory);
     const chosenMethod = methods.find(({ method }) => method.IdPaymentMethod === singlePayment.id);
     /* `Paid: true` com forma `credit_card` é 406: no cartão, marcar a
        compra como paga não tira dinheiro de conta nenhuma — quem tira é
@@ -529,10 +561,7 @@ export function AddExpense() {
                         label="De quem é o custo"
                         optionLabel="Pessoa"
                         addLabel="Adicionar pessoa"
-                        options={activePersons.map((person) => ({
-                            id: person.IdPerson,
-                            label: person.Name,
-                        }))}
+                        options={personOptions}
                         lines={draft.persons}
                         onChange={(next) => patch({ persons: next })}
                         total={draft.TotalValue}
@@ -552,11 +581,11 @@ export function AddExpense() {
                             id="expense-category"
                             value={draft.IdCategory}
                             onChange={(IdCategory) => patch({ IdCategory })}
-                            options={activeCategories.map((item) => ({
-                                value: item.IdCategory,
-                                label: item.Description,
-                                icon: <CategoryIcon iconKey={item.IconKey} />,
-                                color: categoryColor(item),
+                            options={categoryOptions.map((option) => ({
+                                value: option.id,
+                                label: option.label,
+                                icon: <CategoryIcon iconKey={option.item.IconKey} />,
+                                color: categoryColor(option.item),
                             }))}
                             emptyLabel="Nenhuma categoria ativa"
                         />
@@ -718,12 +747,12 @@ export function AddExpense() {
                         )}
                         {usableLines(draft.persons).map((line) => (
                             <span className={styles.chip} key={line.id}>
-                                {activePersons.find((person) => person.IdPerson === line.id)
-                                    ?.Name ?? "Pessoa"}{" "}
+                                {personOptions.find((option) => option.id === line.id)?.label ??
+                                    "Pessoa"}{" "}
                                 {formatMoney(line.value)}
                             </span>
                         ))}
-                        {category && <span className={styles.chip}>{category.Description}</span>}
+                        {category && <span className={styles.chip}>{category.label}</span>}
                         {chosenMethod && (
                             <span className={styles.chip}>
                                 {chosenMethod.account.Name} · {chosenMethod.method.Name}
