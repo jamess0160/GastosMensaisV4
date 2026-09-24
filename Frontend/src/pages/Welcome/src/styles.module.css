@@ -1,0 +1,247 @@
+/* O assistente dos primeiros passos.
+
+   Coluna única e estreita, centrada — como a tela do Espaço. Um passo
+   por vez, e nada na coluna da direita: alinhar à esquerda deixaria
+   metade da largura vazia, e um campo de nome com 1200px não é melhor,
+   é só maior.
+
+   Toda cor vem de token. O vermelho de TEXTO é o `--neg-ink`, e não o
+   `--neg` — este é preenchimento e borda. */
+
+.head,
+.shell {
+    width: 100%;
+    max-width: 680px;
+    margin: 0 auto;
+}
+
+.shell {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ── A trilha ─────────────────────────────────────────────── */
+
+/* Ela não é navegação: nenhum item é clicável, porque cada passo grava
+   ao avançar e não há para onde voltar. Ela diz quantos faltam, que é a
+   pergunta que um assistente sem fim à vista deixa sem resposta.
+
+   `flex-wrap` e não rolagem horizontal: a 390px os quatro nomes viram
+   duas linhas, que é legível — uma faixa que rola esconde justamente a
+   contagem que a trilha existe para mostrar. */
+.trail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.trailItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--ink-3);
+}
+
+.trailMark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.trailMark svg {
+    width: 12px;
+    height: 12px;
+}
+
+.trailName {
+    white-space: nowrap;
+}
+
+.trailDone {
+    color: var(--ink-2);
+}
+
+.trailDone .trailMark {
+    background: var(--pos-soft);
+    border-color: var(--pos-soft);
+    color: var(--pos-ink);
+}
+
+.trailNow {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.trailNow .trailMark {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: var(--on-accent);
+}
+
+/* ── O card do passo ──────────────────────────────────────── */
+
+.step {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.stepTitle {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.stepText {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    line-height: 1.6;
+    margin: 6px 0 0;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.note {
+    font-size: 12px;
+    color: var(--ink-2);
+    line-height: 1.6;
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+}
+
+/* Os botões à direita, e o "pular" à esquerda do principal: a ordem de
+   leitura é a de decisão — o que a tela propõe fica por último, que é
+   onde o dedo do polegar chega no mobile. A 390px eles empilham, e o
+   principal fica em cima. */
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 520px) {
+    .actions {
+        flex-direction: column-reverse;
+    }
+
+    .actions > * {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ── As linhas de pessoa ──────────────────────────────────── */
+
+.lines {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.line > :first-child {
+    flex: 1;
+    min-width: 0;
+}
+
+.lineDrop {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    color: var(--ink-2);
+    cursor: pointer;
+}
+
+.lineDrop:hover {
+    border-color: var(--neg);
+    color: var(--neg-ink);
+}
+
+.lineDrop svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ── O painel final ───────────────────────────────────────── */
+
+.summary {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.summaryLine {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink);
+}
+
+.summaryMark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    border-radius: var(--r-pill);
+    background: var(--pos-soft);
+    color: var(--pos-ink);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.summaryMark svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* O que ficou de fora não é erro: é um passo pulado, e o token do
+   vermelho não entra aqui. */
+.summaryOff {
+    color: var(--ink-2);
+}
+
+.summaryOff .summaryMark {
+    background: var(--fill-soft);
+    color: var(--ink-3);
+}

@@ -39,6 +39,7 @@ const Profile = lazy(() => import("@/pages/Profile/Profile").then((m) => ({ defa
 const WorkspaceScreen = lazy(() =>
     import("@/pages/Workspace/Workspace").then((m) => ({ default: m.Workspace })),
 );
+const Welcome = lazy(() => import("@/pages/Welcome/Welcome").then((m) => ({ default: m.Welcome })));
 
 /** O intervalo entre clicar no menu e a tela chegar. Fica em `center`,
  *  a mesma medida do carregamento da sessão, para que a troca de tela
@@ -53,11 +54,22 @@ export interface ScreenRoute {
     element: ReactNode;
 }
 
-/** As 11 telas do chassi — as 8 do layout menos o login, mais o perfil,
- *  o espaço, o extrato, a fatura e o orçamento, que a API pede e o
- *  layout não desenha. */
+/** As 12 telas do chassi — as 8 do layout menos o login, mais o perfil,
+ *  o espaço, o extrato, a fatura, o orçamento e o assistente dos
+ *  primeiros passos, que a API pede e o layout não desenha. */
 export const SHELL_SCREENS: ScreenRoute[] = [
     { index: true, element: load(<Dashboard />) },
+    /* O ASSISTENTE DOS PRIMEIROS PASSOS, e ele é a única tela do chassi
+       que NÃO está na sidebar nem na tab bar: a porta dele é o cadastro,
+       que navega para cá em vez do Início, e a retomada é o botão que o
+       Início mostra enquanto o espaço não tem conta nenhuma. Um item de
+       menu permanente para uma tela que se visita uma vez ocuparia o
+       lugar das cinco áreas de visita constante.
+
+       Tela do chassi e não modal: quatro passos com formulário cada não
+       cabem num painel de 390px sem rolagem dentro de rolagem, e a
+       sidebar em volta faz parte do que o assistente ensina. */
+    { path: "bem-vindo", element: load(<Welcome />) },
     { path: "gastos", element: load(<Expenses />) },
     { path: "renda", element: load(<Income />) },
     /* O ORÇAMENTO é uma tela sua desde a leva 9, e não mais o painel do

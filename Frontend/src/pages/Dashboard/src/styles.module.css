@@ -456,3 +456,35 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
+
+/* A retomada dos primeiros passos.
+
+   Um bloco e UM botão — não um checklist: o checklist seria uma segunda
+   interface ensinando a mesma ordem que `/bem-vindo` ensina. Ele aparece
+   enquanto o espaço tem zero contas e desaparece sozinho quando a
+   primeira é cadastrada, e por isso não tem botão de dispensar.
+
+   Tom de marca, e não de alerta: não há nada errado — há algo que falta
+   fazer. */
+.resume {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--brand-soft);
+    border-color: var(--brand-tint);
+}
+
+.resumeTitle {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.resumeText {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 4px;
+    line-height: 1.5;
+    max-width: 60ch;
+}

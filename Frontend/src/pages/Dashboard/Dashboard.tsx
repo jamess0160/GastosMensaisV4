@@ -4,7 +4,12 @@ import styles from "./src/styles.module.css";
 import { useMonthScope } from "@/app/monthScope";
 import { useOpenModal } from "@/app/modalRoute";
 import { useSession } from "@/app/session";
-import { useCategoryIndex, usePaymentMethodIndex, usePersonIndex } from "@/data/catalogs";
+import {
+    useAccounts,
+    useCategoryIndex,
+    usePaymentMethodIndex,
+    usePersonIndex,
+} from "@/data/catalogs";
 import { useMonthBudgets, useMonthLegs, useMonthReport } from "@/data/month";
 import { Button, Card, PageHead, Workspace as Page } from "@/ui/primitives";
 import { HideOnMobile, Topbar } from "@/ui/topbar";
@@ -102,11 +107,14 @@ export function Dashboard() {
        ela existia para dizer quantas fatias a cópia traria, e quem monta
        um mês agora está na tela do Orçamento. Uma requisição a menos em
        toda visita ao Início. */
-    /* `useAccounts` continua sendo lido nesta tela — por dentro de
-       `usePaymentMethodIndex`, que é quem dá nome à fatia "Por forma de
-       pagamento". O que saiu foi a leitura DIRETA, que existia só para
-       somar o `totalBalance`: esse número agora é o `CurrentBalance` da
-       rota. Mesma chave de cache, nenhuma requisição a mais. */
+    /* A LEITURA DIRETA DAS CONTAS VOLTOU, e por outro motivo que o
+       antigo: ela existia para somar o `totalBalance`, e esse número
+       agora é o `CurrentBalance` da rota. O que ela responde hoje é se o
+       espaço JÁ FOI MONTADO — ver a faixa de retomada mais abaixo.
+       Continua sem custo: é a mesma entrada de cache que
+       `usePaymentMethodIndex` já buscava por dentro, e não uma
+       requisição a mais. */
+    const accounts = useAccounts();
     const categoryIndex = useCategoryIndex();
     const personIndex = usePersonIndex();
     const methodIndex = usePaymentMethodIndex();
@@ -180,6 +188,25 @@ export function Dashboard() {
 
     const firstName = user.Name.split(/\s+/)[0];
 
+    /* ── A RETOMADA DOS PRIMEIROS PASSOS ─────────────────────
+       Enquanto o espaço tem ZERO contas ele não está montado, e não há
+       onde lançar nem gasto nem renda — é o cadastro da conta que cria
+       as formas de pagamento dela. A rede de segurança é UM BOTÃO para a
+       tela que já ensina a ordem (`/bem-vindo`), e não um checklist:
+       um checklist aqui seria uma segunda interface ensinando a mesma
+       ordem, e as duas divergiriam na primeira mudança de passo.
+
+       **O estado é DERIVADO DO DADO**, como o `Balance` e o `Spent`: o
+       espaço tem conta, ou não tem. Não há coluna `OnboardingCompleted`
+       nem bandeira no `localStorage` — uma segunda fonte para uma
+       pergunta que o dado já responde é a armadilha do saldo em cache
+       numa escala menor. Com uma conta cadastrada o botão desaparece
+       sozinho, e por isso não há o que dispensar.
+
+       Só depois da resposta: mostrá-lo enquanto a lista carrega o faria
+       piscar em toda visita ao Início de quem já tem conta. */
+    const needsOnboarding = accounts.isSuccess && accounts.data.length === 0;
+
     return (
         <>
             <Topbar
@@ -200,6 +227,23 @@ export function Dashboard() {
 
             <Page>
                 <PageHead title={`Início - ${formatMonthLabel(month)}`} />
+
+                {needsOnboarding && (
+                    <Card className={styles.resume}>
+                        <div>
+                            <div className={styles.resumeTitle}>
+                                Seu espaço ainda não tem uma conta
+                            </div>
+                            <div className={styles.resumeText}>
+                                Enquanto ela não existe não há onde lançar gasto nem renda: é o
+                                cadastro da conta que cria as formas de pagamento dela.
+                            </div>
+                        </div>
+                        <Button variant="primary" onClick={() => navigate("/bem-vindo")}>
+                            Continuar os primeiros passos
+                        </Button>
+                    </Card>
+                )}
 
                 {/* ── Faixa principal ──────────────────────────── */}
                 <div className={styles.hero}>

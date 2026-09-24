@@ -76,7 +76,19 @@ export function SignUp() {
             finishSignUp() {
                 setPending(false);
                 queryClient.clear();
-                navigate("/", { replace: true });
+                /* O CADASTRO ABRE O ASSISTENTE, e não o Início: um
+                   espaço recém-nascido só tem as treze categorias, e o
+                   Início dele é uma coluna de estados vazios que sabem
+                   dizer que estão vazios sem dizer qual vem primeiro.
+
+                   **Quem veio de CONVITE vai para o Início**: o espaço
+                   dele já existe, já tem conta e já tem movimento, e um
+                   assistente ali ensinaria a montar o que outra pessoa
+                   montou. O `inviteHash` é o que separa os dois — o
+                   mesmo valor que `submitSignUp` manda como
+                   `InviteHash`, então a tela navega pelo mesmo critério
+                   com que a conta foi criada. */
+                navigate(inviteHash ? "/" : "/bem-vindo", { replace: true });
             },
         }),
         [
