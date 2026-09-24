@@ -396,31 +396,24 @@ export function Expenses() {
                     <div className={styles.cell}>
                         <div className={styles.cellLabel}>Total</div>
                         <div className={styles.cellValue}>{formatMoney(total)}</div>
-                        <div className={styles.cellCaption}>
-                            o que o mês custa, parcela a parcela
-                        </div>
                     </div>
                     <div className={styles.cell}>
                         <div className={styles.cellLabel}>Já pagos</div>
                         <div className={`${styles.cellValue} ${styles.positive}`}>
                             {formatMoney(paid)}
                         </div>
-                        <div className={styles.cellCaption}>já saiu do saldo</div>
                     </div>
                     <div className={`${styles.cell} ${toPay > 0 ? styles.attn : ""}`}>
                         <div className={styles.cellLabel}>A pagar</div>
                         <div className={styles.cellValue}>{formatMoney(toPay)}</div>
-                        <div className={styles.cellCaption}>ainda em aberto neste mês</div>
                     </div>
                     <div className={styles.cell}>
                         <div className={styles.cellLabel}>Fixos</div>
                         <div className={styles.cellValue}>{formatMoney(fixed)}</div>
-                        <div className={styles.cellCaption}>aluguel, assinaturas</div>
                     </div>
                     <div className={styles.cell}>
                         <div className={styles.cellLabel}>Parcelados</div>
                         <div className={styles.cellValue}>{formatMoney(installments)}</div>
-                        <div className={styles.cellCaption}>só a parcela que vence no mês</div>
                     </div>
                 </div>
 

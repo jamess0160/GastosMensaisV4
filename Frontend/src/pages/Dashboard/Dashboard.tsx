@@ -57,7 +57,6 @@ function Breakdown({
             <div className={styles.breakdownHead}>
                 <div>
                     <div className={styles.sectionTitle}>{title}</div>
-                    <div className={styles.breakdownTotal}>{formatMoney(total)}</div>
                 </div>
             </div>
 
@@ -156,7 +155,6 @@ export function Dashboard() {
     const unbudgeted = budgets.data?.Unbudgeted ?? 0;
     const overBudget = periods.filter((period) => budgetState(period) === "over");
     const alerting = periods.filter((period) => budgetState(period) === "alert");
-    const hasPersonBudget = periods.some((period) => period.IdPerson !== null);
 
     /* A régua do cartão principal. Com teto cadastrado ela mede o
        consumo do teto; sem teto nenhum, mede o quanto do que entrou já
@@ -318,18 +316,15 @@ export function Dashboard() {
                         <KpiCard
                             label="Saldo nas contas"
                             value={report.isPending ? "—" : currentBalance}
-                            caption={`Posição em ${formatMonthLabel(month)}. Só o que foi pago, o que está em aberto não entra.`}
                         />
                         <KpiCard
                             label="Faturas em aberto"
                             value={report.isPending ? "—" : openInvoices}
                             tone={openInvoices > 0 ? "neg" : "neutral"}
-                            caption="Compras de cartão que vencem até o fim do mês e ainda não foram pagas."
                         />
                         <KpiCard
                             label="Fixos do mês"
                             value={fixed}
-                            caption="Aluguel, assinaturas e contas gerais."
                             badge={
                                 expenses > 0 ? (
                                     <DeltaPill tone="mute">
@@ -456,23 +451,6 @@ export function Dashboard() {
                                 ))}
                             </div>
 
-                            {/* A conferência que vira chamado se não estiver
-                                escrita: o rateio por pessoa é OPCIONAL no
-                                gasto, então um gasto sem `Persons` não entra
-                                em orçamento de pessoa nenhum. E o mesmo gasto
-                                conta nos dois tipos de teto sem ser dupla
-                                contagem — são duas perguntas sobre o mesmo
-                                dinheiro. O que não se pode é somar os dois. */}
-                            {hasPersonBudget && (
-                                <div className={styles.budgetNote}>
-                                    Os tetos de pessoa somam só o que foi <b>atribuído</b> a alguém,
-                                    e o rateio é opcional no gasto — por isso eles não fecham com o
-                                    total gasto do mês. Um mesmo gasto conta no teto da categoria e
-                                    no da pessoa: são duas perguntas sobre o mesmo dinheiro, e somar
-                                    os dois é que seria contar duas vezes.
-                                </div>
-                            )}
-
                             {/* ── O FORA DO ORÇAMENTO ────────────────
                                 O `Unbudgeted` do mês, e ele só aparece
                                 quando existe: é o gasto que não casou com
@@ -490,10 +468,7 @@ export function Dashboard() {
                                 >
                                     <span className={styles.unbudgetedLabel}>
                                         <IconAlert />
-                                        Fora do orçamento
-                                    </span>
-                                    <span className={styles.unbudgetedValue}>
-                                        {formatMoney(unbudgeted)}
+                                        Foi encontrado {formatMoney(unbudgeted)} em gastos fora do orçamento
                                     </span>
                                 </button>
                             )}

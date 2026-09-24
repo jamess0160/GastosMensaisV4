@@ -301,7 +301,7 @@ export function Workspace() {
             <div className={styles.head}>
                 <PageHead
                     title={workspace.Name}
-                    subtitle={`Onde vivem suas contas, categorias e lançamentos · ${workspaces.length} espaço${workspaces.length === 1 ? "" : "s"} nesta conta`}
+                    subtitle="Onde vivem suas contas, categorias e lançamentos"
                 />
                 <Badge className={styles.headBadge}>
                     {isOwner ? "Você é o dono" : "Você é membro"}
@@ -312,14 +312,6 @@ export function Workspace() {
                 {/* ── O nome ────────────────────────────────── */}
                 <Card>
                     <div className={styles.section}>
-                        <div className={styles.sectionHead}>
-                            <div>
-                                <div className={styles.sectionTitle}>Nome do espaço</div>
-                                <div className={styles.sectionSub}>
-                                    É o que aparece no seletor da barra lateral, em toda tela.
-                                </div>
-                            </div>
-                        </div>
 
                         <FormError>{errors.name}</FormError>
                         <FormNotice>{done.name}</FormNotice>
@@ -676,12 +668,6 @@ export function Workspace() {
                                     })}
                                 </div>
                             )}
-
-                            <div className={styles.note}>
-                                Revogar um convite só impede quem <b>ainda não usou</b> o link. Quem
-                                já entrou aparece em <b>Quem tem acesso</b>, acima, e é lá que se
-                                remove.
-                            </div>
                         </div>
                     </Card>
                 )}

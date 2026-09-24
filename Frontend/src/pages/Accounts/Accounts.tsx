@@ -425,10 +425,6 @@ export function Accounts() {
                                 {formatMoney(balance).replace("R$", "").trim()}
                             </span>
                         </div>
-                        <div className={styles.totalCaption}>
-                            Somando as {active.length} contas até o último dia do mês · o que está
-                            pendente não entra
-                        </div>
                     </Card>
 
                     <Card className={styles.kpi}>

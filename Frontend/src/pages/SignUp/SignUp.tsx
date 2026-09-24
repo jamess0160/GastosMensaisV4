@@ -125,7 +125,7 @@ export function SignUp() {
                 {invite.kind === "valid" && (
                     <div className={styles.notice}>
                         Convite de <b>{invite.inviterName}</b> para <b>{invite.workspaceName}</b>.
-                        Só uma conta com o e-mail convidado entra, então ele já vem preenchido.
+                        Só uma conta com o e-mail convidado pode entrar
                     </div>
                 )}
 
@@ -157,11 +157,6 @@ export function SignUp() {
                     teclado e é ignorado por leitor de tela. */}
                 <FormField
                     label="E-mail"
-                    help={
-                        invite.kind === "valid"
-                            ? "É o endereço do convite, e ele não muda: a matrícula é conferida contra ele."
-                            : undefined
-                    }
                 >
                     {(field) => (
                         <Input

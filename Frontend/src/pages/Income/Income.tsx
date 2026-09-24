@@ -312,19 +312,14 @@ export function Income() {
                         <div className={`${styles.cellValue} ${styles.positive}`}>
                             {formatMoney(received)}
                         </div>
-                        <div className={styles.cellCaption}>já no saldo</div>
                     </div>
                     <div className={`${styles.cell} ${expected > 0 ? styles.attn : ""}`}>
                         <div className={styles.cellLabel}>Pendente</div>
                         <div className={styles.cellValue}>{formatMoney(expected)}</div>
-                        <div className={styles.cellCaption}>previsto, ainda fora do saldo</div>
                     </div>
                     <div className={styles.cell}>
                         <div className={styles.cellLabel}>Transferências</div>
                         <div className={styles.cellValue}>{formatMoney(transferred)}</div>
-                        <div className={styles.cellCaption}>
-                            o que saiu de uma conta e foi para outra
-                        </div>
                     </div>
                 </div>
 
@@ -696,8 +691,8 @@ export function Income() {
                         draft?.IdInflow !== null && draft
                             ? "Editar entrada"
                             : draft?.Kind === "transfer"
-                              ? "Transferir entre contas"
-                              : "Nova entrada"
+                                ? "Transferir entre contas"
+                                : "Nova entrada"
                     }
                     subtitle={
                         draft?.Kind === "transfer"
@@ -743,20 +738,20 @@ export function Income() {
                                                 setDraft((c) =>
                                                     c
                                                         ? {
-                                                              ...c,
-                                                              Kind,
-                                                              // Rateio é proibido em
-                                                              // transferência; a origem só
-                                                              // existe nela.
-                                                              persons:
-                                                                  Kind === "transfer"
-                                                                      ? []
-                                                                      : c.persons,
-                                                              IdFromAccount:
-                                                                  Kind === "transfer"
-                                                                      ? c.IdFromAccount
-                                                                      : null,
-                                                          }
+                                                            ...c,
+                                                            Kind,
+                                                            // Rateio é proibido em
+                                                            // transferência; a origem só
+                                                            // existe nela.
+                                                            persons:
+                                                                Kind === "transfer"
+                                                                    ? []
+                                                                    : c.persons,
+                                                            IdFromAccount:
+                                                                Kind === "transfer"
+                                                                    ? c.IdFromAccount
+                                                                    : null,
+                                                        }
                                                         : c,
                                                 )
                                             }
@@ -810,10 +805,10 @@ export function Income() {
                                                 setDraft((c) =>
                                                     c
                                                         ? {
-                                                              ...c,
-                                                              CompetenceDate:
-                                                                  CompetenceDate ?? today(),
-                                                          }
+                                                            ...c,
+                                                            CompetenceDate:
+                                                                CompetenceDate ?? today(),
+                                                        }
                                                         : c,
                                                 )
                                             }

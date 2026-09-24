@@ -426,7 +426,7 @@ export function Report() {
         <Page>
             <PageHead
                 title="Relatório"
-                subtitle={`${formatDate(range.From)} a ${formatDate(range.To)} · soma de parcelas pela data em que cada uma pesa`}
+                subtitle={`${formatDate(range.From)} a ${formatDate(range.To)}`}
                 actions={
                     /* Este botão exporta O PERÍODO QUE ESTÁ NA TELA, e o
                        item da sidebar exporta o histórico inteiro. São
@@ -567,7 +567,6 @@ export function Report() {
                         <KpiCard
                             label="Gasto no período"
                             value={total}
-                            caption={`${months.length} ${months.length === 1 ? "mês" : "meses"} · soma das parcelas que pesam neles`}
                         />
                         <KpiCard
                             label="Dia mais caro"
@@ -670,10 +669,6 @@ export function Report() {
                         <div className={styles.sectionHead}>
                             <div>
                                 <div className={styles.sectionTitle}>Gastos do período</div>
-                                <div className={styles.sectionSub}>
-                                    Uma linha por parcela, na data em que ela pesa — o mesmo recorte
-                                    que os gráficos desenham.
-                                </div>
                             </div>
                         </div>
 

@@ -378,7 +378,7 @@ export function Settings() {
                                         )}
                                     </FormField>
 
-                                    <FormField label="Ícone" hint="Do catálogo">
+                                    <FormField label="Ícone">
                                         {() => (
                                             <IconPicker
                                                 value={categoryDraft.IconKey}
@@ -391,7 +391,6 @@ export function Settings() {
 
                                     <FormField
                                         label="Cor"
-                                        help="Sem cor própria, a categoria usa a paleta do sistema — e o relatório continua coerente."
                                     >
                                         {() => (
                                             <ColorPicker

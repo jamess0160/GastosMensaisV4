@@ -285,16 +285,6 @@ export function Budget() {
                             )}
                         </span>
                     </div>
-
-                    {/* A renda do mês é competência: a entrada prevista
-                        conta no total contra o qual se reparte. Sem esta
-                        linha o usuário procura de onde saiu um total
-                        maior do que o extrato dele mostra. */}
-                    <div className={styles.incomeNote}>
-                        O total do mês conta o previsto junto com o recebido — é o que permite
-                        repartir o mês antes de ele acabar. Transferência entre as suas contas não
-                        entra: ela não é renda nova.
-                    </div>
                 </Card>
 
                 {loading ? (
@@ -394,7 +384,7 @@ export function Budget() {
                             adicionar, ao lado. */}
                         <SplitEditor
                             label={`Rateio de ${formatMonthLabel(month)}`}
-                            hint="Cada linha é uma fatia da renda. A pessoa, a categoria, ou as duas — “Luana”, “Mercado”, ou “Luana em Mercado”."
+                            hint="Cada linha é uma fatia da renda. A pessoa, a categoria, ou as duas"
                             closure="loose"
                             options={personOptions}
                             optionLabel="Pessoa"
