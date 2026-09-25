@@ -246,7 +246,7 @@ export function Welcome() {
                 {step === 1 && (
                     <StepCard
                         title="Onde seu dinheiro fica"
-                        description="Comece pela conta em que o salário cai. Ela já nasce com pix e débito — e é por isso que ela vem primeiro: sem conta não existe forma de pagamento, e sem forma de pagamento não há onde lançar nada."
+                        description="Começe cadastrando a sua conta principal"
                     >
                         <form
                             className={styles.form}
@@ -275,7 +275,7 @@ export function Welcome() {
                             <FormGrid columns={2}>
                                 <FormField
                                     label="Saldo de hoje"
-                                    help="Quanto há na conta agora. Pode ser negativo — é o cheque especial."
+                                    help="Quanto há na conta agora. Pode ser negativo"
                                 >
                                     {(field) => (
                                         <MoneyInput
@@ -335,7 +335,7 @@ export function Welcome() {
                 {step === 2 && (
                     <StepCard
                         title="Um cartão de crédito"
-                        description="O cartão é a única forma de pagamento que não nasce com a conta. Os dois dias abaixo estão escritos na sua fatura — e é por isso que perguntamos os dois: um dia do mês não se deduz do outro."
+                        description=""
                     >
                         <form
                             className={styles.form}
@@ -413,7 +413,7 @@ export function Welcome() {
 
                 {step === 3 && (
                     <StepCard
-                        title="Quem divide o custo"
+                        title="Com quem você divide os gastos"
                         description="Quem mais aparece nos seus gastos — e depois no orçamento. Uma pessoa por linha; ninguém precisa ter login para estar aqui."
                     >
                         <form
@@ -491,7 +491,7 @@ export function Welcome() {
                 {step === 4 && (
                     <StepCard
                         title="A renda do mês"
-                        description={`O que entra em ${formatMonthLabel(today())}. Ela vem antes do orçamento porque orçar é repartir a renda do mês — repartir antes de lançá-la é repartir zero.`}
+                        description={`O que entra em ${formatMonthLabel(today())}.`}
                     >
                         <form
                             className={styles.form}
