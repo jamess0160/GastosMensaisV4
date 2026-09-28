@@ -1091,6 +1091,108 @@ describe("Expenses", () => {
             expect((await findPayments(afterClosing.IdExpense))[0].CompetenceDate).toBe("2026-10-28")
         })
 
+        //  **O TESTE DA ETAPA 17, e o retorno que a abriu.** Os dois testes acima medem o mês da
+        //  fatura pelo dia em que ela fecha, e isso é certo só porque os dois cartões fecham no
+        //  fim do mês. Num cartão que fecha **dia 3** as duas coisas divergem: a fatura que fecha
+        //  em 03/10 leva as compras de 04/09 a 03/10, 27 dos seus 30 dias são setembro, e chamá-la
+        //  de "outubro" jogava a compra de 05/09 um mês para frente.
+        //
+        //  As duas linhas do 02/09 e do 05/09 são o retorno inteiro: a primeira é da fatura que
+        //  venceu em 10/09, junto com as compras de agosto, e pesa em **agosto**; a segunda é da
+        //  que vence em 10/10 e pesa em **setembro**. Uma fatura pesa num mês só, e é isso que o
+        //  par prova.
+        it("dá o mês das compras, e não o do fechamento, num cartão que fecha dia 3", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { DueDay: 10, ClosingDay: 3, CompetenceMode: "purchase" })
+
+            let competenceOf = async (ExpenseDate: string) => {
+                let created = await createExpense(workspace, { ExpenseDate, Payments: [{ IdPaymentMethod: card, Value: 100 }] })
+
+                return (await findPayments(created.IdExpense))[0].CompetenceDate
+            }
+
+            //  Da fatura que fecha em 03/09 e vence em 10/09 — a das compras de agosto
+            expect(await competenceOf("2026-09-02")).toBe("2026-08-02")
+            //  **No dia do fechamento ainda é daquela fatura**, a mesma convenção do cartão que fecha 30
+            expect(await competenceOf("2026-09-03")).toBe("2026-08-03")
+            //  Da fatura que fecha em 03/10 e vence em 10/10 — a das compras de setembro
+            expect(await competenceOf("2026-09-04")).toBe("2026-09-04")
+            expect(await competenceOf("2026-09-05")).toBe("2026-09-05")
+            //  E o ciclo fecha onde começou: 03/10 ainda é a fatura de setembro
+            expect(await competenceOf("2026-10-03")).toBe("2026-09-03")
+        })
+
+        //  **A borda da metade do mês**, que é o divisor inteiro da regra. O ciclo de quem fecha
+        //  15 é 16/08–15/09, com 16 dias de agosto: a fatura é de agosto. O de quem fecha 16 é
+        //  17/08–16/09, com 16 dias de setembro: ela é de setembro. Um dia no cadastro do cartão,
+        //  e o mês do orçamento inteiro troca.
+        it("vira a âncora do ciclo entre o dia 15 e o dia 16", async () => {
+            let workspace = await buildWorkspace()
+            let early = await createCard(workspace, { DueDay: 25, ClosingDay: 15, CompetenceMode: "purchase" })
+            let late = await createCard(workspace, { DueDay: 26, ClosingDay: 16, CompetenceMode: "purchase" })
+
+            let competenceOf = async (IdPaymentMethod: number, ExpenseDate: string) => {
+                let created = await createExpense(workspace, { ExpenseDate, Payments: [{ IdPaymentMethod, Value: 100 }] })
+
+                return (await findPayments(created.IdExpense))[0].CompetenceDate
+            }
+
+            //  Fecha 15: a fatura que fecha em 15/09 é de agosto, e a de 15/10 é de setembro
+            expect(await competenceOf(early, "2026-09-10")).toBe("2026-08-10")
+            expect(await competenceOf(early, "2026-09-20")).toBe("2026-09-20")
+
+            //  Fecha 16: a fatura que fecha em 16/09 é de setembro
+            expect(await competenceOf(late, "2026-09-10")).toBe("2026-09-10")
+            expect(await competenceOf(late, "2026-09-20")).toBe("2026-10-20")
+        })
+
+        //  **A guarda da alternativa recusada.** Decidir a âncora por `ClosingDay <= DueDay` — o
+        //  `monthShift`, que o modelo já infere — dispensaria o número fixo e acertaria o cartão
+        //  que fecha 3. Só que ela responde outra pergunta: este cartão, que fecha 20 e vence 28,
+        //  cai do MESMO lado daquela comparação, e por aquela regra a compra de 15/09 — que está
+        //  na fatura que fecha 20/09 e é paga em 28/09 — pesaria em agosto. O cartão inteiro
+        //  andaria um mês para trás.
+        it("não mexe no cartão que fecha 20 e vence 28, que fecha na segunda metade do mês", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { DueDay: 28, ClosingDay: 20, CompetenceMode: "purchase" })
+
+            let competenceOf = async (ExpenseDate: string) => {
+                let created = await createExpense(workspace, { ExpenseDate, Payments: [{ IdPaymentMethod: card, Value: 100 }] })
+
+                return (await findPayments(created.IdExpense))[0].CompetenceDate
+            }
+
+            expect(await competenceOf("2026-09-15")).toBe("2026-09-15")
+            expect(await competenceOf("2026-09-25")).toBe("2026-10-25")
+        })
+
+        //  O parcelamento no cartão de fechamento cedo: a âncora entra **uma vez**, no ciclo, e a
+        //  parcela continua andando um mês por vez em cima dele. Sem isso a etapa 17 teria
+        //  desfeito a regra "a parcela pesa 100 por mês" só neste formato de cartão.
+        it("anda uma parcela por mês a partir do ciclo num cartão que fecha dia 3", async () => {
+            let workspace = await buildWorkspace()
+            let card = await createCard(workspace, { DueDay: 10, ClosingDay: 3, CompetenceMode: "purchase" })
+
+            let created = await createExpense(workspace, {
+                TotalValue: 600,
+                ExpenseDate: "2026-09-05",
+                Kind: "installment",
+                InstallmentTotal: 6,
+                Payments: [{ IdPaymentMethod: card, Value: 600 }],
+            })
+
+            let payments = await findPayments(created.IdExpense)
+
+            expect(payments.map((item) => item.CompetenceDate)).toEqual([
+                "2026-09-05", "2026-10-05", "2026-11-05", "2026-12-05", "2027-01-05", "2027-02-05",
+            ])
+
+            //  E o caixa segue a fatura de cada parcela, que não se mexeu nesta etapa
+            expect(payments.map((item) => item.CashDate)).toEqual([
+                "2026-10-10", "2026-11-10", "2026-12-10", "2027-01-10", "2027-02-10", "2027-03-10",
+            ])
+        })
+
         //  **O teste da etapa.** Se 'purchase' significasse simplesmente CompetenceDate =
         //  ExpenseDate, 600 em 6x jogaria 600 inteiros no mês da compra e mataria a regra "a
         //  parcela pesa 100 por mês", que é a razão de o orçamento somar pernas e não gastos.

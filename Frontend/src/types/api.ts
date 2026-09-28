@@ -396,8 +396,17 @@ export namespace ApiTypes {
      *
      *  | Modo | A compra de 20/08 | A compra de 28/09 | 600 em 6× |
      *  |---|---|---|---|
-     *  | `purchase` *(default)* | pesa em **agosto** — o mês em que a fatura dela fecha | pesa em **outubro**: ela passou do fechamento de setembro | 100/mês a partir do mês do ciclo |
+     *  | `purchase` *(default)* | pesa em **agosto** — o mês das compras da fatura dela | pesa em **outubro**: ela passou do fechamento de setembro | 100/mês a partir do mês do ciclo |
      *  | `invoice` | pesa em **setembro**, com o vencimento | pesa em **novembro** | 100/mês a partir do vencimento |
+     *
+     *  **No `purchase`, o mês de uma fatura é aquele em que estão a
+     *  maioria das compras dela, e não o do fechamento** — as duas coisas
+     *  só coincidem quando o fechamento é o fim do mês. Num cartão que
+     *  fecha **3** e vence 10, a fatura que fecha em 03/10 leva as compras
+     *  de 04/09 a 03/10 e pesa em **setembro**; a compra de 05/09 é dela e
+     *  pesa em setembro, e a de 02/09 é da fatura anterior — a que venceu
+     *  em 10/09, com as compras de agosto — e pesa em **agosto**. Ver
+     *  `HALF_MONTH` em `src/lib/card.ts`.
      *
      *  Ele governa a COMPETÊNCIA, nunca o caixa: o `Balance` da conta é
      *  idêntico nos dois modos, porque o dinheiro sai quando a fatura é

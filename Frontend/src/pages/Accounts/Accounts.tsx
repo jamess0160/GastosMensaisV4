@@ -40,7 +40,7 @@ import {
 import { CardList, ItemCard } from "@/ui/cardList";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import { totalBalance } from "@/lib/aggregate";
-import { COMPETENCE_LABEL, MAX_DAY_OF_MONTH, MIN_DAY_OF_MONTH } from "@/lib/card";
+import { closesEarly, COMPETENCE_LABEL, MAX_DAY_OF_MONTH, MIN_DAY_OF_MONTH } from "@/lib/card";
 import { accentColor } from "@/lib/categoryColor";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatMoney } from "@/lib/money";
@@ -1054,13 +1054,22 @@ export function Accounts() {
                             vez do nome do campo: ninguém escolhe entre
                             "competência da compra" e "competência da fatura",
                             mas todo mundo sabe dizer se paga a fatura inteira
-                            todo mês. */}
+                            todo mês.
+
+                            O `purchase` tem DUAS redações porque a frase
+                            concreta muda com o cartão: uma fatura pesa no mês
+                            das compras dela, e num cartão que fecha no começo
+                            do mês essa fatura é a que fecha no mês SEGUINTE.
+                            Uma frase só teria que ser abstrata para ser
+                            verdadeira nos dois, e aí não explicaria nada. */}
                             <FormField
                                 label="Como você usa esse cartão?"
                                 help={
-                                    cardDraft.CompetenceMode === "purchase"
-                                        ? "As compras diminuem o dinheiro que você pode gastar no mês em que a fatura delas fecha. O que você passar depois do dia do fechamento já conta no mês seguinte."
-                                        : "As compras diminuem o dinheiro que você pode gastar no mês em que a fatura delas vence, que é quando você vai pagar por elas."
+                                    cardDraft.CompetenceMode !== "purchase"
+                                        ? "As compras diminuem o dinheiro que você pode gastar no mês em que a fatura delas vence, que é quando você vai pagar por elas."
+                                        : closesEarly(cardDraft.ClosingDay)
+                                          ? "As compras diminuem o dinheiro que você pode gastar no mês em que você as fez. Como este cartão fecha no começo do mês, quem pesa neste mês é a fatura que fecha no mês que vem."
+                                          : "As compras diminuem o dinheiro que você pode gastar no mês em que a fatura delas fecha. O que você passar depois do dia do fechamento já conta no mês seguinte."
                                 }
                             >
                                 {() => (

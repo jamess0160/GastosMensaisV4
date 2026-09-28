@@ -8,7 +8,7 @@ começar em 6 está em [../RoadMap MVP.md](../RoadMap%20MVP.md#as-levas-daqui-pr
 | [6. O cartão, o uso real e a gestão de membros](6.%20O%20cartão,%20o%20uso%20real%20e%20a%20gestão%20de%20membros.md) | escrita em 09/09/2026, **fechada** em 09/09/2026 — 18 de 18 etapas |
 | [7. O que a lei cobra e o que só quebra em produção](7.%20O%20que%20a%20lei%20cobra%20e%20o%20que%20só%20quebra%20em%20produção.md) | escrita em 10/09/2026, 12 de 12 etapas fechadas no mesmo dia — **reaberta** em 11/09/2026 com a etapa 13, **fechada** no mesmo dia: 13 de 13 |
 | [8. O que só se prova subindo](8.%20O%20que%20só%20se%20prova%20subindo.md) | escrita em 11/09/2026, **9 de 10 etapas** fechadas entre 11/09 e 13/09 — falta a do e-mail do domínio, que depende de conta no provedor e de registro no DNS |
-| [9. O que voltou de quem usa](9.%20O%20que%20voltou%20de%20quem%20usa.md) | escrita em 22/09/2026, **fechada** em 23/09/2026 — 16 de 16 etapas |
+| [9. O que voltou de quem usa](9.%20O%20que%20voltou%20de%20quem%20usa.md) | escrita em 22/09/2026, 16 de 16 etapas fechadas em 23/09/2026 — **reaberta** em 28/09/2026 com a etapa 17, o mês do ciclo num cartão de fechamento cedo |
 | [10. O segundo retorno, e a porta de entrada](10.%20O%20segundo%20retorno,%20e%20a%20porta%20de%20entrada.md) | escrita em 23/09/2026, **fechada** em 24/09/2026 — 9 de 9 etapas |
 
 **A 10 é o segundo retorno de uso, e o que a separa da 9 é o que cada uma faz com o modelo.** A
@@ -141,6 +141,12 @@ seguinte. O critério é o que separa uma etapa nova de uma leva nova: reabre qu
 **a mesma pergunta que a leva já estava respondendo** e depende de uma etapa dela — ali, o
 re-aceite dos termos, que lê a coluna que a etapa 2 tinha acabado de gravar. Trabalho que só
 *parece* do mesmo assunto começa leva própria.
+
+Aconteceu de novo em 28/09/2026 com a leva 9, e esse caso mostra o critério pelo outro lado: a
+etapa 17 **corrige a etapa 3 da própria leva**. Um retorno de uso, cinco dias depois de a leva
+fechar, provou que a regra da competência do cartão estava calibrada para um formato de cartão só.
+Ir para a leva 11 partiria uma pergunta em dois documentos, e quem lesse a etapa 3 não teria como
+saber que ela foi refeita.
 
 Quando isso acontece, **a reabertura fica escrita na abertura do plano**, com a data e o que a
 provocou. Uma etapa que aparece no fim de uma leva fechada, sem explicação, lê-se como esquecimento.

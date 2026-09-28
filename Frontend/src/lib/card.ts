@@ -97,6 +97,29 @@ export function invoiceCycle(
 export const cycleLabel = (cycle: InvoiceCycle): string =>
     `compras de ${formatShort(cycle.start)} a ${formatShort(cycle.end)}`;
 
+/** A metade do mês, nominal e fixa — o divisor que decide **de que mês é
+ *  uma fatura**.
+ *
+ *  Um ciclo tem cerca de trinta dias e termina no `ClosingDay`, então ele
+ *  tem `ClosingDay` dias no mês do fechamento e `30 − ClosingDay` no
+ *  anterior: a fatura é do mês onde está a maioria dos dias dela, e a
+ *  maioria vira aqui. Fechando 30, a fatura que fecha em 30/08 é de
+ *  agosto; fechando 3, a que fecha em 03/10 leva as compras de 04/09 a
+ *  03/10 e é de **setembro**.
+ *
+ *  Fixo de propósito: com o `daysInMonth` real o mesmo cartão trocaria de
+ *  regra entre fevereiro e julho, que é o defeito que o `ClosingDay`
+ *  matou. Quem escreve a competência é a API — esta constante existe para
+ *  a tela conseguir **explicar** a escolha do modo, não para recalcular
+ *  nada. */
+export const HALF_MONTH = 15;
+
+/** O cartão fecha na primeira metade do mês? É o que separa as duas
+ *  redações da ajuda do modo `purchase`: no cartão de fechamento cedo a
+ *  fatura que pesa no mês é a que fecha no mês SEGUINTE. */
+export const closesEarly = (closingDay: number | null): boolean =>
+    closingDay !== null && closingDay <= HALF_MONTH;
+
 /** O modo, em uma frase curta. É a única configuração do cadastro que
  *  muda um número já exibido na tela, então ela precisa ser legível sem
  *  abrir o formulário — no painel do cartão e no cabeçalho da fatura.
@@ -106,9 +129,14 @@ export const cycleLabel = (cycle: InvoiceCycle): string =>
  *  data. A compra de 28/09 num cartão que fecha 27 pegou a fatura que
  *  fecha em 27/10 e vence em 04/11, então ela pesa em outubro no
  *  `purchase` e em novembro no `invoice`. Em nenhum dos dois ela pesa
- *  em setembro, por mais que tenha sido comprada em setembro. */
+ *  em setembro, por mais que tenha sido comprada em setembro.
+ *
+ *  O `purchase` diz "das compras", e não "em que a fatura fecha", porque
+ *  as duas coisas só coincidem quando o fechamento é o fim do mês —
+ *  ver `HALF_MONTH`. A frase tem que valer nos dois formatos de cartão,
+ *  já que ela aparece num crachá que não sabe qual deles está olhando. */
 export const COMPETENCE_LABEL: Record<ApiTypes.CompetenceMode, string> = {
-    purchase: "pesa no mês em que a fatura fecha",
+    purchase: "pesa no mês das compras da fatura",
     invoice: "pesa no mês em que a fatura vence",
 };
 

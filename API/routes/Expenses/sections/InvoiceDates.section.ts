@@ -9,6 +9,12 @@ import { Utils } from "root/Utils/Utils"
 //
 //  Toda a aritmética é sobre "YYYY-MM-DD" (Utils.addMonthsToDate/addDaysToDate, moment por
 //  baixo), nunca sobre Date solto — em UTC-3 o dia 01 viraria o 31 do mês anterior.
+
+//  **A metade do mês, nominal e fixa.** É o divisor do `cycleAnchor`, e o porquê de ele não ser o
+//  `daysInMonth` real está lá: um divisor que muda de mês faz o mesmo cartão trocar de regra ao
+//  longo do ano.
+const HALF_MONTH = 15
+
 class Controller {
 
     /**
@@ -55,17 +61,26 @@ class Controller {
      * **`CompetenceDate` é quando a perna pesa**, e é ela que o cartão governa. Os dois modos
      * respondem a mesma pergunta sobre a **fatura** que pegou a compra, em dois pontos dela:
      *
-     *     purchase   ->  o mês em que essa fatura FECHA
+     *     purchase   ->  o mês das COMPRAS dessa fatura
      *     invoice    ->  o mês em que essa fatura VENCE
      *
      * **Quem decide o mês é o ciclo, não a data da compra**, e é aí que o `cycleShift` entra.
-     * Num cartão que fecha dia 30, a compra de 31/08 não está na fatura de agosto: ela chegou
-     * depois do fechamento, vai ser cobrada com a fatura seguinte, e pesar em agosto consumiria
-     * um orçamento que ela nunca tocou. `dia(ExpenseDate) > ClosingDay` é a linha entre os dois
-     * casos — e ela cai **depois** do dia do fechamento, porque a compra feita *no* dia em que
-     * a fatura fecha ainda é daquela fatura, a mesma convenção do `cycleOf` logo abaixo.
+     * Ele é a soma de duas perguntas independentes, e cada uma tem o seu método:
      *
-     * Três coisas nessa fórmula, e todas mudam o resultado:
+     *     qual fatura pegou esta compra?   ->  monthsToClosing   (0 ou 1)
+     *     de que mês é essa fatura?        ->  cycleAnchor      (0 ou -1)
+     *
+     * A primeira é a comparação com o fechamento: num cartão que fecha dia 30, a compra de
+     * 31/08 não está na fatura de agosto — ela chegou depois do fechamento e vai ser cobrada
+     * com a fatura seguinte. A linha cai **depois** do dia do fechamento, porque a compra feita
+     * *no* dia em que a fatura fecha ainda é daquela fatura, a mesma convenção do `cycleOf`.
+     *
+     * A segunda é o `cycleAnchor`, e ela existe porque **"o mês em que a fatura fecha" só é o
+     * mês das compras dela quando o fechamento é o fim do mês.** Num cartão que fecha dia 3, a
+     * fatura que fecha em 03/10 é feita das compras de 04/09 a 03/10 — 27 dos seus 30 dias são
+     * setembro —, e chamá-la de "outubro" jogava a compra de 05/09 um mês para frente.
+     *
+     * Quatro coisas nessa fórmula, e todas mudam o resultado:
      *
      * - **o dia da compra é preservado, o mês é que anda.** Escrever a competência como o
      *   próprio `ClosingDate` daria o mesmo mês e arruinaria o único lugar que lê a competência
@@ -74,8 +89,13 @@ class Controller {
      * - **o `addMonthsToDate` grampeia**, e é por isso que ele é a operação certa aqui: 31/08
      *   mais um mês é 30/09, nunca 03/10. O dia que não existe no mês de destino vira o último
      *   dele e o mês — que é o que a competência quer dizer — sai certo;
-     * - **o `cycleShift` nunca passa de 1.** Com o fechamento sendo um dia do mês, a compra ou
-     *   pegou a fatura que fecha no mês dela ou pegou a do mês seguinte; não há terceiro caso.
+     * - **o `cycleShift` vai de -1 a 1, e nunca passa disso.** Com o fechamento sendo um dia do
+     *   mês, a compra pegou a fatura que fecha no mês dela ou a do mês seguinte, e essa fatura é
+     *   de um dos dois meses que ela atravessa. Não há terceiro caso em nenhuma das duas;
+     * - **uma fatura pesa num mês só.** É o que separa isto de "a compra pesa no mês em que foi
+     *   feita, sempre": aquela devolveria a compra de 02/09 do cartão que fecha 3 para setembro
+     *   e colocaria, no mesmo setembro, compras de duas faturas diferentes — a que venceu em
+     *   10/09 e a que vence em 10/10. O orçamento do mês deixaria de ter fatura correspondente.
      *
      * O avanço por parcela no modo `purchase` **não é detalhe**: sem ele, 600 em 6x jogaria
      * 600 inteiros no mês da compra e mataria a regra "a parcela pesa 100 por mês", que é a
@@ -94,7 +114,9 @@ class Controller {
     ) {
         let CashDate = dates.DueDate ?? ExpenseDate
 
-        let cycleShift = this.isCreditCard(paymentMethod) ? this.monthsToClosing(paymentMethod, ExpenseDate) : 0
+        let cycleShift = this.isCreditCard(paymentMethod)
+            ? this.monthsToClosing(paymentMethod, ExpenseDate) + this.cycleAnchor(paymentMethod)
+            : 0
 
         let CompetenceDate = paymentMethod.CompetenceMode === "purchase"
             ? Utils.addMonthsToDate(ExpenseDate, cycleShift + index)
@@ -206,10 +228,40 @@ class Controller {
     //  fechamento. Não há terceiro valor possível: o fechamento acontece uma vez por mês.
     //
     //  **Uma conta, dois leitores.** Ela diz em que mês a fatura desta compra fecha, e isso é o
-    //  que o `creditCardInvoice` precisa para achar o vencimento *e* o que o `withDates` precisa
-    //  para saber em que mês a compra pesa. Duas cópias divergiriam no único dia que importa.
+    //  que o `creditCardInvoice` precisa para achar o vencimento *e* metade do que o `withDates`
+    //  precisa para saber em que mês a compra pesa. Duas cópias divergiriam no único dia que
+    //  importa. A outra metade é o `cycleAnchor`, e ela é do `withDates` só: o vencimento de uma
+    //  fatura é um fato do emissor, o mês dela é uma escolha nossa.
     private monthsToClosing(card: CardCycleSource, ExpenseDate: string) {
         return ExpenseDate <= Utils.setDayOfMonth(ExpenseDate, card.ClosingDay!) ? 0 : 1
+    }
+
+    /**
+     * **De que mês é uma fatura** — `0` para o mês em que ela fecha, `-1` para o anterior.
+     *
+     * Um ciclo tem cerca de trinta dias e termina no `ClosingDay`, então ele tem `ClosingDay`
+     * dias no mês do fechamento e `30 − ClosingDay` no mês anterior: **a fatura é do mês em que
+     * está a maioria dos dias dela**, e a maioria vira na metade do mês. Fechando 30, o ciclo
+     * 31/07–30/08 é agosto e o fechamento também; fechando 3, o ciclo 04/09–03/10 é setembro e o
+     * fechamento é outubro — é esse segundo caso que a conta existe para acertar.
+     *
+     * Confere na borda: fechando 15 o ciclo é 16/08–15/09, com 16 dias de agosto, e a fatura é de
+     * **agosto**; fechando 16 é 17/08–16/09, com 16 dias de setembro, e ela é de **setembro**.
+     *
+     * **O 15 é fixo de propósito, e usar o `daysInMonth` real seria a folga em dias de volta.**
+     * Com o divisor variando (14 em fevereiro, 15,5 em julho), um cartão que fecha 15 pesaria no
+     * mês do fechamento em março e no anterior em agosto — o mesmo cartão trocando de regra ao
+     * longo do ano, que é exatamente o que o `ClosingDay` matou. A comparação é entre dois
+     * números **nominais**, como a do `monthShift`: um dia do mês contra meio mês.
+     *
+     * **A alternativa recusada foi decidir pelo `ClosingDay` contra o `DueDay`**, reaproveitando
+     * o `monthShift` e dispensando o número fixo. Ela responde outra pergunta — onde o vencimento
+     * está em relação ao fechamento —, e as duas só coincidem por acaso: um cartão que fecha 20 e
+     * vence 28 tem `ClosingDay <= DueDay` igual ao que fecha 3 e vence 10, e por aquela regra a
+     * compra de 15/09 — que está na fatura que fecha 20/09 e é paga em 28/09 — pesaria em agosto.
+     */
+    private cycleAnchor(card: CardCycleSource) {
+        return card.ClosingDay! <= HALF_MONTH ? -1 : 0
     }
 
     /**

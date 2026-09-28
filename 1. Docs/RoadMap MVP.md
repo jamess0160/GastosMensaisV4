@@ -126,7 +126,10 @@ dia do mês em que o cartão fecha; a relação entre os dois dias (`ClosingDay 
 mês anterior ao do vencimento) é a única coisa que o modelo infere, e o laço de rolagem do
 `InvoiceDates` morreu com ela. Em cima disso, a competência de uma compra em modo `purchase`
 passou a ser **o mês do ciclo que a pegou**, não o mês da compra: num cartão que fecha 30, o
-gasto de 31/08 pesa em setembro, que é quando a fatura que o cobra fecha. As duas migrations
+gasto de 31/08 pesa em setembro, que é quando a fatura que o cobra fecha. **A etapa 17, de
+28/09, corrige a segunda metade dessa conta:** o mês de um ciclo é aquele em que estão a
+**maioria dos dias dele**, e não o do fechamento — num cartão que fecha dia 3, a fatura que
+fecha em 03/10 é feita de compras de setembro e pesa em setembro. As duas migrations
 recalculam a perna já gravada, e isso **move dinheiro entre meses** para quem já tinha compra em
 cartão — o ponto sendo que os números velhos estavam errados. A fatura ganhou tela própria
 (`/contas/fatura/:id`), com navegação entre ciclos independente do mês global e o botão de
