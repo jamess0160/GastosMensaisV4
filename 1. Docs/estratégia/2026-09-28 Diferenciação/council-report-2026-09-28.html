@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conselho — Diferenciação · 28/09/2026</title>
+<style>
+  :root{
+    --bg:#ffffff; --ink:#1a1a1a; --muted:#6b6b6b; --line:#e4e4e7; --soft:#fafafa;
+    --accent:#1f4e79; --yes:#15803d; --no:#b91c1c; --warn:#b45309;
+    --c1:#7c3aed; --c2:#0369a1; --c3:#15803d; --c4:#b45309; --c5:#be123c;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:16px; line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:860px; margin:0 auto; padding:56px 28px 80px}
+  header.top{border-bottom:2px solid var(--ink); padding-bottom:22px; margin-bottom:34px}
+  .eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-weight:600}
+  h1{font-size:30px; line-height:1.22; margin:10px 0 8px; letter-spacing:-.02em}
+  .sub{color:var(--muted); font-size:14px; margin:0}
+  h2{font-size:21px; margin:46px 0 14px; letter-spacing:-.01em; padding-bottom:7px; border-bottom:1px solid var(--line)}
+  h3{font-size:16px; margin:26px 0 8px}
+  p{margin:0 0 14px}
+  ul{margin:0 0 14px; padding-left:22px} li{margin-bottom:8px}
+  code{background:var(--soft); border:1px solid var(--line); border-radius:3px; padding:1px 5px; font-size:13px;
+       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  pre{background:var(--soft); border:1px solid var(--line); border-radius:5px; padding:14px 16px;
+      overflow-x:auto; font-size:13px; line-height:1.55; margin:6px 0 16px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  pre code{background:0; border:0; padding:0; font-size:13px}
+  strong{font-weight:650}
+
+  .question{background:var(--soft); border:1px solid var(--line); border-left:3px solid var(--accent);
+            border-radius:4px; padding:18px 22px; margin-bottom:8px}
+  .question .q-label{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:600; margin-bottom:8px}
+  .question p{margin:0 0 10px} .question p:last-child{margin:0}
+  .question em{color:var(--muted)}
+
+  .verdict{border:2px solid var(--ink); border-radius:6px; padding:26px 28px; margin:26px 0 10px}
+  .verdict .tag{display:inline-block; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+                font-weight:700; background:var(--ink); color:#fff; padding:4px 10px; border-radius:3px; margin-bottom:14px}
+  .verdict h3{margin:0 0 10px; font-size:19px}
+  .verdict p:last-child{margin:0}
+  .answer{display:flex; gap:14px; align-items:baseline; padding:14px 0; border-top:1px solid var(--line)}
+  .answer:first-of-type{border-top:0; padding-top:4px}
+  .badge{flex:0 0 auto; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+         padding:3px 9px; border-radius:3px; white-space:nowrap}
+  .badge.no{background:#fef2f2; color:var(--no); border:1px solid #fecaca}
+  .badge.yes{background:#f0fdf4; color:var(--yes); border:1px solid #bbf7d0}
+  .badge.warn{background:#fffbeb; color:var(--warn); border:1px solid #fde68a}
+  .answer .txt{flex:1}
+  .answer .txt p{margin:0}
+
+  table{width:100%; border-collapse:collapse; font-size:14.5px; margin:6px 0 18px}
+  .scroll{overflow-x:auto}
+  th,td{text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:650;
+     border-bottom:1.5px solid var(--ink)}
+  tbody tr:last-child td{border-bottom:0}
+
+  .grid{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:0; border:1px solid var(--line);
+        border-radius:5px; overflow:hidden; font-size:14px; margin:6px 0 10px}
+  .grid > div{padding:11px 14px; border-bottom:1px solid var(--line)}
+  .grid > div:nth-child(-n+4){background:var(--soft); font-size:11px; letter-spacing:.09em;
+        text-transform:uppercase; color:var(--muted); font-weight:650}
+  .grid .who{font-weight:600; border-left:3px solid transparent}
+  .w1{border-left-color:var(--c1)!important} .w2{border-left-color:var(--c2)!important}
+  .w3{border-left-color:var(--c3)!important} .w4{border-left-color:var(--c4)!important}
+  .w5{border-left-color:var(--c5)!important}
+  .v{font-weight:600} .v.no{color:var(--no)} .v.yes{color:var(--yes)} .v.warn{color:var(--warn)}
+
+  .spectrum{border:1px solid var(--line); border-radius:5px; overflow:hidden; margin:8px 0 22px}
+  .spectrum .head{display:grid; grid-template-columns:1fr 1fr; background:var(--soft);
+        font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:650}
+  .spectrum .head div{padding:10px 14px; border-bottom:1px solid var(--line)}
+  .spectrum .head div:first-child{border-right:1px solid var(--line)}
+  .spectrum .body{display:grid; grid-template-columns:1fr 1fr}
+  .spectrum .body > div{padding:14px; font-size:14px}
+  .spectrum .body > div:first-child{border-right:1px solid var(--line)}
+  .spectrum .name{display:block; font-weight:650; margin-bottom:2px}
+  .spectrum .name.n1{color:var(--c1)} .spectrum .name.n2{color:var(--c2)}
+  .spectrum .name.n3{color:var(--c3)} .spectrum .name.n4{color:var(--c4)}
+  .spectrum .name.n5{color:var(--c5)}
+  .spectrum .why{display:block; color:var(--muted); font-size:13.5px; margin-bottom:12px}
+  .spectrum .why:last-child{margin-bottom:0}
+
+  .callout{border:1px solid var(--line); border-left:3px solid var(--warn); background:#fffdf7;
+           border-radius:4px; padding:16px 20px; margin:6px 0 18px; font-size:15px}
+  .callout p:last-child{margin:0}
+  .callout .lbl{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--warn); font-weight:700; margin-bottom:6px}
+
+  details{border:1px solid var(--line); border-radius:5px; margin-bottom:10px; overflow:hidden}
+  details[open]{background:#fcfcfd}
+  summary{cursor:pointer; padding:13px 18px; font-weight:600; font-size:15px; list-style:none;
+           display:flex; align-items:center; gap:10px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+"; margin-left:auto; color:var(--muted); font-weight:400; font-size:18px}
+  details[open] summary::after{content:"\2212"}
+  summary .dot{width:9px; height:9px; border-radius:50%; flex:0 0 auto}
+  .d1{background:var(--c1)} .d2{background:var(--c2)} .d3{background:var(--c3)}
+  .d4{background:var(--c4)} .d5{background:var(--c5)} .dx{background:var(--muted)}
+  summary .role{color:var(--muted); font-weight:400; font-size:13.5px}
+  .body-in{padding:2px 20px 18px; border-top:1px solid var(--line)}
+  .body-in p:first-child{margin-top:14px}
+
+  .first{border:2px solid var(--accent); border-radius:6px; padding:24px 26px; margin:22px 0 10px; background:#f8fbfe}
+  .first .tag{display:inline-block; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+              font-weight:700; background:var(--accent); color:#fff; padding:4px 10px; border-radius:3px; margin-bottom:14px}
+  .first h3{margin:0 0 10px; font-size:19px}
+  .first p:last-child{margin:0}
+
+  footer{margin-top:60px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:13px}
+  footer a{color:var(--accent)}
+  @media (max-width:640px){
+    .wrap{padding:36px 18px 60px} h1{font-size:25px}
+    .grid{grid-template-columns:1fr} .grid > div:nth-child(-n+4){display:none}
+    .grid .who{border-left-width:4px}
+    .spectrum .head, .spectrum .body{grid-template-columns:1fr}
+    .spectrum .body > div:first-child{border-right:0; border-bottom:1px solid var(--line)}
+    .spectrum .head div:first-child{border-right:0}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">LLM Council · quarto conselho</div>
+  <h1>O medo de ser "apenas mais um"</h1>
+  <p class="sub">Gastos Mensais V4 · diferenciação · 28 de setembro de 2026 · 5 conselheiros, revisão cruzada anônima</p>
+</header>
+
+<div class="question">
+  <div class="q-label">A pergunta</div>
+  <p><em>"Ele ficou muito legal, e eu vejo grande uso nele. Mas dando uma pesquisada eu notei que
+  fazer um gerenciador de finanças pessoais é algo comum para micro SaaS, e fiquei com medo do meu
+  acabar sendo apenas mais um por aí. Não sei exatamente no que o meu se diferencia (…) Preciso
+  saber se esse medo faz sentido, ou se eu tenho uma vantagem em relação a outros produtos
+  parecidos no mercado."</em></p>
+</div>
+<p class="sub">Contexto dado aos conselheiros: 22 tabelas, 16 telas, 811 testes de integração, no ar
+em VPS própria, dois ciclos de retorno de uso real — e <strong>zero pagantes</strong>, com o Open
+Finance (3 a 6 semanas, R$160/mês fixo) ainda não construído.</p>
+
+<h2>O veredito</h2>
+
+<div class="verdict">
+  <span class="tag">Chairman</span>
+  <h3>O medo é legítimo, e está mal endereçado. A vantagem existe, e é uma só.</h3>
+
+  <div class="answer">
+    <span class="badge no">não é</span>
+    <div class="txt"><p><strong>"apenas mais um"</strong> — um produto com quatro versões, 811
+    testes e dois ciclos de retorno de uso real não tem problema de produto.</p></div>
+  </div>
+  <div class="answer">
+    <span class="badge warn">é</span>
+    <div class="txt"><p><strong>indistinguível</strong> de mais um. Problema diferente, e muito mais
+    barato: nenhuma linha de código está errada — a frase está faltando.</p></div>
+  </div>
+  <div class="answer">
+    <span class="badge yes">a vantagem</span>
+    <div class="txt"><p><strong>Quem pagou não é quem gastou, com a competência do cartão certa,
+    numa casa em que mais de uma pessoa gasta.</strong> Não é "gerenciador de finanças pessoais" —
+    é contabilidade doméstica. O app do banco não consegue nem entrar nessa categoria: ele vê uma
+    conta, de uma pessoa.</p></div>
+  </div>
+  <div class="answer">
+    <span class="badge no">não é vantagem</span>
+    <div class="txt"><p>811 testes, saldo sem cache, rateio em centavos, <code>CompetenceDate</code>
+    vs <code>CashDate</code> como conceito. Isso é <strong>qualidade: retém, não adquire.</strong>
+    "Ninguém compra carro porque a solda é boa."</p></div>
+  </div>
+</div>
+
+<h3>As cinco decisões</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th style="width:38%">Decisão</th><th>Por quê</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. Represar o Open Finance</strong> — não cancelar, represar</td>
+        <td>4 dos 5 conselheiros e todos os revisores que tocaram no tema. Construir agora é comprar
+        paridade no eixo em que ele perde de quem tem capital, com custo fixo antes do primeiro
+        pagante.</td></tr>
+    <tr><td><strong>2. Reposicionar</strong> de "controle financeiro pessoal" para <em>"o dinheiro da
+        casa, quando mais de uma pessoa gasta"</em></td>
+        <td>Não é copy: é a escolha de contra quem competir. Contra a planilha compartilhada e o
+        grupo do WhatsApp, não contra Mobills.</td></tr>
+    <tr><td><strong>3. A frase</strong>, que o produto já cumpre</td>
+        <td><em>"o app do dinheiro da casa em que a fatura do cartão bate com a do banco e você sabe
+        quem gastou — não só de qual conta saiu."</em> Duas capacidades, as duas prontas, as duas
+        entendidas por quem não é técnico.</td></tr>
+    <tr><td><strong>4. As frentes B2B em espera</strong></td>
+        <td>Licenciar o motor e vender a planejador financeiro são produtos novos, não alavancas.
+        Exceção barata: MEI/workspace múltiplo é a segunda melhor hipótese, e testá-la na copy da
+        mesma landing não custa nada.</td></tr>
+    <tr><td><strong>5. A próxima leva não é integração:</strong> é o rateio analítico deixar de ser
+        digitação</td>
+        <td>Regra por categoria ou estabelecimento, herança do mês anterior, confirmação de um
+        toque. É o único código que fortalece o diferencial em vez de comprar paridade — e é onde as
+        3 a 6 semanas deveriam ir.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Onde o conselho concorda</h2>
+<ul>
+  <li><strong>O medo está mirando o objeto errado — 5 de 5, por cinco caminhos independentes.</strong>
+  O problema não é "tem muita gente fazendo". É que nada do que ele lista é uma frase que um
+  comprador repetiria para um amigo.</li>
+  <li><strong>A vantagem é UMA, não a lista: quem pagou ≠ quem gastou.</strong> Os dois eixos que
+  nunca se cruzam foram eleitos a única coisa defensável pelo Contrarian, pelo Expansionista e pelo
+  Pensador de Primeiros Princípios — e são uma das duas únicas coisas que o Outsider entendeu sem
+  explicação. Três conselheiros com incentivos opostos convergindo no mesmo item.</li>
+  <li><strong>O segundo item vendável é o ciclo de cartão.</strong> "A fatura bate com a do banco" é
+  a outra frase que atravessou até o Outsider — e ela não nasceu de estratégia, nasceu de um bug de
+  uso real que virou migration.</li>
+  <li><strong>O resto do orgulho técnico é invisível no funil — 4 de 5.</strong></li>
+  <li><strong>A evidência atual não é validação.</strong> 22 retornos de conhecidos pessoais é
+  gentileza. Zero estranhos disseram sim a um preço.</li>
+  <li><strong>Nenhum dos cinco recomendou começar por Open Finance agora.</strong></li>
+</ul>
+
+<h2>Onde o conselho briga</h2>
+
+<h3>1. Open Finance desdiferencia, ou <em>é</em> o produto?</h3>
+<div class="spectrum">
+  <div class="head">
+    <div>Desdiferencia — 3 de 5</div>
+    <div>É o produto — 1 de 5, e é o comprador</div>
+  </div>
+  <div class="body">
+    <div>
+      <span class="name n5">O Contrarian</span>
+      <span class="why">"Você vai gastar 3 a 6 semanas e R$160/mês fixo para se transformar em
+      commodity mais rápido."</span>
+      <span class="name n2">Primeiros Princípios</span>
+      <span class="why">"Importar extrato é exatamente o eixo onde você é comparável a quem tem
+      capital, marca e app store."</span>
+      <span class="name n4">O Executor</span>
+      <span class="why">"Construir primeiro o que te iguala, para descobrir depois se você era
+      diferente, é a ordem errada."</span>
+    </div>
+    <div>
+      <span class="name n3">O Outsider</span>
+      <span class="why">"Já tentei três apps desses e parei em duas semanas. Não porque eram ruins —
+      porque cansei de digitar. Sem ela você está me pedindo R$29,90 pra eu trabalhar de
+      graça."</span>
+      <span class="name n1">O Expansionista <span style="font-weight:400;color:var(--muted)">(ponte)</span></span>
+      <span class="why">"Não é paridade, é alavanca: com o ciclo de cartão certo, você prevê a
+      fatura antes de fechar."</span>
+    </div>
+  </div>
+</div>
+<p><strong>Por que razoáveis discordam: eles medem coisas diferentes.</strong> Os três primeiros
+falam de <strong>aquisição</strong> (o que faz alguém escolher você); o Outsider fala de
+<strong>retenção</strong> (o que faz alguém ficar). Open Finance é ruim de aquisição e bom de
+retenção, e as duas frases são verdadeiras ao mesmo tempo. A costura saiu da revisão cruzada — é o
+ponto cego nº 2.</p>
+
+<h3>2. Expandir agora, ou reposicionar e parar aí?</h3>
+<p>O Expansionista abre quatro frentes: casal, MEI/CNPJ, licenciar o motor a planejador financeiro,
+previsão de fatura. Os <strong>cinco</strong> revisores elegeram esse parecer o maior ponto cego da
+mesa — quatro alavancas sobre a mesma premissa não testada, com zero pagantes e um dev solo. Mas o
+item 1 dele ("o casal é o nicho") é justamente onde os outros quatro convergem. O veredito parte o
+parecer em dois: <strong>o reposicionamento sim, as três frentes B2B não.</strong></p>
+
+<h3>3. Qual teste vem primeiro</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>Conselheiro</th><th>Teste proposto</th><th>O que ele mede</th></tr></thead>
+  <tbody>
+    <tr><td>O Executor</td><td>2 horas lançando o mesmo caso em Mobills, Organizze e Minhas Economias</td><td>paridade de feature</td></tr>
+    <tr><td>O Contrarian</td><td>cobrar R$29,90 de dez estranhos, hoje, na versão manual</td><td>disposição a pagar</td></tr>
+    <tr><td>Primeiros Princípios</td><td>10 entrevistas com quem divide contas e ele não conhece</td><td>se a alternativa está quebrada</td></tr>
+    <tr><td>O Outsider</td><td>terminar a frase "é o app pra quem ___"</td><td>se é repetível para um amigo</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Os quatro são bons e nenhum é o primeiro. O primeiro custa zero, e saiu da revisão cruzada.</p>
+
+<h2>Pontos cegos que só o peer review pegou</h2>
+
+<div class="callout">
+  <div class="lbl">o maior — 2 revisores, independentemente</div>
+  <p><strong>A resposta já está no banco de produção dele.</strong> A tese central deste conselho —
+  de que o eixo duplo é a diferenciação — é falsificável <strong>hoje, de graça, sem falar com
+  ninguém</strong>. Em quantos gastos o rateio analítico é mais de uma pessoa? Quantos workspaces
+  têm mais de um membro? Quantas <code>Persons</code> sem <code>IdUser</code> — o filho, o cônjuge
+  que não usa o app — recebem rateio? Se os usuários atuais nunca usaram o segundo eixo, a tese de
+  três conselheiros morre em cinco minutos. <em>Nenhum dos cinco conselheiros viu isso.</em></p>
+</div>
+
+<div class="callout">
+  <div class="lbl">o mais fino — resolve a briga nº 1</div>
+  <p><strong>O eixo que diferencia é o único que nenhuma integração automatiza.</strong> Extrato
+  bancário diz de qual conta o dinheiro saiu; ele <strong>nunca</strong> diz quem gastou.
+  <code>ExpensePersons</code> só se preenche à mão, por definição. Então Open Finance mata a
+  digitação exatamente na metade <em>commodity</em> do produto e deixa intacta a digitação da metade
+  que diferencia. Sem regra, herança do mês anterior ou confirmação de um toque, o nicho morre
+  <strong>pelo mesmo motivo</strong> que fez o Outsider abandonar os concorrentes — só que agora na
+  feature que era o diferencial.</p>
+</div>
+
+<div class="callout">
+  <div class="lbl">ignorado duas vezes — 3 revisores</div>
+  <p><strong>A terceira via: import de OFX/CSV e de fatura.</strong> Mata "cansei de digitar" em
+  dias, sem R$160/mês fixo, sem consentimento regulado, sem expiração em 12 meses e sem 6 semanas.
+  Já apareceu no conselho de <strong>03/08</strong> como "alternativa nunca considerada" e foi
+  ignorada; voltou agora por três caminhos independentes.</p>
+</div>
+
+<div class="callout">
+  <div class="lbl">a reler depois, não agora — 2 revisores</div>
+  <p><strong>O preço fechado não sobrevive ao posicionamento recomendado.</strong> R$29,90 por casa
+  com 3 conexões inclusas foi precificado em 18/09 para um comprador <em>individual</em>. Se o
+  diferencial é a casa com quatro pessoas e vários bancos, consentimento é custo recorrente por
+  conexão — e o break-even de 9 a 14 pagantes assume consumo mínimo. Isso não invalida a decisão de
+  18/09; marca que ela tem que ser relida quando o reposicionamento entrar.</p>
+</div>
+
+<h2>A primeira coisa a fazer</h2>
+
+<div class="first">
+  <span class="tag">uma coisa só</span>
+  <h3>Rode três queries no banco de produção, hoje — antes de uma linha de copy ou de código.</h3>
+  <pre><code>-- 1. O segundo eixo é realmente usado? Gastos rateados entre mais de uma pessoa.
+SELECT e."IdWorkspace",
+       COUNT(*) FILTER (WHERE p.pessoas &gt; 1) AS gastos_rateados,
+       COUNT(*)                              AS gastos_total
+  FROM "Expenses" e
+  JOIN (SELECT "IdExpense", COUNT(DISTINCT "IdPerson") AS pessoas
+          FROM "ExpensePersons"
+         GROUP BY "IdExpense") p ON p."IdExpense" = e."IdExpense"
+ GROUP BY e."IdWorkspace";
+
+-- 2. Os espaços têm mais de uma pessoa de verdade dentro?
+SELECT "IdWorkspace", COUNT(*) AS membros
+  FROM "WorkspaceMembers"
+ GROUP BY "IdWorkspace"
+HAVING COUNT(*) &gt; 1;
+
+-- 3. Pessoas sem login recebendo rateio — o filho, o cônjuge que não usa o app.
+SELECT COUNT(DISTINCT ep."IdPerson") AS pessoas_sem_login_com_rateio
+  FROM "ExpensePersons" ep
+  JOIN "Persons" pe ON pe."IdPerson" = ep."IdPerson"
+ WHERE pe."IdUser" IS NULL;</code></pre>
+  <p>São cinco minutos e decidem tudo o que está acima. Se a maioria dos gastos tem <strong>uma</strong>
+  pessoa no eixo analítico, o reposicionamento é teoria bonita sobre uma feature que ninguém usa — e
+  a resposta honesta à pergunta é que <strong>o medo se justifica</strong>. Se o eixo é usado, ele
+  não tem uma hipótese de posicionamento: tem a primeira frase da landing page
+  <strong>com prova de uso</strong>, antes de gastar um real ou uma semana.</p>
+</div>
+
+<h2>Os cinco pareceres, na íntegra</h2>
+
+<details>
+  <summary><span class="dot d5"></span> O Contrarian <span class="role">— "o medo está com medo da coisa errada"</span></summary>
+  <div class="body-in">
+    <p>O medo faz sentido, mas ele está com medo da coisa errada.</p>
+    <p>Nada na sua lista de diferenciais é vendável. <code>CompetenceDate</code> vs
+    <code>CashDate</code>, rateio em centavos, 811 testes sem mock, saldo sem cache — isso é
+    invisível antes do uso e indistinguível de "mais um" na landing page. Você não tem um
+    diferencial de produto: tem um diferencial de <em>corretude</em>, e corretude é o atributo que
+    ninguém acredita até já ter sido traído, e que Mobills também alega ter. Rigor de engenharia não
+    aparece em nenhuma decisão de compra de R$29,90.</p>
+    <p>Pior: o Open Finance que os conselhos anteriores aprovaram <strong>destrói</strong> o pouco de
+    diferenciação que existe. Hoje seu ativo é um modelo de lançamento manual mais honesto que o dos
+    outros. Com dado entrando automático, o campo de batalha vira categorização automática, app
+    nativo e marca — exatamente onde você perde de goleada para quem tem capital. Você vai gastar 3
+    a 6 semanas e R$160/mês fixo para se transformar em commodity mais rápido.</p>
+    <p>E sua evidência de tração é ruim. 22 retornos de conhecidos pessoais não é validação, é
+    gentileza. Zero pessoas já disseram sim a um preço. Amigo dá feedback; estranho dá churn.</p>
+    <p>A única coisa aqui que parece defensável você está escondendo: <strong>dois eixos de rateio
+    que não se cruzam</strong> — quem pagou ≠ quem gastou. Isso é casal e família, é o caso de uso
+    que os concorrentes fazem mal porque foi enxertado depois. Não é "gerenciador de finanças
+    pessoais".</p>
+    <p>O teste que você está evitando: cobre R$29,90 de dez estranhos, hoje, na versão manual. Se
+    ninguém paga sem Open Finance, o Open Finance não é a solução — é só o preço mais alto do mesmo
+    fracasso.</p>
+  </div>
+</details>
+
+<details>
+  <summary><span class="dot d2"></span> O Pensador de Primeiros Princípios <span class="role">— "sua pergunta está errada em dois níveis"</span></summary>
+  <div class="body-in">
+    <p>Sua pergunta está errada em dois níveis.</p>
+    <p><strong>Primeiro:</strong> "no que meu produto se diferencia" trata diferenciação como
+    propriedade do produto. Não é. É propriedade do <em>alternativo do comprador</em>. Uma feature só
+    diferencia se a gambiarra atual da pessoa quebra sem ela. Então a pergunta certa é:
+    <strong>existe alguém para quem Mobills, o app do Nubank e a planilha estão todos
+    quebrados?</strong> Se você não consegue escrever esse alguém numa frase sem usar a palavra
+    "melhor", não há diferenciação — e aí nenhuma leva resolve.</p>
+    <p><strong>Segundo:</strong> você não construiu um gerenciador de finanças pessoais. Isso é o
+    rótulo da categoria que você herdou ao pesquisar concorrentes, e ele te fez comparar seu app com
+    a coisa errada. Olhe a sua modelagem: os dois eixos de rateio que nunca se cruzam, competência
+    por ciclo de cartão, parcela como perna. Nada disso é sobre <em>rastrear</em> gasto. É sobre
+    <strong>contabilidade de uma casa onde mais de uma pessoa gasta e paga em proporções
+    diferentes</strong>. Mobills responde "quanto eu gastei". Você responde "quem gastou, quem pagou,
+    e por que esses dois números não batem". São perguntas diferentes. O app do banco nunca vai fazer
+    a segunda — ele só vê uma conta, de uma pessoa.</p>
+    <p><strong>A consequência é desconfortável:</strong> Open Finance é o investimento que te
+    <em>desdiferencia</em>. Importar extrato é exatamente o eixo onde você é comparável a quem tem
+    capital, marca e app store. Gastar 3-6 semanas nisso é pagar para entrar na grade de features
+    onde você perde. O consenso unânime dos conselhos anteriores é o pressuposto que eu desmontaria
+    primeiro: ele assume que você está na categoria "tracker".</p>
+    <p><strong>Teste antes de codar qualquer coisa:</strong> ache 10 pessoas que dividem contas e que
+    você não conhece. Peça que descrevam o acerto do mês passado. Se a descrição exigir dois eixos,
+    você tem produto. Se for "a gente racha no meio", você tem um projeto pessoal excelente.</p>
+  </div>
+</details>
+
+<details>
+  <summary><span class="dot d1"></span> O Expansionista <span class="role">— "você construiu um motor de rateio doméstico"</span></summary>
+  <div class="body-in">
+    <p>O medo está mirando o objeto errado. Você não construiu um gerenciador de finanças —
+    construiu um <strong>motor de rateio doméstico</strong> e embrulhou num app de finanças. Os
+    concorrentes que você listou resolvem "quanto eu gastei". Nenhum resolve "quanto <strong>nós</strong>
+    gastamos e quem deve a quem", porque nenhum tem dois eixos que fecham separados. Mobills não tem.
+    Organizze não tem. Splitwise tem o eixo de quem gastou e nenhum orçamento. O app do Nubank só vê
+    o cartão do Nubank — não consegue nem existir na conta de um casal.</p>
+    <p>Onde isso fica maior do que você está imaginando:</p>
+    <p><strong>1. O casal é o nicho, não o indivíduo.</strong> Reposicionar para "dinheiro de casa, a
+    dois" muda tudo: membros ilimitados grátis deixa de ser custo e vira o canal — cada pagante traz
+    1 a 3 pessoas que veem o produto funcionando todos os dias. R$29,90 por casa é R$15 por cabeça, e
+    ninguém compara com planilha porque planilha compartilhada entre duas pessoas é o inferno que eles
+    já conhecem.</p>
+    <p><strong>2. Workspace múltiplo grátis é um segundo produto escondido.</strong> MEI que mistura
+    dinheiro de casa com dinheiro do CNPJ são milhões de pessoas, e o competência-vs-caixa que você já
+    modelou é exatamente o que contador pede e nenhum app pessoal entrega.</p>
+    <p><strong>3. O motor vale mais que a tela.</strong> 811 testes sem mock, rateio em centavos,
+    ciclo de cartão corrigido por migration retroativa — isso é infraestrutura licenciável. Planejador
+    financeiro CFP cobrando R$300/mês do cliente paga R$99 por assento sem pensar.</p>
+    <p><strong>4. Open Finance não é paridade, é alavanca.</strong> Com consentimento e o ciclo de
+    cartão correto, você prevê a fatura antes de fechar. "Quanto ainda podemos gastar em setembro" —
+    ninguém no Brasil acerta isso hoje.</p>
+  </div>
+</details>
+
+<details>
+  <summary><span class="dot d3"></span> O Outsider <span class="role">— "ninguém compra carro porque a solda é boa"</span></summary>
+  <div class="body-in">
+    <p>Li a lista inteira e vou ser honesto: não entendi metade. "Dois eixos de rateio que nunca se
+    cruzam", "811 testes de integração sem mock", "calculado na API a cada leitura sem cache" — isso
+    não é vantagem, isso é o motor do carro. Ninguém compra carro porque a solda é boa.</p>
+    <p>Do que você listou, <strong>duas</strong> coisas me acertaram:</p>
+    <ul>
+      <li><strong>O cartão que fecha dia 30 e joga a compra do dia 31 pro mês seguinte.</strong> Isso
+      eu sinto na pele. Todo mês eu olho a fatura e não sei se aquele gasto é "desse mês" ou não. Se
+      você me disser "aqui a fatura bate com a do banco", eu entendo na hora.</li>
+      <li><strong>Saber quem gastou, e não só de qual conta saiu.</strong> Eu e minha esposa dividimos
+      as contas e isso é briga real em casa. O app do Nubank nunca vai resolver porque o dinheiro está
+      espalhado em dois nomes e três bancos.</li>
+    </ul>
+    <p>O resto é coisa que eu presumo que qualquer app faz.</p>
+    <p>Agora o problema de verdade, que não é concorrência: <strong>eu já tentei três apps desses e
+    parei em duas semanas.</strong> Não porque eram ruins — porque cansei de digitar. Então, pra mim,
+    essa integração com o banco não é uma feature que falta. É o produto. Sem ela você está me pedindo
+    R$29,90 por mês pra eu trabalhar de graça, quando meu banco já me mostra gasto por categoria sem
+    eu fazer nada.</p>
+    <p>O medo faz sentido, mas não pelo motivo que você pensa. Não é que tem muita gente fazendo. É
+    que <strong>nada do que você me contou é uma frase que eu repetiria pra um amigo.</strong> Se você
+    não consegue terminar "é o app pra quem ___", eu também não vou conseguir.</p>
+  </div>
+</details>
+
+<details>
+  <summary><span class="dot d4"></span> O Executor <span class="role">— "hipótese se testa em um dia, não em seis semanas"</span></summary>
+  <div class="body-in">
+    <p>Seu medo é uma hipótese, e hipótese se testa em um dia, não em seis semanas.</p>
+    <p><strong>Segunda-feira, 9h, sem escrever uma linha de código.</strong> Baixe Mobills, Organizze
+    e Minhas Economias. Crie conta grátis nos três. Lance exatamente o mesmo caso, cronometrando:
+    compra de R$600 em 6x, feita em 31/08, num cartão que fecha dia 30 e vence dia 10; rateada entre
+    duas pessoas (60/40) e paga em duas formas. Depois abra a tela de "quanto gastei em agosto" de
+    cada um.</p>
+    <p>Três resultados possíveis, e todos resolvem sua dúvida antes de quarta:</p>
+    <ul>
+      <li><strong>Eles erram a competência</strong> (meu palpite: a maioria joga em agosto ou não
+      deixa você separar os dois eixos). Então você não tem medo, tem diferencial — e tem o material
+      de marketing já pronto: três prints lado a lado, o seu certo, os outros errados. Isso é uma
+      página de comparação, não um discurso de posicionamento.</li>
+      <li><strong>Eles acertam tudo.</strong> Você economizou 6 semanas e R$160/mês. Vira projeto
+      pessoal excelente, e pronto.</li>
+      <li><strong>Eles acertam, mas em 8 telas e 4 minutos</strong> enquanto você faz em 1. Aí o
+      diferencial é velocidade de lançamento, e o teste é outro: cronômetro.</li>
+    </ul>
+    <p><strong>Terça:</strong> mande uma pergunta só para as ~5 pessoas que deram os 22 retornos — "se
+    eu desligasse o app amanhã, o que você faria na mão?". A resposta delas é sua descrição de
+    produto.</p>
+    <p>Open Finance não responde nada disso. Ele te iguala aos outros; não te diferencia. Construir
+    primeiro o que te iguala, para descobrir depois se você era diferente, é a ordem errada. Faça o
+    teste de duas horas antes de assinar qualquer R$160/mês.</p>
+  </div>
+</details>
+
+<h2>A rodada de revisão cruzada</h2>
+
+<p>As cinco respostas foram anonimizadas e embaralhadas. Cada revisor leu as cinco sem saber de quem
+eram, e apontou a mais forte, o maior ponto cego e o que todas deixaram passar.</p>
+
+<div class="grid">
+  <div>Letra</div><div>Conselheiro</div><div>Votos "mais forte"</div><div>Votos "maior ponto cego"</div>
+  <div class="who w4">A</div><div>O Executor</div><div class="v">—</div><div class="v">—</div>
+  <div class="who w5">B</div><div>O Contrarian</div><div class="v">—</div><div class="v">—</div>
+  <div class="who w3">C</div><div>O Outsider</div><div class="v yes">1</div><div class="v">—</div>
+  <div class="who w1">D</div><div>O Expansionista</div><div class="v">—</div><div class="v no">5 — unânime</div>
+  <div class="who w2">E</div><div>Primeiros Princípios</div><div class="v yes">4</div><div class="v">—</div>
+</div>
+
+<details>
+  <summary><span class="dot dx"></span> As cinco revisões, na íntegra</summary>
+  <div class="body-in">
+    <h3>Revisor 1</h3>
+    <p><strong>Mais forte: E.</strong> É a única que ataca a pergunta, não a lista de features:
+    diferenciação é propriedade da alternativa do comprador, não do produto. Nomeia a categoria
+    herdada errada ("tracker"), desmonta explicitamente o consenso unânime dos conselhos anteriores
+    como <em>pressuposto</em>, e fecha com teste falsificável em duas direções. B chega perto e
+    acrescenta o teste que importa (cobrar de dez estranhos hoje); A tem o melhor método, mas testa
+    paridade de feature, não disposição a pagar.</p>
+    <p><strong>Maior ponto cego: D.</strong> É só upside, sem uma única hipótese que possa falhar.
+    Licenciar "o motor" para CFP a R$99/assento e atacar MEI partindo de <strong>zero pagantes</strong>
+    e dev solo são dois produtos novos, não alavancas. E trata 811 testes como ativo comercial — C
+    mostra que o comprador não vê solda. Falta: qualquer teste, e o custo de foco de abrir três
+    frentes.</p>
+    <p><strong>Todas deixaram passar:</strong> <em>o meio-caminho</em> — C diz que abandonou por
+    digitação, não por falta de Open Finance; importar OFX/CSV resolve boa parte disso em dias, sem
+    R$160/mês e sem consentimento, e nenhuma resposta cogitou. E <em>a economia unitária do preço já
+    "fechado"</em> — 3 conexões × R$4 + reconsentimento anual + suporte de conexão quebrada corroem
+    R$29,90; break-even 9–14 pagantes assume churn zero.</p>
+
+    <h3>Revisor 2</h3>
+    <p><strong>Mais forte: E.</strong> É a única que ataca o erro de método, não só a resposta. Ela
+    nomeia a categoria herdada ("tracker") como a causa do medo, desmonta explicitamente o consenso
+    unânime dos conselhos anteriores em vez de herdá-lo, e fecha com um teste falsificável em duas
+    direções. A tem o melhor teste operacional (duas horas, três apps, um caso), mas mede features; E
+    mede comprador.</p>
+    <p><strong>Maior ponto cego: D.</strong> Com zero pagantes, ela empilha três produtos novos — nicho
+    casal, MEI/CNPJ, licenciar o motor a CFP a R$99/assento — e afirma sem verificação o que Mobills,
+    Organizze e Splitwise não fazem. Vender motor a planejador é B2B com ciclo longo, contrato e
+    suporte, o oposto de dev solo. B e E também apostam no nicho, mas testam antes.</p>
+    <p><strong>O que as cinco deixaram passar:</strong> o diferencial e o antídoto ao churn se
+    contradizem. C abandona apps por cansaço de digitar, mas o extrato do Open Finance jamais sabe
+    <strong>quem gastou</strong> — o eixo <code>ExpensePersons</code> só se preenche à mão. Automatizar
+    não remove o trabalho onde o produto é único. O conselho precisa decidir como o rateio analítico
+    sobrevive sem digitação (regras, sugestão, confirmação de um toque), ou o nicho morre pelo mesmo
+    motivo que os concorrentes.</p>
+
+    <h3>Revisor 3</h3>
+    <p><strong>Mais forte: C.</strong> É a única que fala da posição do comprador e não do dono. Valida
+    só duas coisas (competência do ciclo do cartão e "quem gastou") e mata o resto como "solda do
+    carro". Principalmente: identifica o inimigo real — não é Mobills, é o abandono por digitação em
+    duas semanas — e entrega o teste mais barato de todos: terminar a frase "é o app pra quem ___".</p>
+    <p><strong>Maior ponto cego: D.</strong> Inventa três mercados novos para um dev solo com
+    <strong>zero pagantes</strong> e nenhuma evidência de nenhum deles. Falta o que todas as outras têm:
+    um teste falsificável. É reposicionamento por entusiasmo.</p>
+    <p><strong>Todas deixaram passar:</strong> <em>o banco dele já tem a resposta</em> — uma query nos
+    22 usuários: quantos criaram <code>ExpensePersons</code> diferente de <code>ExpensePayments</code>?
+    Se quase ninguém usou os dois eixos, a tese de B, D e E cai hoje, de graça. E <em>existe
+    meio-caminho entre digitar e Open Finance</em>: import OFX/CSV e fatura, recorrência automática.</p>
+
+    <h3>Revisor 4</h3>
+    <p><strong>Mais forte: E.</strong> Diferenciação não é propriedade do app, é propriedade da
+    alternativa quebrada do comprador. Disso ela deriva o reenquadramento, a consequência incômoda e um
+    teste falsificável com critério de parada — "se for 'racha no meio', é projeto pessoal". A tem o
+    melhor teste operacional (2 horas, hoje) e complementa E.</p>
+    <p><strong>Maior ponto cego: D.</strong> Empilha quatro alavancas, todas dependentes da mesma
+    premissa não testada, com zero pagantes. Falta o passo que sustenta qualquer uma: uma venda a um
+    estranho. E ignora que membros ilimitados grátis também é custo de suporte, não só canal.</p>
+    <p><strong>Todas deixaram passar:</strong> ele já tem a evidência no próprio banco. Quantos
+    workspaces têm &gt;1 membro? Em quantos gastos <code>ExpensePayments</code> ≠
+    <code>ExpensePersons</code>? Se o eixo duplo não é usado pelos 22, a tese morre hoje, de graça. E
+    ninguém citou a terceira via: importar OFX/CSV/fatura mata "cansei de digitar" em dias, sem
+    R$160/mês nem agregador regulado.</p>
+
+    <h3>Revisor 5</h3>
+    <p><strong>Mais forte: E.</strong> É a única que ataca a premissa, não o sintoma. Daí sai a
+    consequência mais valiosa do conselho — Open Finance é o eixo onde ele é <em>comparável</em> — e um
+    teste falsificável. A é a melhor complementar: mesmo diagnóstico, teste ainda mais barato.</p>
+    <p><strong>Maior ponto cego: D.</strong> Empilha mercados que não existem no dado disponível para
+    quem tem <em>zero pagantes</em>. Afirma "Mobills não tem, Organizze não tem" sem ter verificado —
+    exatamente o teste que A propõe. E ignora que "membros ilimitados grátis" deixa de ser canal barato
+    quando cada consentimento custa R$4.</p>
+    <p><strong>O que as cinco passaram:</strong> a economia unitária do preço já fechado. R$29,90 com 3
+    conexões, R$160/mês fixo, R$4/consentimento — <strong>e consentimento de Open Finance expira e
+    precisa ser renovado</strong>, então é custo recorrente por conexão por membro, não one-off.
+    Break-even de 9–14 pagantes assume consumo mínimo e nenhum workspace familiar grande. Ninguém
+    checou se o preço sobrevive ao próprio diferencial (casa com 4 pessoas e 3 bancos cada).</p>
+  </div>
+</details>
+
+<footer>
+  <p><strong>Conselho de 28/09/2026</strong> — tema: diferenciação. Cinco conselheiros independentes,
+  revisão cruzada anônima, síntese do Chairman. Transcrição completa em
+  <a href="council-transcript-2026-09-28.md">council-transcript-2026-09-28.md</a>.</p>
+  <p>Conselhos anteriores sobre o mesmo produto: 31/07 (preço) · 02/08 (preço 2) · 03/08 (aquisição) ·
+  18/09 (preço por workspace). O que ficou decidido em 18/09 está em
+  <a href="../2026-09-18 Preço por workspace/Decisões.md">Decisões.md</a> — e este conselho
+  <strong>não</strong> reabre o preço: ele marca em que condição ele precisa ser relido.</p>
+</footer>
+
+</div>
+</body>
+</html>
