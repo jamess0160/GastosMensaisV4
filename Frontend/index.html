@@ -30,9 +30,29 @@
                instalado, no diálogo de instalar e no atalho de desktop.
 
              O `apple-touch-icon` fica fora dessa conversa: o iOS não tem máscara adaptativa —
-             ele arredonda os cantos da arte cheia, e por isso esse arquivo não leva margem. -->
+             ele arredonda os cantos da arte cheia, e por isso esse arquivo não leva margem.
+
+             **O hexadecimal no nome é o começo do sha256 do próprio arquivo**, pela mesma razão
+             que o Vite carimba hash nos `assets/`: o nome É a impressão digital, então trocar a
+             arte troca a URL. Sem isso, a Cloudflare na frente do site guarda o ícone por quatro
+             horas e serve a arte velha depois do deploy — medido, com `cf-cache-status: HIT` e
+             o `Content-Length` do arquivo anterior, enquanto a origem já respondia o novo. O
+             `site.webmanifest` escapa disso sozinho (a extensão não está na lista de tipos que
+             a Cloudflare cacheia, e ele responde `DYNAMIC`), e é por isso que basta ele apontar
+             para um nome novo: o manifesto chega na hora e pede a URL que ninguém tem em cache.
+
+             **Trocar a arte é trocar o hash junto**, nos dois lugares que a citam (aqui e no
+             manifesto) — o `sha256sum` de cada arquivo tem de bater com o nome dele. Esquecer
+             não quebra nada em desenvolvimento e volta a ser exatamente o bug acima, em
+             produção, horas depois.
+
+             **O `favicon.ico` é a exceção, e ela é deliberada**: `/favicon.ico` é um caminho que
+             o próprio navegador pede sozinho em alguns contextos, sem ler o `<link>`. Renomeado,
+             esse pedido cairia no `try_files` do nginx e receberia o `index.html` com
+             `Content-Type: image/x-icon`. Ele fica no nome fixo e paga o preço de uma purga
+             manual na Cloudflare no dia em que mudar. -->
         <link rel="icon" href="/favicon.ico" sizes="32x32" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.b3c3d14f.png" />
         <link rel="manifest" href="/site.webmanifest" />
 
         <!-- Inter e JetBrains Mono NÃO se pedem ao Google aqui: elas moram em
