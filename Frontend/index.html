@@ -12,7 +12,25 @@
         <!-- Derivados de `public/logo.png`, que continua servindo de IMAGEM no app mas deixou
              de ser o ícone: 761 KB baixados em toda visita para desenhar 16 pixels na aba.
              Precisam EXISTIR em `public/` — com o `try_files` do nginx, um ícone que falta não
-             dá 404, dá `index.html`. -->
+             dá 404, dá `index.html`.
+
+             O `site.webmanifest` declara CADA tamanho DUAS vezes, e os dois pares não são
+             redundância:
+
+             - `purpose: "maskable"` (`icon-*-maskable.png`) é o ícone do LANÇADOR do Android.
+               Sem um ícone marcado assim, o Android não confia que a arte sobrevive ao
+               recorte da máscara do aparelho (círculo, quadrado arredondado, gota) e aplica o
+               tratamento de ícone legado: encolhe a imagem inteira e a cola sobre um disco
+               branco. É isso, e não um tamanho faltando, que faz a marca aparecer pequena
+               dentro do ícone instalado. A máscara come até 10% de cada lado, então a arte
+               desses dois arquivos tem a margem embutida — o `G` cabe no círculo de 80% do
+               lado, que é a zona segura do formato;
+             - `purpose: "any"` (`icon-192.png`, `icon-512.png`) continua cheio até a borda,
+               porque ninguém o recorta: é ele que o Chrome usa na TELA DE CARREGAMENTO do app
+               instalado, no diálogo de instalar e no atalho de desktop.
+
+             O `apple-touch-icon` fica fora dessa conversa: o iOS não tem máscara adaptativa —
+             ele arredonda os cantos da arte cheia, e por isso esse arquivo não leva margem. -->
         <link rel="icon" href="/favicon.ico" sizes="32x32" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/site.webmanifest" />
