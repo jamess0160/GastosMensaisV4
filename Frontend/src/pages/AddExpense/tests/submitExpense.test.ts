@@ -1,6 +1,7 @@
 import { HttpResponse, http as msw } from "msw";
 import { describe, expect, it } from "vitest";
 import { server } from "@/test/server";
+import { personsFollowingTotal } from "../AddExpense";
 import { submitExpense } from "../sections/submitExpense";
 import { aDraft, fakeAddExpenseContext } from "./context";
 
@@ -343,6 +344,45 @@ describe("submitExpense · erro da API", () => {
         expect(context.failSubmit).toHaveBeenCalledWith(
             "A soma do rateio não bate com o valor total!",
         );
+    });
+});
+
+describe("personsFollowingTotal · o rateio de uma pessoa segue o total", () => {
+    /* Editar o valor de um gasto de uma pessoa só deixava o rateio
+       desatualizado, e salvar dava 406. Com UMA linha o rateio tem zero
+       graus de liberdade — só um valor fecha com o total —, e é isso que
+       torna seguro sobrescrever o que estava escrito. */
+
+    it("leva o total inteiro quando há uma pessoa só", () => {
+        expect(personsFollowingTotal([{ id: 7, value: 200 }], 350)).toEqual([
+            { id: 7, value: 350 },
+        ]);
+    });
+
+    it("NÃO toca nos valores quando há duas pessoas ou mais", () => {
+        // Aqui os graus de liberdade são reais: sobrescrever uma decisão
+        // de quem lançou é pior do que deixar o rateio aberto, e o
+        // editor acusa a diferença.
+        expect(
+            personsFollowingTotal(
+                [
+                    { id: 1, value: 120 },
+                    { id: 2, value: 80 },
+                ],
+                350,
+            ),
+        ).toEqual([
+            { id: 1, value: 120 },
+            { id: 2, value: 80 },
+        ]);
+    });
+
+    it("deixa a linha sem pessoa em branco", () => {
+        // Meia-linha preenchida sem alvo não conta para o total: o
+        // rateio passaria a nunca fechar.
+        expect(personsFollowingTotal([{ id: null, value: null }], 350)).toEqual([
+            { id: null, value: null },
+        ]);
     });
 });
 

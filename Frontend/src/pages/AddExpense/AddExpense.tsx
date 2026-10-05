@@ -65,6 +65,39 @@ const emptyDraft = (): ExpenseDraft => ({
     RecurrenceEndDate: null,
 });
 
+/** O rateio entre pessoas depois de o total mudar.
+ *
+ *  **Com exatamente UMA linha de pessoa, e ela tendo alvo, o valor dela
+ *  passa a ser o total** — a mesma regra da forma única logo abaixo, só
+ *  no outro eixo. Ali o rateio tem ZERO graus de liberdade: a API exige
+ *  que ele feche com o total, então existe um único valor válido, e não
+ *  atualizá-lo garante um 406 que alguém conserta à mão. O que o
+ *  `pristine` do `SplitEditor` protege — "a decisão de quem lançou" —
+ *  não existe quando nenhum outro número jamais foi válido.
+ *
+ *  A regra fica AQUI, e não no `pristine` do componente: o mesmo
+ *  `SplitEditor` é o do Orçamento, onde uma fatia única jamais pode ser
+ *  forçada ao total da renda. Com duas pessoas ou mais os graus de
+ *  liberdade são reais e só o SINAL é reposto — sobrescrever um valor
+ *  deliberado é pior do que deixar o rateio aberto, que o editor acusa.
+ *
+ *  "Uma linha COM ALVO" é a condição inteira: a linha em branco não
+ *  recebe valor, ou o formulário fica com meia-linha sem pessoa, que não
+ *  conta para o total (ver `usableLines`). E o sinal sai de graça —
+ *  atribuir o total já traz o sinal dele. */
+export const personsFollowingTotal = (
+    persons: readonly SplitLine[],
+    TotalValue: ApiTypes.Money | null,
+): SplitLine[] => {
+    const alone = persons.filter((line) => line.id !== null).length === 1;
+
+    return persons.map((line) =>
+        alone && line.id !== null
+            ? { ...line, value: TotalValue }
+            : { ...line, value: withSignOf(line.value, TotalValue) },
+    );
+};
+
 /** A caixa de campo do layout (`.inbox`): rótulo pequeno em cima, o
  *  controle sem moldura própria embaixo. */
 function Box({
@@ -266,7 +299,9 @@ export function AddExpense() {
     const singlePayment = draft.payments[0] ?? emptyLine();
 
     /** Com uma forma só, ela carrega o total inteiro: pedir o mesmo
-     *  número duas vezes é o jeito mais fácil de o rateio não fechar.
+     *  número duas vezes é o jeito mais fácil de o rateio não fechar. É
+     *  a mesma regra que vale para UMA pessoa, no eixo analítico — ver
+     *  `personsFollowingTotal`.
      *
      *  O SINAL do total é reposto nas linhas dos dois eixos: um gasto é
      *  inteiro positivo ou inteiro negativo, e a API recusa a mistura. */
@@ -279,10 +314,7 @@ export function AddExpense() {
                       value: withSignOf(line.value, TotalValue),
                   }))
                 : [{ ...singlePayment, value: TotalValue }],
-            persons: draft.persons.map((line) => ({
-                ...line,
-                value: withSignOf(line.value, TotalValue),
-            })),
+            persons: personsFollowingTotal(draft.persons, TotalValue),
         });
 
     /* O campo grande de valor é um `<input>` cru, para caber o tipo do
