@@ -1067,7 +1067,7 @@ export function Expenses() {
                     open={seriesDraft !== null}
                     onClose={() => setSeriesDraft(null)}
                     title="Esta ocorrência e as seguintes"
-                    subtitle="O que já passou fica como está — o corte é a data desta ocorrência, não o relógio."
+                    subtitle="O que já passou fica como está — o corte é a data desta ocorrência."
                     wide
                     footer={
                         <>

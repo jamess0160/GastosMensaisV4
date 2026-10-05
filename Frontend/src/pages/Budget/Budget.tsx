@@ -27,7 +27,7 @@ import {
     sumMoney,
 } from "@/lib/aggregate";
 import { categoryColor, paletteColor } from "@/lib/categoryColor";
-import { formatDateTime, formatMonthLabel, formatMonthShort } from "@/lib/date";
+import { formatDate, formatMonthLabel, formatMonthShort } from "@/lib/date";
 import { formatMoney, fromCents, toCents } from "@/lib/money";
 import type { ApiTypes } from "@/types/api";
 
@@ -342,10 +342,9 @@ export function Budget() {
                                 <div className={styles.closedTitle}>Mês fechado</div>
                                 <div className={styles.closedText}>
                                     {closedPeriod.ClosedAt
-                                        ? `Fechado em ${formatDateTime(closedPeriod.ClosedAt)}.`
+                                        ? `Fechado em ${formatDate(closedPeriod.ClosedAt)}.`
                                         : "Este mês já foi fechado."}{" "}
-                                    O rateio dele não muda mais — é o que mantém a história de um
-                                    mês encerrado de pé.
+                                    O rateio dele não muda mais
                                 </div>
                             </div>
                         </div>
