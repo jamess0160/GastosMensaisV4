@@ -41,7 +41,7 @@ Etapa por etapa, com commit e data: [Old/API/Levas executadas.md](Old/API/Levas%
 que fecha a última pendência que o front tinha contra a API.
 
 **15 suítes de integração**, sem um único teste unitário e sem nada mockado. A última contagem
-registrada é **811 testes**, no fim da leva 10 — eram 732 no fim da 7. A décima sexta suíte não
+registrada é **829 testes**, no fim da leva 11 — eram 811 no fim da 10 e 732 no fim da 7. A décima sexta suíte não
 foi apagada por descuido: `Budgets.test.ts` morreu com a tabela que ela cobria, na etapa 9 da
 leva 9 (`bedb31b`), quando o teto perene virou a repartição do mês e o que restou dela passou a
 ser coberto por `BudgetPeriods.test.ts`.
@@ -141,7 +141,9 @@ que o `CHECK` antigo proibia —, e o orçamento virou **uma repartição da ren
 mês é montável, inclusive o que ainda não chegou, clonando o anterior ou rateando a renda na
 tela nova `/orcamento`. Cada porção de gasto consome **uma** linha ou nenhuma, com precedência
 `(pessoa, categoria)` → `(pessoa, —)`, e o que não casa aparece como `Unbudgeted` em vez de
-sumir — sem isso a regra estrita seria silenciosa.
+sumir — sem isso a regra estrita seria silenciosa. **A leva 11 troca o denominador dessa
+repartição** — não a renda do mês, mas o que sobra dela depois dos fixos e das parcelas — e o
+casamento passou a ver só o gasto avulso; o que vale hoje está na seção da 11, abaixo.
 
 O resto: a lista de Gastos passou a mostrar **a parcela, e não a compra** (a tabela e a faixa de
 indicadores voltaram a somar a mesma coisa, e o vermelho de atraso passou a olhar o `CashDate`);
@@ -185,6 +187,59 @@ Pix inverte no tema escuro por token, em vez de um segundo arquivo; a lista de G
 ter ordem dentro de cada grupo; as categorias se reordenam **arrastando pela alça**, com as setas
 virando o teclado dela; a biometria saiu do desktop; e o rateio do gasto voltou a mostrar a
 pessoa arquivada que ele já aponta, em vez de uma linha em branco que recusa ao salvar.
+
+### Leva 11 — o dinheiro que já tem dono, fechada em 05/10
+
+**8 de 8 etapas**, escritas e executadas em 05/10:
+[Levas/11. O dinheiro que já tem dono, e a etiqueta que não voltava](Levas/11.%20O%20dinheiro%20que%20já%20tem%20dono,%20e%20a%20etiqueta%20que%20não%20voltava.md).
+É o terceiro retorno de uso, e o que a separa dos dois primeiros é de onde vem o item que dá nome
+a ela: a 9 e a 10 nasceram de listas de retornos — treze e oito —, e esta nasceu de **uma sessão
+montando o orçamento do mês corrente e não conseguindo responder a pergunta que a tela existe
+para responder**. A renda de outubro era 10.226 e **5.254 dela já tinham dono** — aluguel de uma
+série fixa lançada meses atrás, mensalidade de escola, parcela 7/10 de uma compra de abril —, e
+nada que fosse digitado naquela tela mudaria aqueles 5.254.
+
+**O orçamento deixa de repartir a renda e passa a repartir o que sobra dela**, e é uma troca de
+modelo **sem migration**: `Expenses.Kind` já separava `single`, `installment` e `fixed`, e a série
+fixa já materializava doze ocorrências reais com pernas reais — o comprometido de qualquer mês,
+inclusive de um mês futuro, já estava no banco. O que faltava era perguntar. `GET /Reports/Month`
+ganhou os três recortes (`ExpensesFixed`, `ExpensesInstallments`, `ExpensesSingle`), que são uma
+partição **exaustiva e disjunta** do `Expenses` e não uma coincidência aritmética que precise
+fechar por arredondamento. `BudgetSpent.getPortions` passou a casar **só o avulso**: a perna
+comprometida **sai do casamento** em vez de ser descontada duas vezes — descontar no topo e
+deixar as fatias contando tudo subtrairia o aluguel uma vez na renda e outra dentro do `Spent` de
+Moradia, errando na direção do pânico. E a tela virou uma cadeia que é uma **decomposição do
+`Available`** que o Início já mostrava: `abertura + renda − fixos − parcelas ± ajustes de virada =
+Livre para o mês`, com os quatro termos-ponte numa linha expansível, e `Livre − avulso =
+Available`. O Orçamento e o Início passaram a pousar no mesmo número **por identidade**, e antes
+nenhum dos dois fazia isso. O preço é um só, aceito e escrito nos rótulos: o `Spent` de uma fatia
+deixa de bater com o mesmo nome no Relatório, porque lá somam os três tipos e aqui só o avulso.
+
+**A tag passou a viajar com a perna.** O pedido era "o relatório não tem filtro de tag", e o
+problema era um degrau antes: a tag só voltava em `GET /Expenses/:id`, então o filtro não teria o
+que testar. `GET /ExpensePayments` ganhou uma **terceira consulta agrupada** — no padrão das duas
+que já fazia para não fazer uma por perna —, deliberadamente **sem o filtro de `Active`**, para
+que arquivar uma tag não a apague do relatório do ano passado em silêncio. Em cima disso vieram o
+filtro de etiqueta em Gastos e no Relatório, os chips nas linhas e uma coluna na planilha, **sem
+uma requisição a mais do que antes**. As opções do filtro saem das pernas que a tela já carregou,
+e não de um catálogo: tag é texto livre e ilimitada, e uma faixa de duzentos chips é inútil. No
+caminho, o predicado de filtro das pernas — que existia **duas vezes**, em Gastos e inline no
+Relatório — virou `Frontend/src/lib/legFilters.ts`, para a condição da tag ser escrita uma vez.
+
+O resto: cada linha do rateio mostra **a sobra ou a falta da mesma fatia no mês anterior** — é
+informação e não alimenta conta nenhuma, porque quem acumula é o saldo em conta dentro da cadeia;
+a entrada pode **nascer recebida**, por um booleano e nunca um `Status` (que proíbe `canceled` no
+nascimento por construção), invertendo uma decisão escrita em `create.ts` porque o risco que ela
+evitava já era aceito do outro lado, no `Paid` da perna de gasto; e o rateio de **uma** pessoa
+passou a seguir o total do gasto, onde ele tem zero graus de liberdade e não atualizar só
+garantia um 406 que alguém conserta à mão.
+
+**O que a leva nomeou e não fez.** A regra que sustenta o denominador novo é a do dono — reserva é
+dinheiro que **saiu** da conta, investido fora do app. Com uma conta de investimento cadastrada
+aqui, mover dinheiro para ela é um `transfer`, **neutro para o total**, então a reserva continuaria
+dentro do "Livre para o mês" e o orçamento a ofereceria para gastar. O conserto é um flag na conta
+(*"não entra no orçamento"*), é pequeno, e fica fora de propósito enquanto o investimento mora
+fora do app: é consequência conhecida, não pendência de etapa.
 
 ---
 

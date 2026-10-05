@@ -10,7 +10,7 @@ começar em 6 está em [../RoadMap MVP.md](../RoadMap%20MVP.md#as-levas-daqui-pr
 | [8. O que só se prova subindo](8.%20O%20que%20só%20se%20prova%20subindo.md) | escrita em 11/09/2026, **9 de 10 etapas** fechadas entre 11/09 e 13/09 — falta a do e-mail do domínio, que depende de conta no provedor e de registro no DNS |
 | [9. O que voltou de quem usa](9.%20O%20que%20voltou%20de%20quem%20usa.md) | escrita em 22/09/2026, 16 de 16 etapas fechadas em 23/09/2026 — **reaberta** em 28/09/2026 com a etapa 17, o mês do ciclo num cartão de fechamento cedo |
 | [10. O segundo retorno, e a porta de entrada](10.%20O%20segundo%20retorno,%20e%20a%20porta%20de%20entrada.md) | escrita em 23/09/2026, **fechada** em 24/09/2026 — 9 de 9 etapas |
-| [11. O dinheiro que já tem dono, e a etiqueta que não voltava](11.%20O%20dinheiro%20que%20já%20tem%20dono,%20e%20a%20etiqueta%20que%20não%20voltava.md) | escrita em 05/10/2026, **aberta** — 0 de 8 etapas |
+| [11. O dinheiro que já tem dono, e a etiqueta que não voltava](11.%20O%20dinheiro%20que%20já%20tem%20dono,%20e%20a%20etiqueta%20que%20não%20voltava.md) | escrita em 05/10/2026, **fechada** no mesmo dia — 8 de 8 etapas |
 
 **A 11 é o terceiro retorno de uso, e é a primeira que não nasce de uma lista de itens
 relatados.** A 9 e a 10 vieram de treze e de oito retornos; esta vem de **uma sessão montando o
