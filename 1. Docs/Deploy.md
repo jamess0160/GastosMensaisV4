@@ -505,6 +505,11 @@ permitir restaurar **uma tabela só**: o dia em que este procedimento for usado,
 provavelmente por causa de uma migration ruim ou de um `delete` errado, e nesses casos restaurar
 o banco inteiro é desfazer o trabalho de todos os outros usuários junto.
 
+**Quer o dado de produção na sua máquina, e não um restore aqui?** Não é este procedimento, e os
+comandos daqui não servem para aquilo — o caminho é
+[Dado de produção na máquina de dev](Dado%20de%20produção%20na%20máquina%20de%20dev.md), que tira
+um dump novo em vez de tocar nestes arquivos.
+
 Comece escolhendo o arquivo:
 
 ```bash
