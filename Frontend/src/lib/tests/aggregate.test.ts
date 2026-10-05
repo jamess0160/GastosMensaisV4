@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    budgetChain,
     budgetPercent,
     budgetRemaining,
     budgetState,
@@ -359,5 +360,106 @@ describe("orçamento com Spent negativo", () => {
 
     it("sobra MAIS do que o teto, que é a leitura certa", () => {
         expect(budgetRemaining(aBudgetPeriod({ LimitValue: 800, Spent: -120 }))).toBe(920);
+    });
+});
+
+describe("budgetChain", () => {
+    /* A cadeia do Orçamento é uma DECOMPOSIÇÃO do `Available` da rota, e
+       este describe existe para travar a identidade que a torna
+       verificável: `Livre − ExpensesSingle = Available`, ao centavo.
+
+       É ela que faz a última linha do Orçamento pousar no mesmo número
+       que o "Restante" do Início por identidade, e não por coincidência —
+       e se um dia não pousar, é a cadeia que está errada, não o Início. */
+
+    /** Um mês com centavos feios em todos os termos, e com o `Available`
+     *  escrito à mão: ele é a resposta da ROTA, não uma conta repetida
+     *  aqui — repeti-la faria o teste provar que a fórmula é igual a si
+     *  mesma. */
+    const aMonthReport = (overrides: Partial<ApiTypes.MonthReport> = {}): ApiTypes.MonthReport => ({
+        ReferenceMonth: "2026-10-01",
+        OpeningBalance: 1500.55,
+        InitialBalances: 300.1,
+        Inflows: 10226,
+        InflowsReceived: 10226,
+        InflowsPending: 0,
+        Expenses: 5508.07,
+        ExpensesFixed: 3454,
+        ExpensesInstallments: 1800,
+        ExpensesSingle: 254.07,
+        PastCommitments: 120.33,
+        OverdueReceivable: 90.01,
+        OverduePayable: 40.02,
+        Available: 6448.24,
+        CurrentBalance: 4000,
+        OpenInvoices: 0,
+        ...overrides,
+    });
+
+    it("soma os quatro termos-ponte numa linha só", () => {
+        //  300,10 − 120,33 + 90,01 − 40,02
+        expect(budgetChain(aMonthReport()).adjustments).toBe(229.76);
+    });
+
+    it("tira do que sobra o fixo e a parcela, e não o avulso", () => {
+        //  1.500,55 + 10.226,00 − 3.454,00 − 1.800,00 + 229,76
+        expect(budgetChain(aMonthReport()).free).toBe(6702.31);
+    });
+
+    /* **A propriedade que torna a etapa verificável.** */
+    it("fecha no Available da rota, ao centavo", () => {
+        const report = aMonthReport();
+
+        expect(budgetChain(report).available).toBe(report.Available);
+    });
+
+    /* O mesmo, num mês em que todos os termos-ponte são zero e o saldo de
+       abertura também: é o caso que abriu a leva 11 — 10.226 de renda,
+       5.254 entre fixos e parcelas, e a tela pedindo para repartir os
+       10.226. O que sobra é 4.972, e é ele o total do rateio. */
+    it("reparte o que sobra, e não a renda do mês", () => {
+        const chain = budgetChain(
+            aMonthReport({
+                OpeningBalance: 0,
+                InitialBalances: 0,
+                PastCommitments: 0,
+                OverdueReceivable: 0,
+                OverduePayable: 0,
+                ExpensesFixed: 3454,
+                ExpensesInstallments: 1800,
+                ExpensesSingle: 0,
+                Expenses: 5254,
+                Available: 4972,
+            }),
+        );
+
+        expect(chain.free).toBe(4972);
+        expect(chain.available).toBe(4972);
+    });
+
+    /* Um mês de estreia (conta aberta dentro dele) com vencido dos dois
+       lados: os quatro termos-ponte entram com sinais opostos, e a
+       identidade tem que sobreviver a isso. */
+    it("sobrevive aos termos-ponte com sinais opostos", () => {
+        const report = aMonthReport({
+            OpeningBalance: 0,
+            InitialBalances: 1500.33,
+            PastCommitments: 980.66,
+            OverdueReceivable: 12.01,
+            OverduePayable: 777.77,
+            //  0 + 1500,33 − 980,66 + 10226 − 5508,07 + 12,01 − 777,77
+            Available: 4471.84,
+        });
+
+        expect(budgetChain(report).available).toBe(report.Available);
+        //  E o que sobra é a última linha mais o avulso já gasto
+        expect(budgetChain(report).free).toBe(4725.91);
+    });
+
+    /* Enquanto a rota não respondeu não há cadeia, e os três são zero: é a
+       tela que decide mostrar traço, porque um zero aqui seria um número —
+       e errado. */
+    it("devolve zeros sem resposta nenhuma", () => {
+        expect(budgetChain(undefined)).toEqual({ adjustments: 0, free: 0, available: 0 });
     });
 });

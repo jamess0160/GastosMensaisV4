@@ -4,50 +4,148 @@
    não parecer de outro produto; o resto sai da forma da tela, que é um
    rateio: renda no topo, linhas no meio, o que sobrou no fim. */
 
-/* ── A renda do mês ───────────────────────────────────────── */
+/* ── A cadeia do que sobra ────────────────────────────────────
+   A forma é a de uma CONTA, e isso manda em tudo aqui: três colunas
+   fixas (o sinal, o nome, o valor), os valores alinhados pela direita
+   em `tabular-nums`, e os totais separados por uma régua. Uma cadeia
+   que não fecha visivelmente é pior do que nenhuma, e é o alinhamento
+   que faz a pessoa conseguir somar as linhas com o olho. */
 .income {
     display: flex;
     flex-direction: column;
     gap: 14px;
 }
 
-.incomeRow {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px 28px;
-}
-
-.incomeItem {
+.chain {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    min-width: 120px;
 }
 
-.incomeLabel {
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
-    color: var(--ink-2);
+.chainRow {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 0;
+    font-size: 13px;
 }
 
-.incomeValue {
-    font-size: 20px;
+/* A coluna do sinal é fixa: ele é o que diz a direção de cada termo, e
+   com largura variável os nomes deixariam de alinhar. */
+.chainSign {
+    width: 14px;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: -0.4px;
+    color: var(--ink-3);
     font-variant-numeric: tabular-nums;
 }
 
-/* O total é o número contra o qual o rateio se mede: ele fecha a linha
-   e vem destacado por isso, não por ser maior. */
-.incomeTotal {
-    margin-left: auto;
+.chainLabel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--ink-1);
+}
+
+.chainCaption {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink-3);
+}
+
+.chainValue {
+    flex-shrink: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
     text-align: right;
 }
 
-.incomeTotal .incomeValue {
+/* ── As duas linhas que a TELA compõe ──────────────────────
+   A régua acima delas é a mesma de uma conta de papel: ela separa os
+   termos do total que eles produzem. O "Livre" é o número contra o qual
+   o rateio se mede — destacado por isso, não por ser maior. */
+.chainRowTotal,
+.chainRowFinal {
+    border-top: 1px solid var(--border);
+    margin-top: 2px;
+    padding-top: 10px;
+}
+
+.chainRowTotal .chainLabel,
+.chainRowFinal .chainLabel {
+    font-weight: 700;
+}
+
+.chainRowTotal .chainValue {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
     color: var(--brand);
+}
+
+.chainRowFinal .chainValue {
+    font-size: 17px;
+    font-weight: 700;
+}
+
+/* ── Os quatro termos-ponte, recolhidos ───────────────────── */
+.bridge {
+    border-top: 1px dashed var(--border);
+    border-bottom: 1px dashed var(--border);
+}
+
+/* `display: flex` no summary também é o que tira o triângulo nativo: o
+   marcador só é desenhado em `display: list-item`, e a seta daqui é a
+   nossa, que gira. */
+.bridgeSummary {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 0;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.bridgeSummary::-webkit-details-marker {
+    display: none;
+}
+
+.bridgeChevron {
+    display: inline-flex;
+    align-self: center;
+    color: var(--ink-3);
+    transition: transform 0.15s ease;
+}
+
+.bridgeChevron svg {
+    width: 15px;
+    height: 15px;
+}
+
+.bridge[open] .bridgeChevron {
+    transform: rotate(180deg);
+}
+
+/* Os quatro recuam, e o recuo é o que diz que eles somam NA linha de
+   cima em vez de na cadeia. */
+.bridgeInner {
+    padding: 2px 0 10px 24px;
+}
+
+.bridgeInner .chainRow {
+    padding: 5px 0;
+    font-size: 12.5px;
+    color: var(--ink-2);
+}
+
+.bridgeNote {
+    margin: 8px 0 0;
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--ink-3);
 }
 
 .allocation {
@@ -70,12 +168,6 @@
     background: var(--neg-soft);
     border-color: var(--neg-soft);
     color: var(--neg-ink);
-}
-
-.incomeNote {
-    font-size: 11.5px;
-    line-height: 1.5;
-    color: var(--ink-3);
 }
 
 /* ── O painel das fatias ──────────────────────────────────── */
@@ -106,6 +198,18 @@
     font-size: 11px;
     color: var(--ink-2);
     font-variant-numeric: tabular-nums;
+}
+
+/* **A palavra que paga o preço da regra.** O `Spent` da fatia conta só
+   avulso desde a leva 11 — o fixo e a parcela saíram da renda lá em
+   cima —, e sem ela "Mercado" mostraria um número aqui e outro no
+   Relatório sem nada explicando a diferença. Fica discreta, mas fica. */
+.rowSpentTag {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--ink-3);
 }
 
 /* ── Mês fechado ──────────────────────────────────────────── */
@@ -232,9 +336,11 @@
 }
 
 @media (max-width: 720px) {
-    .incomeTotal {
-        margin-left: 0;
-        text-align: left;
+    /* No telefone a cadeia aperta a coluna do valor contra o nome: o
+       recuo dos termos-ponte cai para metade e as legendas somem do
+       caminho sozinhas, porque já quebram em linha própria. */
+    .bridgeInner {
+        padding-left: 12px;
     }
 
     /* A régua ao lado do valor não cabe em 390px junto dos dois

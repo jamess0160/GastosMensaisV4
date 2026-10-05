@@ -19,8 +19,10 @@ import { TestClient, TestDatabase, TestUser, UsersFactory } from "root/Utils/Tes
 //  4. **mês fechado recusa escrita** — o `ClosedAt` que a rotina carimba é a trava que impede
 //     reescrever a história de agosto em novembro.
 //
-//  E o comprometido, que é o que dá sentido ao número ao lado: a parcela conta no mês em que
-//  vence, e o pendente conta junto com o pago, ao contrário do saldo.
+//  E o comprometido, que é o que dá sentido ao número ao lado: **só o gasto avulso procura
+//  fatia** desde a leva 11 — o fixo e a parcela são descontados da renda antes do rateio, e
+//  deixá-los consumir fatia também os subtrairia duas vezes —, a perna é a unidade, e o pendente
+//  conta junto com o pago, ao contrário do saldo.
 
 describe("BudgetPeriods", () => {
 
@@ -175,9 +177,19 @@ describe("BudgetPeriods", () => {
             expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods[0].Spent).toBe(0)
         })
 
-        //  **A parcela pesa no mês em que vence, não no mês da compra.** Somar os 600 em agosto
-        //  estouraria a fatia por uma dívida que é de meio ano.
-        it("distribui a compra parcelada pelos meses das parcelas", async () => {
+        //  **A parcela não consome fatia nenhuma, em nenhum dos meses dela** — e este teste
+        //  afirmava exatamente o contrário até a leva 10: 600 em 6x comiam 100 da fatia de agosto
+        //  e 100 da de setembro, pela regra "conta a perna, não o gasto".
+        //
+        //  **A regra da perna não caiu**, e ela continua travada no avulso pago em duas pernas,
+        //  mais abaixo. O que mudou é quem procura fatia: o orçamento passou a repartir o que
+        //  **sobra** da renda, e o valor da parcela não é uma decisão daquele mês — é um fato que
+        //  já estava no banco antes de a tela abrir.
+        //
+        //  **O dinheiro não desaparece da tela, ele troca de lugar:** sai no
+        //  `ExpensesInstallments` de `GET /Reports/Month` e é descontado da renda **antes** do
+        //  rateio. Descontá-lo lá e deixá-lo consumir fatia aqui o subtrairia duas vezes.
+        it("não deixa a compra parcelada consumir fatia em nenhum dos meses dela", async () => {
             let workspace = await buildWorkspace()
 
             await createPeriod(workspace, { ReferenceMonth: "2026-08", LimitValue: 800 })
@@ -190,24 +202,88 @@ describe("BudgetPeriods", () => {
                 ExpenseDate: "2026-08-10",
             })
 
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-08`)).body.Periods[0].Spent).toBe(100)
-            expect((await workspace.client.get(`/BudgetPeriods?ReferenceMonth=2026-09`)).body.Periods[0].Spent).toBe(100)
+            for (let ReferenceMonth of ["2026-08", "2026-09"]) {
+                let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=${ReferenceMonth}`)
+
+                expect(response.body.Periods[0].Spent).toBe(0)
+                //  **Nem no `Unbudgeted`:** a parcela não é gasto "sem fatia", ela está fora do
+                //  rateio inteiro. Pô-la ali seria o alerta mais forte da tela apontando para o
+                //  dinheiro mais previsível do mês, que é o sintoma que abriu a leva.
+                expect(response.body.Unbudgeted).toBe(0)
+            }
+
+            //  E a perna continua pesando no mês, pelo outro lado da conta de fechamento
+            expect((await readReport(workspace, "2026-08")).ExpensesInstallments).toBe(100)
+        })
+
+        //  **A troca de modelo da leva 11, inteira num teste**: o mesmo mês, as mesmas duas
+        //  categorias, os três formatos de compra — e só o avulso procura fatia.
+        //
+        //  É o número que abriu a leva. A tela pedia para repartir 10.226 quando 5.254 já tinham
+        //  dono — o aluguel de uma série `fixed` lançada meses atrás e a parcela 7/10 de uma
+        //  compra de abril —, e nada digitado naquela tela mudaria aqueles 5.254.
+        //
+        //  A conta de fechamento que o usuário confere sozinho ganhou dois termos e continua
+        //  fechando, com **cada centavo em exatamente um balde**:
+        //
+        //      Σ Spent + Unbudgeted + ExpensesFixed + ExpensesInstallments = o gasto do mês
+        it("só o avulso consome fatia, e os quatro baldes somam o gasto do mês", async () => {
+            let workspace = await buildWorkspace()
+            let moradia = await createCategory(workspace, "Moradia")
+            let lazer = await createCategory(workspace, "Lazer")
+
+            //  Mercado é a categoria do arranjo, e é nela que a parcela e o avulso convivem
+            await createPeriod(workspace, { LimitValue: 800 })
+            await createPeriod(workspace, { IdCategory: moradia, LimitValue: 2000 })
+
+            //  O aluguel: série fixa nascida em agosto, 1.800 na ocorrência do mês
+            await createExpense(workspace, { TotalValue: 1800, Kind: "fixed", IdCategory: moradia, ExpenseDate: "2026-08-05" })
+            //  A parcela: 600 em 6x em Mercado, 100 no mês
+            await createExpense(workspace, { TotalValue: 600, Kind: "installment", InstallmentTotal: 6, ExpenseDate: "2026-08-10" })
+            //  O avulso: 250 em Mercado, que tem fatia, e 90 em Lazer, que não tem
+            await createExpense(workspace, { TotalValue: 250, ExpenseDate: "2026-08-12" })
+            await createExpense(workspace, { TotalValue: 90, IdCategory: lazer, ExpenseDate: "2026-08-13" })
+
+            let month = await readMonth(workspace)
+            let report = await readReport(workspace)
+
+            //  Mercado vê o avulso e ignora a parcela da MESMA categoria; Moradia ignora o
+            //  aluguel e fica em zero — não é um mês sem gasto, é um mês sem decisão
+            expect(month.Periods.map((item) => item.Spent)).toEqual([250, 0])
+            //  E o "fora do orçamento" volta a significar algo afiado: **avulso gasto sem fatia
+            //  que o cubra**, que é um alerta que merece o vermelho que ele já tem
+            expect(month.Unbudgeted).toBe(90)
+
+            expect(report.ExpensesFixed).toBe(1800)
+            expect(report.ExpensesInstallments).toBe(100)
+            expect(report.ExpensesSingle).toBe(340)
+            expect(report.Expenses).toBe(2240)
+
+            expect(month.total + month.Unbudgeted + report.ExpensesFixed + report.ExpensesInstallments).toBe(report.Expenses)
         })
 
         //  **O teste que sustenta a decisão do rateio.** Sem ele, o mesmo gasto contaria 600
         //  na fatia da pessoa e 100 na da categoria, e "quanto a Maria comprometeu em agosto"
         //  não teria resposta certa.
-        it("rateia a parcela pelo rateio do gasto: 600 em 6x da Maria dão 100 no mês", async () => {
+        //
+        //  Era um parcelado até a leva 11 e virou um **avulso pago em duas pernas** — 100 no
+        //  débito e 500 numa fatura que vence em setembro. A regra sob prova é a mesma, e é a da
+        //  perna: a porção é a parte daquela pessoa *naquela perna*, não na compra. O parcelado
+        //  deixou de servir para exercê-la porque ele não procura mais fatia nenhuma.
+        it("rateia a perna pelo rateio do gasto: 600 da Maria com 100 no mês dão 100", async () => {
             let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
             let IdPerson = await createPerson(workspace, "Maria")
 
             await createPersonPeriod(workspace, IdPerson, { ReferenceMonth: "2026-08", LimitValue: 500 })
 
             await createExpense(workspace, {
                 TotalValue: 600,
-                Kind: "installment",
-                InstallmentTotal: 6,
-                ExpenseDate: "2026-08-10",
+                ExpenseDate: "2026-08-21",
+                Payments: [
+                    { IdPaymentMethod: workspace.IdDebit, Value: 100, Paid: false },
+                    { IdPaymentMethod: card, Value: 500, Paid: false },
+                ],
                 Persons: [{ IdPerson, Value: 600 }],
             })
 
@@ -215,7 +291,7 @@ describe("BudgetPeriods", () => {
 
             expect(response.status).toBe(200)
             expect(response.body.Periods).toHaveLength(1)
-            //  100, não 600: o rateio é do gasto e a parcela é da perna
+            //  100, não 600: o rateio é do gasto e a perna é da forma de pagamento
             expect(response.body.Periods[0].Spent).toBe(100)
         })
 
@@ -248,9 +324,14 @@ describe("BudgetPeriods", () => {
         })
 
         //  O rateio arredonda **uma vez, no fim**: a divisão em numeric do Postgres tem
-        //  precisão de sobra, e arredondar por parcela espalharia o erro.
+        //  precisão de sobra, e arredondar por perna espalharia o erro.
+        //
+        //  A perna que produz a divisão feia é o débito de 100 de um avulso de 600 — o resto
+        //  vence na fatura de setembro. Era um parcelado até a leva 11, e trocou de formato pelo
+        //  mesmo motivo do teste acima: só o avulso procura fatia.
         it("arredonda o rateio uma vez, no fim", async () => {
             let workspace = await buildWorkspace()
+            let card = await createCard(workspace)
             let maria = await createPerson(workspace, "Maria")
             let joao = await createPerson(workspace, "João")
 
@@ -259,9 +340,11 @@ describe("BudgetPeriods", () => {
 
             await createExpense(workspace, {
                 TotalValue: 600,
-                Kind: "installment",
-                InstallmentTotal: 6,
-                ExpenseDate: "2026-08-10",
+                ExpenseDate: "2026-08-21",
+                Payments: [
+                    { IdPaymentMethod: workspace.IdDebit, Value: 100, Paid: false },
+                    { IdPaymentMethod: card, Value: 500, Paid: false },
+                ],
                 Persons: [{ IdPerson: maria, Value: 400 }, { IdPerson: joao, Value: 200 }],
             })
 
@@ -477,18 +560,26 @@ describe("BudgetPeriods", () => {
                 expect(month.Unbudgeted).toBe(0)
             })
 
-            //  **A porção é da PERNA, não da compra.** 600 em 6x rateados 400/200 não comem
-            //  400 e 200 de agosto: comem a parte de cada um **naquela parcela**, 66,67 e
-            //  33,33, e os dois juntos dão exatamente os 100 da perna.
-            it("a porção é da perna: o parcelado casa mês a mês", async () => {
+            //  **A porção é da PERNA, não da compra.** Um avulso de 600 rateado 400/200, com 100
+            //  no débito e 500 numa fatura que vence em setembro, não come 400 e 200 de agosto:
+            //  come a parte de cada um **naquela perna**, 66,67 e 33,33, e os dois juntos dão
+            //  exatamente os 100 da perna.
+            //
+            //  Era o parcelado que carregava este teste até a leva 11. A unidade continua sendo a
+            //  perna — o que saiu do rateio foi o FORMATO da compra, não a regra.
+            it("a porção é da perna: o avulso de duas pernas casa mês a mês", async () => {
                 let workspace = await buildWorkspace()
+                let card = await createCard(workspace)
                 let example = await buildAllocationExample(workspace)
 
                 await createExpense(workspace, {
                     TotalValue: 600,
-                    Kind: "installment",
-                    InstallmentTotal: 6,
+                    ExpenseDate: "2026-08-21",
                     IdCategory: example.alimentacao,
+                    Payments: [
+                        { IdPaymentMethod: workspace.IdDebit, Value: 100, Paid: false },
+                        { IdPaymentMethod: card, Value: 500, Paid: false },
+                    ],
                     Persons: [{ IdPerson: example.tiago, Value: 400 }, { IdPerson: example.luana, Value: 200 }],
                 })
 
@@ -1991,8 +2082,10 @@ function limit(item: { LimitValue: number }) {
  * O mês lido pelo id da fatia, e não pela posição na lista: com cinco fatias possíveis e uma
  * regra de precedência entre elas, `body.Periods[0]` vira adivinhação.
  *
- * `total` é a soma dos `Spent`, e ela existe por causa da conta que fecha a regra:
- * **soma dos `Spent` + `Unbudgeted` = o gasto do mês inteiro**.
+ * `total` é a soma dos `Spent`, e ela existe por causa da conta que fecha a regra — a que ganhou
+ * dois termos na leva 11, porque o fixo e a parcela saíram do rateio:
+ * **Σ `Spent` + `Unbudgeted` + `ExpensesFixed` + `ExpensesInstallments` = o gasto do mês**. Num
+ * mês só de avulso os dois últimos são zero, e ela volta a ser a soma de dois termos.
  */
 async function readMonth(workspace: TestWorkspace, ReferenceMonth = "2026-08") {
     let response = await workspace.client.get(`/BudgetPeriods?ReferenceMonth=${ReferenceMonth}`)
@@ -2006,6 +2099,29 @@ async function readMonth(workspace: TestWorkspace, ReferenceMonth = "2026-08") {
         spent: new Map(Periods.map((item): [number, number] => [item.IdBudgetPeriod, item.Spent])),
         total: Periods.reduce((sum, item) => sum + item.Spent, 0),
         Unbudgeted: response.body.Unbudgeted as number,
+    }
+}
+
+/**
+ * **O gasto do mês aberto por formato de compra**, de `GET /Reports/Month` — o outro lado da
+ * conta de fechamento do orçamento:
+ *
+ *     Σ Spent + Unbudgeted + ExpensesFixed + ExpensesInstallments = o gasto do mês
+ *
+ * Os dois últimos termos são lidos de LÁ, e não desta feature, porque eles não estão na resposta
+ * do orçamento de propósito: a tela já lê as duas rotas, e repetir o recorte aqui seria duas
+ * rotas respondendo a mesma pergunta — livres para divergir no dia em que uma mudar o filtro.
+ */
+async function readReport(workspace: TestWorkspace, ReferenceMonth = "2026-08") {
+    let response = await workspace.client.get(`/Reports/Month?ReferenceMonth=${ReferenceMonth}`)
+
+    expect(response.status).toBe(200)
+
+    return response.body as {
+        Expenses: number
+        ExpensesFixed: number
+        ExpensesInstallments: number
+        ExpensesSingle: number
     }
 }
 

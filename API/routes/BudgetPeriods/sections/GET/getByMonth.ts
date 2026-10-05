@@ -6,8 +6,13 @@ import { BudgetSpent } from "../BudgetSpent.section"
 import { Utils } from "root/Utils/Utils"
 import { BudgetPeriodsNamespace } from "../types"
 
-//  O orçamento do mês: cada fatia com o alvo dela e **quanto já foi comprometido**, mais o que
-//  o mês gastou **fora** de qualquer fatia.
+//  O orçamento do mês: cada fatia com o alvo dela e **quanto do avulso do mês já a comprometeu**,
+//  mais o avulso que o mês gastou **fora** de qualquer fatia.
+//
+//  **Só avulso, desde a leva 11**, e a regra está num lugar só — o filtro de `Kind` mora no
+//  `getPortions` (ver BudgetSpent.section.ts), que esta rota e a prévia chamam igual. O fixo e a
+//  parcela são descontados da renda **antes** do rateio, na tela; se também consumissem fatia
+//  aqui, o aluguel seria subtraído duas vezes.
 //
 //  **Qualquer mês responde** — passado, corrente ou futuro. Nada aqui nasce de rotina desde a
 //  leva 9: um mês tem orçamento porque alguém o montou, então navegar para outubro em setembro
@@ -22,7 +27,14 @@ import { BudgetPeriodsNamespace } from "../types"
 //  não de linha nenhuma. Ele existe porque o casamento é estrito (ver BudgetSpent.section.ts) —
 //  uma porção de gasto consome uma fatia ou nenhuma, e a que não consome nada precisa aparecer
 //  em algum lugar, ou a regra vira um sumiço silencioso de dinheiro. Com ele fecha a conta que
-//  o usuário confere sozinho: **soma dos `Spent` + `Unbudgeted` = o gasto do mês inteiro**.
+//  o usuário confere sozinho, e ela tem **quatro** termos desde a leva 11:
+//
+//      Σ Spent  +  Unbudgeted  +  ExpensesFixed  +  ExpensesInstallments  =  o gasto do mês
+//
+//  **E os dois últimos NÃO entram nesta resposta.** Foi o primeiro desenho da etapa e ele está
+//  errado: a tela do Orçamento já lê `GET /Reports/Month` para o cabeçalho da renda, e repetir
+//  `ExpensesFixed` aqui seria duas rotas respondendo a mesma pergunta — livres para divergir no
+//  dia em que uma das duas mudar o filtro.
 //
 //  **Não há mais um `Scope` derivado na resposta.** Ele existia para o cliente não deduzir o
 //  tipo pelo id nulo, e funcionava enquanto os formatos eram dois. Com três — só categoria, só

@@ -28,7 +28,7 @@ export interface MonthSpent {
     Unbudgeted: number
 }
 
-//  **Quanto já foi comprometido no mês, e de qual linha do orçamento.**
+//  **Quanto o mês já comprometeu em gasto AVULSO, e de qual linha do orçamento.**
 //
 //  **Cada porção de gasto consome uma linha, ou nenhuma** — nunca duas. Era o furo que o alvo
 //  duplo abriu: com as duas consultas independentes de antes (uma por categoria, outra por
@@ -58,10 +58,35 @@ export interface MonthSpent {
 //  lida e testada num lugar só. A consulta produz as porções do mês — uma dúzia de linhas, como
 //  as do orçamento — e o casamento acontece contra um índice em memória.
 //
+//  **Só o gasto AVULSO procura fatia**, e é a troca de modelo da leva 11: o orçamento deixou de
+//  repartir a renda do mês e passou a repartir **o que sobra dela**. O fixo e a parcela saem da
+//  renda antes do rateio — eles não são uma decisão daquele mês, são um fato que já estava no
+//  banco antes de a tela abrir —, então a fatia mede o teto do que se **escolhe** gastar.
+//
+//  **E a perna comprometida tinha que sair daqui, não só do topo.** Descontar o aluguel da renda
+//  e deixar a fatia de Moradia continuar contando a perna dele o subtrairia **duas vezes**: a
+//  régua da fatia passaria a medir um teto de avulso contra um gasto que inclui o comprometido, e
+//  erraria na direção do pânico — estouro onde não há. Saldo plausível e errado é a pior falha
+//  deste app, e essa seria uma.
+//
+//  O preço é de **rótulo, e ele fica visível na tela**: o `Spent` da fatia "Mercado" deixa de
+//  bater com "Mercado" no Relatório, onde a soma continua sendo de tudo. São perguntas
+//  diferentes, e por isso a tela do Orçamento diz **avulso** com a palavra escrita. É o mesmo
+//  preço que o `Unbudgeted` já paga desde a leva 9.
+//
+//  A conta de fechamento que o usuário confere sozinho ganhou um termo e continua fechando, com
+//  **cada centavo em exatamente um balde**:
+//
+//      Σ Spent  +  Unbudgeted  +  ExpensesFixed  +  ExpensesInstallments  =  o gasto do mês
+//
+//  Os dois últimos saem de `GET /Reports/Month` (a partição por `Kind`), e não desta rota: duas
+//  rotas respondendo a mesma pergunta são duas rotas livres para divergir.
+//
 //  As três regras de sempre continuam valendo e não mudaram:
 //
-//  1. **Conta a perna, não o gasto.** 600 em 6x não come 600 do orçamento de agosto: come 100
-//     em cada um dos seis meses, que é como o dinheiro sai e como a pessoa orça.
+//  1. **Conta a perna, não o gasto.** Um avulso de 300 pago metade no débito e metade na fatura
+//     que vence no mês seguinte come 150 de agosto e 150 de setembro, que é como o dinheiro sai
+//     e como a pessoa orça.
 //  2. **A data que vale é a `CompetenceDate` da perna**, congelada no lançamento — o mês em que
 //     o gasto *pesa*, nunca o mês em que o dinheiro sai (esse é o `CashDate`, e é do saldo).
 //  3. **Conta pago e pendente, ao contrário do saldo.** Saldo é realizado; orçamento é
@@ -69,7 +94,7 @@ export interface MonthSpent {
 class Controller {
 
     /**
-     * **As porções do mês, numa consulta só.**
+     * **As porções de AVULSO do mês, numa consulta só.**
      *
      * O `leftJoin` de `ExpensePersons` é o que dá as duas formas de porção em uma passada: a
      * perna rateada vira uma porção por pessoa, e a perna de um gasto **sem rateio** sobrevive
@@ -79,9 +104,11 @@ class Controller {
      *
      *     valor da porção = ExpensePersons.Value * ExpensePayments.Value / Expenses.TotalValue
      *
-     * **O rateio é do gasto e a parcela é da perna**, então a porção é a parte daquela pessoa
-     * *naquela parcela*. 600 em 6x todos da Maria dão **100 por mês**, não 600. Quem "otimizar"
-     * somando antes e rateando depois muda a conta.
+     * **O rateio é do gasto e a perna é da forma de pagamento**, então a porção é a parte daquela
+     * pessoa *naquela perna*. Um avulso de 600 todo da Maria, 100 no débito e 500 numa fatura que
+     * vence no mês seguinte, dá **100 neste mês**, não 600 — e o `Kind` filtrado acima não muda
+     * isso: a perna continua sendo a unidade. Quem "otimizar" somando antes e rateando depois
+     * muda a conta.
      *
      * Agrupa por `(IdCategory, IdPerson)` porque é exatamente a chave que o casamento lê: o
      * par é o que decide a linha, então duas porções do mesmo par sempre terminariam na mesma
@@ -104,6 +131,17 @@ class Controller {
             .innerJoin("Expenses", "Expenses.IdExpense", "ExpensePayments.IdExpense")
             .leftJoin("ExpensePersons", "ExpensePersons.IdExpense", "Expenses.IdExpense")
             .where("Expenses.IdWorkspace", IdWorkspace)
+            //  **A linha que troca o modelo da leva 11, e ela é uma só de propósito.** O fixo e a
+            //  parcela são descontados da renda antes do rateio (ver o cabeçalho), então a perna
+            //  deles não pode voltar a consumir fatia aqui — seria o mesmo dinheiro subtraído duas
+            //  vezes. `Kind` é do GASTO, não da perna: a perna não tem formato.
+            //
+            //  Está aqui, e não nas rotas, porque `GET /BudgetPeriods` e
+            //  `POST /BudgetPeriods/preview` chamam este mesmo método: o filtro cobre a leitura e
+            //  a prévia de uma vez, e a prévia continua sendo ao centavo o que o `GET` responderia
+            //  depois de salvar. Uma segunda regra em qualquer um dos dois seria a primeira
+            //  divergência entre eles.
+            .where("Expenses.Kind", "single")
             //  Gasto cancelado não compromete teto nenhum, como não move saldo.
             .whereNot("Expenses.Status", "canceled")
             .where("ExpensePayments.CompetenceDate", ">=", ReferenceMonth)
@@ -122,9 +160,10 @@ class Controller {
      * da consulta acima e as linhas vêm do mês já lido.
      *
      * As linhas que entram aqui são as que a rota vai **mostrar**, e isso fecha uma conta que
-     * o usuário consegue conferir: `soma dos Spent + Unbudgeted = o gasto do mês inteiro`
-     * (a menos de centavos de arredondamento). Uma linha de alvo arquivado sai da tela, e o
-     * que ela consumiria volta a procurar linha como qualquer outra porção.
+     * o usuário consegue conferir: `Σ Spent + Unbudgeted + ExpensesFixed + ExpensesInstallments
+     * = o gasto do mês inteiro` (a menos de centavos de arredondamento) — os dois últimos termos
+     * vindos de `GET /Reports/Month`, porque aqui só entra avulso. Uma linha de alvo arquivado
+     * sai da tela, e o que ela consumiria volta a procurar linha como qualquer outra porção.
      *
      * Os três índices são separados porque os três formatos de alvo são alvos **diferentes**:
      * "Mercado" e "Maria em Mercado" convivem no mesmo mês, e é por isso que a unicidade no

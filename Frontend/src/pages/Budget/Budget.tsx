@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { BudgetController, type BudgetContext, type BudgetLine } from "./controller";
@@ -17,9 +17,10 @@ import { SplitEditor, type SplitOption } from "@/ui/SplitEditor";
 import { ProgressMeter } from "@/ui/budget";
 import { FormError, FormNotice, cx } from "@/ui/form";
 import { CategoryIcon } from "@/ui/iconCatalog";
-import { IconAlert, IconPlus } from "@/ui/icons";
+import { IconAlert, IconChevronDown, IconPlus } from "@/ui/icons";
 import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import {
+    budgetChain,
     budgetPercent,
     budgetState,
     budgetTargetKey,
@@ -48,15 +49,67 @@ import type { ApiTypes } from "@/types/api";
    o que ficou fora), aqui se DECIDE. É a mesma relação que Contas tem
    com o Extrato.
 
-   ── A tela abre pela RENDA, e nenhum número dela é somado aqui ──
+   ── A tela abre pela CADEIA do que sobra, não pela renda ──
 
-   "Entrou 3.200 · a receber 1.800 · total 5.000" sai inteiro de
-   `GET /Reports/Month`. Somar as entradas do mês no cliente para
-   conferir seria refazer o filtro de transferência e o de cancelada —
-   as duas regras que, replicadas, fazem o mesmo dinheiro ser contado
-   duas vezes. O que a tela soma é o que ela mesma escreveu: o total
-   ALOCADO, que é a soma das linhas que o usuário está editando, e a
-   sobra que sai dele.
+   Até a leva 10 ela abria pelos três números da renda — "entrou 3.200 ·
+   a receber 1.800 · total 5.000" — e repartia aquele total. O número que
+   abriu a leva 11 foi esse: 10.226 de renda, 5.254 **já com dono** (o
+   aluguel de uma série `fixed` lançada meses atrás, a parcela 7/10 de
+   uma compra de abril), e a tela anunciando 10.226 a distribuir. A sobra
+   mentia por 5.254, e nada digitado aqui mudaria aqueles 5.254: eles já
+   estavam no banco, com competência neste mês, antes de a tela abrir.
+
+   **O orçamento passou a repartir o que SOBRA da renda**, e a cadeia é:
+
+       Em conta no dia 1º            OpeningBalance
+     + Renda do mês                  Inflows
+     − Fixos do mês                  ExpensesFixed
+     − Parcelas do mês               ExpensesInstallments
+     ± Ajustes de virada             os quatro termos-ponte
+     ──────────────────────────────────────────────────────
+     = Livre para o mês                                      <- o total do rateio
+     − Avulso já gasto               ExpensesSingle
+     ──────────────────────────────────────────────────────
+     = Ainda posso gastar            ** = Available **       <- o número do Início
+
+   **Ela é uma DECOMPOSIÇÃO do `Available`, não uma fórmula nova.** Todos
+   os termos vêm prontos de `GET /Reports/Month`, e o que acontece aqui é
+   soma e subtração em centavos — `budgetChain`, em src/lib/aggregate.ts,
+   com teste. A propriedade que a torna verificável é `Livre −
+   ExpensesSingle = Available`: a última linha bate **ao centavo** com o
+   "Restante" do Início, por identidade e não por coincidência. Se um dia
+   não bater, é a cadeia que está errada.
+
+   Os quatro termos-ponte ficam numa linha EXPANSÍVEL, e os dois motivos
+   se puxam: aberta, a tela abre com sete linhas de contabilidade;
+   escondida, a cadeia não fecha visivelmente — e uma cadeia que não
+   fecha é pior do que nenhuma. O preço de juntá-los é de rótulo: numa
+   tela de novembro, a fatura que vence semana que vem aparece sob um
+   termo chamado "vencido". A nota de dentro diz isso.
+
+   ── A perna comprometida saiu do CASAMENTO, não só do topo ──
+
+   Se o fixo e a parcela fossem descontados aqui em cima e as fatias
+   continuassem contando tudo, a perna do aluguel em "Moradia" seria
+   subtraída DUAS vezes — e erraria na direção do pânico, mostrando
+   estouro onde não há. Por isso o `getPortions` da API filtra
+   `Kind = 'single'`: o `Spent` de cada fatia e o `Unbudgeted` do mês são
+   de avulso, e só.
+
+   O preço é de rótulo e fica NA TELA: "Mercado" aqui não bate mais com
+   "Mercado" no Relatório, onde a soma é de tudo. São perguntas
+   diferentes, e é por isso que a palavra **avulso** aparece escrita ao
+   lado da régua — o mesmo preço que o `Unbudgeted` já paga desde a
+   leva 9: a exclusão fica visível em vez de silenciosa.
+
+   ── E nenhum número da rota é somado do zero aqui ──
+
+   Os três da renda saem inteiros de `GET /Reports/Month`: somar as
+   entradas do mês no cliente para conferir seria refazer o filtro de
+   transferência e o de cancelada — as duas regras que, replicadas, fazem
+   o mesmo dinheiro ser contado duas vezes. O que a tela soma é o que ela
+   mesma escreveu: o total ALOCADO, que é a soma das linhas que o usuário
+   está editando, e a sobra que sai dele.
 
    ── O rateio daqui NÃO precisa fechar ──
 
@@ -64,8 +117,8 @@ import type { ApiTypes } from "@/types/api";
    `closure="loose"` do SplitEditor: lá a soma tem que bater com o total
    ou é 406; aqui sobrar é o normal — o que não foi alocado é,
    literalmente, o que ainda não foi orçado. O que a tela sinaliza é o
-   ESTOURO, e mesmo ele não impede salvar: a renda do mês ainda pode
-   crescer, e a API não lê renda nenhuma para responder.
+   ESTOURO, e mesmo ele não impede salvar: o que sobra da renda ainda
+   pode crescer, e a API não lê total nenhum para responder.
 
    ── Mês fechado abre em LEITURA ──
 
@@ -74,6 +127,65 @@ import type { ApiTypes } from "@/types/api";
    qualquer escrita, e a tela não oferece um controle que sempre
    falharia — ela mostra a data do fechamento no lugar deles.
    ════════════════════════════════════════════════════════════ */
+
+/** Uma linha da cadeia: o sinal, o que ela é, e o valor.
+ *
+ *  **O sinal não é decoração e por isso não é `aria-hidden`:** sem ele a
+ *  linha "Fixos do mês R$ 3.454,00" não diz que o número está sendo
+ *  subtraído, e é justamente a direção de cada termo que faz a cadeia
+ *  fechar. "−" e "=" são lidos como tal.
+ *
+ *  O valor chega FORMATADO, e isso é de propósito: quem decide mostrar o
+ *  traço enquanto a rota não respondeu é a tela, num lugar só (`money`). */
+function ChainRow({
+    sign,
+    label,
+    caption,
+    value,
+    tone,
+}: {
+    sign?: string;
+    label: string;
+    caption?: string;
+    value: string;
+    /** `total` é o "Livre para o mês" e `final` é o "Ainda posso gastar" —
+     *  as duas linhas que a tela compõe, destacadas por isso. */
+    tone?: "total" | "final";
+}) {
+    return (
+        <div
+            className={cx(
+                styles.chainRow,
+                tone === "total" && styles.chainRowTotal,
+                tone === "final" && styles.chainRowFinal,
+            )}
+        >
+            <span className={styles.chainSign}>{sign}</span>
+            <span className={styles.chainLabel}>
+                {label}
+                {caption && <span className={styles.chainCaption}>{caption}</span>}
+            </span>
+            <span className={styles.chainValue}>{value}</span>
+        </div>
+    );
+}
+
+/** O comprometido ao lado de uma linha do rateio — e **só de avulso**,
+ *  com a palavra escrita.
+ *
+ *  O rótulo é o preço de o fixo e a parcela saírem do casamento (ver o
+ *  cabeçalho), e ele fica na tela porque sem ele o mesmo nome mostraria
+ *  dois números em duas telas sem nada explicando a diferença. */
+function RowSpent({ spent, children }: { spent: ApiTypes.Money; children: ReactNode }) {
+    return (
+        <span className={styles.rowSpent}>
+            <span className={styles.rowSpentValue}>
+                {formatMoney(spent)} <span className={styles.rowSpentTag}>avulso</span>
+            </span>
+            {children}
+        </span>
+    );
+}
 
 /** A linha em branco do rateio. Os DOIS alvos nascem vazios: a fatia
  *  pode ser de pessoa, de categoria, ou das duas. */
@@ -168,13 +280,32 @@ export function Budget() {
         [month, lines, invalidateMovement],
     );
 
-    /* ── A renda do mês: três números, nenhum somado aqui ─────
+    /* ── Os termos da cadeia, todos vindos da rota ────────────
        Ver o cabeçalho. `Inflows` é competência — pendente junto com
-       recebida —, e é ele o total contra o qual o rateio se mede: orçar
-       só o que já caiu na conta seria orçar depois do mês ter acabado. */
+       recebida —, porque orçar só o que já caiu na conta seria orçar
+       depois do mês ter acabado. */
     const received = report.data?.InflowsReceived ?? 0;
     const expected = report.data?.InflowsPending ?? 0;
     const income = report.data?.Inflows ?? 0;
+    const opening = report.data?.OpeningBalance ?? 0;
+    const fixed = report.data?.ExpensesFixed ?? 0;
+    const installments = report.data?.ExpensesInstallments ?? 0;
+    const single = report.data?.ExpensesSingle ?? 0;
+    /* Os quatro termos-ponte, que existem porque a abertura é CAIXA e o
+       fluxo é COMPETÊNCIA: a abertura de novembro lida em outubro não tem
+       o salário que ainda não caiu nem a fatura que ainda não foi paga, e
+       os quatro capturam exatamente esses — cada perna uma vez só. */
+    const initialBalances = report.data?.InitialBalances ?? 0;
+    const pastCommitments = report.data?.PastCommitments ?? 0;
+    const overdueReceivable = report.data?.OverdueReceivable ?? 0;
+    const overduePayable = report.data?.OverduePayable ?? 0;
+
+    /* **O que sobra da renda, e o que ainda dá para gastar.** A conta
+       inteira é uma decomposição do `Available` da rota, em centavos e com
+       teste — ver `budgetChain`. `chain.available` é o `Available` de
+       volta, ao centavo: é ele que faz a última linha desta tela pousar no
+       mesmo número que o "Restante" do Início. */
+    const chain = budgetChain(report.data);
 
     /** Enquanto a rota não respondeu, o traço — um zero aqui seria um
      *  número, e um número errado. */
@@ -182,9 +313,13 @@ export function Budget() {
 
     /* O que a tela SOMA é só o que ela mesma escreveu: as linhas do
        rascunho. Em centavos, porque somar trinta linhas em ponto
-       flutuante erra o centavo do total. */
+       flutuante erra o centavo do total.
+
+       **E a sobra é medida contra o LIVRE, não contra a renda.** Era aqui
+       que ela mentia: com o mês em branco a tela anunciava os 10.226
+       inteiros a distribuir quando existiam 4.972. */
     const allocated = sumMoney(lines.map((line) => line.value ?? 0));
-    const remainder = fromCents(toCents(income) - toCents(allocated));
+    const remainder = fromCents(toCents(chain.free) - toCents(allocated));
 
     const personOptions = useMemo<SplitOption[]>(
         () =>
@@ -283,21 +418,95 @@ export function Budget() {
                 <FormError>{error}</FormError>
                 <FormNotice>{notice}</FormNotice>
 
-                {/* ── A renda, que é por onde a tela abre ──────── */}
+                {/* ── A cadeia, que é por onde a tela abre ──────
+                    Uma decomposição do `Available`: cada linha é um termo
+                    que a rota já respondeu, e as duas linhas de total são
+                    o que a tela compõe em centavos. Ver o cabeçalho. */}
                 <Card className={styles.income}>
-                    <div className={styles.incomeRow}>
-                        <div className={styles.incomeItem}>
-                            <span className={styles.incomeLabel}>Entrou</span>
-                            <span className={styles.incomeValue}>{money(received)}</span>
-                        </div>
-                        <div className={styles.incomeItem}>
-                            <span className={styles.incomeLabel}>A receber</span>
-                            <span className={styles.incomeValue}>{money(expected)}</span>
-                        </div>
-                        <div className={cx(styles.incomeItem, styles.incomeTotal)}>
-                            <span className={styles.incomeLabel}>Total do mês</span>
-                            <span className={styles.incomeValue}>{money(income)}</span>
-                        </div>
+                    <div className={styles.chain}>
+                        <ChainRow label="Em conta no dia 1º" value={money(opening)} />
+                        <ChainRow
+                            sign="+"
+                            label="Renda do mês"
+                            caption={`entrou ${money(received)} · a receber ${money(expected)}`}
+                            value={money(income)}
+                        />
+                        <ChainRow sign="−" label="Fixos do mês" value={money(fixed)} />
+                        <ChainRow sign="−" label="Parcelas do mês" value={money(installments)} />
+
+                        {/* ── Os quatro termos-ponte ───────────────
+                            Numa linha só, e expansível: aberta ela abre a
+                            tela com sete linhas de contabilidade, e
+                            escondida de vez a cadeia não fecharia
+                            visivelmente — uma cadeia que não fecha é pior
+                            do que nenhuma.
+
+                            `<details>` nativo e não estado de React: o
+                            navegador dá o teclado, o foco e o estado de
+                            expandido de graça. */}
+                        <details className={styles.bridge}>
+                            <summary className={styles.bridgeSummary}>
+                                <span className={styles.chainSign}>±</span>
+                                <span className={styles.chainLabel}>
+                                    Ajustes de virada
+                                    <span className={styles.chainCaption}>
+                                        o que a virada do mês deixa para trás
+                                    </span>
+                                </span>
+                                <span className={styles.chainValue}>
+                                    {money(chain.adjustments)}
+                                </span>
+                                <span className={styles.bridgeChevron} aria-hidden="true">
+                                    <IconChevronDown />
+                                </span>
+                            </summary>
+
+                            <div className={styles.bridgeInner}>
+                                <ChainRow
+                                    sign="+"
+                                    label="Contas abertas dentro do mês"
+                                    value={money(initialBalances)}
+                                />
+                                <ChainRow
+                                    sign="−"
+                                    label="Já pesou antes, e o dinheiro ainda está aqui"
+                                    value={money(pastCommitments)}
+                                />
+                                <ChainRow
+                                    sign="+"
+                                    label="A receber vencido"
+                                    value={money(overdueReceivable)}
+                                />
+                                <ChainRow
+                                    sign="−"
+                                    label="A pagar vencido"
+                                    value={money(overduePayable)}
+                                />
+                                <p className={styles.bridgeNote}>
+                                    O saldo do dia 1º é <b>caixa</b> e o resto da cadeia é{" "}
+                                    <b>competência</b>: estes quatro costuram as duas bases, cada
+                                    perna uma vez só. Num mês futuro, &quot;vencido&quot; quer dizer{" "}
+                                    <b>de antes dele</b> — com a tela em novembro, a fatura que
+                                    vence semana que vem aparece aqui.
+                                </p>
+                            </div>
+                        </details>
+
+                        <ChainRow
+                            sign="="
+                            label="Livre para o mês"
+                            caption="é este o total que o rateio reparte"
+                            value={money(chain.free)}
+                            tone="total"
+                        />
+                        <ChainRow sign="−" label="Avulso já gasto" value={money(single)} />
+                        <ChainRow
+                            sign="="
+                            label="Ainda posso gastar"
+                            caption="o mesmo número do Início, ao centavo"
+                            value={money(chain.available)}
+                            tone="final"
+                        />
                     </div>
 
                     {/* O que a tela soma sozinha: o alocado e a sobra. O
@@ -315,7 +524,7 @@ export function Budget() {
                                 </>
                             ) : (
                                 <>
-                                    <b>{formatMoney(-remainder)}</b> acima do que entra no mês
+                                    <b>{formatMoney(-remainder)}</b> acima do que sobra no mês
                                 </>
                             )}
                         </span>
@@ -418,7 +627,7 @@ export function Budget() {
                             adicionar, ao lado. */}
                         <SplitEditor
                             label={`Rateio de ${formatMonthLabel(month)}`}
-                            hint="Cada linha é uma fatia da renda. A pessoa, a categoria, ou as duas"
+                            hint="Cada linha é uma fatia do que sobra, e a régua dela mede o avulso. A pessoa, a categoria, ou as duas"
                             closure="loose"
                             options={personOptions}
                             optionLabel="Pessoa"
@@ -427,7 +636,13 @@ export function Budget() {
                             addLabel="Adicionar fatia"
                             lines={lines}
                             onChange={setLines}
-                            total={income}
+                            /* **O total é o LIVRE, não a renda** — é a
+                               troca de modelo da leva 11 chegando no
+                               editor: o botão de distribuir o que sobra, a
+                               sobra e o aviso de estouro passam todos a se
+                               medir contra o que resta depois do fixo e da
+                               parcela. */
+                            total={chain.free}
                             disabled={pending}
                             rowExtra={(_, line) => {
                                 const key = budgetTargetKey(line.secondaryId ?? null, line.id);
@@ -441,10 +656,7 @@ export function Budget() {
                                     preview.data?.spentByTarget.get(key) ?? period?.Spent ?? 0;
 
                                 return (
-                                    <span className={styles.rowSpent}>
-                                        <span className={styles.rowSpentValue}>
-                                            {formatMoney(spent)}
-                                        </span>
+                                    <RowSpent spent={spent}>
                                         <ProgressMeter
                                             height={6}
                                             percent={budgetPercent({
@@ -458,7 +670,7 @@ export function Budget() {
                                                 AlertPercent: period?.AlertPercent ?? 80,
                                             })}
                                         />
-                                    </span>
+                                    </RowSpent>
                                 );
                             }}
                         />
@@ -472,11 +684,22 @@ export function Budget() {
                             simplesmente não apareceria em lugar nenhum
                             desta tela.
 
-                            Vem da API como tudo o mais aqui: soma dos
-                            `Spent` + `Unbudgeted` = o gasto do mês. E vem
-                            da PRÉVIA, não do mês gravado, que é o que o
-                            faz descer conforme os alvos cobrem o gasto —
-                            antes de salvar. */}
+                            Vem da API como tudo o mais aqui, e desde a
+                            leva 11 ele é **só de avulso** — o que o fez
+                            voltar a significar algo afiado: avulso gasto
+                            sem fatia que o cubra. Antes, quem não criava
+                            fatias para cobrir os fixos (e por que
+                            criaria, se o valor deles não é uma decisão?)
+                            abria a tela com o aluguel inteiro em vermelho
+                            aqui: o alerta mais forte da tela apontando
+                            para o dinheiro mais previsível do mês.
+
+                            A conta que fecha ganhou dois termos e segue
+                            fechando: Σ `Spent` + `Unbudgeted` +
+                            `ExpensesFixed` + `ExpensesInstallments` = o
+                            gasto do mês. E ele vem da PRÉVIA, não do mês
+                            gravado, que é o que o faz descer conforme os
+                            alvos cobrem o gasto — antes de salvar. */}
                         <Card
                             className={cx(
                                 styles.unbudgeted,
@@ -490,7 +713,7 @@ export function Budget() {
                                             <IconAlert />
                                         </span>
                                     ) : null}
-                                    Fora do orçamento
+                                    Avulso fora do orçamento
                                 </span>
                                 <span className={styles.unbudgetedValue}>
                                     {formatMoney(unbudgeted)}
@@ -499,13 +722,14 @@ export function Budget() {
                             <div className={styles.unbudgetedText}>
                                 {unbudgeted > 0 ? (
                                     <>
-                                        Este gasto do mês não casou com nenhuma fatia. Um gasto
-                                        atribuído a alguém nunca cai numa fatia só de categoria —
-                                        para cobrir a pessoa por inteiro, dê a ela uma fatia{" "}
-                                        <b>sem categoria</b>.
+                                        Este avulso do mês não casou com nenhuma fatia — o fixo e a
+                                        parcela já saíram lá em cima, e não entram nesta conta. Um
+                                        gasto atribuído a alguém nunca cai numa fatia só de
+                                        categoria: para cobrir a pessoa por inteiro, dê a ela uma
+                                        fatia <b>sem categoria</b>.
                                     </>
                                 ) : (
-                                    "Todo gasto do mês caiu em alguma fatia."
+                                    "Todo avulso do mês caiu em alguma fatia."
                                 )}
                             </div>
                             <div className={styles.unbudgetedAction}>
@@ -528,15 +752,14 @@ function ReadOnlyRow({ period }: { period: ApiTypes.BudgetPeriod }) {
         <div className={styles.readOnlyRow}>
             <span className={styles.readOnlyName}>{budgetTargetName(period)}</span>
             <span className={styles.readOnlyValue}>{formatMoney(period.LimitValue)}</span>
-            <span className={styles.rowSpent}>
-                <span className={styles.rowSpentValue}>{formatMoney(period.Spent)}</span>
+            <RowSpent spent={period.Spent}>
                 <ProgressMeter
                     height={6}
                     percent={budgetPercent(period)}
                     state={budgetState(period)}
                     alertPercent={period.AlertPercent}
                 />
-            </span>
+            </RowSpent>
         </div>
     );
 }

@@ -1212,9 +1212,20 @@ export namespace ApiTypes {
      *  | Unidade        | a **perna**, nunca o `TotalValue`| a perna paga                        |
      *
      *  ```
-     *  Available = OpeningBalance + Inflows − Expenses
+     *  Available = OpeningBalance
+     *            + InitialBalances                 (contas abertas dentro do mês)
+     *            − PastCommitments                 (pesou antes, o dinheiro ainda está lá)
+     *            + Inflows                         (pendentes + recebidas)
+     *            − Expenses                        (pendentes + pagas)
      *            + OverdueReceivable − OverduePayable
      *  ```
+     *
+     *  **A fórmula inteira está aqui porque a tela do Orçamento a LÊ
+     *  inteira** desde a leva 11: ela decompõe o `Available` em linhas
+     *  (ver `budgetChain`, em src/lib/aggregate.ts) para dizer quanto
+     *  sobra da renda depois do que já tem dono. Os sete termos
+     *  continuam vindo prontos da rota — o cliente só soma e subtrai em
+     *  centavos o que ela já respondeu.
      *
      *  Só conta `Active` entra no `OpeningBalance` e no
      *  `CurrentBalance` — o mesmo filtro de `GET /Accounts`, senão a
@@ -1228,6 +1239,14 @@ export namespace ApiTypes {
          *  quem começa setembro com 1000 e recebe 3000 tem 4000, não
          *  3000. */
         OpeningBalance: Money;
+        /** **A abertura de uma conta cadastrada DENTRO do mês**, que ali
+         *  é fluxo e não posição: quem começa a usar o app no dia 08 tem
+         *  uma conta que "não existia" em 01/09, então o
+         *  `OpeningBalance` cortado no dia 1º a zera — e o dinheiro que
+         *  a pessoa tem sumiria justo do indicador que diz quanto ela
+         *  pode gastar. É um dos quatro termos-ponte da cadeia do
+         *  Orçamento. */
+        InitialBalances: Money;
         /** Competência no mês, **pendentes junto com recebidas**, sem
          *  transferência. NÃO é "quanto recebi": é competência, não
          *  caixa — e é por isso que o rótulo da tela não diz
@@ -1257,6 +1276,15 @@ export namespace ApiTypes {
         ExpensesFixed: Money;
         ExpensesInstallments: Money;
         ExpensesSingle: Money;
+        /** **A costura entre a abertura, que é caixa, e o fluxo, que é
+         *  competência** — e é dinheiro que já tem dono. São as pernas
+         *  que **pesaram num mês anterior e cujo dinheiro ainda está na
+         *  conta**: a compra de 25/08 no cartão que vence em 28/09 saiu
+         *  do "posso gastar" de agosto e continua dentro do saldo de
+         *  31/08. Sem descontá-la, setembro abre com um dinheiro que não
+         *  é mais dele. Termo-ponte da cadeia do Orçamento, e entra com
+         *  sinal negativo. */
+        PastCommitments: Money;
         /** O atrasado, e ele entra no `Available` dos dois lados: uma
          *  perna com competência em julho e ainda pendente não está no
          *  saldo de julho (não foi paga) nem na janela de agosto (a

@@ -11,6 +11,11 @@ import type { ApiTypes } from "@/types/api";
 const aMonthReport = (overrides: Partial<ApiTypes.MonthReport> = {}): ApiTypes.MonthReport => ({
     ReferenceMonth: "2026-09-01",
     OpeningBalance: 1500,
+    /* Os dois termos-ponte que a cadeia do Orçamento lê desde a leva 11.
+       Zero aqui porque este arquivo prova o TRANSPORTE da rota, não a
+       fórmula — quem trava a fórmula é `budgetChain`, com teste. */
+    InitialBalances: 0,
+    PastCommitments: 0,
     Inflows: 3000,
     InflowsReceived: 3000,
     InflowsPending: 0,

@@ -503,13 +503,21 @@ export function Dashboard() {
 
                             {/* ── O FORA DO ORÇAMENTO ────────────────
                                 O `Unbudgeted` do mês, e ele só aparece
-                                quando existe: é o gasto que não casou com
-                                fatia nenhuma, e é o que impede a regra
-                                estrita de casamento de ser silenciosa —
-                                sem esta linha, um gasto que não achou
-                                fatia não apareceria em lugar nenhum do
-                                orçamento. O número é da API: soma dos
-                                `Spent` + `Unbudgeted` = o gasto do mês. */}
+                                quando existe: é o AVULSO que não casou
+                                com fatia nenhuma, e é o que impede a
+                                regra estrita de casamento de ser
+                                silenciosa — sem esta linha, um gasto que
+                                não achou fatia não apareceria em lugar
+                                nenhum do orçamento.
+
+                                **Só avulso desde a leva 11**, e o rótulo
+                                diz: o fixo e a parcela são descontados da
+                                renda antes do rateio (ver a cadeia na
+                                tela do Orçamento), então eles não contam
+                                aqui. O número é da API, e a conta que
+                                fecha é Σ `Spent` + `Unbudgeted` +
+                                `ExpensesFixed` + `ExpensesInstallments` =
+                                o gasto do mês. */}
                             {unbudgeted > 0 && (
                                 <button
                                     type="button"
@@ -518,8 +526,8 @@ export function Dashboard() {
                                 >
                                     <span className={styles.unbudgetedLabel}>
                                         <IconAlert />
-                                        Foi encontrado {formatMoney(unbudgeted)} em gastos fora do
-                                        orçamento
+                                        Foi encontrado {formatMoney(unbudgeted)} em gastos avulsos
+                                        fora do orçamento
                                     </span>
                                 </button>
                             )}

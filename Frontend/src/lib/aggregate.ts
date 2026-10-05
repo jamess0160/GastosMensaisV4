@@ -345,3 +345,67 @@ export const budgetPercent = (period: BudgetNumbers): number =>
 /** O que sobra do teto. Negativo é estouro. */
 export const budgetRemaining = (period: BudgetNumbers): ApiTypes.Money =>
     fromCents(toCents(period.LimitValue) - toCents(period.Spent));
+
+/** **A cadeia do Orçamento: o que sobra da renda, e o que ainda dá para
+ *  gastar.** Os três números que a tela do rateio mostra além dos que a
+ *  rota já entrega prontos. */
+export interface BudgetChain {
+    /** Os quatro termos-ponte somados num só, porque na tela eles são uma
+     *  linha expansível: `InitialBalances − PastCommitments +
+     *  OverdueReceivable − OverduePayable`. */
+    adjustments: ApiTypes.Money;
+    /** **O denominador do rateio** — a renda do mês mais o que já estava
+     *  em conta, menos o que já tem dono. É o `total` do `SplitEditor`. */
+    free: ApiTypes.Money;
+    /** `free − ExpensesSingle`, que é **o `Available` da rota de novo** —
+     *  igual ao centavo, por construção. Ver abaixo. */
+    available: ApiTypes.Money;
+}
+
+/** **A DECOMPOSIÇÃO do `Available`, não uma fórmula nova.**
+ *
+ *  A rota responde `Available = OpeningBalance + InitialBalances −
+ *  PastCommitments + Inflows − Expenses + OverdueReceivable −
+ *  OverduePayable`, e `Expenses` é exatamente `ExpensesFixed +
+ *  ExpensesInstallments + ExpensesSingle` (a partição por `Kind` é
+ *  exaustiva e disjunta, e a API garante isso em centavos). Tirar o
+ *  avulso do meio dessa soma dá o que sobra da renda **antes** de
+ *  qualquer decisão deste mês:
+ *
+ *      free      = Available + ExpensesSingle
+ *      available = free − ExpensesSingle
+ *
+ *  Daí a propriedade que torna a cadeia verificável: a última linha da
+ *  tela do Orçamento bate **ao centavo** com o "Restante" do Início, por
+ *  IDENTIDADE e não por coincidência. O teste trava isso.
+ *
+ *  **Não é recálculo.** Nada aqui soma lançamento: os sete termos vêm
+ *  prontos da rota, e o que acontece é soma e subtração em centavos —
+ *  `Balance` e `Spent` continuam sendo da API, como sempre. Em ponto
+ *  flutuante, sete termos somados erram o centavo do total; em centavos,
+ *  cada termo já é inteiro e a soma é exata.
+ *
+ *  Sem resposta ainda, os três são zero e quem decide mostrar traço em
+ *  vez de número é a tela — um zero aqui seria um número, e errado. */
+export function budgetChain(report: ApiTypes.MonthReport | undefined): BudgetChain {
+    if (!report) return { adjustments: 0, free: 0, available: 0 };
+
+    const adjustments =
+        toCents(report.InitialBalances) -
+        toCents(report.PastCommitments) +
+        toCents(report.OverdueReceivable) -
+        toCents(report.OverduePayable);
+
+    const free =
+        toCents(report.OpeningBalance) +
+        toCents(report.Inflows) -
+        toCents(report.ExpensesFixed) -
+        toCents(report.ExpensesInstallments) +
+        adjustments;
+
+    return {
+        adjustments: fromCents(adjustments),
+        free: fromCents(free),
+        available: fromCents(free - toCents(report.ExpensesSingle)),
+    };
+}

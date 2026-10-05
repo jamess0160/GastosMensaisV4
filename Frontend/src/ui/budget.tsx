@@ -127,7 +127,17 @@ export function BudgetBar({
             />
 
             <div className={styles.status}>
-                <span>{Math.round(percent)}% do teto</span>
+                {/* **A régua fala de AVULSO, com a palavra escrita.** O
+                    `Spent` da fatia conta só gasto avulso desde a leva 11:
+                    o fixo e a parcela são descontados da renda antes do
+                    rateio, e deixá-los consumir fatia aqui os subtrairia
+                    duas vezes. O preço é este rótulo — "Mercado" nesta
+                    régua não bate com "Mercado" no Relatório, onde a soma
+                    é de tudo, e são perguntas diferentes.
+
+                    É o mesmo preço que o `Unbudgeted` já paga desde a
+                    leva 9: a exclusão fica VISÍVEL em vez de silenciosa. */}
+                <span>{Math.round(percent)}% do teto em avulso</span>
                 <span>
                     {remaining >= 0
                         ? `${formatMoney(remaining)} disponíveis`

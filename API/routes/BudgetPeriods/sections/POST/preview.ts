@@ -4,7 +4,7 @@ import { Utils } from "root/Utils/Utils"
 import { BudgetSpent, SpentTarget } from "../BudgetSpent.section"
 import { BudgetPeriodsNamespace } from "../types"
 
-//  **Quanto já foi comprometido nos alvos que a tela está montando — antes de gravar.**
+//  **Quanto de avulso já foi gasto nos alvos que a tela está montando — antes de gravar.**
 //
 //  O defeito que ela existe para fechar: `GET /BudgetPeriods` devolve o `Spent` por
 //  `IdBudgetPeriod`, e uma fatia só tem id depois de gravada. Então **nenhum alvo recém-escolhido
@@ -19,6 +19,16 @@ import { BudgetPeriodsNamespace } from "../types"
 //  (BudgetSpent.section.ts) justamente por isso. Recalculá-la no navegador para "só mostrar uma
 //  prévia" seria a segunda cópia da regra, e a primeira divergência entre as duas seria uma
 //  prévia plausível e errada.
+//
+//  **E é por isso que a troca de modelo da leva 11 não encostou nesta rota.** O orçamento passou a
+//  repartir o que sobra da renda, e o que a mudança exigiu foi o filtro de `Kind = 'single'` dentro
+//  do `getPortions` — a prévia herdou-o sem uma linha aqui. A conta de fechamento que o usuário
+//  confere ganhou um termo e continua fechando, com cada centavo em exatamente um balde:
+//
+//      Σ Spent  +  Unbudgeted  +  ExpensesFixed  +  ExpensesInstallments  =  o gasto do mês
+//
+//  Os dois últimos são de `GET /Reports/Month`, não desta resposta: aqui só há avulso, e o
+//  `Unbudgeted` da prévia voltou a significar algo afiado — **avulso gasto sem fatia que o cubra**.
 //
 //  **Não há regra nova nenhuma aqui, e é o ponto.** A section é a chamada do `getPortions` do mês
 //  mais o `match` contra os alvos do corpo — o mesmo par que o `GET` usa —, com **o índice da
