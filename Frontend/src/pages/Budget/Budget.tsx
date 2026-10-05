@@ -576,7 +576,7 @@ export function Budget() {
                         <ChainRow
                             sign="="
                             label="Ainda posso gastar"
-                            caption="o mesmo número do Início, ao centavo"
+                            caption="o mesmo número do Início"
                             value={money(chain.available)}
                             tone="final"
                         />
@@ -700,7 +700,6 @@ export function Budget() {
                             adicionar, ao lado. */}
                         <SplitEditor
                             label={`Rateio de ${formatMonthLabel(month)}`}
-                            hint="Cada linha é uma fatia do que sobra, e a régua dela mede o avulso. A pessoa, a categoria, ou as duas"
                             closure="loose"
                             options={personOptions}
                             optionLabel="Pessoa"
