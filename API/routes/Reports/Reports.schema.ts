@@ -40,6 +40,18 @@ class Schema {
             /** Pernas com competência no mês, pendentes e pagas */
             Expenses: Joi.number().required(),
             /**
+             * O mesmo total recortado pelo formato da compra, com os mesmos filtros de
+             * competência e de cancelada. Os três somam **exatamente** o `Expenses`: `Kind` tem
+             * três valores, cada perna pertence a um gasto e cada gasto a um `Kind`, então a
+             * partição é exaustiva e disjunta por construção — sem arredondamento.
+             *
+             * Três campos e não um mapa por `Kind`: a resposta é um envelope plano, e um mapa
+             * convidaria o cliente a iterar sobre chaves que ele não controla.
+             */
+            ExpensesFixed: Joi.number().required(),
+            ExpensesInstallments: Joi.number().required(),
+            ExpensesSingle: Joi.number().required(),
+            /**
              * Pernas que **pesaram num mês anterior mas cujo dinheiro ainda não saiu** — a
              * compra de agosto no cartão que vence em setembro. É o que costura a abertura
              * (caixa) com o fluxo do mês (competência).

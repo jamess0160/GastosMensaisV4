@@ -1,4 +1,5 @@
 import { KnexConnection } from "root/Utils/Connections/Knex/KnexConnection"
+import { Database } from "root/Utils/database"
 
 //  **Os totais do mês, cada um com a sua regra — e as regras se contradizem de propósito.**
 //
@@ -28,10 +29,24 @@ class Controller {
      * @param NextMonth primeiro dia do mês seguinte — limite exclusivo, corte meio aberto
      */
     public async run(IdWorkspace: number, ReferenceMonth: string, NextMonth: string) {
-        let [Inflows, InflowsReceived, Expenses, PastCommitments, OverdueReceivable, OverduePayable, OpenInvoices] = await Promise.all([
+        let [
+            Inflows,
+            InflowsReceived,
+            Expenses,
+            ExpensesFixed,
+            ExpensesInstallments,
+            ExpensesSingle,
+            PastCommitments,
+            OverdueReceivable,
+            OverduePayable,
+            OpenInvoices,
+        ] = await Promise.all([
             this.sumInflows(IdWorkspace, ReferenceMonth, NextMonth),
             this.sumInflows(IdWorkspace, ReferenceMonth, NextMonth, "received"),
             this.sumExpenses(IdWorkspace, ReferenceMonth, NextMonth),
+            this.sumExpenses(IdWorkspace, ReferenceMonth, NextMonth, "fixed"),
+            this.sumExpenses(IdWorkspace, ReferenceMonth, NextMonth, "installment"),
+            this.sumExpenses(IdWorkspace, ReferenceMonth, NextMonth, "single"),
             this.sumPastCommitments(IdWorkspace, ReferenceMonth),
             this.sumOverdueReceivable(IdWorkspace, ReferenceMonth),
             this.sumOverduePayable(IdWorkspace, ReferenceMonth),
@@ -50,6 +65,18 @@ class Controller {
             InflowsReceived,
             InflowsPending: Math.round((Inflows - InflowsReceived) * 100) / 100,
             Expenses,
+            //  **O mesmo total, recortado pelo formato do gasto** — e os três fecham com o
+            //  `Expenses` sem arredondamento nenhum: `Kind` tem três valores, cada perna
+            //  pertence a um gasto e cada gasto a um `Kind`, então a partição é exaustiva e
+            //  disjunta. Não é coincidência aritmética, é construção.
+            //
+            //  São três consultas e não uma diferença (como o `InflowsPending` faz): lá o
+            //  recorte é binário e a terceira possibilidade já saiu pelo filtro de cancelada;
+            //  aqui são três conjuntos, e deduzir um deles dos outros dois só trocaria uma
+            //  consulta por uma subtração que mente no dia em que `Kind` ganhar um valor.
+            ExpensesFixed,
+            ExpensesInstallments,
+            ExpensesSingle,
             PastCommitments,
             OverdueReceivable,
             OverduePayable,
@@ -80,15 +107,26 @@ class Controller {
 
     //  **A perna, nunca o TotalValue da compra.** É o que faz o indicador funcionar com
     //  parcelamento: 600 em 6x pesam 100 neste mês, e os outros 500 são problema dos próximos.
-    private sumExpenses(IdWorkspace: number, ReferenceMonth: string, NextMonth: string) {
-        return this.total(KnexConnection
+    //
+    //  `Kind` recorta a MESMA soma, pelo mesmo motivo que o `Status` recorta a de entrada: o
+    //  filtro de cancelada e o corte de competência valem igual para o total e para cada
+    //  recorte, e duas cópias da consulta divergem no dia em que um dos dois mudar. O recorte é
+    //  **um `where` a mais**, e nada além disso.
+    private sumExpenses(IdWorkspace: number, ReferenceMonth: string, NextMonth: string, Kind?: Database.Expenses["Kind"]) {
+        let query = KnexConnection
             .sum({ Total: "ExpensePayments.Value" })
             .from("ExpensePayments")
             .innerJoin("Expenses", "Expenses.IdExpense", "ExpensePayments.IdExpense")
             .where("ExpensePayments.IdWorkspace", IdWorkspace)
             .whereNot("Expenses.Status", "canceled")
             .where("ExpensePayments.CompetenceDate", ">=", ReferenceMonth)
-            .where("ExpensePayments.CompetenceDate", "<", NextMonth))
+            .where("ExpensePayments.CompetenceDate", "<", NextMonth)
+
+        //  **O `Kind` é do gasto, não da perna** — a perna não tem formato: ela é uma das seis
+        //  de um parcelado ou a única de um avulso, e é a compra que sabe qual dos três é.
+        if (Kind) query.where("Expenses.Kind", Kind)
+
+        return this.total(query)
     }
 
     /**

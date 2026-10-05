@@ -19,12 +19,10 @@ import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import {
     budgetState,
     budgetTargetName,
-    legsOfKind,
     spentByCategory,
     spentByPaymentMethod,
     spentByPerson,
     sumMoney,
-    totalSpent,
 } from "@/lib/aggregate";
 import { accentColor, categoryColor, paletteColor } from "@/lib/categoryColor";
 import { formatMoney, fromCents, toCents } from "@/lib/money";
@@ -133,6 +131,13 @@ export function Dashboard() {
     const available = report.data?.Available ?? 0;
     const inflows = report.data?.Inflows ?? 0;
     const expenses = report.data?.Expenses ?? 0;
+    /* Os dois recortes por tipo, e eles também vêm da rota: eram a
+       exceção que ainda somava perna no cliente, e somar o recorte aqui
+       com o total vindo de lá é a mesma pergunta com duas origens. Os
+       três fecham com o `Expenses` por construção — a API é quem garante
+       isso, e a tela não confere. */
+    const fixed = report.data?.ExpensesFixed ?? 0;
+    const installments = report.data?.ExpensesInstallments ?? 0;
     const currentBalance = report.data?.CurrentBalance ?? 0;
     const openInvoices = report.data?.OpenInvoices ?? 0;
     const overdueReceivable = report.data?.OverdueReceivable ?? 0;
@@ -142,14 +147,12 @@ export function Dashboard() {
      *  número, e um número errado. */
     const money = (value: ApiTypes.Money): string => (report.isPending ? "—" : formatMoney(value));
 
-    /* O que FICA no cliente: os dois recortes por tipo de gasto e as
-       três quebras de baixo. A rota não responde nenhum deles, e todos
-       saem da lista de pernas que a tela já tem em cache. O que mudou é
-       o DENOMINADOR — o total dos painéis passou a ser o `Expenses` da
-       rota, e não o `totalSpent` das pernas: dois totais de gasto na
-       mesma tela é exatamente o que ela veio evitar. */
-    const fixed = totalSpent(legsOfKind(legs, "fixed"));
-    const installments = totalSpent(legsOfKind(legs, "installment"));
+    /* O que FICA no cliente: as três quebras de baixo, e nada mais. A
+       rota não responde nenhuma delas, e todas saem da lista de pernas
+       que a tela já tem em cache. O DENOMINADOR dos painéis continua
+       sendo o `Expenses` da rota, e não o `totalSpent` das pernas: dois
+       totais de gasto na mesma tela é exatamente o que ela veio
+       evitar. */
 
     /* **A resposta é um ENVELOPE, e as duas metades entram na tela.**
        `Periods` são as fatias; `Unbudgeted` é o gasto do mês que não
@@ -368,7 +371,7 @@ export function Dashboard() {
                         />
                         <KpiCard
                             label="Fixos do mês"
-                            value={fixed}
+                            value={report.isPending ? "—" : fixed}
                             badge={
                                 expenses > 0 ? (
                                     <DeltaPill tone="mute">
@@ -377,7 +380,10 @@ export function Dashboard() {
                                 ) : undefined
                             }
                         />
-                        <KpiCard label="Parcelas do mês" value={installments} />
+                        <KpiCard
+                            label="Parcelas do mês"
+                            value={report.isPending ? "—" : installments}
+                        />
                     </div>
                 </div>
 

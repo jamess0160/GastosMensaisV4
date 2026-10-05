@@ -1243,6 +1243,20 @@ export namespace ApiTypes {
         InflowsPending: Money;
         /** Pernas com competência no mês, pendentes **e** pagas. */
         Expenses: Money;
+        /** **O mesmo gasto aberto pelo FORMATO da compra**, com os mesmos
+         *  filtros de competência e de cancelada:
+         *  `ExpensesFixed + ExpensesInstallments + ExpensesSingle ===
+         *  Expenses`, exato em centavos — `Kind` tem três valores, cada
+         *  perna pertence a um gasto e cada gasto a um `Kind`, então a
+         *  partição é exaustiva e disjunta por construção.
+         *
+         *  São três campos e não um mapa por `Kind` de propósito: o dia
+         *  em que aparecer um quarto formato, uma tela que itera sobre as
+         *  chaves quebra em silêncio e uma que lê os três dá erro de
+         *  tipo. */
+        ExpensesFixed: Money;
+        ExpensesInstallments: Money;
+        ExpensesSingle: Money;
         /** O atrasado, e ele entra no `Available` dos dois lados: uma
          *  perna com competência em julho e ainda pendente não está no
          *  saldo de julho (não foi paga) nem na janela de agosto (a

@@ -84,6 +84,9 @@ describe("Reports", () => {
                 InflowsReceived: 0,
                 InflowsPending: 0,
                 Expenses: 0,
+                ExpensesFixed: 0,
+                ExpensesInstallments: 0,
+                ExpensesSingle: 0,
                 PastCommitments: 0,
                 OverdueReceivable: 0,
                 OverduePayable: 0,
@@ -231,6 +234,64 @@ describe("Reports", () => {
 
             expect((await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-09`)).body.Expenses).toBe(100)
             expect((await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-10`)).body.Expenses).toBe(100)
+        })
+
+        //  **A identidade que o recorte promete, e ela é exata por construção:** `Kind` tem três
+        //  valores, cada perna pertence a exatamente um gasto e cada gasto a exatamente um
+        //  `Kind` — então a partição é exaustiva e disjunta, não uma coincidência aritmética que
+        //  precise de arredondamento para fechar. A asserção é em centavos porque é assim que
+        //  todo invariante de dinheiro do projeto fecha.
+        it("recorta o gasto do mês nos três tipos, e os três fecham com o total", async () => {
+            let workspace = await buildWorkspace()
+
+            //  Fixo: a série nasce em setembro, e só a primeira ocorrência pesa no mês
+            await createExpense(workspace, {
+                Description: "Aluguel",
+                TotalValue: 400,
+                Kind: "fixed",
+                ExpenseDate: "2026-09-05",
+            })
+            //  Parcelado: **a perna, não a compra** — 600 em 6x pesam 100 aqui
+            await createExpense(workspace, {
+                Description: "Geladeira",
+                TotalValue: 600,
+                Kind: "installment",
+                InstallmentTotal: 6,
+                ExpenseDate: "2026-09-10",
+            })
+            await createExpense(workspace, { TotalValue: 250, ExpenseDate: "2026-09-12" })
+
+            let response = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-09`)
+
+            expect(response.body.ExpensesFixed).toBe(400)
+            expect(response.body.ExpensesInstallments).toBe(100)
+            expect(response.body.ExpensesSingle).toBe(250)
+            expect(response.body.Expenses).toBe(750)
+            expect(Utils.toCents(response.body.ExpensesFixed)
+                + Utils.toCents(response.body.ExpensesInstallments)
+                + Utils.toCents(response.body.ExpensesSingle))
+                .toBe(Utils.toCents(response.body.Expenses))
+        })
+
+        //  O mês de um tipo só: os outros dois são **zero, nunca null** — o `sum()` do Postgres
+        //  devolve null sem linha nenhuma, e um null aqui propagaria pela tela inteira.
+        it("deixa em zero os dois tipos que o mês não tem", async () => {
+            let workspace = await buildWorkspace()
+
+            await createExpense(workspace, {
+                TotalValue: 600,
+                Kind: "installment",
+                InstallmentTotal: 6,
+                ExpenseDate: "2026-09-10",
+            })
+
+            //  Outubro só tem a segunda parcela: nada avulso e nada fixo
+            let response = await workspace.client.get(`/Reports/Month?ReferenceMonth=2026-10`)
+
+            expect(response.body.ExpensesInstallments).toBe(100)
+            expect(response.body.ExpensesFixed).toBe(0)
+            expect(response.body.ExpensesSingle).toBe(0)
+            expect(response.body.Expenses).toBe(100)
         })
 
         //  **Transferência é soma zero para o patrimônio**, e é a regra oposta à do saldo, que
@@ -997,6 +1058,11 @@ describe("Reports", () => {
                 InflowsReceived: 0,
                 InflowsPending: 3000,
                 Expenses: 500,
+                //  A luz e a compra no cartão são as duas avulsas: o recorte por tipo põe os
+                //  500 inteiros no `ExpensesSingle`, e a partição fecha com o total
+                ExpensesFixed: 0,
+                ExpensesInstallments: 0,
+                ExpensesSingle: 500,
                 //  Cartão 'invoice' e tudo em setembro: competência e caixa coincidem, então
                 //  não há nada pesando antes e saindo depois
                 PastCommitments: 0,

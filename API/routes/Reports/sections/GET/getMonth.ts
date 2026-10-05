@@ -109,6 +109,18 @@ export class GetMonth {
             InflowsReceived: totals.InflowsReceived,
             InflowsPending: totals.InflowsPending,
             Expenses: totals.Expenses,
+            //  **O gasto do mês aberto pelo formato da compra**, e a partição é exaustiva:
+            //  `ExpensesFixed + ExpensesInstallments + ExpensesSingle === Expenses`, exato em
+            //  centavos. `Kind` tem três valores, cada perna pertence a exatamente um gasto e
+            //  cada gasto a exatamente um `Kind` — não há perna fora dos três nem em dois.
+            //
+            //  **Três campos nomeados e não um mapa por `Kind`:** a resposta é um envelope
+            //  plano de totais em toda parte, e um mapa convidaria a tela a iterar sobre um
+            //  conjunto de chaves que ela não controla. No dia em que `Kind` ganhar um quarto
+            //  valor, quem itera quebra em silêncio e quem lê três campos dá erro de tipo.
+            ExpensesFixed: totals.ExpensesFixed,
+            ExpensesInstallments: totals.ExpensesInstallments,
+            ExpensesSingle: totals.ExpensesSingle,
             PastCommitments: totals.PastCommitments,
             OverdueReceivable: totals.OverdueReceivable,
             OverduePayable: totals.OverduePayable,
