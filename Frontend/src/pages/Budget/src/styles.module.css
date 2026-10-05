@@ -184,13 +184,18 @@
     justify-content: center;
 }
 
-/* O comprometido ao lado do valor da linha: o número e a régua, na
-   mesma medida da quebra por categoria do Início. */
+/* O comprometido ao lado do valor da linha: o número, a régua e — desde
+   a leva 11 — a sobra do mês anterior embaixo das duas.
+
+   A coluna cresceu de 110px para acomodar a terceira linha, que é a mais
+   larga daqui: "set/2026: 300,00 orçado · sobrou 150,00" em 110px
+   quebraria em três pedaços. Ela ainda quebra em dois, e está bem — o
+   que não pode é a frase picada em sílabas. */
 .rowSpent {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    width: 110px;
+    width: 150px;
     flex-shrink: 0;
 }
 
@@ -210,6 +215,25 @@
     letter-spacing: 0.5px;
     text-transform: uppercase;
     color: var(--ink-3);
+}
+
+/* **A sobra do mês anterior**, a linha secundária da coluna. Fica abaixo
+   da régua porque é o número mais fraco dos três — ele informa de onde o
+   dinheiro veio, e não mede nada do mês que está na tela. */
+.rowCarry {
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+/* A falta, quando a fatia estourou no mês passado. A cor acompanha o
+   sinal porque o rótulo também troca ("faltou" no lugar de "sobrou"), e
+   as duas leituras juntas são o que impede ler um estouro como folga.
+   `--neg-ink` e não `--neg`: o vermelho do layout não passa de 4,5:1
+   sobre a superfície, e aqui é texto de 10px. */
+.rowCarryMissed {
+    color: var(--neg-ink);
 }
 
 /* ── Mês fechado ──────────────────────────────────────────── */

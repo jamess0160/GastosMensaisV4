@@ -80,20 +80,20 @@ export function useMonthStatement(
  *  daqui, ele é da API: somar `Spent` no cliente para "conferir" é a
  *  segunda implementação da mesma pergunta.
  *
- *  `enabled` existe por causa de UM chamador: o estado vazio do Início
- *  lê também o mês ANTERIOR, para saber quantas fatias o botão de
- *  clonar vai trazer. Essa leitura só interessa quando o mês da tela
- *  está vazio, e sem o gate ela seria uma requisição a mais em toda
- *  visita ao Início. A CHAVE é a mesma de sempre — navegar para o mês
- *  anterior reaproveita a resposta em vez de pedir de novo. */
+ *  **O Orçamento o chama DUAS vezes — o mês da tela e o anterior.** O
+ *  segundo já foi um `enabled` condicional, ligado só no mês vazio para
+ *  o botão de clonar dizer quantas fatias trazia; desde a leva 11 ele é
+ *  sempre lido, porque é dele que sai a sobra de cada fatia no mês
+ *  passado. A CHAVE é a mesma de sempre — navegar para o mês anterior
+ *  reaproveita a resposta em vez de pedir de novo, e é isso que faz a
+ *  segunda leitura custar uma requisição por visita e não uma por mês
+ *  visitado. */
 export function useMonthBudgets(
     month: ApiTypes.ReferenceMonth,
-    enabled = true,
 ): UseQueryResult<ApiTypes.BudgetMonth> {
     return useQuery({
         queryKey: queryKeys.budgets(month),
         queryFn: () => BudgetPeriodsConnection.list(month),
-        enabled,
     });
 }
 

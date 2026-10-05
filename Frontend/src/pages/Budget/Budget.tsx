@@ -22,6 +22,7 @@ import { EmptyState, ErrorState, LoadingRows } from "@/ui/states";
 import {
     budgetChain,
     budgetPercent,
+    budgetRemaining,
     budgetState,
     budgetTargetKey,
     budgetTargetName,
@@ -29,7 +30,7 @@ import {
 } from "@/lib/aggregate";
 import { categoryColor, paletteColor } from "@/lib/categoryColor";
 import { formatDate, formatMonthLabel, formatMonthShort } from "@/lib/date";
-import { formatMoney, fromCents, toCents } from "@/lib/money";
+import { formatAmount, formatMoney, fromCents, toCents } from "@/lib/money";
 import type { ApiTypes } from "@/types/api";
 
 /* ════════════════════════════════════════════════════════════
@@ -187,6 +188,49 @@ function RowSpent({ spent, children }: { spent: ApiTypes.Money; children: ReactN
     );
 }
 
+/** **O que sobrou (ou faltou) da MESMA fatia no mês anterior.**
+ *
+ *  O caso que a pediu: 300 para jogos, 150 gastos de propósito, para
+ *  comprar um jogo de 450 no mês seguinte. Ao montar o mês seguinte nada
+ *  na tela dizia que sobraram 150 — e esse é justamente o número que
+ *  justifica digitar 450.
+ *
+ *  **É INFORMAÇÃO, e não alimenta a matemática.** Ela não entra na
+ *  cadeia, não vira teto, não muda o `total` do editor nem a sobra do
+ *  rateio. Quem acumula a sobra é o `OpeningBalance` dentro da cadeia, e
+ *  globalmente — é isso que dissolve a limitação de olhar UM mês para
+ *  trás: se a poupança para o jogo levou três meses, os três já estão
+ *  dentro do "Livre para o mês". Esta linha explica **de onde o dinheiro
+ *  veio**, não quanto existe.
+ *
+ *  **O mês vai escrito no rótulo** porque a linha fala de outro mês que
+ *  não o da tela, e com o ano junto: em janeiro, "dez" sozinho seria
+ *  dezembro de qual?
+ *
+ *  O sinal troca o rótulo e a cor — `budgetRemaining` é assinado, e
+ *  negativo é estouro. Zero cai em "sobrou", e está certo: a fatia
+ *  existiu e foi gasta inteira. O que NÃO pode aparecer como zero é a
+ *  fatia que não existia, e quem garante isso é o chamador: sem fatia no
+ *  mês anterior não há componente. "Sobrou 0" e "não havia fatia" são
+ *  fatos diferentes. */
+function RowCarry({
+    month,
+    period,
+}: {
+    month: ApiTypes.ReferenceMonth;
+    period: ApiTypes.BudgetPeriod;
+}) {
+    const remaining = budgetRemaining(period);
+    const missed = remaining < 0;
+
+    return (
+        <span className={cx(styles.rowCarry, missed && styles.rowCarryMissed)}>
+            {formatMonthShort(month)}: {formatAmount(period.LimitValue)} orçado ·{" "}
+            {missed ? "faltou" : "sobrou"} {formatAmount(Math.abs(remaining))}
+        </span>
+    );
+}
+
 /** A linha em branco do rateio. Os DOIS alvos nascem vazios: a fatia
  *  pode ser de pessoa, de categoria, ou das duas. */
 const emptyBudgetLine = (): BudgetLine => ({ id: null, secondaryId: null, value: null });
@@ -217,15 +261,23 @@ export function Budget() {
     const persons = usePersons();
     const invalidateMovement = useInvalidateMovement();
 
-    /* O mês ANTERIOR, lido só quando este está vazio: é ele que diz
-       quantas fatias o botão de clonar vai trazer, e um botão que não
-       diz o tamanho do que faz é um botão que ninguém clica. Mesma
-       chave de cache de sempre — navegar até lá reaproveita a resposta. */
+    /* ── O mês ANTERIOR, lido SEMPRE ──────────────────────────
+       Ele responde DUAS perguntas desta tela, e por isso deixou de ser
+       uma leitura condicional:
+
+       - quantas fatias o botão de clonar vai trazer — e um botão que não
+         diz o tamanho do que faz é um botão que ninguém clica;
+       - **quanto sobrou de cada fatia no mês passado**, que é o número
+         que justifica o valor que a pessoa vai digitar aqui. 300 para
+         jogos com 150 gastos de propósito é o que explica 450 agora, e
+         enquanto esta leitura era gateada pelo mês vazio o número não
+         existia em lugar nenhum do produto.
+
+       Custa UMA requisição por visita, na mesma chave de cache que
+       navegar até lá já usaria — a resposta é reaproveitada nos dois
+       sentidos. */
     const previous = previousMonth(month);
-    const previousBudgets = useMonthBudgets(
-        previous,
-        !budgets.isPending && (budgets.data?.Periods.length ?? 0) === 0,
-    );
+    const previousBudgets = useMonthBudgets(previous);
 
     const periods = useMemo(() => budgets.data?.Periods ?? [], [budgets.data]);
 
@@ -385,6 +437,27 @@ export function Budget() {
                 ]),
             ),
         [periods],
+    );
+
+    /** **As fatias do mês ANTERIOR, indexadas pelo mesmo alvo** — é delas
+     *  que sai a sobra de cada linha. O índice é o mesmo padrão do
+     *  `savedByTarget` acima porque a pergunta é a mesma: a linha conhece
+     *  o par `(categoria, pessoa)`, nunca o id da fatia — e o id de
+     *  setembro não teria nada a ver com o de outubro de todo jeito.
+     *
+     *  **Enquanto a rota não respondeu o mapa está VAZIO, e nenhuma linha
+     *  mostra nada.** É de propósito: um número que aparece e muda é pior
+     *  que um número que aparece depois, e aqui não há sequer um valor
+     *  provisório honesto a pôr no lugar — ver `RowCarry`. */
+    const previousByTarget = useMemo(
+        () =>
+            new Map(
+                (previousBudgets.data?.Periods ?? []).map((period) => [
+                    budgetTargetKey(period.IdCategory, period.IdPerson),
+                    period,
+                ]),
+            ),
+        [previousBudgets.data],
     );
 
     /* O "fora do orçamento" também sai da prévia: é o que o faz se mover
@@ -655,6 +728,12 @@ export function Budget() {
                                 const spent =
                                     preview.data?.spentByTarget.get(key) ?? period?.Spent ?? 0;
 
+                                /* A MESMA fatia no mês anterior, se ela
+                                   existiu lá. `undefined` é o caso em que
+                                   a linha não mostra sobra nenhuma — ver
+                                   `RowCarry`. */
+                                const last = previousByTarget.get(key);
+
                                 return (
                                     <RowSpent spent={spent}>
                                         <ProgressMeter
@@ -670,6 +749,7 @@ export function Budget() {
                                                 AlertPercent: period?.AlertPercent ?? 80,
                                             })}
                                         />
+                                        {last && <RowCarry month={previous} period={last} />}
                                     </RowSpent>
                                 );
                             }}
