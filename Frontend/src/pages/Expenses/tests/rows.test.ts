@@ -1,14 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-    installmentLabel,
-    isLegOverdue,
-    legMatches,
-    legStatus,
-    sortLegs,
-    type LegFilters,
-} from "../src/rows";
+import { installmentLabel, isLegOverdue, sortLegs } from "../src/rows";
+import { legMatches, legStatus, type LegFilters } from "@/lib/legFilters";
 import { paymentLegs, totalSpent, type ExpenseLeg } from "@/lib/aggregate";
-import { aLegRow, anExpense, anExpensePerson, installmentRows } from "@/lib/tests/factories";
+import { aLegRow, anExpense, installmentRows } from "@/lib/tests/factories";
 import type { ApiTypes } from "@/types/api";
 
 /* Os dois casos que a leva 9 existe para consertar:
@@ -18,7 +12,11 @@ import type { ApiTypes } from "@/types/api";
    2. a compra no cartão feita ontem, que ficava vermelha hoje porque o
       alerta comparava a data da COMPRA com o relógio. */
 
-/** Os filtros com que a tela nasce: tudo menos cancelado. */
+/** Os filtros com que a tela nasce: tudo menos cancelado.
+ *
+ *  O predicado em si é testado em `@/lib/tests/legFilters.test.ts`, com
+ *  o resto das regras de perna; aqui ele aparece só porque a lista de um
+ *  mês passa por ele antes de somar. */
 const defaultFilters = (overrides: Partial<LegFilters> = {}): LegFilters => ({
     statuses: ["pending", "paid"],
     kinds: [],
@@ -183,46 +181,6 @@ describe("o vermelho segue a CashDate, não a data da compra", () => {
 
         expect(legStatus(cancelado)).toBe("canceled");
         expect(isLegOverdue(cancelado, "2026-12-01")).toBe(false);
-    });
-});
-
-describe("legMatches", () => {
-    const [leg] = paymentLegs([
-        aLegRow(
-            anExpense({ Description: "Mercado do bairro", IdCategory: 4, Kind: "single" }),
-            { IdPaymentMethod: 2 },
-            [anExpensePerson(8, 100)],
-        ),
-    ]);
-
-    it("vazio em cada filtro é 'sem recorte'", () => {
-        expect(legMatches(leg, defaultFilters())).toBe(true);
-    });
-
-    it("recorta por categoria, formato e forma de pagamento da PERNA", () => {
-        expect(legMatches(leg, defaultFilters({ idCategories: [4] }))).toBe(true);
-        expect(legMatches(leg, defaultFilters({ idCategories: [5] }))).toBe(false);
-        expect(legMatches(leg, defaultFilters({ kinds: ["single"] }))).toBe(true);
-        expect(legMatches(leg, defaultFilters({ kinds: ["fixed"] }))).toBe(false);
-        expect(legMatches(leg, defaultFilters({ idMethods: [2] }))).toBe(true);
-        expect(legMatches(leg, defaultFilters({ idMethods: [3] }))).toBe(false);
-    });
-
-    it("recorta pelo rateio do gasto, que vem igual em toda perna dele", () => {
-        expect(legMatches(leg, defaultFilters({ idPersons: [8] }))).toBe(true);
-        expect(legMatches(leg, defaultFilters({ idPersons: [9] }))).toBe(false);
-    });
-
-    it("a busca é da descrição, sem caixa", () => {
-        expect(legMatches(leg, defaultFilters({ search: "  BAIRRO " }))).toBe(true);
-        expect(legMatches(leg, defaultFilters({ search: "padaria" }))).toBe(false);
-    });
-
-    it("o cancelado só aparece com o chip dele marcado", () => {
-        const [cancelado] = paymentLegs([aLegRow(anExpense({ Status: "canceled" }))], true);
-
-        expect(legMatches(cancelado, defaultFilters())).toBe(false);
-        expect(legMatches(cancelado, defaultFilters({ statuses: ["canceled"] }))).toBe(true);
     });
 });
 

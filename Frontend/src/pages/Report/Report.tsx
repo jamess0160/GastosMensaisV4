@@ -28,6 +28,7 @@ import {
     spentByMonthCategory,
     totalSpent,
 } from "@/lib/aggregate";
+import { legMatches, type LegFilters } from "@/lib/legFilters";
 import { accentColor, categoryColor } from "@/lib/categoryColor";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatMoney } from "@/lib/money";
@@ -140,38 +141,35 @@ export function Report() {
     const methodIndex = usePaymentMethodIndex();
 
     /* ── O recorte ─────────────────────────────────────────────
-       Um predicado só, sobre PERNAS — e todos os cinco filtros são
+       Um predicado só, sobre PERNAS — e todos os filtros são
        respondidos pela própria perna, inclusive destino e forma de
        pagamento, que antes custavam um `get(id)` por gasto do período.
-       O intervalo é aparado aqui, no dia: o cache trabalha em meses
-       inteiros, e um período que começa no dia 10 não pode trazer os
-       nove primeiros junto. */
-    const shown = useMemo(() => {
-        const term = search.trim().toLowerCase();
+       É o MESMO `legMatches` da tela de Gastos: as condições eram
+       iguais e estavam escritas duas vezes, e uma condição nova escrita
+       duas vezes é a próxima divergência entre as telas.
 
-        return legs.filter((leg) => {
-            const day = legCompetence(leg).slice(0, 10);
-            if (day < range.From || day > range.To) return false;
+       `statuses` fica de fora porque o Relatório não tem chip de
+       status, e ausente quer dizer "não recorta por status". */
+    const filters = useMemo<LegFilters>(
+        () => ({ kinds, idCategories, idPersons, idMethods, search }),
+        [kinds, idCategories, idPersons, idMethods, search],
+    );
 
-            if (kinds.length > 0 && !kinds.includes(leg.expense.Kind)) return false;
-            if (idCategories.length > 0 && !idCategories.includes(leg.expense.IdCategory)) {
-                return false;
-            }
-            if (term && !leg.expense.Description.toLowerCase().includes(term)) return false;
+    /* O apara-dias NÃO é um filtro do usuário, e por isso não entra no
+       predicado compartilhado: é a correção de que o cache trabalha em
+       meses inteiros, e um período que começa no dia 10 não pode trazer
+       os nove primeiros junto. Ele é desta tela, a única que olha
+       período. */
+    const shown = useMemo(
+        () =>
+            legs.filter((leg) => {
+                const day = legCompetence(leg).slice(0, 10);
+                if (day < range.From || day > range.To) return false;
 
-            if (idMethods.length > 0 && !idMethods.includes(leg.payment.IdPaymentMethod)) {
-                return false;
-            }
-            if (
-                idPersons.length > 0 &&
-                !leg.persons.some((person) => idPersons.includes(person.IdPerson))
-            ) {
-                return false;
-            }
-
-            return true;
-        });
-    }, [legs, range, kinds, idCategories, idPersons, idMethods, search]);
+                return legMatches(leg, filters);
+            }),
+        [legs, range, filters],
+    );
 
     /* O contexto do único evento da tela. O período é o mesmo que os
        gráficos estão mostrando — é dele que sai o recorte da planilha. */

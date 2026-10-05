@@ -14,14 +14,7 @@ import {
     usePaymentMethods,
 } from "@/data/catalogs";
 import { useExpenseDetail, useInvalidateMovement, useMonthLegs } from "@/data/month";
-import {
-    installmentLabel,
-    isLegOverdue,
-    legMatches,
-    legStatus,
-    sortLegs,
-    type LegFilters,
-} from "./src/rows";
+import { installmentLabel, isLegOverdue, sortLegs } from "./src/rows";
 import { Avatar, Badge, Button, Card, Chip, PageHead, Workspace as Page } from "@/ui/primitives";
 import { HideOnMobile, Topbar } from "@/ui/topbar";
 import {
@@ -61,6 +54,7 @@ import {
     totalSpent,
     type ExpenseLeg,
 } from "@/lib/aggregate";
+import { legMatches, legStatus, type LegFilters } from "@/lib/legFilters";
 import { isCardLeg } from "@/lib/card";
 import { accentColor, categoryColor } from "@/lib/categoryColor";
 import { useIsMobile } from "@/lib/useMediaQuery";
@@ -213,7 +207,9 @@ export function Expenses() {
        indicadores são a mesma perna. Eram dois universos — a tabela
        listava compras e a faixa somava pernas —, e por isso setembro
        dizia "Total: 1.340" com uma tabela que somava 1.240. O predicado
-       mora em `src/rows.ts`, sem React, e é testado lá. */
+       mora em `@/lib/legFilters`, sem React, é testado lá e é o MESMO
+       que o Relatório chama — `statuses` é o que separa as duas telas,
+       e é por isso que ele é opcional lá. */
     const filters = useMemo<LegFilters>(
         () => ({ statuses, kinds, idCategories, idPersons, idMethods, search }),
         [statuses, kinds, idCategories, idPersons, idMethods, search],
