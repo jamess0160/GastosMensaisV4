@@ -55,6 +55,8 @@ export interface LegFilters {
     idCategories: readonly number[];
     idPersons: readonly number[];
     idMethods: readonly number[];
+    /** As etiquetas marcadas na faixa, em OU: ver `legMatches`. */
+    idTags: readonly number[];
     search: string;
 }
 
@@ -71,7 +73,7 @@ export interface LegFilters {
  *  perna — um gasto pago com duas formas passa no filtro de qualquer
  *  uma das duas, pela perna que corresponde a ela. */
 export function legMatches(leg: ExpenseLeg, filters: LegFilters): boolean {
-    const { statuses, kinds, idCategories, idPersons, idMethods } = filters;
+    const { statuses, kinds, idCategories, idPersons, idMethods, idTags } = filters;
 
     if (statuses && statuses.length > 0 && !statuses.includes(legStatus(leg))) return false;
     if (kinds.length > 0 && !kinds.includes(leg.expense.Kind)) return false;
@@ -84,8 +86,42 @@ export function legMatches(leg: ExpenseLeg, filters: LegFilters): boolean {
         return false;
     }
 
+    /* A tag é do GASTO e viaja na perna desde a leva 11, então o recorte
+       não custa consulta nenhuma. Multisseleção em **OU**, igual a
+       pessoa: a perna passa se tiver QUALQUER uma das marcadas. "E" —
+       os gastos que têm as duas — é outra pergunta, e não é esta. */
+    if (idTags.length > 0 && !leg.tags.some((tag) => idTags.includes(tag.IdTag))) return false;
+
     const term = filters.search.trim().toLowerCase();
     if (term && !leg.expense.Description.toLowerCase().includes(term)) return false;
 
     return true;
+}
+
+/** As etiquetas PRESENTES nas pernas que a tela carregou, uma vez cada,
+ *  em ordem de nome.
+ *
+ *  É a inversão deliberada em relação aos outros filtros: categoria,
+ *  pessoa e forma de pagamento saem de catálogo porque são estáveis e
+ *  pequenas, e ver "zero neste período" ali é informação. Tag é texto
+ *  livre e ilimitada — depois de dois anos o espaço tem duzentas, e uma
+ *  faixa de duzentos chips não se usa. Derivá-la das pernas carregadas
+ *  dá o conjunto certo por construção: nunca oferece tag com zero
+ *  resultado, fica no recorte que está na tela, e não precisa de rota,
+ *  catálogo nem cache novos.
+ *
+ *  O escopo é o de cada tela — o mês em Gastos (de `allLegs`, com os
+ *  cancelados, para o universo ser o mesmo dos outros filtros dali) e o
+ *  período no Relatório. A consequência que as duas têm que tratar é o
+ *  id órfão: a seleção sobrevive à troca de mês, e a tag pode não. */
+export function legTags(legs: readonly ExpenseLeg[]): ApiTypes.Tag[] {
+    const byId = new Map<number, ApiTypes.Tag>();
+
+    for (const leg of legs) {
+        for (const tag of leg.tags) {
+            if (!byId.has(tag.IdTag)) byId.set(tag.IdTag, tag);
+        }
+    }
+
+    return [...byId.values()].sort((a, b) => a.Name.localeCompare(b.Name, "pt-BR"));
 }

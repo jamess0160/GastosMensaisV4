@@ -23,6 +23,7 @@ const defaultFilters = (overrides: Partial<LegFilters> = {}): LegFilters => ({
     idCategories: [],
     idPersons: [],
     idMethods: [],
+    idTags: [],
     search: "",
     ...overrides,
 });

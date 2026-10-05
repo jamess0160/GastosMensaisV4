@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import styles from "./src/styles.module.css";
 import { ExpensesController, type ExpensesContext, type SeriesDraft } from "./controller";
@@ -54,7 +54,7 @@ import {
     totalSpent,
     type ExpenseLeg,
 } from "@/lib/aggregate";
-import { legMatches, legStatus, type LegFilters } from "@/lib/legFilters";
+import { legMatches, legStatus, legTags, type LegFilters } from "@/lib/legFilters";
 import { isCardLeg } from "@/lib/card";
 import { accentColor, categoryColor } from "@/lib/categoryColor";
 import { useIsMobile } from "@/lib/useMediaQuery";
@@ -135,6 +135,7 @@ export function Expenses() {
     const [idCategories, setIdCategories] = useState<number[]>([]);
     const [idPersons, setIdPersons] = useState<number[]>([]);
     const [idMethods, setIdMethods] = useState<number[]>([]);
+    const [idTags, setIdTags] = useState<number[]>([]);
     const [search, setSearch] = useState("");
     /* O extrato manda para cá com `?IdExpense=`, e é a URL que decide o
        PRIMEIRO painel: depois disso quem manda é o clique na lista. */
@@ -211,8 +212,8 @@ export function Expenses() {
        que o Relatório chama — `statuses` é o que separa as duas telas,
        e é por isso que ele é opcional lá. */
     const filters = useMemo<LegFilters>(
-        () => ({ statuses, kinds, idCategories, idPersons, idMethods, search }),
-        [statuses, kinds, idCategories, idPersons, idMethods, search],
+        () => ({ statuses, kinds, idCategories, idPersons, idMethods, idTags, search }),
+        [statuses, kinds, idCategories, idPersons, idMethods, idTags, search],
     );
 
     /* A LINHA É A PERNA. `allLegs` traz os cancelados junto, porque o
@@ -221,6 +222,40 @@ export function Expenses() {
         () => monthLegs.allLegs.filter((leg) => legMatches(leg, filters)),
         [monthLegs.allLegs, filters],
     );
+
+    /* ── As etiquetas que a faixa oferece ──────────────────────
+       Saem das pernas do MÊS e não de um catálogo — o porquê está em
+       `legTags`. É `allLegs`, a mesma lista que a tabela filtra, para o
+       universo das opções ser o dos outros filtros daqui: com o chip
+       "Cancelados" marcado, a tag que só existe num gasto cancelado
+       precisa estar na faixa.
+
+       E é `allLegs` e não `rows`: derivar do recorte já filtrado faria
+       marcar uma etiqueta apagar as outras da lista. */
+    const tagOptions = useMemo(() => legTags(monthLegs.allLegs), [monthLegs.allLegs]);
+
+    /* **O id órfão sai da seleção na troca de mês.** Filtrar por
+       "Viagem Chile" em outubro e navegar para novembro, onde a tag não
+       existe, deixaria o `idTags` devolvendo zero linha por um filtro
+       que não está visível na faixa — não quebra nada, e é exatamente
+       por isso que confunde.
+
+       É efeito, e não poda na leitura, porque o universo novo só se
+       conhece DEPOIS da resposta: o `setMonth` não sabe quais tags o
+       mês seguinte tem. Podar só na leitura guardaria no estado um id
+       invisível, que ressuscitaria ao voltar para outubro.
+
+       E o `isPending` é o que separa "o mês não tem essa tag" de "o mês
+       ainda não chegou": sem ele, toda navegação limparia a seleção
+       durante a carga, inclusive quando a tag existe nos dois meses. */
+    useEffect(() => {
+        if (monthLegs.isPending) return;
+
+        setIdTags((current) => {
+            const next = current.filter((id) => tagOptions.some((tag) => tag.IdTag === id));
+            return next.length === current.length ? current : next;
+        });
+    }, [tagOptions, monthLegs.isPending]);
 
     /* O grupo tem ordem FIXA dentro dele, e `sortLegs` é quem a sabe:
        depois do filtro e antes de agrupar. A tabela do desktop e a lista
@@ -266,6 +301,7 @@ export function Expenses() {
         idCategories.length > 0 ||
         idPersons.length > 0 ||
         idMethods.length > 0 ||
+        idTags.length > 0 ||
         search.trim() !== "";
 
     const clearAll = () => {
@@ -274,6 +310,7 @@ export function Expenses() {
         setIdCategories([]);
         setIdPersons([]);
         setIdMethods([]);
+        setIdTags([]);
         setSearch("");
     };
 
@@ -522,6 +559,23 @@ export function Expenses() {
                                 color: accentColor(method.Color ?? account.Color),
                             }))}
                         />
+
+                        {/* A faixa de etiquetas só existe quando o mês
+                            TEM etiqueta: sem nenhuma, um seletor vazio
+                            seria um controle que não responde a
+                            clique. */}
+                        {tagOptions.length > 0 && (
+                            <FilterMultiSelect
+                                values={idTags}
+                                onChange={setIdTags}
+                                ariaLabel="Etiqueta"
+                                allLabel="Todas as etiquetas"
+                                options={tagOptions.map((tag) => ({
+                                    value: tag.IdTag,
+                                    label: tag.Name,
+                                }))}
+                            />
+                        )}
 
                         {hasFilters && <ClearFilters onClick={clearAll} />}
                     </FilterBar>

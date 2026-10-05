@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./src/styles.module.css";
 import { ReportController, type ReportContext } from "./controller";
 import {
@@ -28,7 +28,7 @@ import {
     spentByMonthCategory,
     totalSpent,
 } from "@/lib/aggregate";
-import { legMatches, type LegFilters } from "@/lib/legFilters";
+import { legMatches, legTags, type LegFilters } from "@/lib/legFilters";
 import { accentColor, categoryColor } from "@/lib/categoryColor";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { formatMoney } from "@/lib/money";
@@ -123,6 +123,7 @@ export function Report() {
     const [idCategories, setIdCategories] = useState<number[]>([]);
     const [idPersons, setIdPersons] = useState<number[]>([]);
     const [idMethods, setIdMethods] = useState<number[]>([]);
+    const [idTags, setIdTags] = useState<number[]>([]);
 
     const pickPreset = (next: Preset) => {
         setPreset(next);
@@ -151,8 +152,8 @@ export function Report() {
        `statuses` fica de fora porque o Relatório não tem chip de
        status, e ausente quer dizer "não recorta por status". */
     const filters = useMemo<LegFilters>(
-        () => ({ kinds, idCategories, idPersons, idMethods, search }),
-        [kinds, idCategories, idPersons, idMethods, search],
+        () => ({ kinds, idCategories, idPersons, idMethods, idTags, search }),
+        [kinds, idCategories, idPersons, idMethods, idTags, search],
     );
 
     /* O apara-dias NÃO é um filtro do usuário, e por isso não entra no
@@ -160,16 +161,53 @@ export function Report() {
        meses inteiros, e um período que começa no dia 10 não pode trazer
        os nove primeiros junto. Ele é desta tela, a única que olha
        período. */
-    const shown = useMemo(
+    const periodLegs = useMemo(
         () =>
             legs.filter((leg) => {
                 const day = legCompetence(leg).slice(0, 10);
-                if (day < range.From || day > range.To) return false;
-
-                return legMatches(leg, filters);
+                return day >= range.From && day <= range.To;
             }),
-        [legs, range, filters],
+        [legs, range],
     );
+
+    /* O recorte do usuário vem DEPOIS do apara-dias, e em dois passos
+       porque a faixa de etiquetas precisa do passo do meio: as opções
+       dela saem do período inteiro, sem os filtros marcados. */
+    const shown = useMemo(
+        () => periodLegs.filter((leg) => legMatches(leg, filters)),
+        [periodLegs, filters],
+    );
+
+    /* ── As etiquetas que a faixa oferece ──────────────────────
+       Saem das pernas do PERÍODO e não de um catálogo — o porquê está
+       em `legTags`. É `periodLegs`, nunca `shown`: derivar do recorte
+       já filtrado faria a faixa encolher a cada tag marcada, e marcar
+       uma apagaria as outras da lista. */
+    const tagOptions = useMemo(() => legTags(periodLegs), [periodLegs]);
+
+    /* **O id órfão sai da seleção na troca de universo.** Filtrar por
+       "Viagem Chile" em outubro e navegar para novembro, onde a tag não
+       existe, deixaria o `idTags` devolvendo zero linha por um filtro
+       que não está visível na faixa — não quebra nada, e é exatamente
+       por isso que confunde.
+
+       É efeito, e não poda na leitura, porque o universo novo só se
+       conhece DEPOIS da resposta: trocar o período não sabe quais tags o
+       próximo tem. Podar só na leitura guardaria no estado um id
+       invisível, que ressuscitaria ao voltar para outubro.
+
+       E o `isPending` é o que separa "o período não tem essa tag" de "o
+       período ainda não chegou": sem ele, toda navegação limparia a
+       seleção durante a carga, inclusive quando a tag existe nos dois
+       lados. */
+    useEffect(() => {
+        if (isPending) return;
+
+        setIdTags((current) => {
+            const next = current.filter((id) => tagOptions.some((tag) => tag.IdTag === id));
+            return next.length === current.length ? current : next;
+        });
+    }, [tagOptions, isPending]);
 
     /* O contexto do único evento da tela. O período é o mesmo que os
        gráficos estão mostrando — é dele que sai o recorte da planilha. */
@@ -245,6 +283,7 @@ export function Report() {
         idCategories.length > 0 ||
         idPersons.length > 0 ||
         idMethods.length > 0 ||
+        idTags.length > 0 ||
         search.trim() !== "";
 
     const clearAll = () => {
@@ -252,6 +291,7 @@ export function Report() {
         setIdCategories([]);
         setIdPersons([]);
         setIdMethods([]);
+        setIdTags([]);
         setSearch("");
     };
 
@@ -538,6 +578,23 @@ export function Report() {
                                 color: accentColor(method.Color ?? account.Color),
                             }))}
                         />
+
+                        {/* A faixa de etiquetas só existe quando o
+                            período TEM etiqueta: sem nenhuma, um
+                            seletor vazio seria um controle que não
+                            responde a clique. */}
+                        {tagOptions.length > 0 && (
+                            <FilterMultiSelect
+                                values={idTags}
+                                onChange={setIdTags}
+                                ariaLabel="Etiqueta"
+                                allLabel="Todas as etiquetas"
+                                options={tagOptions.map((tag) => ({
+                                    value: tag.IdTag,
+                                    label: tag.Name,
+                                }))}
+                            />
+                        )}
 
                         {hasFilters && <ClearFilters onClick={clearAll} />}
                     </FilterBar>
