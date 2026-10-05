@@ -941,8 +941,48 @@ describe("Reports", () => {
             expect(expense).toEqual([
                 "10/09/2026", "10/09/2026", "10/09/2026",
                 "Mercado", "Categoria do teste", "Conta corrente", "Débito",
-                "", "Pendente", "Não", 250.5,
+                "", "Pendente", "Não", 250.5, "",
             ])
+        })
+
+        //  **A planilha é onde se cruza "Viagem Chile" com o resto**, e por isso a tag tem
+        //  coluna aqui. Uma coluna por tag não existe (o gasto tem N) e uma linha por tag
+        //  duplicaria a perna: concatenado, o "contém" do filtro do Excel ainda a encontra.
+        it("concatena as tags do gasto numa coluna, e deixa a célula vazia sem nenhuma", async () => {
+            let workspace = await buildWorkspace()
+
+            await createExpense(workspace, {
+                Description: "Hotel",
+                ExpenseDate: "2026-09-10",
+                Tags: ["Viagem Chile", "Presente"],
+            })
+
+            await createExpense(workspace, { Description: "Mercado", ExpenseDate: "2026-09-11" })
+
+            let sheet = (await open(await download(workspace, `?From=2026-09-01&To=2026-09-30`))).getWorksheet("Gastos")!
+
+            expect(sheet.getCell("L1").value).toBe("Tags")
+            //  Em ordem de nome, as duas na mesma célula
+            expect(sheet.getCell("L2").value).toBe("Presente, Viagem Chile")
+            expect(sheet.getCell("D3").value).toBe("Mercado")
+            //  O gasto sem tag não escreve "null" na célula
+            expect(sheet.getCell("L3").value ?? "").toBe("")
+        })
+
+        //  **Arquivar a tag não pode apagá-la da planilha do ano passado.** O soft delete tira
+        //  a etiqueta das próximas escolhas; a célula do gasto já marcado é histórico.
+        it("mantém na planilha a tag arquivada", async () => {
+            let workspace = await buildWorkspace()
+
+            let created = await createExpense(workspace, { ExpenseDate: "2026-09-10", Tags: ["Viagem Chile"] })
+
+            let [tag] = (await workspace.client.get(`/Expenses/IdExpense=${created.IdExpense}`)).body.Tags
+
+            expect((await workspace.client.delete(`/Tags/IdTag=${tag.IdTag}`)).status).toBe(200)
+
+            let sheet = (await open(await download(workspace, `?From=2026-09-01&To=2026-09-30`))).getWorksheet("Gastos")!
+
+            expect(sheet.getCell("L2").value).toBe("Viagem Chile")
         })
 
         //  **A aba de gastos lista pernas, não compras** — a mesma unidade do resto do projeto.

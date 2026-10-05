@@ -103,5 +103,13 @@ export namespace ReportsNamespace {
         CategoryName: string | null
         PaymentMethodName: string
         AccountName: string
+        /**
+         * As tags do gasto **concatenadas numa célula**, e `null` quando ele não tem nenhuma.
+         *
+         * Uma coluna por tag não existe (o gasto tem N) e uma linha por tag duplicaria a
+         * perna, estragando a soma da coluna de valor. Concatenado, o filtro do Excel ainda
+         * encontra "Viagem Chile" por "contém", que é o que se faz com uma exportação.
+         */
+        TagNames: string | null
     }
 }

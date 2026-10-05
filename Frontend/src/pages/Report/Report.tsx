@@ -706,6 +706,17 @@ export function Report() {
                                                                 ? `${method.account.Name} · ${method.method.Name}`
                                                                 : "Forma arquivada"}
                                                         </Chip>
+                                                        {/* As etiquetas do gasto, que até aqui
+                                                            só se viam abrindo ele. Vêm na
+                                                            perna: nenhuma consulta a mais. */}
+                                                        {leg.tags.map((tag) => (
+                                                            <span
+                                                                className={styles.legTag}
+                                                                key={tag.IdTag}
+                                                            >
+                                                                {tag.Name}
+                                                            </span>
+                                                        ))}
                                                         <span className={styles.meta}>
                                                             {formatDate(
                                                                 legCompetence(leg).slice(0, 10),
@@ -762,6 +773,23 @@ export function Report() {
                                                             ? `Parcela ${leg.payment.InstallmentNumber}/${leg.payment.InstallmentTotal}`
                                                             : KIND_LABEL[leg.expense.Kind]}
                                                     </div>
+                                                    {/* As etiquetas, sob a descrição: elas
+                                                        são do GASTO, e é dele que a linha
+                                                        fala. Vêm na própria perna, então
+                                                        mostrá-las não custa requisição
+                                                        nenhuma — era abrir o gasto, antes. */}
+                                                    {leg.tags.length > 0 && (
+                                                        <div className={styles.legTags}>
+                                                            {leg.tags.map((tag) => (
+                                                                <span
+                                                                    className={styles.legTag}
+                                                                    key={tag.IdTag}
+                                                                >
+                                                                    {tag.Name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </Cell>
 

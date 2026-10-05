@@ -132,6 +132,11 @@ export class GetExport {
             { header: "Situação do gasto", key: "ExpenseStatus", width: 18 },
             { header: "Pago", key: "Paid", width: 10 },
             { header: "Valor", key: "Value", width: 14 },
+            //  **A coluna das tags entra no fim, e não ao lado da categoria**, que é onde ela
+            //  ficaria melhor: inseri-la no meio empurraria o `Valor` de K para L, e é para K
+            //  que o `SUM` do Resumo aponta. Uma coluna nova no fim não move nada do que já
+            //  estava na planilha de quem exportou antes.
+            { header: "Tags", key: "TagNames", width: 24 },
         ]
 
         this.header(sheet)
@@ -151,6 +156,9 @@ export class GetExport {
                 ExpenseStatus: payment.ExpenseStatus === "paid" ? "Pago" : "Pendente",
                 Paid: payment.Paid ? "Sim" : "Não",
                 Value: Number(payment.Value),
+                //  Célula vazia no gasto sem tag, e não "null" escrito: a planilha é lida por
+                //  gente, e o filtro do Excel conta a vazia como vazia.
+                TagNames: payment.TagNames ?? "",
             })
 
             row.getCell("Value").numFmt = this.money

@@ -26,6 +26,7 @@ import {
     anAccount,
     anExpense,
     anInflow,
+    aTag,
     installmentRows,
 } from "./factories";
 import type { ApiTypes } from "@/types/api";
@@ -140,6 +141,28 @@ describe("paymentLegs", () => {
 
         expect(totalSpent(inMonth("2026-08", [noCartao]))).toBe(0);
         expect(totalSpent(inMonth("2026-09", [noCartao]))).toBe(320);
+    });
+
+    it("a tag viaja com a perna, igual nas seis e sem nada a ratear", () => {
+        // A tag não tem valor: as seis pernas de uma compra repetem as
+        // mesmas etiquetas, e nenhuma conta sai delas — é o que a
+        // distingue de `persons`, que precisa de proporção.
+        const tags = [aTag("Viagem Chile"), aTag("Presente", { IdTag: 2, Active: false })];
+        const rows = installmentRows({ total: 600, parts: 6 }).map((row) => ({
+            ...row,
+            Tags: tags,
+        }));
+        const legs = paymentLegs(rows);
+
+        expect(legs).toHaveLength(6);
+        expect(legs.map((leg) => leg.tags.map((tag) => tag.Name))).toEqual(
+            // A arquivada inclusive: a tag marcada num gasto é histórico
+            Array.from({ length: 6 }, () => ["Viagem Chile", "Presente"]),
+        );
+    });
+
+    it("a perna de um gasto sem tag vem com a lista vazia", () => {
+        expect(paymentLegs([aLegRow()])[0].tags).toEqual([]);
     });
 });
 

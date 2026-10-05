@@ -60,6 +60,12 @@ export const expenseResponse = Joi.object({
 })
 
 //  A perna como ela sai na leitura: com as datas da fatura em que caiu.
+//
+//  **Sem Tags aqui, e é de propósito.** A tag é do GASTO, e a perna só a carrega na lista do
+//  período (GET /ExpensePayments), onde o gasto vem embutido — é lá que ela é somada à forma,
+//  junto com Expense e Persons (ExpensePayments.schema.ts). No GET de um gasto só as tags já
+//  saem no nível do gasto, e repeti-las em cada uma das seis pernas seria a mesma lista seis
+//  vezes na resposta.
 export const expensePaymentResponse = Joi.object({
     IdExpensePayment: Joi.number().required(),
     IdWorkspace: Joi.number().required(),

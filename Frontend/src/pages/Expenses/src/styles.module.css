@@ -273,6 +273,30 @@
     font-weight: 500;
 }
 
+/* A etiqueta NA LINHA da lista, menor que a `.tag` da gaveta: a linha já
+   tem chip de categoria e de pessoa, e um terceiro na altura deles
+   empurraria a descrição. */
+.legTags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+}
+
+.legTag {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 7px;
+    border-radius: var(--r-pill);
+    background: var(--brand-soft);
+    color: var(--brand);
+    border: 1px solid var(--brand-tint);
+    font-size: 10.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 .notes {
     padding: 12px 14px;
     border-radius: 10px;

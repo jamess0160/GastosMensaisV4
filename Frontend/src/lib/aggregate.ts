@@ -61,6 +61,13 @@ export interface ExpenseLeg {
      *  as seis pernas trazem o mesmo rateio de 600. Quem o transforma na
      *  fatia do mês é `spentByPerson`. */
     persons: readonly ApiTypes.ExpensePerson[];
+    /** As etiquetas do gasto, e aqui NÃO há o asterisco de `persons`: a
+     *  tag não tem valor, então ela é do gasto e pronto — as seis pernas
+     *  de uma compra repetem as mesmas, e não existe fatia a calcular.
+     *
+     *  A arquivada vem junto: a tag marcada num gasto é histórico, não
+     *  sugestão, e arquivar só a tira das próximas escolhas. */
+    tags: readonly ApiTypes.Tag[];
     value: ApiTypes.Money;
     /** O mês em que esta perna pesa, "YYYY-MM". */
     month: ApiTypes.ReferenceMonth;
@@ -100,6 +107,7 @@ export function paymentLegs(
             expense: row.Expense,
             payment: row,
             persons: row.Persons,
+            tags: row.Tags,
             value: row.Value,
             month: toReferenceMonth(row.CompetenceDate),
             paid: row.Paid,

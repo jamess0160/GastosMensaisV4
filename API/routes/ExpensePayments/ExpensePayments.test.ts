@@ -153,6 +153,67 @@ describe("ExpensePayments", () => {
             expect(response.body[0].Persons).toEqual([])
         })
 
+        //  **A tag viaja com a perna**, e é a tag inteira — o nome é o que a linha da tela
+        //  desenha. Sem ela aqui, mostrar a etiqueta na listagem custaria um get(id) por gasto
+        //  do período: o N+1 que esta rota existe para fechar.
+        //
+        //  E ela é do GASTO e **pronto**: a tag não tem valor, então as seis parcelas repetem
+        //  as mesmas duas etiquetas e não há nada a ratear — a diferença em relação a Persons,
+        //  que precisa de proporção para virar número.
+        it("traz as tags do gasto em cada parcela, sem nada a ratear", async () => {
+            let workspace = await buildWorkspace()
+
+            await createInstallment(workspace, {
+                ExpenseDate: "2026-03-10",
+                Tags: ["Viagem Chile", "Presente"],
+            })
+
+            let response = await workspace.client.get(`/ExpensePayments?From=2026-03-01&To=2026-08-31`)
+
+            expect(response.body).toHaveLength(6)
+
+            for (let leg of response.body) {
+                expect(leg.Value).toBe(100)
+                //  Em ordem de nome, as duas iguais nas seis pernas
+                expect(leg.Tags.map((tag: { Name: string }) => tag.Name)).toEqual(["Presente", "Viagem Chile"])
+            }
+        })
+
+        //  A lista vazia, e não a chave ausente — a mesma regra de Persons: a tela que itera
+        //  não pode ter que checar undefined antes. A maioria dos gastos não tem tag nenhuma.
+        it("devolve tags vazias quando o gasto não tem nenhuma", async () => {
+            let workspace = await buildWorkspace()
+
+            await createExpense(workspace, { ExpenseDate: "2026-08-10" })
+
+            let response = await workspace.client.get(`/ExpensePayments?From=2026-08-01&To=2026-08-31`)
+
+            expect(response.body[0].Tags).toEqual([])
+        })
+
+        //  ⚠️ **Arquivar uma tag não pode apagá-la do relatório do ano passado.** A tag marcada
+        //  num gasto é histórico, não sugestão: o soft delete tira a etiqueta das próximas
+        //  escolhas e não toca no vínculo. Se a consulta plural herdasse o filtro de Active do
+        //  baseQuery de Tags, a perna antiga perderia o nome **em silêncio** — e o soft delete
+        //  não estaria comprando nada.
+        it("continua trazendo a tag arquivada na perna do gasto que a tem", async () => {
+            let workspace = await buildWorkspace()
+            let created = await createExpense(workspace, { ExpenseDate: "2026-08-10", Tags: ["Viagem Chile"] })
+
+            let [tag] = (await workspace.client.get(`/Expenses/IdExpense=${created.IdExpense}`)).body.Tags
+
+            expect((await workspace.client.delete(`/Tags/IdTag=${tag.IdTag}`)).status).toBe(200)
+
+            //  Fora da sugestão: é isso, e só isso, que arquivar compra
+            expect((await workspace.client.get(`/Tags/search`)).body).toHaveLength(0)
+
+            let response = await workspace.client.get(`/ExpensePayments?From=2026-08-01&To=2026-08-31`)
+
+            expect(response.body[0].Tags).toHaveLength(1)
+            expect(response.body[0].Tags[0].Name).toBe("Viagem Chile")
+            expect(response.body[0].Tags[0].Active).toBe(false)
+        })
+
         //  O recorte é por workspace, como toda leitura: sem ele a lista do mês traria as
         //  parcelas do vizinho junto com as próprias.
         it("nunca traz a perna de outro workspace", async () => {

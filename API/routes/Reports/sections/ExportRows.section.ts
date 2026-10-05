@@ -63,6 +63,20 @@ class Controller {
                 { CategoryName: "Categories.Description" },
                 { PaymentMethodName: "PaymentMethods.Name" },
                 { AccountName: "Accounts.Name" },
+                //  **As tags numa célula, por subconsulta e não por junção.** Um gasto tem N
+                //  tags: um `left join` com ExpenseTags devolveria a mesma perna uma vez por
+                //  tag, e aí a aba de gastos deixaria de ser "uma linha por perna" — a soma da
+                //  coluna de valor contaria a perna duas vezes.
+                //
+                //  Sem filtro de `Active`, como em toda leitura de tag marcada em gasto
+                //  (Tags.model.ts): arquivar a etiqueta não pode apagá-la da planilha do ano
+                //  passado.
+                KnexConnection.raw(`(
+                    select string_agg("Tags"."Name", ', ' order by "Tags"."Name")
+                    from "ExpenseTags"
+                    inner join "Tags" on "Tags"."IdTag" = "ExpenseTags"."IdTag"
+                    where "ExpenseTags"."IdExpense" = "Expenses"."IdExpense"
+                ) as "TagNames"`),
             )
             .from("ExpensePayments")
             .innerJoin("Expenses", "Expenses.IdExpense", "ExpensePayments.IdExpense")

@@ -1,5 +1,6 @@
 import { BaseModel, MaybeArray } from "root/Utils/Base"
 import { Database } from "root/Utils/database"
+import { TagsNamespace } from "./sections/types"
 
 //  A taxonomia temporária, ao lado da permanente que é Categories: uma viagem, um evento, um
 //  presente. Um gasto tem **uma** categoria e **N** tags — por isso Tags é uma tabela à parte
@@ -38,6 +39,26 @@ export class class_Tags_model extends BaseModel {
             .from<Database.Tags>("Tags")
             .whereIn("IdTag", this.KnexConnection.select("IdTag").from("ExpenseTags").where("IdExpense", IdExpense))
             .orderBy("Name")
+    }
+
+    //  As tags de vários gastos **numa consulta só**, para a lista de pernas do período
+    //  (GET /ExpensePayments): as seis parcelas de uma compra apontam para o mesmo gasto, e um
+    //  getByExpense por perna reabriria o N+1 que aquela rota existe para fechar. É a mesma
+    //  forma do getByExpenses do rateio (Expenses/ExpensePersons.model.ts), e o IdExpense vem
+    //  ao lado da tag porque é por ele que a rota agrupa em memória.
+    //
+    //  Fora do baseQuery, e **sem o filtro de Active** pelo mesmo motivo do singular acima: a
+    //  tag marcada num gasto é histórico, não sugestão. Se a versão plural herdasse o Active,
+    //  arquivar uma tag a apagaria do relatório do ano passado **em silêncio** — e é o tipo de
+    //  perda que ninguém percebe até precisar.
+    getByExpenses(ids: number[]) {
+        return this.KnexConnection
+            .select("Tags.*", "ExpenseTags.IdExpense")
+            .from<Database.ExpenseTags>("ExpenseTags")
+            .innerJoin("Tags", "Tags.IdTag", "ExpenseTags.IdTag")
+            .whereIn("ExpenseTags.IdExpense", ids)
+            .orderBy("Tags.Name")
+            .orderBy("Tags.IdTag") as unknown as Promise<TagsNamespace.TagOfExpense[]>
     }
 
     //  Fora do baseQuery, e sem filtro de Active: o índice unique(IdWorkspace, Name) não conhece

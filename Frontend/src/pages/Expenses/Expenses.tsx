@@ -306,6 +306,10 @@ export function Expenses() {
             persons,
             firstPerson: persons.length > 0 ? personIndex.get(persons[0].IdPerson) : undefined,
             method: methodIndex.get(leg.payment.IdPaymentMethod),
+            //  As tags são do GASTO, e vêm na perna desde a leva 11: não
+            //  há índice a consultar porque a tag chega inteira — não
+            //  existe catálogo de tags no cliente.
+            tags: leg.tags,
             status: legStatus(leg),
             overdue: isLegOverdue(leg),
             installment: installmentLabel(leg.payment),
@@ -621,6 +625,18 @@ export function Expenses() {
                                                                         ` +${info.persons.length - 1}`}
                                                                 </Chip>
                                                             )}
+                                                            {/* As etiquetas do gasto: elas
+                                                                vêm na perna, então mostrá-las
+                                                                aqui não custa requisição
+                                                                nenhuma. */}
+                                                            {info.tags.map((tag) => (
+                                                                <span
+                                                                    className={styles.legTag}
+                                                                    key={tag.IdTag}
+                                                                >
+                                                                    {tag.Name}
+                                                                </span>
+                                                            ))}
                                                             {/* O vencimento DA PERNA, que é a
                                                                 data em que o dinheiro sai da
                                                                 conta — num cartão, a da
@@ -699,6 +715,23 @@ export function Expenses() {
                                                         <div className={styles.meta}>
                                                             {originOf(leg)}
                                                         </div>
+                                                        {/* As etiquetas, sob a descrição e
+                                                            não em coluna própria: o gasto tem
+                                                            N tags e a tabela já tem oito
+                                                            colunas. Vêm na perna — nenhuma
+                                                            consulta a mais do que antes. */}
+                                                        {info.tags.length > 0 && (
+                                                            <div className={styles.legTags}>
+                                                                {info.tags.map((tag) => (
+                                                                    <span
+                                                                        className={styles.legTag}
+                                                                        key={tag.IdTag}
+                                                                    >
+                                                                        {tag.Name}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </RowTrigger>
 

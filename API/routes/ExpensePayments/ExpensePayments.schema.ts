@@ -2,6 +2,7 @@ import Joi from "joi"
 import { joiController } from "root/Utils/joiController"
 import { periodQuery } from "root/Utils/joiSchemas"
 import { expensePaymentResponse, expensePersonResponse, expenseResponse } from "root/routes/Expenses/Expenses.schema"
+import { tagResponse } from "root/routes/Tags/Tags.schema"
 
 class Schema {
 
@@ -23,6 +24,11 @@ class Schema {
             //  **O rateio é o do gasto, não o da perna** — as seis parcelas de uma compra
             //  trazem o mesmo rateio do total. Ver sections/GET/getByWorkspace.ts.
             Persons: Joi.array().items(expensePersonResponse).required(),
+            //  **A tag viaja com a perna**, e é a tag INTEIRA — a mesma forma do GET de um
+            //  gasto só, porque é o nome que a linha da tela desenha e o IdExpenseTag não
+            //  serve para nada. Diferente de Persons, ela não tem valor: é do gasto e pronto,
+            //  sem nada a ratear pela perna.
+            Tags: Joi.array().items(tagResponse).required(),
         }))),
     ]
 

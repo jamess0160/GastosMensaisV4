@@ -68,6 +68,7 @@ export function aLegRow(
     expense: ApiTypes.Expense = anExpense(),
     payment: Partial<ApiTypes.ExpensePayment> = {},
     persons: ApiTypes.ExpensePerson[] = [],
+    tags: ApiTypes.Tag[] = [],
 ): ApiTypes.ExpensePaymentRow {
     return {
         ...aPayment({
@@ -79,6 +80,24 @@ export function aLegRow(
         }),
         Expense: expense,
         Persons: persons,
+        // Sem tag é o padrão porque é o caso da maioria dos gastos.
+        Tags: tags,
+    };
+}
+
+/** Uma tag como ela vem na perna: a linha inteira do cadastro, porque
+ *  não há catálogo de tags no cliente para resolver nome por id. */
+export function aTag(Name: string, overrides: Partial<ApiTypes.Tag> = {}): ApiTypes.Tag {
+    return {
+        IdTag: 1,
+        IdWorkspace: 1,
+        IdUser: 1,
+        Name,
+        Color: null,
+        Active: true,
+        CreatedAt: NOW,
+        UpdatedAt: NOW,
+        ...overrides,
     };
 }
 

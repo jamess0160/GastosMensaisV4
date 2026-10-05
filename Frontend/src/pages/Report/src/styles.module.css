@@ -244,6 +244,31 @@
     height: 14px;
 }
 
+/* A etiqueta NA LINHA, menor que a da gaveta de um gasto: a linha já
+   tem chip de categoria e de forma de pagamento, e um terceiro na
+   altura deles empurraria a descrição. Tom de marca porque a tag não é
+   mais um atributo entre os outros — é o recorte que o período ganhou. */
+.legTags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+}
+
+.legTag {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 7px;
+    border-radius: var(--r-pill);
+    background: var(--brand-soft);
+    color: var(--brand);
+    border: 1px solid var(--brand-tint);
+    font-size: 10.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 /* Forma de pagamento: ladrilho + nome que corta. */
 .who {
     display: inline-flex;

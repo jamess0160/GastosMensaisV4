@@ -841,11 +841,19 @@ export namespace ApiTypes {
      *  A forma de pagamento vem como id, não inteira: ela já chega
      *  completa em `GET /Accounts`, e repeti-la em cada perna repetiria
      *  a mesma linha dezenas de vezes na resposta de um mês. Idem a
-     *  pessoa, que sai de `GET /Persons`. E não há tags: quem as mostra
-     *  abre o gasto. */
+     *  pessoa, que sai de `GET /Persons`. */
     export interface ExpensePaymentRow extends ExpensePayment {
         Expense: Expense;
         Persons: ExpensePerson[];
+        /** As tags do GASTO, inteiras — não há catálogo de tags para
+         *  resolver nome por id, e era isso que obrigava a abrir o gasto
+         *  para ver a etiqueta.
+         *
+         *  Ao contrário de `Persons`, não há o que ratear: a tag não tem
+         *  valor, então as seis pernas de uma compra repetem as mesmas
+         *  etiquetas e nenhum número sai delas. Vem ARQUIVADA inclusive
+         *  (`Active: false`) — a tag marcada num gasto é histórico. */
+        Tags: Tag[];
     }
 
     /** A lista do que CAI no período — filtra por `CompetenceDate`, e não
