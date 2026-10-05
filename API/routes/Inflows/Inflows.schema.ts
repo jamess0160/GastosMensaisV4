@@ -28,6 +28,10 @@ const inflowResponse = Joi.object({
 //  O corpo de uma entrada, num const só, porque ele é usado em dois lugares: o POST avulso e
 //  cada item do POST /Inflows/batch. Um shape paralelo para o lote faria o que é 406 sozinho
 //  passar acompanhado.
+//
+//  A ÚNICA divergência entre os dois é o Received, e ela é declarada nos dois lados logo
+//  abaixo: no avulso ele é livre, no lote só aceita false. O campo está fora deste const
+//  justamente para a diferença ficar escrita, em vez de nascer de uma chave esquecida.
 const inflowBody = Joi.object({
     Description: Joi.string().trim().max(255).required(),
     //  positive: entrada de valor zero ou negativo é saída, e saída é gasto.
@@ -45,8 +49,18 @@ const inflowBody = Joi.object({
     CompetenceDate: isoDate.required(),
     ExpectedDate: isoDate.allow(null).default(null),
     Notes: Joi.string().trim().allow(null).default(null),
-    //  Sem Status: a entrada nasce pendente, e só receive/cancel a movem.
+    //  Sem Status, e quem o substitui é o booleano abaixo: aceitar Status deixaria um cliente
+    //  criar entrada CANCELADA, que não é lançamento nenhum. Depois do nascimento, só
+    //  receive/unreceive/cancel movem o estado.
 })
+
+//  Nasce recebida? O caso comum é lançar a renda **depois** de ela cair na conta, e exigir o
+//  POST .../receive em seguida cobrava dois gestos por um fato só.
+//
+//  É um booleano, nunca um Status — a mesma forma que a perna de gasto já usa no Paid. O
+//  booleano proíbe 'canceled' no nascimento **por construção**, que é a regra que a ausência do
+//  Status queria: o que mudou é só o tamanho da porta.
+const received = Joi.boolean().default(false)
 
 //  Teto do lote. Um mês de renda tem de cinco a dez linhas; 100 é folga larga e ainda impede
 //  que um corpo montado errado abra uma transaction gigante.
@@ -76,7 +90,7 @@ class Schema {
     ]
 
     public readonly create = [
-        joiController.validateBody(inflowBody),
+        joiController.validateBody(inflowBody.keys({ Received: received })),
         joiController.validateResponse(Joi.object({
             IdInflow: Joi.number().required(),
         })),
@@ -87,7 +101,13 @@ class Schema {
         joiController.validateBody(Joi.object({
             //  min(1): lote vazio não é "nada a fazer", é chamada montada errada — e responder
             //  200 com lista vazia esconderia isso do cliente.
-            Inflows: Joi.array().items(inflowBody).min(1).max(batchLimit).required(),
+            Inflows: Joi.array().items(inflowBody.keys({
+                //  Fixo em false: clonar o mês é repetir renda que ainda **vai** chegar, e
+                //  marcar em lote é mover saldo sem olhar linha por linha. Declarado em vez de
+                //  omitido para o lote recusar o true com a mesma cara dos outros 406, em vez
+                //  de um "chave desconhecida" que não diz o porquê.
+                Received: received.valid(false),
+            })).min(1).max(batchLimit).required(),
         })),
         joiController.validateResponse(Joi.object({
             msg: Joi.string().required(),

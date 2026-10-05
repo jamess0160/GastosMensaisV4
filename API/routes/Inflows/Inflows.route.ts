@@ -29,7 +29,9 @@ Inflows_route.post("/Inflows/batch", Inflows_schema.createBatch, AsyncHandler(In
 
 Inflows_route.put("/Inflows/IdInflow=:IdInflow", Inflows_schema.update, AsyncHandler(Inflows_controller.update))
 
-//  É o recebimento que entra no saldo, não o lançamento.
+//  Põe no saldo a entrada que nasceu em aberto. O POST /Inflows também pode nascer recebido (o
+//  `Received` do corpo); esta é o caminho da entrada que **já** existe, e a única que sabe
+//  recusar a cancelada e a que já foi recebida.
 Inflows_route.post("/Inflows/IdInflow=:IdInflow/receive", Inflows_schema.receive, AsyncHandler(Inflows_controller.receive))
 
 //  Volta para 'pending' e limpa o ReceivedAt. Não estorna nada: o saldo não é gravado, e

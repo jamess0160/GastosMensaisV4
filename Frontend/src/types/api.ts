@@ -676,15 +676,30 @@ export namespace ApiTypes {
         CompetenceDate: CalendarDate;
         ExpectedDate?: CalendarDate | null;
         Notes?: string | null;
+        /** Nasce recebida: a API grava `Status: "received"` e o
+         *  `ReceivedAt` na própria criação, e o dinheiro entra no saldo
+         *  na hora. O caso comum é lançar a renda DEPOIS de ela cair.
+         *
+         *  É um booleano, nunca `Status` — `canceled` no nascimento não
+         *  é lançamento nenhum, e a porta estreita é o que proíbe isso
+         *  por construção.
+         *
+         *  Só vale na criação: editar não mexe em estado, e quem move
+         *  uma entrada que já existe é `receive`/`unreceive`. */
+        Received?: boolean;
     }
 
     /** O corpo do `POST /Inflows/batch`.
      *
-     *  Cada item é EXATAMENTE o corpo do `POST /Inflows`: o que é 406
-     *  sozinho é 406 no lote. Tudo ou nada numa transaction, que é o que
-     *  impede a clonagem de deixar o mês pela metade. */
+     *  Cada item é o corpo do `POST /Inflows` — o que é 406 sozinho é
+     *  406 no lote —, com UMA diferença: o `Received` lá só aceita
+     *  `false`. Clonar o mês é repetir renda que ainda VAI chegar, e
+     *  marcar em lote seria mover saldo sem olhar linha por linha.
+     *
+     *  Tudo ou nada numa transaction, que é o que impede a clonagem de
+     *  deixar o mês pela metade. */
     export interface InflowBatchCreateBody {
-        Inflows: InflowCreateBody[];
+        Inflows: Omit<InflowCreateBody, "Received">[];
     }
 
     /** Não se edita `Kind`, contas nem `Status`. */

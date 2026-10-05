@@ -31,12 +31,42 @@ describe("submitInflow · entrada", () => {
         expect(context.closeForm).toHaveBeenCalledOnce();
     });
 
-    it("nunca manda Status — a entrada nasce pendente", async () => {
+    //  Quem decide o nascimento é o booleano `Received`, e NÃO um
+    //  `Status`: aceitar `Status` deixaria criar entrada cancelada, que
+    //  não é lançamento nenhum
+    it("nunca manda Status — o nascimento é o booleano Received", async () => {
         const seen = capture();
 
         await submitInflow(fakeIncomeContext());
 
         expect(seen.body).not.toHaveProperty("Status");
+        expect(seen.body?.Received).toBe(false);
+    });
+
+    it("manda Received: true quando a caixa está marcada", async () => {
+        const seen = capture();
+        const context = fakeIncomeContext({ draft: anInflowDraft({ received: true }) });
+
+        await submitInflow(context);
+
+        expect(seen.body?.Received).toBe(true);
+        expect(seen.body).not.toHaveProperty("Status");
+        // A mensagem diz o que aconteceu com o saldo, porque é isso que
+        // muda entre os dois casos.
+        expect(context.finishSubmit).toHaveBeenCalledWith(
+            "Entrada lançada e recebida — o dinheiro já está no saldo da conta.",
+        );
+    });
+
+    it("diz que a entrada nasceu em aberto quando a caixa não está marcada", async () => {
+        capture();
+        const context = fakeIncomeContext();
+
+        await submitInflow(context);
+
+        expect(context.finishSubmit).toHaveBeenCalledWith(
+            "Entrada lançada — ela nasce pendente até você confirmar o recebimento.",
+        );
     });
 
     //  A entrada não tem rateio: nem chave, nem lista vazia. O rateio da
@@ -73,6 +103,25 @@ describe("submitInflow · transferência", () => {
         expect(seen.body?.IdFromAccount).toBe(2);
     });
 
+    it("lança já recebida e a mensagem fala das duas pontas do saldo", async () => {
+        const seen = capture();
+        const context = fakeIncomeContext({
+            draft: anInflowDraft({
+                Kind: "transfer",
+                IdFromAccount: 2,
+                IdToAccount: 1,
+                received: true,
+            }),
+        });
+
+        await submitInflow(context);
+
+        expect(seen.body?.Received).toBe(true);
+        expect(context.finishSubmit).toHaveBeenCalledWith(
+            "Transferência lançada — o saldo das duas contas já se mexeu.",
+        );
+    });
+
     it("recusa transferência sem conta de origem", async () => {
         const context = fakeIncomeContext({
             draft: anInflowDraft({ Kind: "transfer", IdFromAccount: null }),
@@ -97,7 +146,7 @@ describe("submitInflow · transferência", () => {
 });
 
 describe("submitInflow · edição", () => {
-    it("NÃO manda Kind nem contas no PUT", async () => {
+    it("NÃO manda Kind, contas nem Received no PUT", async () => {
         let body: Record<string, unknown> | undefined;
         server.use(
             msw.put("*/api/Inflows/IdInflow=1", async ({ request }) => {
@@ -106,7 +155,10 @@ describe("submitInflow · edição", () => {
             }),
         );
 
-        await submitInflow(fakeIncomeContext({ draft: anInflowDraft({ IdInflow: 1 }) }));
+        // Marcada de propósito: nem assim o estado vai no PUT.
+        await submitInflow(
+            fakeIncomeContext({ draft: anInflowDraft({ IdInflow: 1, received: true }) }),
+        );
 
         // Os três reescreveriam o que o lançamento significa e o saldo
         // das contas envolvidas junto.
@@ -114,6 +166,9 @@ describe("submitInflow · edição", () => {
         expect(body).not.toHaveProperty("IdFromAccount");
         expect(body).not.toHaveProperty("IdToAccount");
         expect(body).not.toHaveProperty("Status");
+        // E nem `Received`: ele é da criação. Quem move uma entrada que
+        // já existe é o `receive`/`unreceive`.
+        expect(body).not.toHaveProperty("Received");
         // E nem Persons: a entrada não tem rateio desde a leva 10.
         expect(body).not.toHaveProperty("Persons");
     });

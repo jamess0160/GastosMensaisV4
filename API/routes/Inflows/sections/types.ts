@@ -21,6 +21,11 @@ export namespace InflowsNamespace {
         CompetenceDate: string
         ExpectedDate: string | null
         Notes: string | null
+        /** Nasce recebida: grava `Status: 'received'` e o `ReceivedAt` na própria criação, e o
+         *  dinheiro entra no saldo na hora. É um booleano e não um `Status` — 'canceled' no
+         *  nascimento fica proibido por construção. No lote é sempre `false`
+         *  (ver Inflows.schema.ts). */
+        Received: boolean
     }
 
     //  Sem Kind e sem contas: mudar qualquer um dos três reescreveria o que o lançamento

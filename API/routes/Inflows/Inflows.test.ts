@@ -264,7 +264,8 @@ describe("Inflows", () => {
             expect(response.status).toBe(406)
         })
 
-        //  Nasce pendente: é o recebimento que entra no saldo, e ele é uma ação à parte
+        //  Sem o Received no corpo, nasce pendente: é o default, e é o que a clonagem do mês
+        //  e todo cliente que não marca a caixa continuam recebendo
         it("cria a entrada pendente", async () => {
             let workspace = await buildWorkspace()
 
@@ -292,6 +293,76 @@ describe("Inflows", () => {
             })
             //  Data de calendário: sai como veio, sem passar por fuso
             expect(inflow.CompetenceDate).toBe("2026-08-05")
+        })
+
+        //  A outra metade da mesma regra: pendente é previsão, e previsão não é saldo
+        it("não entra no saldo quando o Received não vem", async () => {
+            let workspace = await buildWorkspace()
+
+            await createInflow(workspace, { TotalValue: 500 })
+
+            expect(await accountBalance(workspace)).toBe(1000)
+        })
+
+        //  **Pode nascer recebida**, porque a renda quase sempre é lançada DEPOIS de cair. O
+        //  ReceivedAt vai junto: uma linha recebida sem o instante seria um recibo sem data
+        it("cria a entrada já recebida e o dinheiro entra no saldo na hora", async () => {
+            let workspace = await buildWorkspace()
+
+            let created = await createInflow(workspace, { TotalValue: 500, Received: true })
+
+            let inflow = await findInflow(created.IdInflow)
+
+            expect(inflow.Status).toBe("received")
+            expect(inflow.ReceivedAt).not.toBeNull()
+            //  Um gesto só: sem passar pelo POST .../receive, o saldo já conta os 500
+            expect(await accountBalance(workspace)).toBe(1500)
+        })
+
+        //  O saldo aberto linha por linha é o extrato, e ele conta só o que liquidou: a entrada
+        //  que nasceu recebida tem que aparecer lá no mesmo instante em que entrou no saldo
+        it("a entrada criada recebida aparece no extrato da conta", async () => {
+            let workspace = await buildWorkspace()
+
+            let created = await createInflow(workspace, {
+                Description: "Salário de agosto",
+                TotalValue: 500,
+                CompetenceDate: "2026-08-10",
+                Received: true,
+            })
+
+            let statement = (await workspace.client.get(`/Reports/Statement?ReferenceMonth=2026-08`)).body
+            let account = statement.Accounts.find((item: { IdAccount: number }) => item.IdAccount === workspace.IdAccount)
+
+            expect(account.Entries).toEqual(expect.arrayContaining([
+                expect.objectContaining({ IdInflow: created.IdInflow, Kind: "inflow", Value: 500 }),
+            ]))
+            expect(account.ClosingBalance).toBe(1500)
+        })
+
+        //  **O booleano não é uma porta para o Status.** Aceitá-lo deixaria um cliente criar
+        //  entrada CANCELADA, que não é lançamento nenhum — e é disso que a regra protege. O
+        //  Received proíbe 'canceled' no nascimento por construção
+        it("recusa Status no corpo", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/Inflows`, buildBody(workspace, {
+                Status: "canceled",
+            }))
+
+            expect(response.status).toBe(406)
+            expect(await countInflows(workspace)).toBe(0)
+        })
+
+        it("recusa Status no corpo mesmo valendo 'received'", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/Inflows`, buildBody(workspace, {
+                Status: "received",
+            }))
+
+            expect(response.status).toBe(406)
+            expect(await countInflows(workspace)).toBe(0)
         })
 
         it("cria a transferência entre duas contas", async () => {
@@ -365,10 +436,23 @@ describe("Inflows", () => {
             let created = await Promise.all(response.body.IdInflows.map((IdInflow: number) => findInflow(IdInflow)))
 
             expect(created.map((item) => item.Description)).toEqual(["Salário", "Aluguel recebido", "Freela"])
-            //  Todas nascem pendentes, como no POST avulso: nenhum saldo se move na gravação, e
-            //  é isso que torna a operação segura de repetir
+            //  Todas nascem pendentes, e aqui isso não depende do corpo: nenhum saldo se move na
+            //  gravação de um lote, e é isso que torna a operação segura de repetir
             expect(created.every((item) => item.Status === "pending")).toBe(true)
             expect(await accountBalance(workspace)).toBe(1000)
+        })
+
+        //  O Received é do POST avulso. Clonar o mês é repetir renda que ainda **vai** chegar, e
+        //  marcar em lote seria mover saldo sem olhar linha por linha
+        it("recusa Received no lote", async () => {
+            let workspace = await buildWorkspace()
+
+            let response = await workspace.client.post(`/Inflows/batch`, {
+                Inflows: [buildBody(workspace, { Description: "Salário", Received: true })],
+            })
+
+            expect(response.status).toBe(406)
+            expect(await countInflows(workspace)).toBe(0)
         })
 
         //  "A conta não é deste workspace", sem dizer qual das linhas, é um erro que o usuário

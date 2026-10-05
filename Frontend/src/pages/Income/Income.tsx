@@ -613,7 +613,7 @@ export function Income() {
                     subtitle={
                         draft?.Kind === "transfer"
                             ? "Ela move as duas pontas do saldo e não conta como renda."
-                            : "Ela nasce pendente: o dinheiro entra no saldo quando você confirmar."
+                            : "Se o dinheiro já caiu, marque aqui embaixo; senão ela fica pendente até você confirmar."
                     }
                     footer={
                         <>
@@ -776,6 +776,29 @@ export function Income() {
                                     />
                                 )}
                             </FormField>
+
+                            {/* Só na criação. A renda quase sempre é
+                                lançada DEPOIS de cair, e exigir o botão
+                                de confirmar em seguida cobrava dois
+                                gestos por um fato só. Ao editar a caixa
+                                não aparece: estado não se edita — quem
+                                move uma entrada que já existe é o botão
+                                de receber / desfazer, no painel dela. */}
+                            {draft.IdInflow === null && (
+                                <Checkbox
+                                    checked={draft.received}
+                                    onChange={(event) =>
+                                        setDraft((c) =>
+                                            c ? { ...c, received: event.target.checked } : c,
+                                        )
+                                    }
+                                    label={
+                                        draft.Kind === "transfer"
+                                            ? "O dinheiro já mudou de conta — mexer no saldo das duas agora"
+                                            : "O dinheiro já caiu na conta — entrar no saldo agora"
+                                    }
+                                />
+                            )}
 
                             {/* O `SplitEditor` de "De quem é a entrada"
                                 ficava aqui, e saiu na leva 10 com o rateio

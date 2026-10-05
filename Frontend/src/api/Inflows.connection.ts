@@ -30,7 +30,12 @@ class Connection {
         return data;
     }
 
-    /** `Status` não é aceito: nasce pendente. */
+    /** `Status` não é aceito; o que decide o nascimento é o booleano
+     *  `Received`. Marcado, a API grava `Status: "received"` e o
+     *  `ReceivedAt` na hora e o dinheiro já entra no saldo — a renda
+     *  quase sempre é lançada depois de cair. Sem ele, nasce pendente e
+     *  o caminho é o `receive`. Um booleano e não um `Status` porque
+     *  `canceled` no nascimento não é lançamento nenhum. */
     async create(body: ApiTypes.InflowCreateBody): Promise<{ IdInflow: number }> {
         const { data } = await http.post<{ IdInflow: number }>(this.route, body);
         return data;
